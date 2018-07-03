@@ -13,7 +13,7 @@ of Record and Relationship objects.
 
 #include "mnoda/mnoda.hpp"
 
-in main void() {
+int main (void) {
     // Create a new document
     mnoda::Document document;
 
@@ -41,6 +41,7 @@ in main void() {
 
     // Pretty-print the document
     std::cout << document.toJson().dump(4) << std::endl;
+
 }
 
 \endcode
