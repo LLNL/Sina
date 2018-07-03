@@ -30,10 +30,10 @@ public:
      *
      * @param id the run's ID
      * @param application the application that was run
-     * @param version the version of the application
-     * @param user the user who executed the run
+     * @param version (optional) the version of the application
+     * @param user (optional) the user who executed the run
      */
-    Run(ID id, std::string application, std::string version, std::string user);
+    Run(ID id, std::string application, std::string version = "", std::string user = "");
 
     /**
      * Create a Run from its representation as a Json object
