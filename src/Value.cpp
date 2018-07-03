@@ -35,10 +35,11 @@ Value::Value(std::string name_, double value_, std::vector<std::string> tags_) :
 Value::Value(nlohmann::json const &asJson) :
     name{getRequiredString(NAME_FIELD, asJson, "name")} {
     //Need to determine what type of Value we have: scalar (double) or value (string)
-    if(asJson[VALUE_FIELD].is_string()){
+    nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, "value");
+    if(valueField.is_string()){
         stringValue = getRequiredString(VALUE_FIELD, asJson, "value");
     }
-    else if(asJson[VALUE_FIELD].is_number()){
+    else if(valueField.is_number()){
         scalarValue = getRequiredDouble(VALUE_FIELD, asJson, "value");
     }
     else {
