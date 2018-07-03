@@ -41,7 +41,6 @@ int main (void) {
 
     // Pretty-print the document
     std::cout << document.toJson().dump(4) << std::endl;
-
 }
 
 \endcode
