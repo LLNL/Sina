@@ -37,10 +37,10 @@ Value::Value(nlohmann::json const &asJson) :
     //Need to determine what type of Value we have: scalar (double) or value (string)
     nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, "value");
     if(valueField.is_string()){
-        stringValue = valueField;
+        stringValue = valueField.get<std::string>();
     }
     else if(valueField.is_number()){
-        scalarValue = valueField;
+        scalarValue = valueField.get<double>();
     }
     else {
         std::ostringstream message;
