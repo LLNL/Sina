@@ -25,8 +25,8 @@ Run::Run(mnoda::ID id, std::string application_, std::string version_,
 Run::Run(nlohmann::json const &asJson) :
         Record(asJson),
         application{getRequiredString(APPLICATION_FIELD, asJson, RUN_TYPE)},
-        version{getRequiredString(VERSION_FIELD, asJson, RUN_TYPE)},
-        user{getRequiredString(USER_FIELD, asJson, RUN_TYPE)} {}
+        version{getOptionalString(VERSION_FIELD, asJson, RUN_TYPE)},
+        user{getOptionalString(USER_FIELD, asJson, RUN_TYPE)} {}
 
 nlohmann::json Run::toJson() const {
     auto asJson = Record::toJson();

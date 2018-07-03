@@ -52,36 +52,6 @@ TEST(Run, create_fromJson_missingApplication) {
     }
 }
 
-TEST(Run, create_fromJson_missingVersion) {
-    nlohmann::json originJson{
-            {EXPECTED_TYPE_KEY, "run"},
-            {EXPECTED_GLOBAL_ID_KEY, "the id"},
-            {EXPECTED_APPLICATION_KEY, "the app"},
-            {EXPECTED_USER_KEY, "jdoe"}
-    };
-    try {
-        mnoda::Run run{originJson};
-        FAIL() << "Version should be missing, but is " << run.getVersion();
-    } catch (std::invalid_argument const &expected) {
-        EXPECT_THAT(expected.what(), HasSubstr(EXPECTED_VERSION_KEY));
-    }
-}
-
-TEST(Run, create_fromJson_missingUser) {
-    nlohmann::json originJson{
-            {EXPECTED_TYPE_KEY, "run"},
-            {EXPECTED_GLOBAL_ID_KEY, "the id"},
-            {EXPECTED_APPLICATION_KEY, "the app"},
-            {EXPECTED_VERSION_KEY, "1.2.3"},
-    };
-    try {
-        mnoda::Run run{originJson};
-        FAIL() << "User should be missing, but is " << run.getUser();
-    } catch (std::invalid_argument const &expected) {
-        EXPECT_THAT(expected.what(), HasSubstr(EXPECTED_USER_KEY));
-    }
-}
-
 TEST(Run, toJson) {
     ID id{"the id", IDType::Global};
     mnoda::Run run{id, "the app", "1.2.3", "jdoe"};

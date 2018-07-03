@@ -27,7 +27,7 @@ properly for your platform.
     cd build
     export SPACK_COMPILER=clang
     ../create_spconfig.sh
-    ./spconfig.py .. -DCMAKE_TOOLCHAIN_FILE=../CMAke/Platform/your_platform_file.cmake
+    ./spconfig.py .. -DCMAKE_TOOLCHAIN_FILE=../CMake/Platform/your_platform_file.cmake
     make
     make test
 ```
