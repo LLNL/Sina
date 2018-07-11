@@ -21,7 +21,6 @@ using ::testing::HasSubstr;
 char const TEST_RECORD_TYPE[] = "test type";
 char const EXPECTED_RECORDS_KEY[] = "records";
 char const EXPECTED_RELATIONSHIPS_KEY[] = "relationships";
-char const EXPECTED_USER_DEFINED_KEY[] = "user_defined";
 
 TEST(Document, create_fromJson_empty) {
     nlohmann::json documentAsJson;
@@ -95,44 +94,12 @@ TEST(Document, create_fromJson_withRelationships) {
     EXPECT_EQ("is related to", relationships[0].getPredicate());
 }
 
-
-TEST(Document, create_fromJson_userDefined) {
-    nlohmann::json asJson{
-            {EXPECTED_USER_DEFINED_KEY, R"({
-                    "k1": "v1",
-                    "k2": 123,
-                    "k3": [1, 2, 3]
-                     })"_json}
-    };
-
-    Document document{asJson, RecordLoader{}};
-    auto const &userDefined = document.getUserDefinedContent();
-    EXPECT_EQ("v1", userDefined["k1"]);
-    EXPECT_EQ(123, userDefined["k2"]);
-    EXPECT_THAT(userDefined["k3"], ElementsAre(1, 2, 3));
-}
-
-TEST(Document, getUserDefined_initialConst) {
-    Document const document;
-    nlohmann::json const &userDefined = document.getUserDefinedContent();
-    EXPECT_EQ(nlohmann::json::value_t::null, userDefined.type());
-}
-
-TEST(Document, getUserDefined_initialNonConst) {
-    Document document;
-    nlohmann::json &initialUserDefined = document.getUserDefinedContent();
-    EXPECT_EQ(nlohmann::json::value_t::null, initialUserDefined.type());
-    initialUserDefined["foo"] = 123;
-    EXPECT_EQ(123, document.getUserDefinedContent()["foo"]);
-}
-
 TEST(Document, toJson_empty) {
     Document const document;
     nlohmann::json asJson = document.toJson();
     EXPECT_EQ(nlohmann::json::value_t::null, asJson[EXPECTED_RECORDS_KEY]);
     EXPECT_EQ(nlohmann::json::value_t::null,
             asJson[EXPECTED_RELATIONSHIPS_KEY]);
-    EXPECT_EQ(nlohmann::json::value_t::null, asJson[EXPECTED_USER_DEFINED_KEY]);
 }
 
 TEST(Document, toJson_records) {
@@ -183,22 +150,6 @@ TEST(Document, toJson_relationships) {
         EXPECT_EQ(expectedObjects[i], actualRelationship["object"]);
         EXPECT_EQ(expectedPredicates[i], actualRelationship["predicate"]);
     }
-}
-
-TEST(Document, toJson_userDefined) {
-    Document document;
-    document.setUserDefinedContent(R"({
-        "k1": "v1",
-        "k2": 123,
-        "k3": [1, 2, 3]
-    })"_json);
-
-    auto asJson = document.toJson();
-
-    auto userDefined = asJson[EXPECTED_USER_DEFINED_KEY];
-    EXPECT_EQ("v1", userDefined["k1"]);
-    EXPECT_EQ(123, userDefined["k2"]);
-    EXPECT_THAT(userDefined["k3"], ElementsAre(1, 2, 3));
 }
 
 /**
