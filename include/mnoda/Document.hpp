@@ -114,30 +114,6 @@ public:
         return relationships;
     }
 
-    /**
-     * Get the user-defined content of the object.
-     *
-     * @return the user-defined content
-     */
-    nlohmann::json const &getUserDefinedContent() const noexcept {
-        return userDefined;
-    }
-
-    /**
-     * Get the user-defined content of the object.
-     *
-     * @return the user-defined content
-     */
-    nlohmann::json &getUserDefinedContent() noexcept {
-        return userDefined;
-    }
-
-    /**
-     * Set the user-defined content of the object.
-     *
-     * @param userDefined the user-defined content
-     */
-    void setUserDefinedContent(nlohmann::json userDefined);
 
     /**
      * Convert this document to its JSON representation.
@@ -149,7 +125,6 @@ public:
 private:
     RecordList records;
     RelationshipList relationships;
-    nlohmann::json userDefined;
 };
 
 /**

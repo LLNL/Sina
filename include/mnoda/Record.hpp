@@ -115,6 +115,31 @@ public:
     }
 
     /**
+     * Get the user-defined content of the object.
+     *
+     * @return the user-defined content
+     */
+    nlohmann::json const &getUserDefinedContent() const noexcept {
+        return userDefined;
+    }
+
+    /**
+     * Get the user-defined content of the object.
+     *
+     * @return the user-defined content
+     */
+    nlohmann::json &getUserDefinedContent() noexcept {
+        return userDefined;
+    }
+
+    /**
+     * Set the user-defined content of the object.
+     *
+     * @param userDefined the user-defined content
+     */
+    void setUserDefinedContent(nlohmann::json userDefined);
+
+    /**
      * Convert this record to its JSON representation.
      *
      * @return the JSON representation of this record.
@@ -128,6 +153,7 @@ private:
     std::string type;
     ValueList values;
     FileList files;
+    nlohmann::json userDefined;
 };
 
 

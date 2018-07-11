@@ -11,6 +11,7 @@
 
 namespace mnoda { namespace testing { namespace {
 
+using ::testing::ElementsAre;
 using ::testing::HasSubstr;
 using ::testing::DoubleEq;
 
@@ -19,6 +20,7 @@ char const EXPECTED_LOCAL_ID_KEY[] = "local_id";
 char const EXPECTED_GLOBAL_ID_KEY[] = "id";
 char const EXPECTED_VALUES_KEY[] = "values";
 char const EXPECTED_FILES_KEY[] = "files";
+char const EXPECTED_USER_DEFINED_KEY[] = "user_defined";
 
 TEST(Record, create_typeMissing) {
     nlohmann::json originalJson{
@@ -97,6 +99,40 @@ TEST(Record, create_globalId_files) {
     EXPECT_EQ("uri3", files[2].getUri());
 }
 
+TEST(Record, create_fromJson_userDefined) {
+    nlohmann::json asJson{
+            {EXPECTED_TYPE_KEY, "my type"},
+            {EXPECTED_GLOBAL_ID_KEY, "the ID"},
+            {EXPECTED_USER_DEFINED_KEY, R"({
+                    "k1": "v1",
+                    "k2": 123,
+                    "k3": [1, 2, 3]
+                     })"_json}
+    };
+
+    Record record{asJson};
+    auto const &userDefined = record.getUserDefinedContent();
+    EXPECT_EQ("v1", userDefined["k1"]);
+    EXPECT_EQ(123, userDefined["k2"]);
+    EXPECT_THAT(userDefined["k3"], ElementsAre(1, 2, 3));
+}
+
+TEST(Record, getUserDefined_initialConst) {
+    ID id{"the id", IDType::Local};
+    Record const record{id, "my type"};
+    nlohmann::json const &userDefined = record.getUserDefinedContent();
+    EXPECT_EQ(nlohmann::json::value_t::null, userDefined.type());
+}
+
+TEST(Record, getUserDefined_initialNonConst) {
+    ID id{"the id", IDType::Local};
+    Record record{id, "my type"};
+    nlohmann::json &initialUserDefined = record.getUserDefinedContent();
+    EXPECT_EQ(nlohmann::json::value_t::null, initialUserDefined.type());
+    initialUserDefined["foo"] = 123;
+    EXPECT_EQ(123, record.getUserDefinedContent()["foo"]);
+}
+
 TEST(Record, toJson_localId) {
     ID id{"the id", IDType::Global};
     Record record{id, "my type"};
@@ -115,6 +151,23 @@ TEST(Record, toJson_globalId) {
     EXPECT_EQ("my type", asJson[EXPECTED_TYPE_KEY]);
     EXPECT_EQ("the id", asJson[EXPECTED_LOCAL_ID_KEY]);
     EXPECT_EQ(0, asJson.count(EXPECTED_GLOBAL_ID_KEY));
+}
+
+TEST(Record, toJson_userDefined) {
+    ID id{"the id", IDType::Local};
+    Record record{id, "my type"};
+    record.setUserDefinedContent(R"({
+        "k1": "v1",
+        "k2": 123,
+        "k3": [1, 2, 3]
+    })"_json);
+
+    auto asJson = record.toJson();
+
+    auto userDefined = asJson[EXPECTED_USER_DEFINED_KEY];
+    EXPECT_EQ("v1", userDefined["k1"]);
+    EXPECT_EQ(123, userDefined["k2"]);
+    EXPECT_THAT(userDefined["k3"], ElementsAre(1, 2, 3));
 }
 
 TEST(Record, toJson_values) {
