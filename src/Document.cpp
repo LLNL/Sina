@@ -15,8 +15,6 @@ namespace mnoda {
 namespace {
 char const RECORDS_KEY[] = "records";
 char const RELATIONSHIPS_KEY[] = "relationships";
-char const USER_DEFINED_KEY[] = "user_defined";
-
 char const SAVE_TMP_FILE_EXTENSION[] = ".mnoda.tmp";
 }
 
@@ -42,7 +40,6 @@ nlohmann::json Document::toJson() const {
     return nlohmann::json{
             {RECORDS_KEY, recordsList},
             {RELATIONSHIPS_KEY, relationshipsList},
-            {USER_DEFINED_KEY, userDefined},
     };
 }
 
@@ -76,14 +73,6 @@ Document::Document(nlohmann::json const &asJson,
         }
     }
 
-    auto userDefinedIter = asJson.find(USER_DEFINED_KEY);
-    if (userDefinedIter != asJson.end()) {
-        userDefined = *userDefinedIter;
-    }
-}
-
-void Document::setUserDefinedContent(nlohmann::json userDefined_) {
-    userDefined = std::move(userDefined_);
 }
 
 void saveDocument(Document const &document, std::string const &fileName) {

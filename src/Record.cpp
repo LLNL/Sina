@@ -17,6 +17,7 @@ char const GLOBAL_ID_FIELD[] = "id";
 char const VALUES_FIELD[] = "values";
 char const TYPE_FIELD[] = "type";
 char const FILES_FIELD[] = "files";
+char const USER_DEFINED_KEY[] = "user_defined";
 
 }
 
@@ -38,6 +39,7 @@ nlohmann::json Record::toJson() const {
     for(auto &value : values)
         valueRef.emplace_back(value.toJson());
     asJson[VALUES_FIELD] = valueRef;
+    asJson[USER_DEFINED_KEY] = userDefined;
     return asJson;
 }
 
@@ -56,6 +58,10 @@ Record::Record(nlohmann::json const &asJson) :
             files.emplace_back(file);
         }
     }
+    auto userDefinedIter = asJson.find(USER_DEFINED_KEY);
+    if (userDefinedIter != asJson.end()) {
+        userDefined = *userDefinedIter;
+    }
 }
 
 void Record::add(Value value) {
@@ -64,6 +70,10 @@ void Record::add(Value value) {
 
 void Record::add(File file) {
     files.emplace_back(std::move(file));
+}
+
+void Record::setUserDefinedContent(nlohmann::json userDefined_) {
+    userDefined = std::move(userDefined_);
 }
 
 void RecordLoader::addTypeLoader(std::string const &type, TypeLoader loader) {
