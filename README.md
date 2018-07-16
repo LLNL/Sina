@@ -19,7 +19,8 @@ The best way to build the code is to use the create\_spconfig.sh script to
 create a Spack spconfig.py file to use in place of cmake. This will
 ensure all the dependencies are brought in and correctly built. The below
 assumes you have "spack" in your path and have already configured spack
-properly for your platform.
+properly for your platform. For a list of dependencies that will be 
+used/installed, see [the package file](package.py).
 
 ```bash
     cd /path/to/mnoda-cpp
@@ -45,3 +46,15 @@ error relating to SPACK_FC, make sure it's set appropriately.
 The above will build all your dependencies with Clang. If you are going to
 use a different compiler, make sure to set `SPACK_COMPILER` to the right
 value.
+
+
+# Supported Environments
+
+What follows is a list of environments mnoda-cpp is tested in.
+Absence is not an indication that mnoda-cpp will not work;
+please consider expanding this list!
+
+- **OSX 10.13**: Primary development environment.
+- **BGQOS 0, RedHat 7.5 (vulcan)***: Automated testing environment.
+- **TOSS 3, RedHat 7.4 (quartz)**: Automated testing environment.
+
