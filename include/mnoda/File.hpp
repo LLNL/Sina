@@ -4,6 +4,7 @@
 /// @file
 
 #include <string>
+#include <vector>
 
 #include "nlohmann/json.hpp"
 
@@ -12,7 +13,7 @@ namespace mnoda {
  * A File tracks the location (URI) and mimetype of a file on the file system. In the Mnoda schema, a File always
  * belongs to a Record or one of Record's inheriting types.
  *
- * Every File must have a URI, while mimetype is optional.
+ * Every File must have a URI, while mimetype and tags are optional.
  *
  * \code
  * mnoda::File myFile{"/path/to/file.png"};
@@ -45,8 +46,18 @@ public:
      *
      * @param uri the location of the file
      * @param mimeType the mime type of the file
+     * @param tags (optional) the tags of the file
      */
-    File(std::string uri, std::string mimeType);
+    File(std::string uri, std::string mimeType, std::vector<std::string> tags = {});
+
+    /**
+     * Construct a new File.
+     *
+     * @param uri the location of the file
+     * @param tags the tags of the file
+     * @param mimeType (optional) the mime type of the file
+     */
+    File(std::string uri, std::vector<std::string> tags, std::string mimeType = "");
 
     /**
      * Construct a new File.
@@ -74,11 +85,27 @@ public:
     }
 
     /**
+     * Get the File's MIME type.
+     *
+     * @return the MIME type
+     */
+    std::vector<std::string> const &getTags() const noexcept {
+        return tags;
+    }
+
+    /**
      * Set the File's MIME type.
      *
      * @param mimeType the MIME type
      */
     void setMimeType(std::string mimeType);
+
+    /**
+     * Set the File's tags.
+     *
+     * @param tags the File's tags
+     */
+    void setTags(std::vector<std::string> tags);
 
     /**
      * Convert this File to its JSON representation.
@@ -90,6 +117,7 @@ public:
 private:
     std::string uri;
     std::string mimeType;
+    std::vector<std::string> tags;
 };
 }
 
