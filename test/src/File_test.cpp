@@ -41,7 +41,7 @@ TEST(File, create_fromJson_basic) {
 }
 
 TEST(File, create_fromJson_complete) {
-    std::vector<std::string> tags = {"tags"};
+    std::vector<std::string> tags = {"tags", "are", "fun"};
     nlohmann::json asJson{
             {EXPECTED_URI_KEY, "the URI"},
             {EXPECTED_MIMETYPE_KEY, "the mime type"},
@@ -63,7 +63,9 @@ TEST(File, toJson_basic) {
 
 TEST(File, toJson_complete) {
     std::vector<std::string> tags = {"these", "are", "tags"};
-    File file{"the URI", "the mime type", tags};
+    File file{"the URI"};
+    file.setMimeType("the mime type");
+    file.setTags(tags);
     auto asJson = file.toJson();
     EXPECT_EQ("the URI", asJson[EXPECTED_URI_KEY]);
     EXPECT_EQ("the mime type", asJson[EXPECTED_MIMETYPE_KEY]);

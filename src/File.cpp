@@ -16,19 +16,9 @@ char const FILE_TYPE_NAME[] = "File";
 char const TAGS_KEY[] = "tags";
 }
 
-File::File(std::string uri_) : uri{std::move(uri_)}, mimeType{} {}
+File::File(std::string uri_) : uri{std::move(uri_)} {}
 
-File::File(char const *uri_) : uri{uri_}, mimeType{} {}
-
-File::File(std::string uri_, std::string mimeType_, std::vector<std::string> tags_) :
-        uri{std::move(uri_)},
-        mimeType{std::move(mimeType_)},
-        tags{std::move(tags_)} {}
-
-File::File(std::string uri_, std::vector<std::string> tags_, std::string mimeType_) :
-        uri{std::move(uri_)},
-        mimeType{std::move(mimeType_)},
-        tags{std::move(tags_)} {}
+File::File(char const *uri_) : uri{uri_} {}
 
 File::File(nlohmann::json const &asJson) :
     uri{getRequiredString(URI_KEY, asJson, FILE_TYPE_NAME)},

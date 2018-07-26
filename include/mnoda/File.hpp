@@ -18,7 +18,8 @@ namespace mnoda {
  * \code
  * mnoda::File myFile{"/path/to/file.png"};
  * myFile.setMimeType("image/png");
- * mnoda::File myOtherFile{"/path/to/other/file.txt","text"};
+ * mnoda::File myOtherFile{"/path/to/other/file.txt"};
+ * myOtherFile.setTags({"these","are","tags"});
  * myRecord->add(myFile);
  * myRecord->add(myOtherFile);
  * \endcode
@@ -40,24 +41,6 @@ public:
     // Note: without this, the constructors taking a std::string and a
     // nlohmann::json are ambiguous if a string literal is used
     explicit File(char const *uri);
-
-    /**
-     * Construct a new File.
-     *
-     * @param uri the location of the file
-     * @param mimeType the mime type of the file
-     * @param tags (optional) the tags of the file
-     */
-    File(std::string uri, std::string mimeType, std::vector<std::string> tags = {});
-
-    /**
-     * Construct a new File.
-     *
-     * @param uri the location of the file
-     * @param tags the tags of the file
-     * @param mimeType (optional) the mime type of the file
-     */
-    File(std::string uri, std::vector<std::string> tags, std::string mimeType = "");
 
     /**
      * Construct a new File.
@@ -85,9 +68,9 @@ public:
     }
 
     /**
-     * Get the File's MIME type.
+     * Get the File's tags.
      *
-     * @return the MIME type
+     * @return the tags
      */
     std::vector<std::string> const &getTags() const noexcept {
         return tags;
