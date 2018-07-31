@@ -6,6 +6,7 @@ namespace mnoda { namespace testing { namespace {
 
 char const EXPECTED_URI_KEY[] = "uri";
 char const EXPECTED_MIMETYPE_KEY[] = "mimetype";
+char const EXPECTED_TAGS_KEY[] = "tags";
 
 TEST(File, construct_differentType) {
     File f1{"from literal"};
@@ -21,6 +22,14 @@ TEST(File, setMimeType) {
     EXPECT_EQ("mime", file.getMimeType());
 }
 
+TEST(File, setTags) {
+    std::vector<std::string> tags = {"these", "are", "tags"};
+    File file{"the URI"};
+    file.setTags(tags);
+    EXPECT_EQ("the URI", file.getUri());
+    EXPECT_EQ(tags, file.getTags());
+}
+
 TEST(File, create_fromJson_basic) {
     nlohmann::json asJson{
             {EXPECTED_URI_KEY, "the URI"}
@@ -28,16 +37,20 @@ TEST(File, create_fromJson_basic) {
     File file{asJson};
     EXPECT_EQ("the URI", file.getUri());
     EXPECT_EQ("", file.getMimeType());
+    EXPECT_EQ(0, file.getTags().size());
 }
 
 TEST(File, create_fromJson_complete) {
+    std::vector<std::string> tags = {"tags", "are", "fun"};
     nlohmann::json asJson{
             {EXPECTED_URI_KEY, "the URI"},
-            {EXPECTED_MIMETYPE_KEY, "the mime type"}
+            {EXPECTED_MIMETYPE_KEY, "the mime type"},
     };
+    asJson[EXPECTED_TAGS_KEY] = tags;
     File file{asJson};
     EXPECT_EQ("the URI", file.getUri());
     EXPECT_EQ("the mime type", file.getMimeType());
+    EXPECT_EQ(tags, file.getTags());
 }
 
 TEST(File, toJson_basic) {
@@ -49,10 +62,14 @@ TEST(File, toJson_basic) {
 }
 
 TEST(File, toJson_complete) {
-    File file{"the URI", "the mime type"};
+    std::vector<std::string> tags = {"these", "are", "tags"};
+    File file{"the URI"};
+    file.setMimeType("the mime type");
+    file.setTags(tags);
     auto asJson = file.toJson();
     EXPECT_EQ("the URI", asJson[EXPECTED_URI_KEY]);
     EXPECT_EQ("the mime type", asJson[EXPECTED_MIMETYPE_KEY]);
+    EXPECT_EQ(tags, asJson[EXPECTED_TAGS_KEY]);
 }
 
 }}}
