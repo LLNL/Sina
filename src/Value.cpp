@@ -69,11 +69,11 @@ Value::Value(nlohmann::json const &asJson) :
 }
 
 void Value::setUnits(std::string units_) {
-    Value::units = std::move(units_);
+    units = std::move(units_);
 }
 
 void Value::setTags(std::vector<std::string> tags_){
-    Value::tags = std::move(tags_);
+    tags = std::move(tags_);
 }
 
 nlohmann::json Value::toJson() const {

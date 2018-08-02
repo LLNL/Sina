@@ -105,9 +105,9 @@ public:
     /**
      * Set the tags of the Value
      *
-     * @param tags_ the tags of the value
+     * @param tags the tags of the value
      */
-    void setTags(std::vector<std::string> tags_);
+    void setTags(std::vector<std::string> tags);
 
     /**
      * Get the units of the Value
@@ -121,9 +121,9 @@ public:
     /**
      * Set the units of the Value
      *
-     * @param units_ the units of the value
+     * @param units the units of the value
      */
-    void setUnits(std::string units_);
+    void setUnits(std::string units);
 
 
     /**
