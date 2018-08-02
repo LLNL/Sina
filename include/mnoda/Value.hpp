@@ -25,7 +25,7 @@ enum class ValueType {
  * or an input parameter. In the Mnoda schema, a Value always
  * belongs to a Record or one of Record's inheriting types.
  *
- * Every Value must have a name and value; units and tags are optional. 
+ * Every Value must have a name and value; units and tags are optional.
  *
  * The value of a Value may be either a string or a double.
  *
@@ -34,7 +34,7 @@ enum class ValueType {
  * mnoda::Value myOtherValue{"my_other_val", "foobar"};
  * //prints 1, corresponding to Scalar
  * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myValue.getType()) << std::endl;
- * //prints 0, corresponding to Value 
+ * //prints 0, corresponding to Value
  * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myOtherValue.getType()) << std::endl;
  * myRecord->add(myValue);
  * myOtherValue.setUnits("km/s");
@@ -48,20 +48,16 @@ public:
      *
      * @param name the name of the Value
      * @param value the string value relating to the key
-     * @param units (optional) the units the Value is represented in (ex: km/h) 
-     * @param tags (optional) array of strings representing tags for the Value
      */
-    Value(std::string name, std::string value, std::string units = std::string(), std::vector< std::string > tags = {});
+    Value(std::string name, std::string value);
 
     /**
      * Construct a new Value.
      *
      * @param name the name of the Value
      * @param value the double value relating to the key
-     * @param units (optional) the units the Value is represented in (ex: km/h) 
-     * @param tags (optional) array of strings representing tags for the Value
      */
-    Value(std::string name, double value, std::string units = std::string(), std::vector< std::string > tags = {});
+    Value(std::string name, double value);
 
     /**
      * Construct a Value from its JSON representation.
@@ -106,27 +102,34 @@ public:
         return tags;
     }
 
-    /** 
+    /**
+     * Set the tags of the Value
+     *
+     * @param tags_ the tags of the value
+     */
+    void setTags(std::vector<std::string> tags_);
+
+    /**
      * Get the units of the Value
      *
      * @return the units of the value
      */
-    std::string getUnits() const noexcept {
+    std::string const &getUnits() const noexcept {
         return units;
-    } 
+    }
 
     /**
      * Set the units of the Value
      *
-     * @param units the units of the value
+     * @param units_ the units of the value
      */
-    void setUnits(std::string units);
-    
+    void setUnits(std::string units_);
+
 
     /**
      * Get the type of the Value
      *
-     * @return the tags of the value
+     * @return the type of the value
      */
     ValueType getType() const noexcept {
         return type;

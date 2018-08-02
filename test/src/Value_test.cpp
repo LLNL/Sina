@@ -17,13 +17,15 @@ using ::testing::ElementsAre;
 
 TEST(Value, create) {
     std::vector<std::string> tags = {"tag1", "tag2"};
-    Value value1{"the name", "value", "units", tags};
+    Value value1{"the name", "value"};
+    value1.setUnits("some units");
+    value1.setTags(tags);
     Value value2{"another name", 3.14};
 
     EXPECT_EQ("the name", value1.getName());
     EXPECT_EQ(ValueType::Value, value1.getType());
     EXPECT_EQ("value", value1.getValue());
-    EXPECT_EQ("units", value1.getUnits());
+    EXPECT_EQ("some units", value1.getUnits());
     EXPECT_EQ(tags, value1.getTags());
 
     EXPECT_EQ("another name", value2.getName());
@@ -38,7 +40,7 @@ TEST(Value, createFromJson) {
     object1["name"] = "object 1";
     object1["value"] = "the value";
     object1["tags"] = tags;
-    object1["units"] = "units";
+    object1["units"] = "some units";
     object2["name"] = "object 2";
     object2["value"] = 3.14;
 
@@ -46,7 +48,7 @@ TEST(Value, createFromJson) {
     Value value2{object2};
     EXPECT_EQ("object 1", value1.getName());
     EXPECT_EQ("the value", value1.getValue());
-    EXPECT_EQ("units", value1.getUnits());
+    EXPECT_EQ("some units", value1.getUnits());
     EXPECT_EQ(tags, value1.getTags());
 
     EXPECT_EQ("object 2", value2.getName());
@@ -54,9 +56,15 @@ TEST(Value, createFromJson) {
 }
 
 TEST(Value, setUnits) {
-    Value value1{"the name","value","units"};
+    Value value1{"the name","value"};
     value1.setUnits("new units");
     EXPECT_EQ("new units", value1.getUnits());
+}
+
+TEST(Value, setTags) {
+    Value value1{"the name","value"};
+    value1.setTags({"new_tag"});
+    EXPECT_EQ("new_tag", value1.getTags()[0]);
 }
 
 TEST(Value, createFromJson_missingKeys) {
@@ -80,14 +88,14 @@ TEST(Value, createFromJson_missingKeys) {
 
 TEST(Value, toJson) {
     std::vector<std::string> tags = {"list", "of", "tags"};
-    Value value1{"value name", "value value", "value units", tags};
+    Value value1{"value name", "value value"};
+    value1.setTags(tags);
     Value value2{"value name again", 3.14};
     value2.setUnits("value units again");
     nlohmann::json valueRef1 = value1.toJson();
     nlohmann::json valueRef2 = value2.toJson();
     EXPECT_EQ("value name", valueRef1["name"]);
     EXPECT_EQ("value value", valueRef1["value"]);
-    EXPECT_EQ("value units", valueRef1["units"]);
     EXPECT_EQ(tags, valueRef1["tags"]);
 
     EXPECT_EQ("value name again", valueRef2["name"]);

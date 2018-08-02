@@ -17,20 +17,16 @@ char const TAGS_FIELD[] = "tags";
 
 namespace mnoda {
 
-Value::Value(std::string name_, std::string value_, std::string units_, std::vector<std::string> tags_) : 
+Value::Value(std::string name_, std::string value_) :
         name{std::move(name_)},
-        stringValue{std::move(value_)},
-        units{std::move(units_)},
-        tags{std::move(tags_)} {
+        stringValue{std::move(value_)}{
     //Set type to Value, as we know it uses strings
     type = ValueType::Value;
 }
 
-Value::Value(std::string name_, double value_, std::string units_, std::vector<std::string> tags_) : 
+Value::Value(std::string name_, double value_) :
         name{std::move(name_)},
-        scalarValue{std::move(value_)},
-        units{std::move(units_)},
-        tags{std::move(tags_)} {
+        scalarValue{std::move(value_)}{
     //Set type to Scalar, as we know it uses doubles
     type = ValueType::Scalar;
 }
@@ -51,9 +47,9 @@ Value::Value(nlohmann::json const &asJson) :
                 << "' must be a string or a double";
         throw std::invalid_argument(message.str());
     }
- 
+
     //Get the units, if there are any
-    units = getOptionalString(UNITS_FIELD, asJson, "value"); 
+    units = getOptionalString(UNITS_FIELD, asJson, "value");
 
     //Need to grab the tags and add them to a vector of strings
     auto tagsIter = asJson.find(TAGS_FIELD);
@@ -72,8 +68,12 @@ Value::Value(nlohmann::json const &asJson) :
     }
 }
 
-void Value::setUnits(std::string const set_units) {
-    units = set_units;
+void Value::setUnits(std::string units_) {
+    Value::units = std::move(units_);
+}
+
+void Value::setTags(std::vector<std::string> tags_){
+    Value::tags = std::move(tags_);
 }
 
 nlohmann::json Value::toJson() const {
@@ -95,7 +95,8 @@ nlohmann::json Value::toJson() const {
     }
     if(tags.size() > 0)
         asJson[TAGS_FIELD] = tags;
-    asJson[UNITS_FIELD] = units;
+    if(!units.empty())
+        asJson[UNITS_FIELD] = units;
     return asJson;
 };
 
