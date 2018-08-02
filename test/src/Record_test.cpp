@@ -194,7 +194,9 @@ TEST(Record, toJson_values) {
 TEST(Record, toJson_files) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
-    record.add(File{"uri1", "mt1"});
+    File file{"uri1"};
+    file.setMimeType("mt1");
+    record.add(file);
     record.add(File{"uri2"});
     auto asJson = record.toJson();
     ASSERT_EQ(2u, asJson[EXPECTED_FILES_KEY].size());
