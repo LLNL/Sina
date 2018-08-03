@@ -62,12 +62,13 @@ TEST(Record, create_globalId_values) {
         {EXPECTED_GLOBAL_ID_KEY, "the ID"}
     };
     originalJson[EXPECTED_VALUES_KEY].emplace_back(
-        R"({"name": "value name 1", 
+        R"({"name": "value name 1",
             "value": "value 1"})"_json
     );
     originalJson[EXPECTED_VALUES_KEY].emplace_back(
-        R"({"name": "value name 2", 
+        R"({"name": "value name 2",
             "value": 2.22,
+            "units": "g/L",
             "tags": ["tag1","tag2"]})"_json
     );
     Record record{originalJson};
@@ -78,6 +79,7 @@ TEST(Record, create_globalId_values) {
 
     EXPECT_EQ("value name 2", values[1].getName());
     EXPECT_THAT(2.22, DoubleEq(values[1].getScalar()));
+    EXPECT_EQ("g/L", values[1].getUnits());
     EXPECT_EQ("tag1", values[1].getTags()[0]);
     EXPECT_EQ("tag2", values[1].getTags()[1]);
 }
@@ -173,16 +175,22 @@ TEST(Record, toJson_userDefined) {
 TEST(Record, toJson_values) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
-    record.add(Value{"name1","value1", {"tag1"}});
+    Value value1 = Value{"name1","value1"};
+    value1.setUnits("some units");
+    value1.setTags({"tag1"});
+    record.add(value1);
     record.add(Value{"name2",2});
     auto asJson = record.toJson();
+    std::cout << asJson;
     ASSERT_EQ(2u, asJson[EXPECTED_VALUES_KEY].size());
     EXPECT_EQ("name1", asJson[EXPECTED_VALUES_KEY][0]["name"]);
     EXPECT_EQ("value1", asJson[EXPECTED_VALUES_KEY][0]["value"]);
+    EXPECT_EQ("some units", asJson[EXPECTED_VALUES_KEY][0]["units"]);
     EXPECT_EQ("tag1", asJson[EXPECTED_VALUES_KEY][0]["tags"][0]);
 
     EXPECT_EQ("name2", asJson[EXPECTED_VALUES_KEY][1]["name"]);
     EXPECT_THAT(asJson[EXPECTED_VALUES_KEY][1]["value"].get<double>(), DoubleEq(2.));
+    EXPECT_TRUE(asJson[EXPECTED_VALUES_KEY][1]["units"].is_null());
     EXPECT_TRUE(asJson[EXPECTED_VALUES_KEY][1]["tags"].is_null());
 }
 
