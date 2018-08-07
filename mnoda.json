@@ -1,0 +1,184 @@
+{
+    "$id" : "https://llnl.gov/mnoda.schema.json",
+    "$schema" : "http://json-schema.org/draft-07/schema#",
+    "title" : "Mnoda",
+    "description" : "Mnoda schema for simulation metadata",
+    "type" : "object",
+    "definitions" : {
+        "fileArray" : {
+            "type": "array",
+            "items": { "$ref": "#/definitions/fileType" },
+            "uniqueItems": true
+        },
+        "fileType" : {
+            "properties": {
+                "uri": { "type": "string" },
+                "mimetype": { "type": "string" },
+                "tags": { "$ref": "#/definitions/stringArray" }
+            },
+            "required" :  [ "uri" ]
+        },
+        "objectType" : {
+            "description": "Object being acted upon by the subject record",
+            "oneOf": [
+                {
+                    "properties": {
+                        "object": {
+                            "description": "Global id of the object record",
+                            "type": "string"
+                        }
+                    },
+                    "required": [ "object" ]
+                }, {
+                    "properties": {
+                        "local_object": {
+                            "description": "Local id of the object record",
+                            "type": "string"
+                        }
+                    },
+                    "required": [ "local_object" ]
+                }
+            ]
+        },
+        "record" : {
+            "description": "A component of application execution",
+            "allOf": [
+                { "$ref": "#/definitions/recordType" },
+                { "$ref": "#/definitions/recordIdType" },
+                { "$ref": "#/definitions/recordData" }
+            ]
+        },
+        "recordData" : {
+            "description": "Optional simulation metadata",
+            "properties": {
+                "files": { "$ref": "#/definitions/fileArray" },
+                "values": { "$ref": "#/definitions/valueArray" },
+                "user_defined": {}
+            }
+        },
+        "recordIdType" : {
+            "oneOf": [
+                {
+                    "properties": {
+                        "id": {
+                            "description": "Unique identifier",
+                            "type": "string"
+                        }
+                    },
+                    "required": [ "id" ]
+                }, {
+                    "properties": {
+                        "local_id": {
+                            "description": "Unique, auto-assigned identifier",
+                            "type": "string"
+                        }
+                    },
+                    "required": [ "local_id" ]
+                }
+            ]
+        },
+        "recordType" : {
+            "properties": {
+                "type": {
+                    "description": "The type of record",
+                    "type": "string"
+                }
+            },
+            "required": [ "type" ]
+        },
+        "relationship" : {
+            "description": "Relationship between two records",
+            "allOf": [
+                { "$ref": "#/definitions/subjectType" },
+                {
+                    "properties": {
+                        "predicate": { "type": "string" }
+                    },
+                    "required": [ "predicate" ]
+                },
+                { "$ref": "#/definitions/objectType" }
+            ]
+        },
+        "run" : {
+            "description": "An individual simulation run",
+            "allOf": [
+                { "$ref": "#/definitions/recordIdType" },
+                {
+                    "properties": {
+                        "type": { "enum": [ "run" ] },
+                        "user": { "type": "string" },
+                        "application": { "type": "string" },
+                        "version": { "type": "string" }
+                    },
+                    "required": [ "type", "application" ]
+                },
+                { "$ref": "#/definitions/recordData" }
+            ],
+            "additionalProperties": false
+        },
+        "stringArray" : {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+        },
+        "subjectType" : {
+            "description": "Record acting on the object record",
+            "oneOf": [
+                {
+                    "properties": {
+                        "subject": {
+                            "description": "Global id of the subject record",
+                            "type": "string"
+                        }
+                    },
+                    "required": [ "subject" ]
+                }, {
+                    "properties": {
+                        "local_subject": {
+                            "description": "Local id of the subject record",
+                            "type": "string"
+                        }
+                    },
+                    "required": [ "local_subject" ]
+                }
+            ]
+        },
+        "valueArray" : {
+            "description": "Array of values",
+            "type": "array",
+            "items": { "$ref": "#/definitions/valueType" },
+            "uniqueItems": true
+        },
+        "valueType" : {
+            "properties": {
+                "name": { "type": "string" },
+                "value": { "type": [ "string", "number" ] },
+                "tags": { "$ref": "#/definitions/stringArray" }
+            },
+            "required" :  [ "name", "value" ]
+        }
+    },
+
+    "properties" : {
+        "records" : {
+            "description" : "Simulation metadata (e.g., runs, invocations)",
+            "type" : "array",
+            "minItems" : 1,
+            "items": { 
+                "oneOf": [
+                    { "$ref": "#/definitions/record" },
+                    { "$ref": "#/definitions/run" }
+                ]
+            },
+            "uniqueItems" : true
+        },
+        "relationships" : {
+            "description" : "Associations between records",
+            "type" : "array",
+            "minItems" : 0,
+            "items": { "$ref": "#/definitions/relationship" },
+            "uniqueItems" : true
+        }
+    },
+    "required": [ "records" ]
+}

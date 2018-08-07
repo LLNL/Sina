@@ -1,0 +1,8 @@
+# For use on LLNL Network. Remove these flags if outside LC.
+ --no-index
+ --trusted-host www-lc.llnl.gov
+ --find-links http://www-lc.llnl.gov/python/wheelhouse/
+
+django==1.11.2
+django-auth-llnl
+django-decorator-include

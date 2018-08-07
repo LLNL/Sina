@@ -1,0 +1,148 @@
+{% comment %}
+This was the original details.html page (similar to what is displayed for the
+Tasks and Jobs detail pages). I'm leaving this here for now as I may want to
+support being able to toggle between the views.
+{% endcomment %}
+
+<h4 class="ui horizontal divider header">
+  <i class="leaf icon"></i>
+  Scalars
+</h4>
+
+<!-- Begin add button -->
+<a href="{% url 'scalar_new' pk=object.id %}" class="ui right floated blue button">
+  <i class="plus icon"></i>
+  Add Scalar
+</a>
+<!-- End add button -->
+<br />
+
+Below is a list of Scalars assocated with the current Run.
+<table class="ui celled teal table">
+  <thead>
+    <tr>
+    <th>Actions</th>
+    <th>Scalar Name</th>
+    <th>Value</th>
+    <th>Unit</th>
+    <th>Group</th>
+    <th>Description</th>
+    <th>Notes</th>
+  </tr></thead>
+  <tbody>
+    {% for scalar in object.scalar_set.all %}
+    <tr>
+      <td>
+        <a href="{% url 'scalar_edit' pk=scalar.id %}" class="ui mini vertical blue basic animated button" tabindex="0">
+          <div class="hidden content">Edit</div>
+          <div class="visible content">
+            <i class="edit icon"></i>
+          </div>
+        </a>
+      </td>
+      <td>
+        <a href="#">{{scalar.name}}</a>
+      </td>
+      <td>{{scalar.value}}</td>
+      <td>{{scalar.unit}}</td>
+      <td>{{scalar.group}}</td>
+      <td>{{scalar.description}}</td>
+      <td>{{scalar.notes}}</td>
+    </tr>
+  </tbody>
+  {% endfor %}
+</table>
+
+<h4 class="ui horizontal divider header">
+  <i class="area chart icon"></i>
+  Curves
+</h4>
+
+<!-- Begin add button -->
+<a href="{% url 'curve_new' pk=object.id %}" class="ui right floated blue button">
+  <i class="plus icon"></i>
+  Add Curve
+</a>
+<!-- End add button -->
+<br />
+
+Below is a list of Curves assocated with the current Run.
+<table class="ui celled violet table">
+  <thead>
+    <tr>
+    <th>Actions</th>
+    <th>Curve Name</th>
+    <th>(x,y)</th>
+    <th>Group</th>
+    <th>Description</th>
+    <th>Notes</th>
+  </tr></thead>
+  <tbody>
+    {% for curve in object.curve_set.all %}
+    <tr>
+      <td>
+        <a href="{% url 'curve_edit' pk=curve.id %}" class="ui mini vertical blue basic animated button" tabindex="0">
+          <div class="hidden content">Edit</div>
+          <div class="visible content">
+            <i class="edit icon"></i>
+          </div>
+        </a>
+      </td>
+      <td>
+        <a href="#">{{curve.name}}</a>
+      </td>
+      <td>{{curve.pairs}}
+      <td>{{curve.group}}</td>
+      <td>{{curve.description}}</td>
+      <td>{{curve.notes}}</td>
+    </tr>
+  </tbody>
+  {% endfor %}
+</table>
+
+<h4 class="ui horizontal divider header">
+  <i class="list icon"></i>
+  Arrays
+</h4>
+
+<!-- Begin add button -->
+<a href="{% url 'array_new' pk=object.id %}" class="ui right floated blue button">
+  <i class="plus icon"></i>
+  Add Array
+</a>
+<!-- End add button -->
+<br />
+
+Below is a list of Arrays assocated with the current Run.
+<table class="ui celled orange table">
+  <thead>
+    <tr>
+    <th>Actions</th>
+    <th>Array Name</th>
+    <th>Values</th>
+    <th>Group</th>
+    <th>Description</th>
+    <th>Notes</th>
+  </tr></thead>
+  <tbody>
+    {% for array in object.array_set.all %}
+    <tr>
+      <td>
+        <a href="{% url 'array_edit' pk=array.id %}" class="ui mini vertical blue basic animated button" tabindex="0">
+          <div class="hidden content">Edit</div>
+          <div class="visible content">
+            <i class="edit icon"></i>
+          </div>
+        </a>
+      </td>
+      <td>
+        <a href="#">{{array.name}}</a>
+      </td>
+      <td>{{array.values}}
+      <td>{{array.group}}</td>
+      <td>{{array.description}}</td>
+      <td>{{array.notes}}</td>
+    </tr>
+  </tbody>
+  {% endfor %}
+</table>

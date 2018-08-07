@@ -1,0 +1,140 @@
+<!--
+A details view for a Task, this also includes listing any subtasks.
+-->
+{% extends "sinaweb/base.html" %}
+
+{% block content %}
+<!-- Begin breadcrumb -->
+<!-- Note: There is probably a better way to implement this -->
+<div class="ui breadcrumb">
+  <a href="{% url 'tasks_list' %}" class="section">{{object.name}}</a>
+  <div class="divider"> / </div>
+</div>
+<!-- End breadcrumb -->
+
+<h1>Task {{object.name}}</h1>
+
+<h4 class="ui horizontal divider header">
+  <i class="checked calendar icon"></i>
+  Subtasks
+</h4>
+
+<!-- Begin add button -->
+<a href="{% url 'task_new' pk=object.id %}" class="ui right floated blue button">
+  <i class="plus icon"></i>
+  Add Subtask
+</a>
+<!-- End add button-->
+<br />
+
+Below is a list of Subtasks assocated with the parent Task.
+<table class="ui celled blue table">
+  <thead>
+    <tr>
+    <th>Actions</th>
+    <th>Task Name</th>
+    <th>Subtasks No.</th>
+    <th>Jobs No.</th>
+    <th>Task Parent</th>
+    <th>Order</th>
+    <th>Created By</th>
+    <th>Due Date</th>
+    <th>Visibility</th>
+  </tr></thead>
+  <tbody>
+    {% for subtask in object.task_set.all %}
+    <tr>
+      <td>
+        <a href="edit/{{subtask.id}}" class="ui mini vertical blue basic animated button" tabindex="0">
+          <div class="hidden content">Edit</div>
+          <div class="visible content">
+            <i class="edit icon"></i>
+          </div>
+        </a>
+      </td>
+      <td>
+        <a href="{% url 'task_details' pk=subtask.id %}">{{subtask.name}}</a>
+      </td>
+      <td>{{subtask.task_set.all|length}}
+      <td>{{subtask.job_set.all|length}}
+      <td>{{subtask.parent_task}}</td>
+      <td>{{subtask.order}}</td>
+      <td>{{subtask.created_by}}</td>
+      <td>{{subtask.due_date}}</td>
+      <td>{{subtask.permissions}}</td>
+    </tr>
+  </tbody>
+  {% endfor %}
+</table>
+
+<h4 class="ui horizontal divider header">
+  <i class="rocket icon"></i>
+  Jobs
+</h4>
+
+<!-- Begin add button -->
+<a href="{% url 'job_new' pk=object.id %}" class="ui right floated blue button">
+  <i class="plus icon"></i>
+  Add Job
+</a>
+<!-- End add button -->
+<br />
+
+Below is a list of Jobs assocated with the current Task.
+<table class="ui celled green table">
+  <thead>
+    <tr>
+    <th>Action</th>
+    <th>Job Name</th>
+    <th>Jid</th>
+    <th>Runs No.</th>
+    <th>Walltime</th>
+    <th>Partition</th>
+    <th>Nodes</th>
+    <th>Bank</th>
+    <th>Output Dir</th>
+    <th>Notes</th>
+  </tr></thead>
+  <tbody>
+    {% for job in object.job_set.all %}
+    <tr>
+      <td>
+        <a href="{% url 'job_edit' pk=job.id %}" class="ui mini vertical blue basic animated button" tabindex="0">
+          <div class="hidden content">Edit</div>
+          <div class="visible content">
+            <i class="edit icon"></i>
+          </div>
+        </a>
+      </td>
+      <td>{{job.name}}</td>
+      <td><a href="{% url 'job_details' pk=job.id %}">{{job.jid}}</a></td>
+      <td>{{subtask.run_set.all|length}}</td>
+      <td>{{job.walltime}}</td>
+      <td>{{job.partition}}</td>
+      <td>{{job.nodes}}</td>
+      <td>{{job.bank}}</td>
+      <td>{{job.output_dir}}</td>
+      <td>{{job.notes}}</td>
+    </tr>
+  </tbody>
+  {% endfor %}
+</table>
+
+<h4 class="ui horizontal divider header">
+  <i class="newspaper icon"></i>
+  References
+</h4>
+
+<!-- Begin add button -->
+<a href="#" class="ui right floated blue button">
+  <i class="plus icon"></i>
+  Add Reference (WIP)
+</a>
+<!-- End add button -->
+<br />
+
+Below is a list of References assocated with the current Task.
+
+{% include 'sinaweb/references.html' %}
+
+{% endblock %}

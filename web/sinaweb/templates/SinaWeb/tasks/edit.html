@@ -1,0 +1,25 @@
+<!--
+This is a general form template for creating and editing models. This was
+originally meant for the Task object; however, I've extended it more broadly
+to all the model objects as I currently don't need to implement any unique
+logic (yet).
+
+@Todo: I'm not sure how long I can continue using the Task edit.html template
+for creating/editing general models, but I should probably move this up
+with the base.html.
+-->
+{% extends "sinaweb/base.html" %}
+
+{% block content %}
+<div class="ui raised red segment">
+  <h1 class="ui horizontal divider header">
+    <i class="edit icon"></i>
+    {{title}}
+  </h1>
+    <form method="POST" class="post-form ui form">{% csrf_token %}
+        {{ form.as_p }}
+        <input type="hidden" name="next" value="{{request.redirect}}">
+        <button type="submit" class="save ui green button">Save</button>
+    </form>
+</div>
+{% endblock %}

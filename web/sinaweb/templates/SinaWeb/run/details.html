@@ -1,0 +1,50 @@
+{% extends "sinaweb/base.html" %}
+{% comment %}
+Details view of the Run class. This includes displaying a list of all related
+objects including: Scalars, Curves, and Arrays.
+{% endcomment %}
+
+{% load staticfiles %}
+
+{% block content %}
+<!-- Begin breadcrumb -->
+<!-- Note: There is probably a better way to implement this -->
+<div class="ui breadcrumb">
+  <a href="{% url 'tasks_list' %}" class="section">{{object.name}}</a>
+  <div class="divider"> / </div>
+</div>
+<!-- End breadcrumb -->
+
+<h1>Run {{object.name}}</h1>
+<h4>{{object.description}}</h4>
+
+<!-- Being tabs -->
+<div id="context2">
+  <div class="ui pointing secondary demo menu">
+      <a class="active red item" data-tab="scalars">Scalars</a>
+      <a class="blue item" data-tab="curves">Curves</a>
+      <a class="green item" data-tab="arrays">Arrays</a>
+  </div>
+
+  <div class="ui active tab" data-tab="scalars">
+    {% with title="Scalars" name="Scalar" %}
+      {% regroup object.scalar_set.all by group as items %}
+      {% include 'sinaweb/run/tabcontent.html' %}
+    {% endwith %}
+  </div>
+  <div class="ui tab" data-tab="curves">
+    {% with title="Curves" name="Curve" %}
+      {% regroup object.curve_set.all by group as items %}
+      {% include 'sinaweb/run/tabcontent.html' %}
+    {% endwith %}
+  </div>
+  <div class="ui tab" data-tab="arrays">
+    {% with title="Arrays" name="Array" %}
+      {% regroup object.array_set.all by group as items %}
+      {% include 'sinaweb/run/tabcontent.html' %}
+    {% endwith %}
+  </div>
+</div> <!-- End of context2 -->
+<!-- End tabs -->
+
+{% endblock %}

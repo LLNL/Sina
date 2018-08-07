@@ -1,0 +1,38 @@
+{% extends "sinaweb/base.html" %}
+
+{% block content %}
+<!-- Begin breadcrumb -->
+<!-- Note: There is probably a better way to implement this -->
+<div class="ui breadcrumb">
+  <a href="{% url 'tasks_list' %}" class="section">{{object.name}}</a>
+  <div class="divider"> / </div>
+</div>
+<!-- End breadcrumb -->
+
+<h1>Run {{object.name}}</h1>
+
+<a href="{% url 'run_new' pk=object.id %}" class="ui right floated blue button">Add Run</a> <br />
+
+Below is a list of Scalars assocated with the current Run.
+<table class="ui celled table">
+  <thead>
+    <tr>
+    <th>Scalar Name</th>
+    <th>Value</th>
+    <th>Description</th>
+    <th>Notes</th>
+  </tr></thead>
+  <tbody>
+    {% for scalar in object.scalar_set.all %}
+    <tr>
+      <td>
+        <a href="#">{{scalar.name}}</a>
+      </td>
+      <td>{{scalar.value}}
+      <td>{{scalar.description}}</td>
+      <td>{{scalar.notes}}</td>
+    </tr>
+  </tbody>
+  {% endfor %}
+</table>
+{% endblock %}

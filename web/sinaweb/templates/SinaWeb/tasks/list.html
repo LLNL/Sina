@@ -1,0 +1,56 @@
+<!--
+Top level table view for listing all the Tasks.
+-->
+{% extends "sinaweb/base.html" %}
+
+{% block content %}
+<h1>Tasks</h1>
+<!-- Begin add button -->
+<a href="{% url 'task_new' %}" class="ui right floated blue button">
+  <i class="plus icon"></i>
+  Add Task
+</a>
+<!-- End add button -->
+<br /><br />
+
+<table class="ui celled orange table">
+  <thead>
+    <tr>
+    <th>Actions</th>
+    <th>Task Name</th>
+    <th>Description</th>
+    <th>Task Parent</th>
+    <th>Subtasks No.</th>
+    <th>Job No.</th>
+    <th>Order</th>
+    <th>Created By</th>
+    <th>Due Date</th>
+    <th>Visibility</th>
+    </tr></thead>
+  <tbody>
+    {% for task in object_list %}
+    <tr>
+      <td>
+        <a href="task/edit/{{task.id}}" class="ui mini vertical blue basic animated button" tabindex="0">
+          <div class="hidden content">Edit</div>
+          <div class="visible content">
+            <i class="edit icon"></i>
+          </div>
+        </a>
+      </td>
+      <td>
+        <a href="{% url 'task_details' pk=task.id %}">{{task.name}}</a>
+      </td>
+      <td>{{task.description}}
+      <td>{{task.parent_task}}</td>
+      <td>{{task.task_set.all|length}}
+      <td>{{task.job_set.all|length}}
+      <td>{{task.order}}</td>
+      <td>{{task.created_by}}</td>
+      <td>{{task.due_date}}</td>
+      <td>{{task.permissions}}</td>
+    </tr>
+  </tbody>
+  {% endfor %}
+</table>
+{% endblock %}

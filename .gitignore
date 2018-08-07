@@ -1,0 +1,20 @@
+.DS_Store
+*.pyc
+*.sqlite*
+*.db
+*.egg-info/
+*.log
+*.coverage
+.tox/
+tests/test_venv
+cover/
+build/
+dist/
+# Ignore auto-generated doc files
+docs/source/generated_docs
+docs/build/
+
+*/migrations/*
+venv/*
+
+nosetests.xml

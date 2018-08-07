@@ -1,0 +1,57 @@
+{% extends "sinaweb/base.html" %}
+
+{% load staticfiles %}
+{% block head %}
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div id="curves" style="width:100%">
+    </div>
+    <div>
+        {{ object.description }}
+    </div>
+</div>
+{% endblock %}
+
+{% block jquery %}
+var graph = $("#curves")[0];
+//insert plotly setup here
+var curveXs = curveYs = [];
+//xy_pairs as "x1,y1 x2,y2 x3,y3 ..."
+var dataFromDjango = `{{ object.xy_pairs }}`;
+//turn [[x1,y1],[x2,y2],[x3,y3]...] into [[x1,x2,x3...],[y1,y2,y3,...]]
+var dataArray = transposeArray(dataFromDjango.split(/\s/).map(function(e){return e.split(',');}));
+curveXs = dataArray[0];
+curveYs = dataArray[1];
+curveChart();
+function transposeArray(arr){
+    return arr[0].map(function(x,i){ return arr.map(function(x){ return x[i]})});
+}
+function curveChart(){
+    var data = [
+        {
+            x: curveXs,
+            y: curveYs,
+            type: 'scatter',
+            mode: 'lines'
+        }
+    ];
+    var layout = {
+        title: "Plot for curve: {{ object.name }}",
+        margin: {r: 50, b: 50},
+        height: "800",
+        xaxis: {
+            title: `{{ object.label_x_axis }}`
+        },
+        yaxis: {
+            title: `{{ object.label_y_axis }}`
+        }
+    }
+    Plotly.newPlot(graph, data, layout);
+}
+$(window).resize(function(){
+    Plotly.Plots.resize(graph);
+})
+{% endblock %}
