@@ -81,7 +81,7 @@ DATASET_FN = os.path.join(CWD,
     "0123467/2.2/data/1-data/WCOA11-01-06-2015_data.csv")
 
 # Data extraction target directory
-FILES_DIR = os.path.join(CWD, 'files')
+FILES_DIR = os.path.realpath(os.path.join(CWD, '../../data/noaa/files'))
 
 # Quality control values and meanings
 QC_DATA = [
