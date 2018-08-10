@@ -33,7 +33,7 @@ class Record(object):
     of that child.
     """
 
-    def __init__(self, record_id, record_type, raw=None, values=[], files=[]):
+    def __init__(self, record_id, record_type, raw=None, values=[], files=[], user_defined=None):
         """
         Create Record with its id, type, raw, and optional args.
 
@@ -48,13 +48,16 @@ class Record(object):
                             children, see sina.model.RESERVED_TYPES
         :param raw: The raw JSON used to create this Record, if applicable
         :param values: A list of dicts representing the Record's values
-        :param viles: A list of dicts representing the Record's files
+        :param files: A list of dicts representing the Record's files
+        :param user_defined: A dictionary of additional miscellaneous data to
+                             store, such as notes. The backend will not index on this.
         """
         self.record_id = record_id
         self.record_type = record_type
         self.raw = raw
         self.values = values
         self.files = files
+        self.user_defined = user_defined
 
     def __repr__(self):
         """Return a string representation of a model Record."""
@@ -72,14 +75,16 @@ class Record(object):
         The reason we use this instead of json.loads(some_record) is the
         "type" and "id" fields (which have to be renamed in the object to
         avoid collision with Python keywords)
+
+        :returns: A JSON string representing this Record
         """
         json_obj = {"id": self.record_id, "type": self.record_type}
         if self.values:
             json_obj["values"] = self.values
         if self.files:
             json_obj["files"] = self.files
-
-        # json module escapes when given double-quotes
+        if self.user_defined:
+            json_obj["user_defined"] = self.user_defined
         return json.dumps(json_obj)
 
     def is_valid(self, print_warnings=False):
@@ -150,6 +155,10 @@ class Record(object):
             except ValueError:
                 (warnings.append("Record {}'s raw is invalid JSON.'"
                                  .format(self.record_id)))
+        if self.user_defined and not isinstance(self.user_defined, dict):
+            (warnings.append("Record {}'s user_defined section is not a "
+                             "dictionary. User_defined: {}"
+                             .format(self.user_defined, self.user_defined)))
         if warnings:
             warnstring = "\n".join(warnings)
             if print_warnings:
@@ -197,17 +206,17 @@ class Run(Record):
     """
 
     def __init__(self, record_id, application, raw=None,
-                 user=None, user_defined=None, version=None,
+                 user=None, version=None, user_defined=None,
                  values=None, files=None):
         """Create Run from Record info plus metadata."""
         super(Run, self).__init__(record_id=record_id,
                                   record_type="run",
                                   raw=raw,
+                                  user_defined=user_defined,
                                   values=values,
                                   files=files)
         self.application = application
         self.user = user
-        self.user_defined = user_defined
         self.version = version
 
     def __repr__(self):
@@ -217,3 +226,26 @@ class Run(Record):
                        self.application,
                        self.user,
                        self.version))
+
+    def to_json(self):
+        """
+        Create a JSON string from a Run.
+
+        The created string will not have a 'raw' field, to prevent recursion
+        and redundancy. It should only be used with Record that weren't created
+        from JSON in the first place.
+
+        The reason we use this instead of json.loads(some_record) is the
+        "type" and "id" fields (which have to be renamed in the object to
+        avoid collision with Python keywords)
+
+        :returns: A JSON string representing this Run
+        """
+        json_obj = json.loads(super(Run, self).to_json())
+        json_obj["application"] = self.application
+        if self.user is not None:
+            json_obj["user"] = self.user
+        # checks 'is not None' because version 0 is falsey
+        if self.version is not None:
+            json_obj["version"] = self.version
+        return json.dumps(json_obj)

@@ -33,7 +33,8 @@ class RecordDAO(dao.RecordDAO):
                   else schema.Record.if_not_exists().create)
         create(record_id=record.record_id,
                record_type=record.record_type,
-               raw=record.raw)
+               raw=record.raw,
+               user_defined=record.user_defined)
         if record.values:
             self._insert_values(record_id=record.record_id,
                                 values=record.values,
@@ -76,7 +77,8 @@ class RecordDAO(dao.RecordDAO):
                       else schema.Record.if_not_exists().create)
             create(record_id=record.record_id,
                    record_type=record.record_type,
-                   raw=record.raw)
+                   raw=record.raw,
+                   user_defined=record.user_defined)
             if record.values:
                 value_from_rec_batch = []
                 scalar_from_rec_batch = []
@@ -585,8 +587,7 @@ class RunDAO(dao.RunDAO):
         create(record_id=run.record_id,
                application=run.application,
                user=run.user,
-               version=run.version,
-               user_defined=run.user_defined)
+               version=run.version)
         self.record_DAO.insert(record=run, force_overwrite=force_overwrite)
 
     def _insert_sans_rec(self, run, force_overwrite=False):
@@ -609,8 +610,7 @@ class RunDAO(dao.RunDAO):
         create(record_id=run.record_id,
                application=run.application,
                user=run.user,
-               version=run.version,
-               user_defined=run.user_defined)
+               version=run.version)
 
     def insert_many(self, list_to_insert, force_overwrite=False):
         """
@@ -643,14 +643,14 @@ class RunDAO(dao.RunDAO):
         :returns: A run matching that identifier or None
         """
         LOGGER.debug('Getting run with id: {}'.format(run_id))
-        record_portion = schema.Record.filter(record_id=run_id).get()
-        run_portion = schema.Run.filter(record_id=run_id).get()
+        record = schema.Record.filter(record_id=run_id).get()
+        run = schema.Run.filter(record_id=run_id).get()
         return model.Run(record_id=run_id,
-                         raw=record_portion.raw,
-                         application=run_portion.application,
-                         user=run_portion.user,
-                         user_defined=run_portion.user_defined,
-                         version=run_portion.version)
+                         raw=record.raw,
+                         application=run.application,
+                         user=run.user,
+                         user_defined=record.user_defined,
+                         version=run.version)
 
     # Who should this belong to?
     def _convert_record_to_run(self, record):
@@ -672,7 +672,7 @@ class RunDAO(dao.RunDAO):
                          raw=record.raw,
                          application=run_portion.application,
                          user=run_portion.user,
-                         user_defined=run_portion.user_defined,
+                         user_defined=record.user_defined,
                          version=run_portion.version)
 
 

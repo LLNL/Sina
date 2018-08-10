@@ -29,9 +29,11 @@ class RecordDAO(dao.RecordDAO):
         :param record: A Record to insert
         """
         LOGGER.debug('Inserting {} into SQL.'.format(record))
+        user_defined = (str(record.user_defined) if record.user_defined else None)
         self.session.add(schema.Record(record_id=record.record_id,
                                        record_type=record.record_type,
-                                       raw=record.raw))
+                                       raw=record.raw,
+                                       user_defined=user_defined))
         if record.values:
             self._insert_values(record.record_id, record.values)
         if record.files:
@@ -95,7 +97,8 @@ class RecordDAO(dao.RecordDAO):
                  .filter(schema.Record.record_id == record_id).one())
         return model.Record(record_id=query.record_id,
                             record_type=query.record_type,
-                            raw=query.raw)
+                            raw=query.raw,
+                            user_defined=query.user_defined,)
 
     def get_all_of_type(self, record_type):
         """
@@ -448,13 +451,9 @@ class RunDAO(dao.RunDAO):
         :param run: A Run to import
         """
         LOGGER.debug('Inserting {} into SQL.'.format(run))
-        # Note: SQL doesn't support maps, so we have to convert the
-        # user_defined to a string (if it exists).
-        user_defined = (str(run.user_defined) if run.user_defined else None)
         self.session.add(schema.Run(record_id=run.record_id,
                                     application=run.application,
                                     user=run.user,
-                                    user_defined=user_defined,
                                     version=run.version))
         self.record_DAO.insert(run)
         self.session.commit()
@@ -471,16 +470,16 @@ class RunDAO(dao.RunDAO):
         :returns: A run matching that identifier or None
         """
         LOGGER.debug('Getting run with id: {}'.format(run_id))
-        record_portion = (self.session.query(schema.Record)
-                          .filter(schema.Record.record_id == run_id).one())
-        run_portion = (self.session.query(schema.Run)
-                       .filter(schema.Run.record_id == run_id).one())
+        record = (self.session.query(schema.Record)
+                  .filter(schema.Record.record_id == run_id).one())
+        run = (self.session.query(schema.Run)
+               .filter(schema.Run.record_id == run_id).one())
         return model.Run(record_id=run_id,
-                         raw=record_portion.raw,
-                         application=run_portion.application,
-                         user=run_portion.user,
-                         user_defined=run_portion.user_defined,
-                         version=run_portion.version)
+                         raw=record.raw,
+                         application=run.application,
+                         user=run.user,
+                         user_defined=record.user_defined,
+                         version=run.version)
 
     def _convert_record_to_run(self, record):
         """
@@ -496,14 +495,14 @@ class RunDAO(dao.RunDAO):
         :returns: A Run representing the Record plus metadata.
         """
         LOGGER.debug('Converting {} to run.'.format(record))
-        run_portion = (self.session.query(schema.Run)
-                       .filter(schema.Run.record_id == record.record_id).one())
+        run = (self.session.query(schema.Run)
+               .filter(schema.Run.record_id == record.record_id).one())
         return model.Run(record_id=record.record_id,
                          raw=record.raw,
-                         application=run_portion.application,
-                         user=run_portion.user,
-                         user_defined=run_portion.user_defined,
-                         version=run_portion.version)
+                         application=run.application,
+                         user=run.user,
+                         user_defined=record.user_defined,
+                         version=run.version)
 
 
 class DAOFactory(dao.DAOFactory):

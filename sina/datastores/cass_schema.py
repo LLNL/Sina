@@ -23,6 +23,7 @@ class Record(Model):
     record_id = columns.Text(primary_key=True)
     record_type = columns.Text()
     raw = columns.Text()
+    user_defined = columns.Map(columns.Text(), columns.Text())
 
 
 class DocumentFromRecord(Model):
@@ -85,7 +86,6 @@ class Run(Model):
     record_id = columns.Text(primary_key=True)
     application = columns.Text(required=True)
     user = columns.Text()
-    user_defined = columns.Map(columns.Text(), columns.Text())
     version = columns.Text()
 
 

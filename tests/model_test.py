@@ -46,8 +46,15 @@ class TestModel(unittest.TestCase):
         spam.record_type = "recipe"
         # Raw isn't real json
         spam.raw = "hello there"
+        self.assertFalse(spam.is_valid())
 
         spam.raw = '{"the_raw_can_differ": "from the contents"}'
+        # user_defined is not a dictionary
+        spam.user_defined = 12
+        self.assertFalse(spam.is_valid())
+
+        spam.user_defined = {"eggs_in_dozen": 12}
+
         # all previous errors fixed: "maximal" valid run
         self.assertTrue(spam.is_valid())
 
@@ -56,13 +63,34 @@ class TestModel(unittest.TestCase):
         target_json = ('{"id":"hello", "type":"greeting", '
                        '"values":[{"name":"language", "value":"english"},'
                        '{"name":"mood","value":"friendly"}],'
-                       '"files":[{"uri":"pronounce.wav"}]}')
+                       '"files":[{"uri":"pronounce.wav"}],'
+                       '"user_defined":{"good": "morning"}}')
         test_record = model.Record("hello", "greeting")
         test_record.values = [{"name": "language", "value": "english"},
                               {"name": "mood", "value": "friendly"}]
         test_record.files = [{"uri": "pronounce.wav"}]
+        test_record.user_defined = {"good": "morning"}
         # Raw is explicitly not reproduced in to_json()
         test_record.raw = '{"none_of_this": "should appear"}'
         self.assertTrue(test_record.is_valid())
         self.assertEqual(sorted(set(json.loads(target_json))),
                          sorted(set(json.loads(test_record.to_json()))))
+
+    def test_generate_json_run(self):
+        """Ensure Run JSON is generating properly."""
+        target_json = ('{"id":"hello", "type":"run",'
+                       '"application":"foo", "user":"JohnD", "version":0,'
+                       '"values":[{"name":"language", "value":"english"},'
+                       '{"name":"mood","value":"friendly"}],'
+                       '"files":[{"uri":"pronounce.wav"}],'
+                       '"user_defined":{"good": "morning"}}')
+        test_run = model.Run("hello", "foo", user="JohnD", version=0)
+        test_run.values = [{"name": "language", "value": "english"},
+                           {"name": "mood", "value": "friendly"}]
+        test_run.files = [{"uri": "pronounce.wav"}]
+        test_run.user_defined = {"good": "morning"}
+        # Raw is explicitly not reproduced in to_json()
+        test_run.raw = '{"none_of_this": "should appear"}'
+        self.assertTrue(test_run.is_valid())
+        self.assertEqual(sorted(set(json.loads(target_json))),
+                         sorted(set(json.loads(test_run.to_json()))))

@@ -49,12 +49,14 @@ class Record(Base):
     record_id = Column(String(255), primary_key=True)
     record_type = Column(String(255), nullable=False)
     raw = Column(Text(), nullable=True)
+    user_defined = Column(Text(), nullable=True)
 
-    def __init__(self, record_id, record_type, raw=None):
+    def __init__(self, record_id, record_type, raw=None, user_defined=None):
         """Create Record table entry with id, type, raw."""
         self.record_id = record_id
         self.record_type = record_type
         self.raw = raw
+        self.user_defined = user_defined
 
     def __repr__(self):
         """Return a string representation of a sql schema Record."""
@@ -200,16 +202,13 @@ class Run(Base):
                        primary_key=True)
     application = Column(String(255), nullable=False)
     user = Column(String(255), nullable=True)
-    user_defined = Column(Text(), nullable=True)
     version = Column(String(255), nullable=True)
 
-    def __init__(self, record_id, application, user=None,
-                 user_defined=None, version=None):
+    def __init__(self, record_id, application, user=None, version=None):
         """Create Run table entry with id, metadata."""
         self.record_id = record_id
         self.application = application
         self.user = user
-        self.user_defined = user_defined
         self.version = version
 
     def __repr__(self):
