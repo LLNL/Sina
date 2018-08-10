@@ -283,6 +283,13 @@ class TestSQL(unittest.TestCase):
         returned_files = record_dao.get_files("spam")
         self.assertEquals(returned_files, mock_record.files)
 
+        # First test the minimal, JSON-free Record
+        pure_obj_record = Record("hello", "there")
+        record_dao.insert(pure_obj_record)
+        returned_record = record_dao.get("hello")
+        self.assertEquals(returned_record.record_id, pure_obj_record.record_id)
+        self.assertEquals(returned_record.record_type, pure_obj_record.record_type)
+
     def test_recorddao_insert_extras(self):
         """
         Test that RecordDAO is inserting and retrieving files and scalars.

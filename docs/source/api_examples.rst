@@ -1,6 +1,11 @@
 API Examples
 ============
 
+This page contains minimal examples to cover Sina's most important concepts.
+For further examples, please see the `sina-examples repository
+<https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina-examples>`__.
+
+
 API Basics
 ~~~~~~~~~~
 
@@ -52,6 +57,50 @@ the same type, such as creating a new sqlite file containing a subset of a
 larger one, ex: all the records with :code:`"type": "run"` with a scalar "volume" greater
 than 400. For examples of all the filters present, please see the
 `DAO documentation <generated_docs/sina.dao.html>`__.
+
+
+Inserting Records and Relationships Programmatically
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can use Sina's API to insert objects into its databases directly, allowing
+databases to grow as a script progresses, rather than writing to file and
+ingesting all at once later on.
+
+**SQLite does not support concurrent modification**, so you should never
+perform parallel inserts with that backend!
+
+Inserting objects is otherwise straightforward::
+
+  ...
+  from sina.model import Record, Run
+
+  my_record = Record(record_id="some_record_id",
+                     record_type="some_type",
+                     values=[{"name":"foo", "value": 12}],
+                     files=[{"uri":"bar/baz.qux", "tags":["output"]}])
+
+  # Use is_valid(print_warnings=True) to help with troubleshooting
+  if not my_record.is_valid(print_warnings=True):
+      raise ValueError("Malformed record")
+
+  my_other_record = Record("another_id", "some_type")
+  record_dao.insert_many([my_record, my_other_record])
+
+  my_run = Run(record_id="some_run_id",
+               application="some_application",
+               user="John Doe",
+               values=[{"name":"oof", "value": 21}],
+               files=[{"uri":"bar/baz.qux"}])
+  run_dao = factory.createRunDAO()
+  run_dao.insert(my_run)
+
+Note that the (sub)type of Record is important--use the right constructor and
+DAO or, if you won't know the type in advance, consider using the CLI
+importer.
+
+Programmatically-created objects will not have the raw form of their JSON
+inserted into the database. Instead, it can be generated using
+:code:`my_record.to_json()`.
 
 
 Filtering Based on Scalar Criteria

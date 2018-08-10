@@ -129,6 +129,14 @@ class TestSearch(unittest.TestCase):
     def test_recorddao_basic(self):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME).createRecordDAO()
+
+        # First test the minimal, JSON-free Record
+        pure_obj_record = Record("hello", "there")
+        record_dao.insert(pure_obj_record)
+        returned_record = record_dao.get("hello")
+        self.assertEquals(returned_record.record_id, pure_obj_record.record_id)
+        self.assertEquals(returned_record.record_type, pure_obj_record.record_type)
+
         mock_record = MagicMock(record_id="spam", record_type="eggs", raw="yo",
                                 values=[{"name": "eggs",
                                          "value": 12,
