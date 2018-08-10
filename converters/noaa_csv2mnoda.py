@@ -42,18 +42,26 @@ The following is a list of the relevant column number-value pairings:
 Data Source: https://catalog.data.gov/dataset/\
     dissolved-inorganic-carbon-total-alkalinity-ph-\
     temperature-salinity-and-other-variables-collect
+ with direct download link:
+    https://www.nodc.noaa.gov/cgi-bin/OAS/prd/accession/download/123467
 """
 
 import csv
 import json
 import os
-import pprint
 import sys
 import traceback
 
 
-# Current working directory, which is assumed to be the extraction root
-CWD = os.getcwd()
+# Quality control values and meanings
+QC_DATA = [
+  (2, 'good value'),
+  (3, 'questionable value'),
+  (4, 'bad value'),
+  (5, 'value not reported'),
+  (6, 'mean of replicated measurements'),
+  (9, 'sample not drawn')
+]
 
 # Observation data file format
 DATA_FMT = """\
@@ -73,35 +81,100 @@ ph          = %s
 ph_qc       = %s
 """
 
-# Observation data file name
-DATA_FN = 'obs-data.txt'
 
-# The path to the data from data.gov
-DATASET_FN = os.path.join(CWD,
-    "0123467/2.2/data/1-data/WCOA11-01-06-2015_data.csv")
+def process_data(dataset_fn, data_dn):
+    """
+    Process the NOAA data.
 
-# Data extraction target directory
-FILES_DIR = os.path.realpath(os.path.join(CWD, '../../data/noaa/files'))
+    :param dataset_fn: qualified name of the NOAA CSV file
+    :param data_dn: destination data directory (i.e., path to where the NOAA
+                    files and data are to be written
+    """
+    fn = 'WCOA11-01-06-2015_data.csv'
+    if not os.path.exists(dataset_fn):
+        raise ValueError('Expected the data set filename (%s) to exist' %
+                         dataset_fn)
+    elif not os.path.isfile(dataset_fn):
+        raise ValueError('Expected the data set filename (%s) to be a file' %
+                         dataset_fn)
+    elif not dataset_fn.endswith(fn):
+        raise ValueError('Expected a CSV data set filename (%s) ending %s' %
+                         (dataset_fn, fn))
 
-# Quality control values and meanings
-QC_DATA = [
-  (2, 'good value'),
-  (3, 'questionable value'),
-  (4, 'bad value'),
-  (5, 'value not reported'),
-  (6, 'mean of replicated measurements'),
-  (9, 'sample not drawn')
-]
+    files_dn = os.path.realpath(os.path.join(data_dn, 'files'))
+    if not os.path.isdir(files_dn):
+        os.makedirs(files_dn)
+
+    data_fn = os.path.realpath(dataset_fn)
+    mdata = NoaaData(data_fn, files_dn)
+    with open(data_fn, "r") as ifd:
+        lastExp = ''
+        sdir = files_dn
+
+        rdr = csv.reader(ifd, delimiter=',')
+        try:
+            for i, row in enumerate(rdr):
+                if i > 0 and len(row[0]) > 0:
+                    exp = row[0]
+                    if exp != lastExp:
+                        sdir = os.path.join(files_dn, exp)
+                        if not os.path.isdir(sdir):
+                            os.makedirs(sdir)
+                        lastExp = row[0]
+                        mdata.add_exp(exp)
+
+                    oid = '-'.join(row[1:6])
+
+                    # Add the relation between the experiment and observation
+                    mdata.add_exp2obs(exp, oid)
+
+                    # Extract the observation data
+                    depth, press, temp = row[11:14]
+                    oxy, o2, o2_qc = row[18:21]
+                    ph, ph_qc = row[30:32]
+
+                    # Write the observation data to a file
+                    pdir = os.path.join(files_dn, exp, 'obs%05d' % i)
+                    if not os.path.isdir(pdir):
+                        os.makedirs(pdir)
+
+                    obsfn = os.path.join(pdir, 'obs-data.txt')
+                    with open(os.path.join(obsfn), 'w') as ofd:
+                        ofd.write(DATA_FMT % (oid, depth, press, temp, oxy, o2,
+                                  o2_qc, ph, ph_qc))
+
+                    # Add the observation data (and create the example file)
+                    mdata.add_obs(oid, obsfn, depth, press, temp, oxy, o2,
+                                  o2_qc, ph, ph_qc)
+
+        except csv.Error, ce:
+            print("ERROR: %s: line %s: %s" % (dataset_fn, rdr.line_num,
+                  str(ce)))
+            sys.exit(1)
+
+        except Exception, exc:
+            print("ERROR: %s: line %s: %s: %s" % (dataset_fn, rdr.line_num,
+                  exc.__class__.__name__, str(exc)))
+            traceback.print_exc()
+            sys.exit(1)
+
+    mdata.write()
 
 
 # --------------------------------- CLASSES ---------------------------------
 class NoaaData(object):
-    """ 
+    """
     Mnoda data class for the NOAA metadata.
     """
-    def __init__(self, input_fn):
+    def __init__(self, input_fn, files_dn):
+        """
+        DAta constructor.
+
+        :param input_fn: pathname to the NOAA data file
+        :param files_dn: pathname to the root of the noaa data directory
+        """
         self.input_fn = input_fn
-        self.output_fn = os.path.join(FILES_DIR, 'WCOA11-01-06-2015.json')
+        self.output_fn = os.path.join(files_dn, 'WCOA11-01-06-2015.json')
         self.recs = []
         self.rels = []
 
@@ -109,13 +182,10 @@ class NoaaData(object):
             self.recs.append({
                 "type": "qc",
                 "id": qid,
-                "values": [ {"name": "desc", "value": desc}, ],
+                "values": [{"name": "desc", "value": desc}, ],
                 })
 
-        return
-
-    
-    def addExp(self, exp):
+    def add_exp(self, exp):
         """
         Add an experiment record.
 
@@ -124,14 +194,10 @@ class NoaaData(object):
         self.recs.append({
             "type": "exp",
             "id": exp,
-            "files": [
-                {"uri": self.input_fn, "mimetype": "text/csv"},
-                ]
+            "files": [{"uri": self.input_fn, "mimetype": "text/csv"}, ]
             })
-        return
 
-
-    def addExp2Obs(self, exp, obs):
+    def add_exp2obs(self, exp, obs):
         """
         Add an experiment-to-observation relationship.
 
@@ -143,10 +209,9 @@ class NoaaData(object):
             "predicate": "contains",
             "object": obs,
             })
-        return
 
-
-    def addObs(self, oid, obsfn, depth, press, temp, oxy, o2, o2_qc, ph, ph_qc):
+    def add_obs(self, oid, obsfn, depth, press, temp, oxy, o2, o2_qc, ph,
+                ph_qc):
         """
         Add the observation data.
 
@@ -166,7 +231,7 @@ class NoaaData(object):
             "type": "obs",
             "id": oid,
             "files": [
-                {"uri": obsfn, "mimetype": "text/plain"}, 
+                {"uri": obsfn, "mimetype": "text/plain"},
                 ],
             "values": [
                 {"name": "depth", "value": float(depth), "units": "meters"},
@@ -180,8 +245,6 @@ class NoaaData(object):
                 {"name": "ph_qc", "value": int(ph_qc), "tags": ["qc"]},
                 ],
             })
-        return
-
 
     def write(self):
         """
@@ -191,75 +254,40 @@ class NoaaData(object):
             mnoda = {'records': self.recs}
             if len(self.rels) > 0:
                 mnoda['relationships'] = self.rels
+        else:
+            mnoda = {}
 
-            with open(self.output_fn, 'w') as ofd:
-                # Pretty-printing not supported with ingester?
-                json.dump(mnoda, ofd, indent=4, separators=(',', ': '),
-                    sort_keys=True)
-                #json.dump(mnoda, ofd, separators=(',', ': '),
-                #    sort_keys=True)
-        return
-
+        with open(self.output_fn, 'w') as ofd:
+            json.dump(mnoda, ofd, indent=4, separators=(',', ': '),
+                      sort_keys=True)
 
 
 # ----------------------------------- MAIN -----------------------------------
 def main():
-    """ Process the hard-coded path to the NOAA data. """
-    mdata = NoaaData(DATASET_FN)
+    # Allow the user to provide the dataset file name and destination data
+    # directory name.
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Convert selected NOAA Ocean Archive System dataset from '
+                    'CSV to a Mnoda file. Full paths will be written to the '
+                    'file to facilitate subsequent access from Jupyter '
+                    'notebooks.')
 
-    with open(DATASET_FN, "r") as ifd:
-        lastExp = ''
-        sdir = FILES_DIR
+    parser.add_argument('csv_pathname',
+                        help='The pathname to the CSV file, which needs to '
+                             'include WCOA11-01-06-2015_data.csv.')
 
-        rdr = csv.reader(ifd, delimiter=',')
-        try:
-            for i, row in enumerate(rdr):
-                if i > 0 and len(row[0]) > 0:
-                    exp = row[0]
-                    if exp != lastExp:
-                        sdir = os.path.join(FILES_DIR, exp)
-                        if not os.path.isdir(sdir):
-                            os.makedirs(sdir)
-                        lastExp = row[0]
-                        mdata.addExp(exp)
+    parser.add_argument('dest_dirname',
+                        help='The pathname to the destination noaa data '
+                             'directory to which the Mnoda and observation '
+                             'files are to be written.  The directory will be '
+                             'created if it does not exist.')
 
-                    oid = '-'.join(row[1:6])
+    args = parser.parse_args()
 
-                    # Add the relation between the experiment and observation
-                    mdata.addExp2Obs(exp, oid)
-
-                    # Extract the observation data
-                    depth, press, temp = row[11:14]
-                    oxy, o2, o2_qc = row[18:21]
-                    ph, ph_qc = row[30:32]
-
-                    # Write the observation data to a file
-                    pdir = os.path.join(FILES_DIR, exp, 'obs%05d' % i)
-                    if not os.path.isdir(pdir):
-                        os.makedirs(pdir)
-
-                    obsfn = os.path.join(pdir, DATA_FN)
-                    with open(os.path.join(obsfn), 'w') as ofd:
-                        ofd.write(DATA_FMT % (oid, depth, press, temp, oxy, o2,
-                            o2_qc, ph, ph_qc))
-
-                    # Add the observation data (and create the example file)
-                    mdata.addObs(oid, obsfn, depth, press, temp, oxy, o2, o2_qc,
-                        ph, ph_qc)
-
-        except csv.Error, ce:
-            print("ERROR: %s: line %s: %s" % (DATASET_FN, rdr.line_num,
-                str(ce)))
-            sys.exit(1)
-
-        except Exception, exc:
-            print("ERROR: %s: line %s: %s: %s" % (DATASET_FN, rdr.line_num,
-                exc.__class__.__name__, str(exc)))
-            traceback.print_exc()
-            sys.exit(1)
-
-    mdata.write()
+    # Process the NOAA data.
+    process_data(args.csv_pathname, args.dest_dirname)
 
 
 if __name__ == "__main__":
-  main()
+    main()
