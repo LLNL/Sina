@@ -46,9 +46,11 @@ Data Source: https://catalog.data.gov/dataset/\
     https://www.nodc.noaa.gov/cgi-bin/OAS/prd/accession/download/123467
 """
 
+import argparse
 import csv
 import json
 import os
+import shutil
 import sys
 import traceback
 
@@ -124,8 +126,6 @@ def process_data(dataset_fn, dest_dn):
 
     # Copy the data and metadata files to the destination so they will be
     # available to the user in the destination directory
-    import shutil
-
     input_fn = os.path.realpath(dataset_fn)
     shutil.copy(input_fn, files_dn)
     for extra_fn, _tag, _mtype in MORE_FILES:
@@ -195,7 +195,7 @@ class NoaaData(object):
     """
     def __init__(self, files_dn):
         """
-        DAta constructor.
+        Data constructor.
 
         :param files_dn: pathname to the root of the noaa data directory
         """
@@ -303,7 +303,6 @@ def main():
     Allow the user to provide the dataset file name and destination data
     directory name.
     '''
-    import argparse
     parser = argparse.ArgumentParser(
         description='Convert selected NOAA Ocean Archive System dataset from '
                     'CSV to a Mnoda file. Full paths will be written to the '
