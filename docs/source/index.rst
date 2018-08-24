@@ -14,6 +14,7 @@ Sina documentation index
    cli_examples
    api_examples
    modules
+   faq.rst
 
 * :ref:`genindex`
 * :ref:`modindex`
