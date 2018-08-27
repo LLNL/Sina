@@ -31,10 +31,10 @@ What does a workflow using Sina look like?
 This depends mainly on whether you run then insert or run *and* insert.
 
 **Run first, write JSON, insert when done**
-Use the Sina CLI to ingest the (Mnoda-compliant JSON files you've created.
-The CLI will handle setting up the backend (though you'll need a pre-existing
-keyspace for Cassandra). That's it! Once ingestion completes, you can begin
-querying your data.
+You will need to modify your code to write Mnoda-compliant JSON. Use the Sina
+CLI to ingest this JSON; it will handle setting up the backend (though you'll
+need a pre-existing keyspace for Cassandra). That's it! Once ingestion completes,
+you can begin querying your data.
 
 **Embed Sina in your workflow**
 See the API examples for specifics. Generally, you'll use Sina as one of the final
@@ -57,5 +57,4 @@ no Sina native query took longer than around half a second to complete, and the
 majority of that time was spent "in transit" (one exception: mid-string matching
 on Cassandra isn't supported natively, so partial URI searches are handled more
 slowly in Python). For SQL, performance is more variable and largely depends on
-the data. Because Sina is backend-agnostic, you may wish to first import in SQL
-and, if performance becomes a problem, consider moving to Cassandra.
+the data.
