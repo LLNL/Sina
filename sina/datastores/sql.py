@@ -32,36 +32,36 @@ class RecordDAO(dao.RecordDAO):
         self.session.add(schema.Record(record_id=record.record_id,
                                        record_type=record.record_type,
                                        raw=record.raw))
-        if record.values:
-            self._insert_values(record.record_id, record.values)
+        if record.data:
+            self._insert_data(record.record_id, record.data)
         if record.files:
             self._insert_files(record.record_id, record.files)
         self.session.commit()
 
-    def _insert_values(self, record_id, values):
+    def _insert_data(self, record_id, data):
         """
-        Insert values into the Scalar and Value tables.
+        Insert data entries into the Scalar and Value tables.
 
         Does not commit(), caller needs to do that.
 
-        :param record_id: The Record ID to associate the values to.
-        :param values: The list of values to insert.
+        :param record_id: The Record ID to associate the data to.
+        :param data: The list of data to insert.
         """
-        LOGGER.debug('Inserting {} values to Record ID {}.'
-                     .format(len(values), record_id))
-        for value in values:
+        LOGGER.debug('Inserting {} data entries to Record ID {}.'
+                     .format(len(data), record_id))
+        for datum in data:
             # Note: SQL doesn't support maps, so we have to convert the
             # tags to a string (if they exist).
             # Using json.dumps() instead of str() (or join()) gives valid JSON
-            tags = (json.dumps(value['tags']) if 'tags' in value else None)
+            tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
             # Check if it's a scalar
-            kind = (schema.Scalar if isinstance(value['value'], numbers.Real)
+            kind = (schema.Scalar if isinstance(datum['value'], numbers.Real)
                     else schema.Value)
             self.session.add(kind(record_id=record_id,
-                                  name=value['name'],
-                                  value=value['value'],
+                                  name=datum['name'],
+                                  value=datum['value'],
                                   # units might be None, always use get()
-                                  units=value.get('units'),
+                                  units=datum.get('units'),
                                   tags=tags))
 
     def _insert_files(self, record_id, files):

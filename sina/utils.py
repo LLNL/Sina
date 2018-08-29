@@ -76,14 +76,14 @@ def import_json(factory, json_path):
                                   user_defined=entry.get('user_defined'),
                                   version=entry.get('version'),
                                   application=entry.get('application'),
-                                  values=entry.get('values'),
+                                  data=entry.get('data'),
                                   files=entry.get('files'),
                                   raw=json.dumps(entry)))
         else:
             records.append(model.Record(record_id=id,
                                         record_type=type,
                                         raw=json.dumps(entry),
-                                        values=entry.get('values'),
+                                        data=entry.get('data'),
                                         files=entry.get('files')))
     factory.createRunDAO().insert_many(runs)
     factory.createRecordDAO().insert_many(records)

@@ -48,7 +48,7 @@ Query
 The query subcommand is used for querying data stored in a compatible backend.
 Any supported backend following the Mnoda schema is queryable. **This includes
 any backend created or updated using the ingest subcommand above.** Queries
-are performed against various selectors (scalar values, associated documents, etc),
+are performed against various selectors (scalar data, associated documents, etc),
 and are used to select entire records. For example::
 
   sina query --uri "foo.png" --database somefile.sqlite
@@ -72,8 +72,8 @@ database technologies. An example raw query::
 
   sina query -r "Select value from scalar where name=xpos" --database somefile.sqlite
 
-This returns the values of all scalars named "xpos". This query would work against sql and
-cassandra backends.
+This returns the values of all scalars named "xpos". This query would work against SQL and
+Cassandra backends.
 
 Export
 ~~~~~~
@@ -83,7 +83,8 @@ The only form of export currently supported is csv::
 
   sina export --database somefile.sqlite --target out.csv --scalars "volume,density" --records "rec_1,rec_2"
 
-This would produce a csv file called :code:`out.csv` containing the values for "density" and "volume" stored in :code:`somefile.sqlite` for records "rec_1" and "rec_2". That might look something like this::
+This would produce a csv file called :code:`out.csv` containing the values for
+"density" and "volume" stored in :code:`somefile.sqlite` for records "rec_1" and "rec_2". That might look something like this::
 
   record_id,density,volume
   rec_1,12.2,400

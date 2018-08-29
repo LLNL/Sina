@@ -34,10 +34,10 @@ class RecordDAO(dao.RecordDAO):
         create(record_id=record.record_id,
                record_type=record.record_type,
                raw=record.raw)
-        if record.values:
-            self._insert_values(record_id=record.record_id,
-                                values=record.values,
-                                force_overwrite=force_overwrite)
+        if record.data:
+            self._insert_data(record_id=record.record_id,
+                              data=record.data,
+                              force_overwrite=force_overwrite)
         if record.files:
             self._insert_files(record_id=record.record_id,
                                files=record.files,
@@ -77,42 +77,42 @@ class RecordDAO(dao.RecordDAO):
             create(record_id=record.record_id,
                    record_type=record.record_type,
                    raw=record.raw)
-            if record.values:
+            if record.data:
                 value_from_rec_batch = []
                 scalar_from_rec_batch = []
-                for value in record.values:
-                    tags = [str(x) for x in value['tags']] if 'tags' in value else None
-                    if isinstance(value['value'], numbers.Real):
-                        from_scalar_batch[value['name']].append((value['value'],
+                for datum in record.data:
+                    tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
+                    if isinstance(datum['value'], numbers.Real):
+                        from_scalar_batch[datum['name']].append((datum['value'],
                                                                  record.record_id,
-                                                                 value.get('units'),
+                                                                 datum.get('units'),
                                                                  tags))
-                        scalar_from_rec_batch.append((value['name'],
-                                                      value['value'],
-                                                      value.get('units'),
+                        scalar_from_rec_batch.append((datum['name'],
+                                                      datum['value'],
+                                                      datum.get('units'),
                                                       tags))
                     else:
-                        from_value_batch[value['name']].append((value['value'],
+                        from_value_batch[datum['name']].append((datum['value'],
                                                                 record.record_id,
-                                                                value.get('units'),
+                                                                datum.get('units'),
                                                                 tags))
-                        value_from_rec_batch.append((value['name'],
-                                                     value['value'],
-                                                     value.get('units'),
+                        value_from_rec_batch.append((datum['name'],
+                                                     datum['value'],
+                                                     datum.get('units'),
                                                      tags))
 
-                # We've finished this record's values--do the batch inserts
-                for table, batchlist in ((schema.ScalarFromRecord, scalar_from_rec_batch),
+                # We've finished this record's data--do the batch inserts
+                for table, data_list in ((schema.ScalarFromRecord, scalar_from_rec_batch),
                                          (schema.ValueFromRecord, value_from_rec_batch)):
                     with BatchQuery() as b:
                         create = (table.batch(b).create if force_overwrite
                                   else table.batch(b).if_not_exists().create)
-                        for value in batchlist:
+                        for entry in data_list:
                             create(record_id=record.record_id,
-                                   name=value[0],
-                                   value=value[1],
-                                   units=value[2],
-                                   tags=value[3])
+                                   name=entry[0],
+                                   value=entry[1],
+                                   units=entry[2],
+                                   tags=entry[3])
             if record.files:
                 document_batch = []
                 for entry in record.files:
@@ -135,45 +135,45 @@ class RecordDAO(dao.RecordDAO):
 
         # We've gone through every record we were given. The from_scalar_batch
         # and from_value_batch dictionaries are ready for batch inserting.
-        for table, batchlist in ((schema.RecordFromScalar, from_scalar_batch),
-                                 (schema.RecordFromValue, from_value_batch)):
-            for partition, values in six.iteritems(batchlist):
+        for table, partition_data in ((schema.RecordFromScalar, from_scalar_batch),
+                                      (schema.RecordFromValue, from_value_batch)):
+            for partition, data_list in six.iteritems(partition_data):
                 with BatchQuery() as b:
                     create = (table.batch(b).create if force_overwrite
                               else table.batch(b).if_not_exists().create)
-                    for value in values:
+                    for entry in data_list:
                         create(name=partition,
-                               value=value[0],
-                               record_id=value[1],
-                               units=value[2],
-                               tags=value[3])
+                               value=entry[0],
+                               record_id=entry[1],
+                               units=entry[2],
+                               tags=entry[3])
 
-    def _insert_values(self, values, record_id, force_overwrite=False):
+    def _insert_data(self, data, record_id, force_overwrite=False):
         """
-        Insert values into two of the four query tables depending on value.
+        Insert data into two of the four query tables depending on value.
 
-        Values that are numbers (12.0) go in the Scalar tables. Values that
+        Data entries that are numbers (12.0) go in the Scalar tables. Any that
         aren't ("Tuesday","12.0") go in the Value tables.
 
-        :param values: The list of values to insert.
-        :param record_id: The Record ID to associate the values to.
-        :param force_overwrite: Whether to forcibly overwrite preexisting values.
+        :param data: The list of data to insert.
+        :param record_id: The Record ID to associate the data to.
+        :param force_overwrite: Whether to forcibly overwrite preexisting data.
                                 Currently only used by Cassandra DAOs.
         """
-        LOGGER.debug('Inserting {} values to Record ID {} and force_overwrite={}.'
-                     .format(len(values), record_id, force_overwrite))
-        for value in values:
-            tags = [str(x) for x in value['tags']] if 'tags' in value else None
+        LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
+                     .format(len(data), record_id, force_overwrite))
+        for datum in data:
+            tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
             # Check if it's a scalar
-            insert_value = (schema.cross_populate_scalar_and_record
-                            if isinstance(value['value'], numbers.Real)
-                            else schema.cross_populate_value_and_record)
-            insert_value(record_id=record_id,
-                         name=value['name'],
-                         value=value['value'],
-                         units=value.get('units'),
-                         tags=tags,
-                         force_overwrite=True)
+            insert_data = (schema.cross_populate_scalar_and_record
+                           if isinstance(datum['value'], numbers.Real)
+                           else schema.cross_populate_value_and_record)
+            insert_data(record_id=record_id,
+                        name=datum['name'],
+                        value=datum['value'],
+                        units=datum.get('units'),
+                        tags=tags,
+                        force_overwrite=True)
 
     def _insert_files(self, record_id, files, force_overwrite=False):
         """

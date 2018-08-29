@@ -58,7 +58,7 @@ class RecordFromValue(Model):
     """
     Query table for finding records given value criteria.
 
-    Values are any Record.value provided by the user that doesn't have a
+    Values are any Record.data entry provided by the user that doesn't have a
     number for a value (ex: "machine":"merl", "version":"1.2").
     """
 
@@ -70,7 +70,7 @@ class RecordFromValue(Model):
 
 
 class ValueFromRecord(Model):
-    """Query table for finding value given record ID."""
+    """Query table for finding a Record.data entry given record ID."""
 
     record_id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
@@ -206,7 +206,7 @@ def cross_populate_value_and_record(name,
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
-    LOGGER.debug('Cross populating value and record with: name={}, value={}, '
+    LOGGER.debug('Cross populating data and record tables with: name={}, value={}, '
                  'record_id={}, tags={}, units={}, and force_overwrite={}.'
                  .format(name, value, record_id, tags, units, force_overwrite))
     value_from_record_create = (ValueFromRecord.create if force_overwrite
