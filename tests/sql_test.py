@@ -266,10 +266,10 @@ class TestSQL(unittest.TestCase):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = sina_sql.DAOFactory().createRecordDAO()
         mock_record = MagicMock(record_id="spam", record_type="eggs", raw="yo",
-                                values=[{"name": "eggs",
-                                         "value": 12,
-                                         "units": None,
-                                         "tags": ["runny"]}],
+                                data=[{"name": "eggs",
+                                       "value": 12,
+                                       "units": None,
+                                       "tags": ["runny"]}],
                                 files=[{"uri": "eggs.brek",
                                         "mimetype": "egg",
                                         "tags": ["fried"]}])
@@ -279,7 +279,7 @@ class TestSQL(unittest.TestCase):
         self.assertEquals(returned_record.record_type, mock_record.record_type)
         self.assertEquals(returned_record.raw, mock_record.raw)
         returned_scalars = record_dao.get_scalars("spam", ["eggs"])
-        self.assertEquals(returned_scalars, mock_record.values)
+        self.assertEquals(returned_scalars, mock_record.data)
         returned_files = record_dao.get_files("spam")
         self.assertEquals(returned_files, mock_record.files)
 
@@ -293,9 +293,9 @@ class TestSQL(unittest.TestCase):
         vals_files = MagicMock(record_id="spam",
                                record_type="new_eggs",
                                raw="{changed}",
-                               values=[{"name": "foo", "value": 12},
-                                       {"name": "bar", "value": "1",
-                                        "tags": ("in")}],
+                               data=[{"name": "foo", "value": 12},
+                                     {"name": "bar", "value": "1",
+                                      "tags": ("in")}],
                                files=[{"uri": "ham.png", "mimetype": "png"},
                                       {"uri": "ham.curve", "tags": ["hammy"]}])
         record_dao.insert(vals_files)

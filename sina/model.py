@@ -8,15 +8,15 @@ class Record(object):
     A record is guaranteed exactly three things: an id, a type, and the raw
     version of its contents (a JSON object). Depending on
     its type, a record might also be something else (ex: a Run). Records may
-    also have values and/or documents associated with them.
+    also have data and/or documents associated with them.
     """
 
-    def __init__(self, record_id, record_type, raw, values=None, files=None):
+    def __init__(self, record_id, record_type, raw, data=None, files=None):
         """Create Record with its id, type, raw, and optional args."""
         self.record_id = record_id
         self.record_type = record_type
         self.raw = raw
-        self.values = values
+        self.data = data
         self.files = files
 
     def __repr__(self):
@@ -64,12 +64,12 @@ class Run(Record):
 
     def __init__(self, record_id, application, raw=None,
                  user=None, user_defined=None, version=None,
-                 values=None, files=None):
+                 data=None, files=None):
         """Create Run from Record info plus metadata."""
         super(Run, self).__init__(record_id=record_id,
                                   record_type="run",
                                   raw=raw,
-                                  values=values,
+                                  data=data,
                                   files=files)
         self.application = application
         self.user = user

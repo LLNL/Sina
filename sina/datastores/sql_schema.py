@@ -66,8 +66,8 @@ class Scalar(Base):
     """
     Implementation of scalar table.
 
-    The scalar table relates record ids to contained "values" if (and only if)
-    those "values" themselves have numerical values. For example,
+    The scalar table relates record ids to contained data if (and only if)
+    those data entries have numerical values. For example,
     "density":200.14 would be represented here, but "strategy":"best-fit" would
     not be. Instead, "strategy":"best-fit" would go in the Value table.
 
@@ -109,8 +109,8 @@ class Value(Base):
     """
     Implementation of value table.
 
-    The value table relates record ids to contained "values" if (and only if)
-    those "values" themselves have non-numerical values. For example,
+    The value table relates record ids to contained data if (and only if)
+    those data entries have non-numerical values. For example,
     "density":"200.14" would be represented here, but "density":200.14 would
     not be, and would instead go in the scalar table. This is done so we can
     store non-scalar values while still giving users the benefit of numerical
