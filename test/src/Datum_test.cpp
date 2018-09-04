@@ -23,7 +23,7 @@ TEST(Datum, create) {
     Datum datum2{"another name", 3.14};
 
     EXPECT_EQ("the name", datum1.getName());
-    EXPECT_EQ(ValueType::Value, datum1.getType());
+    EXPECT_EQ(ValueType::String, datum1.getType());
     EXPECT_EQ("value", datum1.getValue());
     EXPECT_EQ("some units", datum1.getUnits());
     EXPECT_EQ(tags, datum1.getTags());

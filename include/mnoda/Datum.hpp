@@ -12,10 +12,10 @@
 namespace mnoda {
 
 /**
- * Represents whether an Datum is a Value (string) or Scalar (double).
+ * Represents whether a Datum is a String or Scalar (double).
  */
 enum class ValueType {
-    Value,
+    String,
     Scalar
 };
 
@@ -31,10 +31,10 @@ enum class ValueType {
  *
  * \code
  * mnoda::Datum myDatum{"my_scalar", 12.34};
- * mnoda::Datum myOtherDatum{"my_value", "foobar"};
+ * mnoda::Datum myOtherDatum{"my_string", "foobar"};
  * //prints 1, corresponding to Scalar
  * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myDatum.getType()) << std::endl;
- * //prints 0, corresponding to Value
+ * //prints 0, corresponding to String
  * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myOtherDatum.getType()) << std::endl;
  * myRecord->add(myDatum);
  * myOtherDatum.setUnits("km/s");

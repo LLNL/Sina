@@ -12,6 +12,7 @@ char const NAME_FIELD[] = "name";
 char const VALUE_FIELD[] = "value";
 char const UNITS_FIELD[] = "units";
 char const TAGS_FIELD[] = "tags";
+char const DATA_PARENT_TYPE[] = "data";
 
 }
 
@@ -20,8 +21,8 @@ namespace mnoda {
 Datum::Datum(std::string name_, std::string value_) :
         name{std::move(name_)},
         stringValue{std::move(value_)}{
-    //Set type to Value, as we know it uses strings
-    type = ValueType::Value;
+    //Set type to String, as we know it uses strings
+    type = ValueType::String;
 }
 
 Datum::Datum(std::string name_, double value_) :
@@ -32,9 +33,9 @@ Datum::Datum(std::string name_, double value_) :
 }
 
 Datum::Datum(nlohmann::json const &asJson) :
-    name{getRequiredString(NAME_FIELD, asJson, "datum")} {
+    name{getRequiredString(NAME_FIELD, asJson, DATA_PARENT_TYPE)} {
     //Need to determine what type of Datum we have: scalar (double) or value (string)
-    nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, "datum");
+    nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, DATA_PARENT_TYPE);
     if(valueField.is_string()){
         stringValue = valueField.get<std::string>();
     }
@@ -49,7 +50,7 @@ Datum::Datum(nlohmann::json const &asJson) :
     }
 
     //Get the units, if there are any
-    units = getOptionalString(UNITS_FIELD, asJson, "datum");
+    units = getOptionalString(UNITS_FIELD, asJson, DATA_PARENT_TYPE);
 
     //Need to grab the tags and add them to a vector of strings
     auto tagsIter = asJson.find(TAGS_FIELD);
@@ -83,7 +84,7 @@ nlohmann::json Datum::toJson() const {
         case ValueType::Scalar:
             asJson[VALUE_FIELD] = scalarValue;
             break;
-        case ValueType::Value:
+        case ValueType::String:
             asJson[VALUE_FIELD] = stringValue;
             break;
         default:
