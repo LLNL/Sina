@@ -34,7 +34,7 @@ Datum::Datum(std::string name_, double value_) :
 
 Datum::Datum(nlohmann::json const &asJson) :
     name{getRequiredString(NAME_FIELD, asJson, DATA_PARENT_TYPE)} {
-    //Need to determine what type of Datum we have: scalar (double) or value (string)
+    //Need to determine what type of Datum we have: Scalar (double) or String.
     nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, DATA_PARENT_TYPE);
     if(valueField.is_string()){
         stringValue = valueField.get<std::string>();
