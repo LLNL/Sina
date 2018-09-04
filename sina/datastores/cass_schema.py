@@ -146,19 +146,19 @@ def cross_populate_scalar_and_record(name,
                                      units=None,
                                      force_overwrite=False):
     """
-    Add entries to both the Scalar_from_Record and Record_from_Scalar tables.
+    Add scalar-value data entries to Scalar_from_Record and Record_from_Scalar tables.
 
-    These tables have the same data (but are organized differently) to allow
+    These tables have the same data but are organized differently to allow
     for various queries.
 
-    This works on only a single scalar and record at a time. For inserting
-    multiple scalars or records, see do_general_batch_insert().
+    Each call handles one entry from one Record's "data" attribute. For mass
+    (batch) insertion, see RecordDAO.insert_many().
 
-    :param name: The name of the scalar
-    :param value: The scalar's value
-    :param record_id: The id of the record containing the scalar
-    :param tags: Tags to be applied to this scalar
-    :param units: Units of the scalar
+    :param name: The name of the entry
+    :param value: The entry's value (must be a scalar)
+    :param record_id: The id of the record containing the entry
+    :param tags: Tags to be applied to this entry
+    :param units: Units of the entry.
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
@@ -193,16 +193,19 @@ def cross_populate_value_and_record(name,
                                     units=None,
                                     force_overwrite=False):
     """
-    Add entries to both the Value_from_Record and Record_from_Value tables.
+    Add string-value data entries to Value_from_Record and Record_from_Value tables.
 
-    These tables have the same data (but are organized differently) to allow
+    These tables have the same data but are organized differently to allow
     for various queries.
 
-    :param name: The name of the value (non-scalar)
-    :param value: The value's value
-    :param record_id: The id of the record containing the value
-    :param tags: Tags to be applied to this value
-    :param units: Units of the value.
+    Each call handles one entry from one Record's "data" attribute. For mass
+    (batch) insertion, see RecordDAO.insert_many().
+
+    :param name: The name of the entry
+    :param value: The entry's value (must be a string)
+    :param record_id: The id of the record containing the entry
+    :param tags: Tags to be applied to this entry
+    :param units: Units of the entry.
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
