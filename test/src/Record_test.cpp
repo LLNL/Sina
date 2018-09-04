@@ -18,7 +18,7 @@ using ::testing::DoubleEq;
 char const EXPECTED_TYPE_KEY[] = "type";
 char const EXPECTED_LOCAL_ID_KEY[] = "local_id";
 char const EXPECTED_GLOBAL_ID_KEY[] = "id";
-char const EXPECTED_VALUES_KEY[] = "values";
+char const EXPECTED_DATA_KEY[] = "data";
 char const EXPECTED_FILES_KEY[] = "files";
 char const EXPECTED_USER_DEFINED_KEY[] = "user_defined";
 
@@ -56,32 +56,32 @@ TEST(Record, create_globalId_fromJson) {
     EXPECT_EQ(IDType::Global, record.getId().getType());
 }
 
-TEST(Record, create_globalId_values) {
+TEST(Record, create_globalId_data) {
     nlohmann::json originalJson {
         {EXPECTED_TYPE_KEY, "my type"},
         {EXPECTED_GLOBAL_ID_KEY, "the ID"}
     };
-    originalJson[EXPECTED_VALUES_KEY].emplace_back(
-        R"({"name": "value name 1",
+    originalJson[EXPECTED_DATA_KEY].emplace_back(
+        R"({"name": "datum name 1",
             "value": "value 1"})"_json
     );
-    originalJson[EXPECTED_VALUES_KEY].emplace_back(
-        R"({"name": "value name 2",
+    originalJson[EXPECTED_DATA_KEY].emplace_back(
+        R"({"name": "datum name 2",
             "value": 2.22,
             "units": "g/L",
             "tags": ["tag1","tag2"]})"_json
     );
     Record record{originalJson};
-    auto &values = record.getValues();
-    ASSERT_EQ(2u, values.size());
-    EXPECT_EQ("value name 1", values[0].getName());
-    EXPECT_EQ("value 1", values[0].getValue());
+    auto &data = record.getData();
+    ASSERT_EQ(2u, data.size());
+    EXPECT_EQ("datum name 1", data[0].getName());
+    EXPECT_EQ("value 1", data[0].getValue());
 
-    EXPECT_EQ("value name 2", values[1].getName());
-    EXPECT_THAT(2.22, DoubleEq(values[1].getScalar()));
-    EXPECT_EQ("g/L", values[1].getUnits());
-    EXPECT_EQ("tag1", values[1].getTags()[0]);
-    EXPECT_EQ("tag2", values[1].getTags()[1]);
+    EXPECT_EQ("datum name 2", data[1].getName());
+    EXPECT_THAT(2.22, DoubleEq(data[1].getScalar()));
+    EXPECT_EQ("g/L", data[1].getUnits());
+    EXPECT_EQ("tag1", data[1].getTags()[0]);
+    EXPECT_EQ("tag2", data[1].getTags()[1]);
 }
 
 TEST(Record, create_globalId_files) {
@@ -172,26 +172,26 @@ TEST(Record, toJson_userDefined) {
     EXPECT_THAT(userDefined["k3"], ElementsAre(1, 2, 3));
 }
 
-TEST(Record, toJson_values) {
+TEST(Record, toJson_data) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
-    Value value1 = Value{"name1","value1"};
-    value1.setUnits("some units");
-    value1.setTags({"tag1"});
-    record.add(value1);
-    record.add(Value{"name2",2});
+    Datum datum1 = Datum{"name1","value1"};
+    datum1.setUnits("some units");
+    datum1.setTags({"tag1"});
+    record.add(datum1);
+    record.add(Datum{"name2",2});
     auto asJson = record.toJson();
     std::cout << asJson;
-    ASSERT_EQ(2u, asJson[EXPECTED_VALUES_KEY].size());
-    EXPECT_EQ("name1", asJson[EXPECTED_VALUES_KEY][0]["name"]);
-    EXPECT_EQ("value1", asJson[EXPECTED_VALUES_KEY][0]["value"]);
-    EXPECT_EQ("some units", asJson[EXPECTED_VALUES_KEY][0]["units"]);
-    EXPECT_EQ("tag1", asJson[EXPECTED_VALUES_KEY][0]["tags"][0]);
+    ASSERT_EQ(2u, asJson[EXPECTED_DATA_KEY].size());
+    EXPECT_EQ("name1", asJson[EXPECTED_DATA_KEY][0]["name"]);
+    EXPECT_EQ("value1", asJson[EXPECTED_DATA_KEY][0]["value"]);
+    EXPECT_EQ("some units", asJson[EXPECTED_DATA_KEY][0]["units"]);
+    EXPECT_EQ("tag1", asJson[EXPECTED_DATA_KEY][0]["tags"][0]);
 
-    EXPECT_EQ("name2", asJson[EXPECTED_VALUES_KEY][1]["name"]);
-    EXPECT_THAT(asJson[EXPECTED_VALUES_KEY][1]["value"].get<double>(), DoubleEq(2.));
-    EXPECT_TRUE(asJson[EXPECTED_VALUES_KEY][1]["units"].is_null());
-    EXPECT_TRUE(asJson[EXPECTED_VALUES_KEY][1]["tags"].is_null());
+    EXPECT_EQ("name2", asJson[EXPECTED_DATA_KEY][1]["name"]);
+    EXPECT_THAT(asJson[EXPECTED_DATA_KEY][1]["value"].get<double>(), DoubleEq(2.));
+    EXPECT_TRUE(asJson[EXPECTED_DATA_KEY][1]["units"].is_null());
+    EXPECT_TRUE(asJson[EXPECTED_DATA_KEY][1]["tags"].is_null());
 }
 
 TEST(Record, toJson_files) {

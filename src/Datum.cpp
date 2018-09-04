@@ -1,6 +1,6 @@
 /// @file
 
-#include "mnoda/Value.hpp"
+#include "mnoda/Datum.hpp"
 
 #include <utility>
 #include <sstream>
@@ -17,24 +17,24 @@ char const TAGS_FIELD[] = "tags";
 
 namespace mnoda {
 
-Value::Value(std::string name_, std::string value_) :
+Datum::Datum(std::string name_, std::string value_) :
         name{std::move(name_)},
         stringValue{std::move(value_)}{
     //Set type to Value, as we know it uses strings
     type = ValueType::Value;
 }
 
-Value::Value(std::string name_, double value_) :
+Datum::Datum(std::string name_, double value_) :
         name{std::move(name_)},
         scalarValue{std::move(value_)}{
     //Set type to Scalar, as we know it uses doubles
     type = ValueType::Scalar;
 }
 
-Value::Value(nlohmann::json const &asJson) :
-    name{getRequiredString(NAME_FIELD, asJson, "name")} {
-    //Need to determine what type of Value we have: scalar (double) or value (string)
-    nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, "value");
+Datum::Datum(nlohmann::json const &asJson) :
+    name{getRequiredString(NAME_FIELD, asJson, "datum")} {
+    //Need to determine what type of Datum we have: scalar (double) or value (string)
+    nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, "datum");
     if(valueField.is_string()){
         stringValue = valueField.get<std::string>();
     }
@@ -49,7 +49,7 @@ Value::Value(nlohmann::json const &asJson) :
     }
 
     //Get the units, if there are any
-    units = getOptionalString(UNITS_FIELD, asJson, "value");
+    units = getOptionalString(UNITS_FIELD, asJson, "datum");
 
     //Need to grab the tags and add them to a vector of strings
     auto tagsIter = asJson.find(TAGS_FIELD);
@@ -68,15 +68,15 @@ Value::Value(nlohmann::json const &asJson) :
     }
 }
 
-void Value::setUnits(std::string units_) {
+void Datum::setUnits(std::string units_) {
     units = std::move(units_);
 }
 
-void Value::setTags(std::vector<std::string> tags_){
+void Datum::setTags(std::vector<std::string> tags_){
     tags = std::move(tags_);
 }
 
-nlohmann::json Value::toJson() const {
+nlohmann::json Datum::toJson() const {
     nlohmann::json asJson;
     asJson[NAME_FIELD] = name;
     switch(type){
