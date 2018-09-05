@@ -1,5 +1,5 @@
-#ifndef MNODA_VALUE_HPP
-#define MNODA_VALUE_HPP
+#ifndef MNODA_DATUM_HPP
+#define MNODA_DATUM_HPP
 
 /// @file
 
@@ -12,62 +12,62 @@
 namespace mnoda {
 
 /**
- * Represents whether an Value is a Value (string) or Scalar (double).
+ * Represents whether a Datum is a String or Scalar (double).
  */
 enum class ValueType {
-    Value,
+    String,
     Scalar
 };
 
 /**
- * A Value tracks the name, value, and (optionally) tags and/or units of a
+ * A Datum tracks the name, value, and (optionally) tags and/or units of a
  * value associated with a Record, e.g. a scalar, a piece of metadata,
- * or an input parameter. In the Mnoda schema, a Value always
+ * or an input parameter. In the Mnoda schema, a Datum always
  * belongs to a Record or one of Record's inheriting types.
  *
- * Every Value must have a name and value; units and tags are optional.
+ * Every Datum must have a name and value; units and tags are optional.
  *
- * The value of a Value may be either a string or a double.
+ * The value of a Datum may be either a string or a double.
  *
  * \code
- * mnoda::Value myValue{"my_val", 12.34};
- * mnoda::Value myOtherValue{"my_other_val", "foobar"};
+ * mnoda::Datum myDatum{"my_scalar", 12.34};
+ * mnoda::Datum myOtherDatum{"my_string", "foobar"};
  * //prints 1, corresponding to Scalar
- * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myValue.getType()) << std::endl;
- * //prints 0, corresponding to Value
- * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myOtherValue.getType()) << std::endl;
- * myRecord->add(myValue);
- * myOtherValue.setUnits("km/s");
- * myRecord->add(myOtherValue);
+ * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myDatum.getType()) << std::endl;
+ * //prints 0, corresponding to String
+ * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myOtherDatum.getType()) << std::endl;
+ * myRecord->add(myDatum);
+ * myOtherDatum.setUnits("km/s");
+ * myRecord->add(myOtherDatum);
  * \endcode
  */
-class Value {
+class Datum {
 public:
     /**
-     * Construct a new Value.
+     * Construct a new Datum.
      *
-     * @param name the name of the Value
+     * @param name the name of the Datum
      * @param value the string value relating to the key
      */
-    Value(std::string name, std::string value);
+    Datum(std::string name, std::string value);
 
     /**
-     * Construct a new Value.
+     * Construct a new Datum.
      *
-     * @param name the name of the Value
+     * @param name the name of the Datum
      * @param value the double value relating to the key
      */
-    Value(std::string name, double value);
+    Datum(std::string name, double value);
 
     /**
-     * Construct a Value from its JSON representation.
+     * Construct a Datum from its JSON representation.
      *
-     * @param asJson the Value as JSON
+     * @param asJson the Datum as JSON
      */
-    explicit Value(nlohmann::json const &asJson);
+    explicit Datum(nlohmann::json const &asJson);
 
     /**
-     * Get the value of the Value.
+     * Get the value of the Datum.
      *
      * @return the string value
      */
@@ -76,7 +76,7 @@ public:
     }
 
     /**
-     * Get the scalar of the Value.
+     * Get the scalar of the Datum.
      *
      * @return the scalar value
      */
@@ -85,7 +85,7 @@ public:
     }
 
     /**
-     * Get the name of the Value.
+     * Get the name of the Datum.
      *
      * @return the name of the value
      */
@@ -94,7 +94,7 @@ public:
     }
 
     /**
-     * Get the tags of the Value
+     * Get the tags of the Datum
      *
      * @return the tags of the value
      */
@@ -103,14 +103,14 @@ public:
     }
 
     /**
-     * Set the tags of the Value
+     * Set the tags of the Datum
      *
      * @param tags the tags of the value
      */
     void setTags(std::vector<std::string> tags);
 
     /**
-     * Get the units of the Value
+     * Get the units of the Datum
      *
      * @return the units of the value
      */
@@ -119,7 +119,7 @@ public:
     }
 
     /**
-     * Set the units of the Value
+     * Set the units of the Datum
      *
      * @param units the units of the value
      */
@@ -127,7 +127,7 @@ public:
 
 
     /**
-     * Get the type of the Value
+     * Get the type of the Datum
      *
      * @return the type of the value
      */
@@ -136,9 +136,9 @@ public:
     }
 
     /**
-     * Convert this value to its JSON representation.
+     * Convert this Datum to its JSON representation.
      *
-     * @return the JSON representation of this value.
+     * @return the JSON representation of this Datum.
      */
     nlohmann::json toJson() const;
 private:
@@ -152,4 +152,4 @@ private:
 
 }
 
-#endif //MNODA_RECORD_HPP
+#endif //MNODA_DATUM_HPP

@@ -11,6 +11,6 @@
 #include "mnoda/ID.hpp"
 #include "mnoda/Record.hpp"
 #include "mnoda/Run.hpp"
-#include "mnoda/Value.hpp"
+#include "mnoda/Datum.hpp"
 
 #endif // MNODA_HPP

@@ -18,7 +18,7 @@ blt_add_library(NAME mnoda
         ../include/mnoda/Record.hpp
         ../include/mnoda/Relationship.hpp
         ../include/mnoda/Run.hpp
-        ../include/mnoda/Value.hpp
+        ../include/mnoda/Datum.hpp
     SOURCES
         Document.cpp
         File.cpp
@@ -27,7 +27,7 @@ blt_add_library(NAME mnoda
         Record.cpp
         Relationship.cpp
         Run.cpp
-        Value.cpp
+        Datum.cpp
     DEPENDS_ON nlohmann_json
 )
 

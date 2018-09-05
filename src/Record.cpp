@@ -8,13 +8,13 @@
 #include "mnoda/CppBridge.hpp"
 #include "mnoda/JsonUtil.hpp"
 #include "mnoda/Run.hpp"
-#include "mnoda/Value.hpp"
+#include "mnoda/Datum.hpp"
 
 namespace {
 
 char const LOCAL_ID_FIELD[] = "local_id";
 char const GLOBAL_ID_FIELD[] = "id";
-char const VALUES_FIELD[] = "values";
+char const DATA_FIELD[] = "data";
 char const TYPE_FIELD[] = "type";
 char const FILES_FIELD[] = "files";
 char const USER_DEFINED_KEY[] = "user_defined";
@@ -34,11 +34,11 @@ nlohmann::json Record::toJson() const {
         asJson[FILES_FIELD].emplace_back(file.toJson());
     }
     id.addTo(asJson);
-    //Loop through vector of values and append Json
-    nlohmann::json valueRef;
-    for(auto &value : values)
-        valueRef.emplace_back(value.toJson());
-    asJson[VALUES_FIELD] = valueRef;
+    //Loop through vector of data and append Json
+    nlohmann::json datumRef;
+    for(auto &datum : data)
+        datumRef.emplace_back(datum.toJson());
+    asJson[DATA_FIELD] = datumRef;
     asJson[USER_DEFINED_KEY] = userDefined;
     return asJson;
 }
@@ -46,10 +46,10 @@ nlohmann::json Record::toJson() const {
 Record::Record(nlohmann::json const &asJson) :
         id{asJson, LOCAL_ID_FIELD, GLOBAL_ID_FIELD},
         type{getRequiredString(TYPE_FIELD, asJson, "record")} {
-    auto valuesIter = asJson.find(VALUES_FIELD);
-    if(valuesIter != asJson.end()){
-        for(auto &value : *valuesIter){
-            values.emplace_back(value);
+    auto dataIter = asJson.find(DATA_FIELD);
+    if(dataIter != asJson.end()){
+        for(auto &datum : *dataIter){
+            data.emplace_back(datum);
        }
     }
     auto filesIter = asJson.find(FILES_FIELD);
@@ -64,8 +64,8 @@ Record::Record(nlohmann::json const &asJson) :
     }
 }
 
-void Record::add(Value value) {
-    values.emplace_back(std::move(value));
+void Record::add(Datum datum) {
+    data.emplace_back(std::move(datum));
 }
 
 void Record::add(File file) {

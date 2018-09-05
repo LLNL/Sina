@@ -15,7 +15,7 @@ blt_add_executable(NAME unittests
         src/Record_test.cpp
         src/Relationship_test.cpp
         src/Run_test.cpp
-        src/Value_test.cpp
+        src/Datum_test.cpp
         src/TestRecord.cpp
     DEPENDS_ON mnoda gtest gmock nlohmann_json
 )

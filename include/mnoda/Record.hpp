@@ -12,7 +12,7 @@
 #include "nlohmann/json.hpp"
 
 #include "mnoda/ID.hpp"
-#include "mnoda/Value.hpp"
+#include "mnoda/Datum.hpp"
 #include "mnoda/File.hpp"
 
 namespace mnoda {
@@ -24,25 +24,25 @@ namespace mnoda {
  * might have a "contains" Relationship for all the runs within it), etc.
  *
  * Each Record must have a type and an id. Each Record can also have a list of
- * Value and File objects.
+ * Datum and File objects.
  *
  * \code
  * mnoda::ID myID{"my_record", mnoda::IDType::Local};
  * std::unique_ptr<mnoda::Record> myRecord{new mnoda::Record{myID, "my_type"}};
  * std::vector<std::string> myTags{"input"};
- * mnoda::Value myValue{"my_scalar", 12, myTags};
- * myRecord->add(std::move(myValue));
+ * mnoda::Datum myDatum{"my_scalar", 12, myTags};
+ * myRecord->add(std::move(myDatum));
  * std::cout << myRecord->toJson() << std::endl;
  * \endcode
  *
  * The output would be:
  * \code{.json} 
- * {"local_id":"my_record","type":"my_type","values":[{"name":"my_scalar","tags":["input"],"value":12.0}]}
+ * {"local_id":"my_record","type":"my_type","data":[{"name":"my_scalar","tags":["input"],"value":12.0}]}
  * \endcode
  */
 class Record {
 public:
-    using ValueList = std::vector<Value>;
+    using DatumList = std::vector<Datum>;
     using FileList = std::vector<File>;
 
     /**
@@ -83,20 +83,20 @@ public:
     }
 
     /**
-     * Get the Record's values.
+     * Get the Record's data.
      *
-     * @return the Record's values
+     * @return the Record's data
      */
-    ValueList const &getValues() const noexcept {
-        return values;
+    DatumList const &getData() const noexcept {
+        return data;
     }
 
     /**
-     * Add a Value to this record.
+     * Add a Datum to this record.
      *
-     * @param value the Value to add
+     * @param datum the Datum to add
      */
-    void add(Value value);
+    void add(Datum datum);
 
     /**
      * Add a File to this record.
@@ -151,7 +151,7 @@ public:
 private:
     internal::IDField id;
     std::string type;
-    ValueList values;
+    DatumList data;
     FileList files;
     nlohmann::json userDefined;
 };
