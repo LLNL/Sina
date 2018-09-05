@@ -152,8 +152,8 @@ class RecordDAO(dao.RecordDAO):
         """
         Insert data into two of the four query tables depending on value.
 
-        Data entries that are numbers (12.0) go in the Scalar tables. Any that
-        aren't ("Tuesday","12.0") go in the Value tables.
+        Data entries that are numbers (12.0) go in the ScalarData tables. Any that
+        aren't ("Tuesday","12.0") go in the StringData tables.
 
         :param data: The list of data to insert.
         :param record_id: The Record ID to associate the data to.
