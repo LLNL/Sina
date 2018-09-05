@@ -17,26 +17,26 @@ from sina.model import Run, Record
 
 def _populate_database_with_scalars(session):
     """Add test scalars to a database."""
-    session.add(schema.Scalar(record_id="spam",
-                              name="spam_scal",
-                              value=10,
-                              units="pigs",
-                              tags='["hammy"]'))
-    session.add(schema.Scalar(record_id="eggs",
-                              name="eggs_scal",
-                              value=0))
-    session.add(schema.Scalar(record_id="spam",
-                              name="spam_scal_2",
-                              value=200))
-    session.add(schema.Scalar(record_id="spam2",
-                              name="spam_scal",
-                              value=10.99999))
-    session.add(schema.Scalar(record_id="spam3",
-                              name="spam_scal",
-                              value=10.5))
-    session.add(schema.Scalar(record_id="spam3",
-                              name="spam_scal_2",
-                              value=10.5))
+    session.add(schema.ScalarData(record_id="spam",
+                                  name="spam_scal",
+                                  value=10,
+                                  units="pigs",
+                                  tags='["hammy"]'))
+    session.add(schema.ScalarData(record_id="eggs",
+                                  name="eggs_scal",
+                                  value=0))
+    session.add(schema.ScalarData(record_id="spam",
+                                  name="spam_scal_2",
+                                  value=200))
+    session.add(schema.ScalarData(record_id="spam2",
+                                  name="spam_scal",
+                                  value=10.99999))
+    session.add(schema.ScalarData(record_id="spam3",
+                                  name="spam_scal",
+                                  value=10.5))
+    session.add(schema.ScalarData(record_id="spam3",
+                                  name="spam_scal_2",
+                                  value=10.5))
     session.commit()
 
 

@@ -40,7 +40,7 @@ class RecordDAO(dao.RecordDAO):
 
     def _insert_data(self, record_id, data):
         """
-        Insert data entries into the Scalar and Value tables.
+        Insert data entries into the ScalarData and StringData tables.
 
         Does not commit(), caller needs to do that.
 
@@ -55,8 +55,8 @@ class RecordDAO(dao.RecordDAO):
             # Using json.dumps() instead of str() (or join()) gives valid JSON
             tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
             # Check if it's a scalar
-            kind = (schema.Scalar if isinstance(datum['value'], numbers.Real)
-                    else schema.Value)
+            kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
+                    else schema.StringData)
             self.session.add(kind(record_id=record_id,
                                   name=datum['name'],
                                   value=datum['value'],
@@ -159,7 +159,7 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Getting all records with scalars within the following '
                      'ranges: {}'.format(scalar_range_list))
-        query = self.session.query(schema.Scalar.record_id)
+        query = self.session.query(schema.ScalarData.record_id)
         query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
         out = query.all()
         if out:
@@ -199,10 +199,10 @@ class RecordDAO(dao.RecordDAO):
         query = query.filter(sqlalchemy
                              .or_(self._build_range_filter(scalar, index)
                                   for index, scalar in enumerate(scalars)))
-        query = (query.group_by(schema.Scalar.record_id)
+        query = (query.group_by(schema.ScalarData.record_id)
                       .having(sqlalchemy.text("{} = {}"
                               .format(sqlalchemy.func
-                                      .count(schema.Scalar.record_id),
+                                      .count(schema.ScalarData.record_id),
                                       len(scalars)))))
         query = query.params(search_args)
         return query
@@ -216,7 +216,7 @@ class RecordDAO(dao.RecordDAO):
 
         Example clause as raw SQL:
 
-        WHERE Scalar.name=:scalar_name0 AND Scalar.value<right_num0
+        WHERE ScalarData.name=:scalar_name0 AND ScalarData.value<right_num0
 
         :param scalar: The scalar used to build the query.
         :param index: optional offset of this criteria if using multiple
@@ -227,7 +227,7 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Building TextClause filter from <scalar={}> and index={}.'
                      .format(scalar, index))
-        conditions = ["(Scalar.name IS :scalar_name{} AND Scalar.value"
+        conditions = ["(ScalarData.name IS :scalar_name{} AND ScalarData.value"
                       .format(index)]
 
         scalar.validate_and_standardize_range()
@@ -247,7 +247,7 @@ class RecordDAO(dao.RecordDAO):
                 conditions.append(":min{}".format(index))
             if (scalar.min is not None) and (scalar.max is not None):
                 # If two-sided range, begin preparing new condition
-                conditions.append(" AND Scalar.value ")
+                conditions.append(" AND ScalarData.value ")
             if scalar.max is not None:
                 conditions.append(" <= " if scalar.max_inclusive else " < ")
                 conditions.append(":max{}".format(index))
@@ -270,11 +270,11 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Getting scalars={} for record id={}'
                      .format(scalar_names, record_id))
         scalars = []
-        query = (self.session.query(schema.Scalar.name, schema.Scalar.value,
-                                    schema.Scalar.units, schema.Scalar.tags)
-                 .filter(schema.Scalar.record_id == record_id)
-                 .filter(schema.Scalar.name.in_(scalar_names))
-                 .order_by(schema.Scalar.name.asc()).all())
+        query = (self.session.query(schema.ScalarData.name, schema.ScalarData.value,
+                                    schema.ScalarData.units, schema.ScalarData.tags)
+                 .filter(schema.ScalarData.record_id == record_id)
+                 .filter(schema.ScalarData.name.in_(scalar_names))
+                 .order_by(schema.ScalarData.name.asc()).all())
         for entry in query:
             # SQL doesn't handle maps. so tags are stored as JSON lists.
             # This converts them to Python.
