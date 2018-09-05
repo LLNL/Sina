@@ -96,7 +96,7 @@ class ScalarData(Base):
 
     def __repr__(self):
         """Return a string representation of a sql schema ScalarData entry."""
-        return ('SQL Schema Scalar: <record_id={}, name={}, value={}, tags={},'
+        return ('SQL Schema ScalarData: <record_id={}, name={}, value={}, tags={},'
                 'units={}>'
                 .format(self.record_id,
                         self.name,
@@ -143,7 +143,7 @@ class StringData(Base):
 
     def __repr__(self):
         """Return a string representation of a sql schema StringData entry."""
-        return ('SQL Schema Value: <record_id={}, name={}, value={}, tags={}, '
+        return ('SQL Schema StringData: <record_id={}, name={}, value={}, tags={}, '
                 'units={}>'
                 .format(self.record_id,
                         self.name,
