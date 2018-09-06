@@ -102,8 +102,8 @@ class RecordDAO(dao.RecordDAO):
                                                      tags))
 
                 # We've finished this record's data--do the batch inserts
-                for table, data_list in ((schema.ScalarFromRecord, scalar_from_rec_batch),
-                                         (schema.ValueFromRecord, value_from_rec_batch)):
+                for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
+                                         (schema.StringDataFromRecord, value_from_rec_batch)):
                     with BatchQuery() as b:
                         create = (table.batch(b).create if force_overwrite
                                   else table.batch(b).if_not_exists().create)
@@ -135,8 +135,8 @@ class RecordDAO(dao.RecordDAO):
 
         # We've gone through every record we were given. The from_scalar_batch
         # and from_value_batch dictionaries are ready for batch inserting.
-        for table, partition_data in ((schema.RecordFromScalar, from_scalar_batch),
-                                      (schema.RecordFromValue, from_value_batch)):
+        for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
+                                      (schema.RecordFromStringData, from_value_batch)):
             for partition, data_list in six.iteritems(partition_data):
                 with BatchQuery() as b:
                     create = (table.batch(b).create if force_overwrite
@@ -152,8 +152,8 @@ class RecordDAO(dao.RecordDAO):
         """
         Insert data into two of the four query tables depending on value.
 
-        Data entries that are numbers (12.0) go in the Scalar tables. Any that
-        aren't ("Tuesday","12.0") go in the Value tables.
+        Data entries that are numbers (12.0) go in the ScalarData tables. Any that
+        aren't ("Tuesday","12.0") go in the StringData tables.
 
         :param data: The list of data to insert.
         :param record_id: The Record ID to associate the data to.
@@ -167,7 +167,7 @@ class RecordDAO(dao.RecordDAO):
             # Check if it's a scalar
             insert_data = (schema.cross_populate_scalar_and_record
                            if isinstance(datum['value'], numbers.Real)
-                           else schema.cross_populate_value_and_record)
+                           else schema.cross_populate_string_and_record)
             insert_data(record_id=record_id,
                         name=datum['name'],
                         value=datum['value'],
@@ -295,13 +295,13 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Getting all records with scalars within the following '
                      'ranges: {}'.format(scalar_range_list))
-        query = schema.RecordFromScalar.objects
+        query = schema.RecordFromScalarData.objects
         rec_ids = list(self
                        ._configure_query_for_scalar_range(query,
                                                           scalar_range_list[0])
                        .values_list('record_id', flat=True).all())
         for scalar_range in scalar_range_list[1:]:
-            query = (schema.ScalarFromRecord.objects
+            query = (schema.ScalarDataFromRecord.objects
                      .filter(record_id__in=rec_ids))
             query = self._configure_query_for_scalar_range(query, scalar_range)
             rec_ids = list(query.values_list('record_id', flat=True).all())
@@ -318,7 +318,7 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Getting all records with scalars within the range: {}'
                      .format(scalar_range))
-        query = schema.RecordFromScalar.objects
+        query = schema.RecordFromScalarData.objects
         out = self._configure_query_for_scalar_range(query, scalar_range).all()
         if out:
             return self.get_many(x.record_id for x in out)
@@ -372,7 +372,7 @@ class RecordDAO(dao.RecordDAO):
         # workaround.
         for name in sorted(scalar_names):
             try:
-                entry = (schema.ScalarFromRecord.objects
+                entry = (schema.ScalarDataFromRecord.objects
                          .filter(record_id=record_id)
                          .filter(name=name)
                          .values_list('name', 'value', 'units', 'tags')).get()
