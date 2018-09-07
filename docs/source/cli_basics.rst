@@ -1,8 +1,5 @@
-CLI Examples
-============
-
 CLI Basics
-~~~~~~~~~~
+==========
 
 The Sina command line interface (CLI) is organized into three subcommands:
 query, ingest, and export. To access these subcommands, make sure you're

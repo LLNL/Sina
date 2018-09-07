@@ -1,8 +1,5 @@
-API Examples
-============
-
 API Basics
-~~~~~~~~~~
+==========
 
 The Sina API is organized around Records and Relationships. A Record is
 a piece of data conforming to the Mnoda JSON schema. It typically represents
