@@ -24,8 +24,8 @@ The following is a list of the relevant column number-value pairings:
  where
       1 is the equivalent of a study/purpose of the database/root dir
    2- 6 form the observational equivalent of a run (so is the id)
-  19-21 are values
-  31-32 are more values
+  19-21 are data values
+  31-32 are more data values
  and
    each line becomes a separate file within the observation directory
 
@@ -207,7 +207,7 @@ class NoaaData(object):
             self.recs.append({
                 "type": "qc",
                 "id": qid,
-                "values": [{"name": "desc", "value": desc}, ],
+                "data": [{"name": "desc", "value": desc}, ],
                 })
 
     def add_exp(self, exp):
@@ -268,7 +268,7 @@ class NoaaData(object):
             "files": [
                 {"uri": obs_fn, "mimetype": "text/plain"},
                 ],
-            "values": [
+            "data": [
                 {"name": "depth", "value": float(depth), "units": "meters"},
                 {"name": "press", "value": float(press), "units": "decibars"},
                 {"name": "temp", "value": float(temp), "units": "C"},
