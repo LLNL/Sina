@@ -1,11 +1,3 @@
-============
-
-This page contains minimal examples to cover Sina's most important concepts.
-For further examples, please see the `sina-examples repository
-<https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina-examples>`__.
-
-
-=======
 API Basics
 ==========
 

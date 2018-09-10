@@ -268,9 +268,9 @@ class TestSQL(unittest.TestCase):
         record_dao = sina_sql.DAOFactory().createRecordDAO()
         mock_record = MagicMock(record_id="spam", record_type="eggs",
                                 data=[{"name": "eggs",
-                                         "value": 12,
-                                         "units": None,
-                                         "tags": ["runny"]}],
+                                       "value": 12,
+                                       "units": None,
+                                       "tags": ["runny"]}],
                                 files=[{"uri": "eggs.brek",
                                         "mimetype": "egg",
                                         "tags": ["fried"]}],
@@ -285,7 +285,7 @@ class TestSQL(unittest.TestCase):
                                                  "units": "None",
                                                  "tags": ["runny"]
                                                 }
-                                                ],
+                                              ],
                                      "files": [{
                                                  "uri": "eggs.brek",
                                                  "mimetype": "egg",
@@ -319,8 +319,8 @@ class TestSQL(unittest.TestCase):
         vals_files = MagicMock(record_id="spam",
                                record_type="new_eggs",
                                data=[{"name": "foo", "value": 12},
-                                       {"name": "bar", "value": "1",
-                                        "tags": ("in")}],
+                                     {"name": "bar", "value": "1",
+                                      "tags": ("in")}],
                                files=[{"uri": "ham.png", "mimetype": "png"},
                                       {"uri": "ham.curve", "tags": ["hammy"]}],
                                user_defined=None,
@@ -332,12 +332,12 @@ class TestSQL(unittest.TestCase):
                                                 "name": "foo",
                                                 "value": 12
                                                },
-                                               {
+                                             {
                                                 "name": "bar",
                                                 "value": "1",
                                                 "tags": ["in"]
                                                }
-                                               ],
+                                             ],
                                     "files": [{
                                                 "uri": "ham.png",
                                                 "mimetype": "png"

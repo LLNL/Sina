@@ -17,20 +17,20 @@ class TestModel(unittest.TestCase):
         # Minimal, valid run
         self.assertTrue(spam._is_valid())
         # Value that's missing a name
-        spam.values = [{"value": "runny"}]
+        spam.data = [{"value": "runny"}]
         self.assertFalse(spam._is_valid()[0])
         # Value that's a missing value
-        spam.values = [{"name": "eggstate"}]
+        spam.data = [{"name": "eggstate"}]
         self.assertFalse(spam._is_valid()[0])
         # Correct minimal value that has a bad tag list
-        spam.values = [{"name": "eggstate", "value": "runny", "tags": "tEGGxture"}]
+        spam.data = [{"name": "eggstate", "value": "runny", "tags": "tEGGxture"}]
         self.assertFalse(spam._is_valid()[0])
         # Second value is the bad one
-        spam.values = [{"name": "eggstate", "value": "runny", "tags": ["tEGGxture"]},
-                       'spam']
+        spam.data = [{"name": "eggstate", "value": "runny", "tags": ["tEGGxture"]},
+                     'spam']
         self.assertFalse(spam._is_valid()[0])
 
-        spam.values = [{"name": "eggstate", "value": "runny", "tags": ["tEGGxture"]}]
+        spam.data = [{"name": "eggstate", "value": "runny", "tags": ["tEGGxture"]}]
         # File that's missing a uri
         spam.files = [{"mimetype": "text/plain"}]
         self.assertFalse(spam._is_valid()[0])
@@ -50,13 +50,13 @@ class TestModel(unittest.TestCase):
     def test_generate_json(self):
         """Ensure JSON is generating properly."""
         target_json = ('{"id":"hello", "type":"greeting", '
-                       '"values":[{"name":"language", "value":"english"},'
+                       '"data":[{"name":"language", "value":"english"},'
                        '{"name":"mood","value":"friendly"}],'
                        '"files":[{"uri":"pronounce.wav"}],'
                        '"user_defined":{"good": "morning"}}')
         test_record = model.Record("hello", "greeting")
-        test_record.values = [{"name": "language", "value": "english"},
-                              {"name": "mood", "value": "friendly"}]
+        test_record.data = [{"name": "language", "value": "english"},
+                            {"name": "mood", "value": "friendly"}]
         test_record.files = [{"uri": "pronounce.wav"}]
         test_record.user_defined = {"good": "morning"}
         # Raw is explicitly not reproduced in to_json()
@@ -68,13 +68,13 @@ class TestModel(unittest.TestCase):
         """Ensure Run JSON is generating properly."""
         target_json = ('{"id":"hello", "type":"run",'
                        '"application":"foo", "user":"JohnD", "version":0,'
-                       '"values":[{"name":"language", "value":"english"},'
+                       '"data":[{"name":"language", "value":"english"},'
                        '{"name":"mood","value":"friendly"}],'
                        '"files":[{"uri":"pronounce.wav"}],'
                        '"user_defined":{"good": "morning"}}')
         test_run = model.Run("hello", "foo", user="JohnD", version=0)
-        test_run.values = [{"name": "language", "value": "english"},
-                           {"name": "mood", "value": "friendly"}]
+        test_run.data = [{"name": "language", "value": "english"},
+                         {"name": "mood", "value": "friendly"}]
         test_run.files = [{"uri": "pronounce.wav"}]
         test_run.user_defined = {"good": "morning"}
         self.assertTrue(test_run._is_valid())
@@ -87,13 +87,13 @@ class TestModel(unittest.TestCase):
                          "id": "spam",
                          "type": "eggs",
                          "user_defined": {"water": "bread"},
-                         "values": [{
+                         "data": [{
                                      "name": "eggs",
                                      "value": 12,
                                      "units": "cm",
                                      "tags": ["runny"]
                                     }
-                                    ],
+                                  ],
                          "files": [{
                                      "uri": "eggs.brek",
                                      "mimetype": "egg",
@@ -105,7 +105,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(json_input['id'], record.record_id)
         self.assertEqual(json_input['type'], record.record_type)
         self.assertEqual(json_input['user_defined'], record.user_defined)
-        self.assertEqual(json_input['values'], record.values)
+        self.assertEqual(json_input['data'], record.data)
         self.assertEqual(json_input['files'], record.files)
 
     def test_generate_record_from_json_bad(self):
@@ -118,13 +118,13 @@ class TestModel(unittest.TestCase):
         json_input = {
                          "type": "eggs",
                          "user_defined": {"water": "bread"},
-                         "values": [{
+                         "data": [{
                                      "name": "eggs",
                                      "value": 12,
                                      "units": "cm",
                                      "tags": ["runny"]
                                     }
-                                    ],
+                                  ],
                          "files": [{
                                      "uri": "eggs.brek",
                                      "mimetype": "egg",
@@ -145,13 +145,13 @@ class TestModel(unittest.TestCase):
                          "application": "skillet",
                          "version": "1.2",
                          "user_defined": {"water": "bread"},
-                         "values": [{
+                         "data": [{
                                      "name": "eggs",
                                      "value": 12,
                                      "units": "cm",
                                      "tags": ["runny"]
                                     }
-                                    ],
+                                  ],
                          "files": [{
                                      "uri": "eggs.brek",
                                      "mimetype": "egg",
@@ -166,7 +166,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(json_input['application'], run.application)
         self.assertEqual(json_input['version'], run.version)
         self.assertEqual(json_input['user_defined'], run.user_defined)
-        self.assertEqual(json_input['values'], run.values)
+        self.assertEqual(json_input['data'], run.data)
         self.assertEqual(json_input['files'], run.files)
 
     def test_generate_run_from_json_bad(self):
@@ -180,13 +180,13 @@ class TestModel(unittest.TestCase):
                          "id": "spam",
                          "type": "eggs",
                          "user_defined": {"water": "bread"},
-                         "values": [{
+                         "data": [{
                                      "name": "eggs",
                                      "value": 12,
                                      "units": "cm",
                                      "tags": ["runny"]
                                     }
-                                    ],
+                                  ],
                          "files": [{
                                      "uri": "eggs.brek",
                                      "mimetype": "egg",

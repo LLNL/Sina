@@ -153,9 +153,9 @@ class TestSearch(unittest.TestCase):
         mock_record = MagicMock(record_id="spam", record_type="eggs",
                                 user_defined=None,
                                 data=[{"name": "eggs",
-                                         "value": 12,
-                                         "units": None,
-                                         "tags": ["runny"]}],
+                                       "value": 12,
+                                       "units": None,
+                                       "tags": ["runny"]}],
                                 files=[{"uri": "eggs.brek",
                                         "mimetype": "egg",
                                         "tags": ["fried"]}],
@@ -169,7 +169,7 @@ class TestSearch(unittest.TestCase):
                                                    "units": "None",
                                                    "tags": ["runny"]
                                                   }
-                                                  ],
+                                                ],
                                        "files": [{
                                                    "uri": "eggs.brek",
                                                    "mimetype": "egg",
@@ -236,12 +236,12 @@ class TestSearch(unittest.TestCase):
                                                   "units": "None",
                                                   "tags": ["in", "on"]
                                                  },
-                                                 {
+                                               {
                                                  "name": "bar",
                                                  "value": "1",
                                                  "units": "None"
                                                  }
-                                                 ],
+                                               ],
                                       "files": [{
                                                   "uri": "ham.png",
                                                   "mimetype": "png"
