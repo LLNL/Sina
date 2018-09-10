@@ -153,6 +153,7 @@
             "properties": {
                 "name": { "type": "string" },
                 "value": { "type": [ "string", "number" ] },
+                "units": { "type": "string" },
                 "tags": { "$ref": "#/definitions/stringArray" }
             },
             "required" :  [ "name", "value" ]
