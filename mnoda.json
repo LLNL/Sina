@@ -52,7 +52,7 @@
             "description": "Optional simulation metadata",
             "properties": {
                 "files": { "$ref": "#/definitions/fileArray" },
-                "values": { "$ref": "#/definitions/valueArray" },
+                "data": { "$ref": "#/definitions/dataArray" },
                 "user_defined": {}
             }
         },
@@ -143,16 +143,17 @@
                 }
             ]
         },
-        "valueArray" : {
-            "description": "Array of values",
+        "dataArray" : {
+            "description": "Array of data values",
             "type": "array",
-            "items": { "$ref": "#/definitions/valueType" },
+            "items": { "$ref": "#/definitions/dataType" },
             "uniqueItems": true
         },
-        "valueType" : {
+        "dataType" : {
             "properties": {
                 "name": { "type": "string" },
                 "value": { "type": [ "string", "number" ] },
+                "units": { "type": "string" },
                 "tags": { "$ref": "#/definitions/stringArray" }
             },
             "required" :  [ "name", "value" ]
