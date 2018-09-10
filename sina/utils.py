@@ -67,24 +67,15 @@ def import_json(factory, json_path):
             id = str(uuid.uuid4())
             try:
                 local[entry['local_id']] = id
+                # Save the UUID to be used for record generation
+                entry['id'] = id
             except KeyError:
                 raise ValueError("Record requires one of: local_id, id: {}"
                                  .format(entry))
         if type == 'run':
-            runs.append(model.Run(record_id=id,
-                                  user=entry.get('user'),
-                                  user_defined=entry.get('user_defined'),
-                                  version=entry.get('version'),
-                                  application=entry.get('application'),
-                                  values=entry.get('values'),
-                                  files=entry.get('files'),
-                                  raw=json.dumps(entry)))
+            runs.append(model.generate_run_from_json(json_input=entry))
         else:
-            records.append(model.Record(record_id=id,
-                                        record_type=type,
-                                        raw=json.dumps(entry),
-                                        values=entry.get('values'),
-                                        files=entry.get('files')))
+            records.append(model.generate_record_from_json(json_input=entry))
     factory.createRunDAO().insert_many(runs)
     factory.createRecordDAO().insert_many(records)
     relationships = []

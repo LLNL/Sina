@@ -3,16 +3,11 @@
 import json
 import logging
 import collections
+import six
 
 logging.basicConfig()
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 RESERVED_TYPES = ["run"]  # Types reserved by Record's children
-
-# Python 3 renamed basestring, but 2 requires it here
-try:
-    basestring
-except NameError:
-    basestring = str
 
 
 class Record(object):
@@ -33,9 +28,10 @@ class Record(object):
     of that child.
     """
 
-    def __init__(self, record_id, record_type, raw=None, values=[], files=[], user_defined=None):
+    def __init__(self, record_id, record_type, values=[], files=[],
+                 user_defined={}):
         """
-        Create Record with its id, type, raw, and optional args.
+        Create Record with its id, type, and optional args.
 
         Currently, values and files are expected to be lists of dicts.
         Lists of strings (ex: ['{"name":"foo"}']) won't be read correctly.
@@ -46,18 +42,70 @@ class Record(object):
         :param record_id: The id of the record. Should be unique within a dataset
         :param record_type: The type of record. Some types are reserved for
                             children, see sina.model.RESERVED_TYPES
-        :param raw: The raw JSON used to create this Record, if applicable
         :param values: A list of dicts representing the Record's values
         :param files: A list of dicts representing the Record's files
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
         """
+        self.raw = {}
         self.record_id = record_id
         self.record_type = record_type
-        self.raw = raw
         self.values = values
         self.files = files
         self.user_defined = user_defined
+
+        is_valid, warnings = self._is_valid()
+        if not is_valid:
+            raise ValueError(warnings)
+
+    @property
+    def record_id(self):
+        return self['record_id']
+
+    @record_id.setter
+    def record_id(self, record_id):
+        self['record_id'] = record_id
+
+    @property
+    def record_type(self):
+        return self['record_type']
+
+    @record_type.setter
+    def record_type(self, record_type):
+        self['record_type'] = record_type
+
+    @property
+    def values(self):
+        return self['values']
+
+    @values.setter
+    def values(self, values):
+        self['values'] = values
+
+    @property
+    def files(self):
+        return self['files']
+
+    @files.setter
+    def files(self, files):
+        self['files'] = files
+
+    @property
+    def user_defined(self):
+        return self['user_defined']
+
+    @user_defined.setter
+    def user_defined(self, user_defined):
+        self['user_defined'] = user_defined
+
+    def __getitem__(self, key):
+        return self.raw[key]
+
+    def __setitem__(self, key, value):
+        self.raw[key] = value
+
+    def __delitem__(self, key):
+        del self.raw[key]
 
     def __repr__(self):
         """Return a string representation of a model Record."""
@@ -87,7 +135,7 @@ class Record(object):
             json_obj["user_defined"] = self.user_defined
         return json.dumps(json_obj)
 
-    def is_valid(self, print_warnings=False):
+    def _is_valid(self, print_warnings=False):
         """Test whether a Record's members are formatted correctly.
 
         The ingester expects certain types to be reserved, and for values
@@ -96,12 +144,14 @@ class Record(object):
 
         :param print_warnings: if true, will print warnings. Warnings are
                                  passed to the logger only by default.
-        :returns: true if valid for ingestion, else false.
+        :returns: A tuple containing true or false if valid for ingestion and
+                  a list of warnings.
         """
         warnings = []
-        if self.record_type in RESERVED_TYPES and type(self) is Record:
-            (warnings.append("Record {} is using a type reserved for child: {}"
-                             .format(self.record_id, self.record_type)))
+        # We should issue a warning if record_type is reserved and we are not
+        # actually a reserved object. This check is removed for now because it
+        # warrants significant code changes in sql/cass modules.
+
         # For files/values, we break immediately on finding any error--in
         # practice these lists can be thousands of entries long, in which case
         # the error is probably in an importer script (and so present in all
@@ -113,7 +163,7 @@ class Record(object):
                                      "Record {} is not a dictionary. Value: {}"
                                      .format(self.record_id, entry)))
                     break
-                if not entry.get("uri"):
+                if "uri" not in entry:
                     (warnings.append("At least one file entry belonging to "
                                      "Record {} is missing a uri. File: {}"
                                      .format(self.record_id, entry)))
@@ -121,7 +171,7 @@ class Record(object):
                 # Python2 and 3 compatible way of checking if the tags are
                 # a list, tuple, etc (but not a string)
                 if (entry.get("tags") and
-                    (isinstance(entry.get("tags"), basestring) or
+                    (isinstance(entry.get("tags"), six.string_types) or
                      not isinstance(entry.get("tags"), collections.Sequence))):
                     (warnings.append("At least one file entry belonging to "
                                      "Record {} has a malformed tag list. File: {}"
@@ -133,39 +183,39 @@ class Record(object):
                                      "Record {} is not a dictionary. Value: {}"
                                      .format(self.record_id, entry)))
                     break
-                if not entry.get("name"):
+                if "name" not in entry:
                     (warnings.append("At least one value entry belonging to "
                                      "Record {} is missing a name. Value: {}"
                                      .format(self.record_id, entry)))
                     break
-                if not entry.get("value"):
+                if "value" not in entry:
                     (warnings.append("At least one value entry belonging to "
                                      "Record {} is missing a value. Value: {}"
                                      .format(self.record_id, entry)))
                     break
                 if (entry.get("tags") and
-                    (isinstance(entry.get("tags"), basestring) or
+                    (isinstance(entry.get("tags"), six.string_types) or
                      not isinstance(entry.get("tags"), collections.Sequence))):
                     (warnings.append("At least one value entry belonging to "
                                      "Record {} has a malformed tag list. Value: {}"
                                      .format(self.record_id, entry)))
         if self.raw:
             try:
-                json.loads(self.raw)
+                json.dumps(self.raw)
             except ValueError:
                 (warnings.append("Record {}'s raw is invalid JSON.'"
                                  .format(self.record_id)))
         if self.user_defined and not isinstance(self.user_defined, dict):
             (warnings.append("Record {}'s user_defined section is not a "
                              "dictionary. User_defined: {}"
-                             .format(self.user_defined, self.user_defined)))
+                             .format(self.record_id, self.user_defined)))
         if warnings:
             warnstring = "\n".join(warnings)
             if print_warnings:
                 print(warnstring)
-            logger.warning(warnstring)
-            return False
-        return True
+            LOGGER.warning(warnstring)
+            return False, warnings
+        return True, warnings
 
 
 class Relationship(object):
@@ -205,19 +255,42 @@ class Run(Record):
     'user_defined'.
     """
 
-    def __init__(self, record_id, application, raw=None,
+    def __init__(self, record_id, application,
                  user=None, version=None, user_defined=None,
                  values=None, files=None):
         """Create Run from Record info plus metadata."""
         super(Run, self).__init__(record_id=record_id,
                                   record_type="run",
-                                  raw=raw,
                                   user_defined=user_defined,
                                   values=values,
                                   files=files)
         self.application = application
         self.user = user
         self.version = version
+
+    @property
+    def application(self):
+        return self['application']
+
+    @application.setter
+    def application(self, application):
+        self['application'] = application
+
+    @property
+    def user(self):
+        return self['user']
+
+    @user.setter
+    def user(self, user):
+        self['user'] = user
+
+    @property
+    def version(self):
+        return self['version']
+
+    @version.setter
+    def version(self, version):
+        self['version'] = version
 
     def __repr__(self):
         """Return a string representation of a model Run."""
@@ -249,3 +322,57 @@ class Run(Record):
         if self.version is not None:
             json_obj["version"] = self.version
         return json.dumps(json_obj)
+
+
+def generate_record_from_json(json_input):
+    """
+    Generates a Record from the json input.
+
+    :param json_input: A JSON representation of a Record.
+    :raises: ValueError if given invalid json input.
+    """
+    LOGGER.debug('Generating record from json input: {}'.format(json_input))
+    # Must create record first
+    try:
+        record = Record(record_id=json_input['id'],
+                        record_type=json_input['type'],
+                        user_defined=json_input.get('user_defined'),
+                        values=json_input.get('values'),
+                        files=json_input.get('files'))
+    except KeyError as e:
+        msg = 'Missing required key <{}>.'.format(e)
+        LOGGER.warn(msg)
+        raise ValueError(msg)
+    # Then set raw to json_input to grab any additional information.
+    record.raw.update({key: val for key, val in json_input.items()
+                      if key not in ['id', 'type', 'user_defined', 'values',
+                                     'files']})
+    return record
+
+
+def generate_run_from_json(json_input):
+    """
+    Generates a Run from the json input.
+
+    :param json_input: A JSON representation of a Run.
+    :raises: ValueError if given invalid json input.
+    """
+    LOGGER.debug('Generating run from json input: {}'.format(json_input))
+    # Must create record first
+    try:
+        run = Run(record_id=json_input['id'],
+                  user=json_input.get('user'),
+                  user_defined=json_input.get('user_defined'),
+                  version=json_input.get('version'),
+                  application=json_input['application'],
+                  values=json_input.get('values'),
+                  files=json_input.get('files'))
+    except KeyError as e:
+        msg = 'Missing required key <{}>.'.format(e)
+        LOGGER.warn(msg)
+        raise ValueError(msg)
+    # Then set raw to json_input to grab any additional information.
+    run.raw.update({key: val for key, val in json_input.items()
+                    if key not in ['id', 'user', 'user_defined', 'version',
+                                   'type', 'application', 'values', 'files']})
+    return run

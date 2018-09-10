@@ -23,7 +23,7 @@ class Record(Model):
     record_id = columns.Text(primary_key=True)
     record_type = columns.Text()
     raw = columns.Text()
-    user_defined = columns.Map(columns.Text(), columns.Text())
+    user_defined = columns.Text()
 
 
 class DocumentFromRecord(Model):

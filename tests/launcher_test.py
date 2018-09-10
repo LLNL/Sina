@@ -57,8 +57,8 @@ class TestCLI(unittest.TestCase):
         # Ingesting without keyspace shouldn't result in another call
         with self.assertRaises(ValueError) as context:
             launcher.ingest(self.args)
-            self.assertIn("not provided. In the future", context.exception)
-            mock_import.assert_called_once()
+        self.assertIn("not provided. In the future", str(context.exception))
+        mock_import.assert_called_once()
 
     def test_ingest_local_ids(self):
         """Verify importer is correctly substituting local IDs for globals."""
@@ -80,21 +80,24 @@ class TestCLI(unittest.TestCase):
         no_subject = ('{"relationships":[{"object":"foo","predicate":"bar"}]}')
         local_ids = {"foo": "global_foo"}
         with self.assertRaises(ValueError) as context:
-            _process_relationship_entry(entry=json.loads(no_subject),
-                                        local_ids=local_ids)
-            self.assertIn("requires one of: subject", context.exception)
+            _process_relationship_entry(
+                entry=json.loads(no_subject)['relationships'][0],
+                local_ids=local_ids)
+        self.assertIn("requires one of: subject", str(context.exception))
         no_object = ('{"relationships":[{"subject":"foo","predicate":"bar"}]}')
         with self.assertRaises(ValueError) as context:
-            _process_relationship_entry(entry=json.loads(no_object),
-                                        local_ids=local_ids)
-            self.assertIn("requires one of: object", context.exception)
+            _process_relationship_entry(
+                entry=json.loads(no_object)['relationships'][0],
+                local_ids=local_ids)
+        self.assertIn("requires one of: object", str(context.exception))
         no_global = ('{"relationships":[{"local_subject":"foo"'
                      ',"predicate":"bar","local_object":"spam"}]}')
         with self.assertRaises(ValueError) as context:
-            _process_relationship_entry(entry=json.loads(no_global),
-                                        local_ids=local_ids)
-            self.assertIn("Local_subject and/or local_object must be",
-                          context.exception)
+            _process_relationship_entry(
+                entry=json.loads(no_global)['relationships'][0],
+                local_ids=local_ids)
+        self.assertIn("Local_subject and/or local_object must be",
+                      str(context.exception))
 
     @patch('sina.launcher.import_json', return_value=True)
     def test_ingest_error_messages(self, mock_import):
@@ -103,14 +106,15 @@ class TestCLI(unittest.TestCase):
         self.args.database = "also_fake.null"
         with self.assertRaises(ValueError) as context:
             launcher.ingest(self.args)
-            self.assertIn("--source-type not provided", context.exception)
-            self.assertIn("not provided and unable", context.exception)
+        self.assertIn("--source-type not provided", str(context.exception))
+        self.assertIn("not provided and unable", str(context.exception))
         self.args.source = "fake.cass"
         self.args.database = "also_fake.cass"
         with self.assertRaises(ValueError) as context:
             launcher.ingest(self.args)
-            self.assertIn("only json is supported", context.exception)
-            self.assertIn("only cass and sql are supported for ingesting", context.exception)
+        self.assertIn("only json is supported", str(context.exception))
+        self.assertIn("only cass and sql are supported for ingesting",
+                      str(context.exception))
         mock_import.assert_not_called()
 
     @patch('sina.launcher.sql.RecordDAO.get_given_document_uri',
@@ -181,8 +185,8 @@ class TestCLI(unittest.TestCase):
         self.args.scalar = ""
         with self.assertRaises(ValueError) as context:
             launcher.query(self.args)
-            self.assertIn("not provided and unable", context.exception)
-            self.assertIn("You must specify a query type!", context.exception)
+        self.assertIn("not provided and unable", str(context.exception))
+        self.assertIn("You must specify a query type!", str(context.exception))
         mock_sql_query.assert_not_called()
         self.args.source = "fake.cass"
         self.args.database = "also_fake.cass"
@@ -190,5 +194,6 @@ class TestCLI(unittest.TestCase):
         self.args.scalar = "somescalar=[1,2]"
         with self.assertRaises(ValueError) as context:
             launcher.query(self.args)
-            self.assertIn("Raw queries don't support additional query", context.exception)
+        self.assertIn("Raw queries don't support additional query",
+                      str(context.exception))
         mock_cass_query.assert_not_called()

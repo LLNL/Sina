@@ -6,6 +6,7 @@ import tempfile
 import time
 import json
 import csv
+import logging
 from collections import OrderedDict
 from mock import MagicMock, patch
 
@@ -13,6 +14,8 @@ import sina.datastores.sql as sina_sql
 import sina.datastores.sql_schema as schema
 from sina.utils import ScalarRange, import_json, export, _export_csv
 from sina.model import Run, Record
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _populate_database_with_scalars(session):
@@ -124,8 +127,6 @@ class TestSQL(unittest.TestCase):
         child_from_scalar = run_factory.get_given_scalar(child_scalar)
         self.assertEquals(canonical['records'][1]['application'],
                           child.application)
-        self.assertEquals(json.dumps(canonical['records'][0]), parent.raw)
-        self.assertEquals(json.dumps(canonical['records'][1]), child.raw)
         self.assertEquals(child.record_id, child_from_uri[0].record_id)
         self.assertEquals(child.record_id, child_from_scalar[0].record_id)
         self.assertEquals(canonical['relationships'][0]['predicate'],
@@ -173,10 +174,10 @@ class TestSQL(unittest.TestCase):
                 scalar_names=scalars,
                 output_type='joes_output_type',
                 output_file=self.test_file_path.name)
-            self.assertIn('Given "joes_output_type" for output_type and it '
-                          'must  be one of the following: csv',
-                          context.exception)
-            self.assertEqual(mock.call_count, 0)
+        self.assertIn('Given "joes_output_type" for output_type and it must '
+                      'be one of the following: csv',
+                      str(context.exception))
+        self.assertEqual(mock.call_count, 0)
 
     def test_export_one_scalar_csv_good_input(self):
         """Test export one scalar correctly to csv from a sql database."""
@@ -265,19 +266,37 @@ class TestSQL(unittest.TestCase):
     def test_recorddao_basic(self):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = sina_sql.DAOFactory().createRecordDAO()
-        mock_record = MagicMock(record_id="spam", record_type="eggs", raw="yo",
+        mock_record = MagicMock(record_id="spam", record_type="eggs",
                                 values=[{"name": "eggs",
                                          "value": 12,
                                          "units": None,
                                          "tags": ["runny"]}],
                                 files=[{"uri": "eggs.brek",
                                         "mimetype": "egg",
-                                        "tags": ["fried"]}])
+                                        "tags": ["fried"]}],
+                                user_defined=None,
+                                raw={
+                                     "record_id": "spam",
+                                     "record_type": "eggs",
+                                     "user_defined": "None",
+                                     "values": [{
+                                                 "name": "eggs",
+                                                 "value": 12,
+                                                 "units": "None",
+                                                 "tags": ["runny"]
+                                                }
+                                                ],
+                                     "files": [{
+                                                 "uri": "eggs.brek",
+                                                 "mimetype": "egg",
+                                                 "tags": ["fried"]
+                                               }
+                                               ]
+                                })
         record_dao.insert(mock_record)
         returned_record = record_dao.get("spam")
         self.assertEquals(returned_record.record_id, mock_record.record_id)
         self.assertEquals(returned_record.record_type, mock_record.record_type)
-        self.assertEquals(returned_record.raw, mock_record.raw)
         returned_scalars = record_dao.get_scalars("spam", ["eggs"])
         self.assertEquals(returned_scalars, mock_record.values)
         returned_files = record_dao.get_files("spam")
@@ -299,12 +318,36 @@ class TestSQL(unittest.TestCase):
         record_dao = sina_sql.DAOFactory().createRecordDAO()
         vals_files = MagicMock(record_id="spam",
                                record_type="new_eggs",
-                               raw="{changed}",
                                values=[{"name": "foo", "value": 12},
                                        {"name": "bar", "value": "1",
                                         "tags": ("in")}],
                                files=[{"uri": "ham.png", "mimetype": "png"},
-                                      {"uri": "ham.curve", "tags": ["hammy"]}])
+                                      {"uri": "ham.curve", "tags": ["hammy"]}],
+                               user_defined=None,
+                               raw={
+                                    "record_id": "spam",
+                                    "record_type": "new_eggs",
+                                    "user_defined": "None",
+                                    "values": [{
+                                                "name": "foo",
+                                                "value": 12
+                                               },
+                                               {
+                                                "name": "bar",
+                                                "value": "1",
+                                                "tags": ["in"]
+                                               }
+                                               ],
+                                    "files": [{
+                                                "uri": "ham.png",
+                                                "mimetype": "png"
+                                              },
+                                              {
+                                                "uri": "ham.curve",
+                                                "tags": ["hammy"]
+                                              }
+                                              ]
+                               })
         record_dao.insert(vals_files)
         scal = ScalarRange(name="foo", min=12, min_inclusive=True,
                            max=12, max_inclusive=True)
@@ -393,11 +436,37 @@ class TestSQL(unittest.TestCase):
         mock_get.return_value = True
         factory = sina_sql.DAOFactory()
         record_dao = factory.createRecordDAO()
-        mock_rec = MagicMock(record_id="spam", record_type="run", raw="yo")
-        mock_rec2 = MagicMock(record_id="spam2", record_type="run", raw="yo")
-        mock_rec3 = MagicMock(record_id="spam3", record_type="foo", raw="yo")
-        mock_rec4 = MagicMock(record_id="spam4", record_type="bar", raw="yo")
-        mock_rec5 = MagicMock(record_id="spam1", record_type="run", raw="yo")
+        mock_rec = MagicMock(record_id="spam", record_type="run",
+                             application="skillet",
+                             raw={
+                                    "record_id": "spam",
+                                    "record_type": "run",
+                                    "application": "skillet"
+                              })
+        mock_rec2 = MagicMock(record_id="spam2", record_type="run",
+                              application="skillet",
+                              raw={
+                                    "record_id": "spam2",
+                                    "record_type": "run",
+                                    "application": "skillet"
+                               })
+        mock_rec3 = MagicMock(record_id="spam3", record_type="foo",
+                              raw={
+                                    "record_id": "spam3",
+                                    "record_type": "foo",
+                              })
+        mock_rec4 = MagicMock(record_id="spam4", record_type="bar",
+                              raw={
+                                    "record_id": "spam4",
+                                    "record_type": "bar",
+                              })
+        mock_rec5 = MagicMock(record_id="spam1", record_type="run",
+                              application="skillet",
+                              raw={
+                                    "record_id": "spam1",
+                                    "record_type": "run",
+                                    "application": "skillet"
+                              })
         record_dao.insert(mock_rec)
         record_dao.insert(mock_rec2)
         record_dao.insert(mock_rec3)
@@ -406,7 +475,6 @@ class TestSQL(unittest.TestCase):
         get_one = record_dao.get_all_of_type("bar")
         self.assertEqual(len(get_one), 1)
         self.assertIsInstance(get_one[0], Record)
-        self.assertEqual(get_one[0].raw, mock_rec4.raw)
         get_many = record_dao.get_all_of_type("run")
         self.assertEqual(len(get_many), 3)
         get_none = record_dao.get_all_of_type("butterscotch")
@@ -480,19 +548,28 @@ class TestSQL(unittest.TestCase):
                               mock_relationship.predicate)
         with self.assertRaises(ValueError) as context:
             relationship_dao.insert(subject_id="spam", object_id="eggs")
-            self.assertIn('Must supply either', context.exception)
+        self.assertIn('Must supply either', str(context.exception))
 
     # RunDAO
     def test_runddao_basic(self):
         """Test that RunDAO is inserting and getting correnctly."""
         run_dao = sina_sql.DAOFactory().createRunDAO()
-        mock_run = MagicMock(record_id="spam", raw="yo",
-                             application="bar", record_type="run",
-                             user="bep", user_defined="eggs", version=None)
+        mock_run = MagicMock(record_id="spam", application="bar",
+                             record_type="run", user="bep",
+                             user_defined={"eggs": "scrambled"}, version=None,
+                             raw={
+                                    "record_id": "spam",
+                                    "application": "bar",
+                                    "record_type": "run",
+                                    "user": "bep",
+                                    "user_defined": {
+                                        "eggs": "scrambled"
+                                    },
+                                    "version": "None"
+                                })
         run_dao.insert(mock_run)
         returned_run = run_dao.get("spam")
         self.assertEquals(returned_run.record_id, mock_run.record_id)
-        self.assertEquals(returned_run.raw, mock_run.raw)
         self.assertEquals(returned_run.application, mock_run.application)
         self.assertEquals(returned_run.user, mock_run.user)
         self.assertEquals(returned_run.user_defined, mock_run.user_defined)
@@ -511,11 +588,17 @@ class TestSQL(unittest.TestCase):
         factory = sina_sql.DAOFactory()
         _populate_database_with_scalars(factory.session)
         run_dao = factory.createRunDAO()
-        mock_rec = MagicMock(record_id="spam2", record_type="task", raw="yo")
+        mock_rec = MagicMock(record_id="spam2", record_type="task",
+                             user_defined=None,
+                             raw={
+                                    "record_id": "spam2",
+                                    "record_type": "task",
+                                    "user_defined": "None",
+                                })
         run = Run(record_id="spam", user="bep", application="foo",
-                  version="1.2", user_defined='{"spam": "eggs"}')
+                  version="1.2", user_defined={"spam": "eggs"})
         run2 = Run(record_id="spam3", user="egg", application="foo",
-                   version="0.4", user_defined='{"eggs": "spam"}')
+                   version="0.4", user_defined={"eggs": "spam"})
         run_dao.record_DAO.insert(mock_rec)
         run_dao.insert_many([run, run2])
         multi_range = ScalarRange(name="spam_scal")
@@ -524,4 +607,10 @@ class TestSQL(unittest.TestCase):
         # They're returned in primary key order
         spam_run = multi_scalar[0]
         self.assertEquals(spam_run.user, run.user)
-        self.assertEquals(spam_run.raw, run.raw)
+
+
+# with self.assertRaises(ValueError) as context:
+#
+#           run3 = Run(record_id="spam3", user="egg", application="foo",
+#                      version="0.4", user_defined={'"eggs": "spam"'})
+#           self.assertIn('Must supply either', context.exception)

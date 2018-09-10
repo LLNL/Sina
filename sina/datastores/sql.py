@@ -4,6 +4,7 @@ import numbers
 import logging
 import sqlalchemy
 import json
+import ast
 
 import sina.dao as dao
 import sina.model as model
@@ -29,11 +30,12 @@ class RecordDAO(dao.RecordDAO):
         :param record: A Record to insert
         """
         LOGGER.debug('Inserting {} into SQL.'.format(record))
-        user_defined = (str(record.user_defined) if record.user_defined else None)
+        user_defined = (str(record.user_defined)
+                        if record.user_defined else None)
         self.session.add(schema.Record(record_id=record.record_id,
                                        record_type=record.record_type,
-                                       raw=record.raw,
-                                       user_defined=user_defined))
+                                       user_defined=user_defined,
+                                       raw=str(record.raw)))
         if record.values:
             self._insert_values(record.record_id, record.values)
         if record.files:
@@ -95,10 +97,18 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Getting record with id={}'.format(record_id))
         query = (self.session.query(schema.Record)
                  .filter(schema.Record.record_id == record_id).one())
-        return model.Record(record_id=query.record_id,
-                            record_type=query.record_type,
-                            raw=query.raw,
-                            user_defined=query.user_defined,)
+        record = model.Record(record_id=query.record_id,
+                              record_type=query.record_type,
+                              user_defined=(ast.literal_eval(
+                                            query.user_defined)
+                                            if query.user_defined
+                                            else None))
+        record.raw.update({key: val
+                          for key, val in ast.literal_eval(query.raw).items()
+                          if key not in ['record_id',
+                                         'record_type',
+                                         'user_defined']})
+        return record
 
     def get_all_of_type(self, record_type):
         """
@@ -111,9 +121,17 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Getting all records of type {}.'.format(record_type))
         query = (self.session.query(schema.Record)
                  .filter(schema.Record.record_type == record_type))
-        return [model.Record(record_id=x.record_id,
-                             record_type=x.record_type,
-                             raw=x.raw) for x in query.all()]
+        records = []
+        for x in query.all():
+            record = model.Record(record_id=x.record_id,
+                                  record_type=x.record_type)
+            record.raw.update({key: val
+                              for key, val in ast.literal_eval(x.raw).items()
+                              if key not in ['record_id',
+                                             'record_type',
+                                             'user_defined']})
+            records.append(record)
+        return records
 
     def get_given_document_uri(self, uri, accepted_ids_list=None):
         """
@@ -474,12 +492,24 @@ class RunDAO(dao.RunDAO):
                   .filter(schema.Record.record_id == run_id).one())
         run = (self.session.query(schema.Run)
                .filter(schema.Run.record_id == run_id).one())
-        return model.Run(record_id=run_id,
-                         raw=record.raw,
-                         application=run.application,
-                         user=run.user,
-                         user_defined=record.user_defined,
-                         version=run.version)
+        run_return = model.Run(record_id=run_id,
+                               application=run.application,
+                               user=run.user,
+                               user_defined=(ast.literal_eval(
+                                             record.user_defined)
+                                             if record.user_defined
+                                             else None),
+                               version=run.version)
+
+        run_return.raw.update({key: val
+                              for key, val in ast.literal_eval(record.raw).items()
+                              if key not in ['record_id',
+                                             'record_type',
+                                             'application',
+                                             'user',
+                                             'user_defined',
+                                             'version']})
+        return run_return
 
     def _convert_record_to_run(self, record):
         """
@@ -498,7 +528,6 @@ class RunDAO(dao.RunDAO):
         run = (self.session.query(schema.Run)
                .filter(schema.Run.record_id == record.record_id).one())
         return model.Run(record_id=record.record_id,
-                         raw=record.raw,
                          application=run.application,
                          user=run.user,
                          user_defined=record.user_defined,
