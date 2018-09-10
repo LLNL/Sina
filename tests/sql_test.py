@@ -20,26 +20,26 @@ LOGGER = logging.getLogger(__name__)
 
 def _populate_database_with_scalars(session):
     """Add test scalars to a database."""
-    session.add(schema.Scalar(record_id="spam",
-                              name="spam_scal",
-                              value=10,
-                              units="pigs",
-                              tags='["hammy"]'))
-    session.add(schema.Scalar(record_id="eggs",
-                              name="eggs_scal",
-                              value=0))
-    session.add(schema.Scalar(record_id="spam",
-                              name="spam_scal_2",
-                              value=200))
-    session.add(schema.Scalar(record_id="spam2",
-                              name="spam_scal",
-                              value=10.99999))
-    session.add(schema.Scalar(record_id="spam3",
-                              name="spam_scal",
-                              value=10.5))
-    session.add(schema.Scalar(record_id="spam3",
-                              name="spam_scal_2",
-                              value=10.5))
+    session.add(schema.ScalarData(record_id="spam",
+                                  name="spam_scal",
+                                  value=10,
+                                  units="pigs",
+                                  tags='["hammy"]'))
+    session.add(schema.ScalarData(record_id="eggs",
+                                  name="eggs_scal",
+                                  value=0))
+    session.add(schema.ScalarData(record_id="spam",
+                                  name="spam_scal_2",
+                                  value=200))
+    session.add(schema.ScalarData(record_id="spam2",
+                                  name="spam_scal",
+                                  value=10.99999))
+    session.add(schema.ScalarData(record_id="spam3",
+                                  name="spam_scal",
+                                  value=10.5))
+    session.add(schema.ScalarData(record_id="spam3",
+                                  name="spam_scal_2",
+                                  value=10.5))
     session.commit()
 
 
@@ -267,7 +267,7 @@ class TestSQL(unittest.TestCase):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = sina_sql.DAOFactory().createRecordDAO()
         mock_record = MagicMock(record_id="spam", record_type="eggs",
-                                values=[{"name": "eggs",
+                                data=[{"name": "eggs",
                                          "value": 12,
                                          "units": None,
                                          "tags": ["runny"]}],
@@ -279,7 +279,7 @@ class TestSQL(unittest.TestCase):
                                      "record_id": "spam",
                                      "record_type": "eggs",
                                      "user_defined": "None",
-                                     "values": [{
+                                     "data": [{
                                                  "name": "eggs",
                                                  "value": 12,
                                                  "units": "None",
@@ -298,7 +298,7 @@ class TestSQL(unittest.TestCase):
         self.assertEquals(returned_record.record_id, mock_record.record_id)
         self.assertEquals(returned_record.record_type, mock_record.record_type)
         returned_scalars = record_dao.get_scalars("spam", ["eggs"])
-        self.assertEquals(returned_scalars, mock_record.values)
+        self.assertEquals(returned_scalars, mock_record.data)
         returned_files = record_dao.get_files("spam")
         self.assertEquals(returned_files, mock_record.files)
 
@@ -318,7 +318,7 @@ class TestSQL(unittest.TestCase):
         record_dao = sina_sql.DAOFactory().createRecordDAO()
         vals_files = MagicMock(record_id="spam",
                                record_type="new_eggs",
-                               values=[{"name": "foo", "value": 12},
+                               data=[{"name": "foo", "value": 12},
                                        {"name": "bar", "value": "1",
                                         "tags": ("in")}],
                                files=[{"uri": "ham.png", "mimetype": "png"},
@@ -328,7 +328,7 @@ class TestSQL(unittest.TestCase):
                                     "record_id": "spam",
                                     "record_type": "new_eggs",
                                     "user_defined": "None",
-                                    "values": [{
+                                    "data": [{
                                                 "name": "foo",
                                                 "value": 12
                                                },

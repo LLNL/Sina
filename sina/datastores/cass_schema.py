@@ -35,7 +35,7 @@ class DocumentFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class RecordFromScalar(Model):
+class RecordFromScalarData(Model):
     """Query table for finding records given scalar criteria."""
 
     name = columns.Text(primary_key=True)
@@ -45,8 +45,8 @@ class RecordFromScalar(Model):
     tags = columns.Set(columns.Text())
 
 
-class ScalarFromRecord(Model):
-    """Query table for finding scalars given record ID."""
+class ScalarDataFromRecord(Model):
+    """Query table for finding a scalar-valued Record.data entry given record ID."""
 
     record_id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
@@ -55,11 +55,11 @@ class ScalarFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class RecordFromValue(Model):
+class RecordFromStringData(Model):
     """
-    Query table for finding records given value criteria.
+    Query table for finding records given string criteria (ex, "version"="1.2.3").
 
-    Values are any Record.value provided by the user that doesn't have a
+    String data are any Record.data entry provided by the user that doesn't have a
     number for a value (ex: "machine":"merl", "version":"1.2").
     """
 
@@ -70,8 +70,8 @@ class RecordFromValue(Model):
     tags = columns.Set(columns.Text())
 
 
-class ValueFromRecord(Model):
-    """Query table for finding value given record ID."""
+class StringDataFromRecord(Model):
+    """Query table for finding a string-valued Record.data entry given record ID."""
 
     record_id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
@@ -146,30 +146,30 @@ def cross_populate_scalar_and_record(name,
                                      units=None,
                                      force_overwrite=False):
     """
-    Add entries to both the Scalar_from_Record and Record_from_Scalar tables.
+    Add scalar-value data entries to ScalarData_from_Record and Record_from_ScalarData tables.
 
-    These tables have the same data (but are organized differently) to allow
+    These tables have the same data but are organized differently to allow
     for various queries.
 
-    This works on only a single scalar and record at a time. For inserting
-    multiple scalars or records, see do_general_batch_insert().
+    Each call handles one entry from one Record's "data" attribute. For mass
+    (batch) insertion, see RecordDAO.insert_many().
 
-    :param name: The name of the scalar
-    :param value: The scalar's value
-    :param record_id: The id of the record containing the scalar
-    :param tags: Tags to be applied to this scalar
-    :param units: Units of the scalar
+    :param name: The name of the entry
+    :param value: The entry's value (must be a scalar)
+    :param record_id: The id of the record containing the entry
+    :param tags: Tags to be applied to this entry
+    :param units: Units of the entry.
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
-    LOGGER.debug('Cross populating scalar and record with: name={}, value={}, '
+    LOGGER.debug('Cross populating scalar data and record tables with: name={}, value={}, '
                  'record_id={}, tags={}, units={}, and force_overwrite={}.'
                  .format(name, value, record_id, tags, units, force_overwrite))
-    scalar_from_record_create = (ScalarFromRecord.create if force_overwrite
-                                 else ScalarFromRecord.if_not_exists()
+    scalar_from_record_create = (ScalarDataFromRecord.create if force_overwrite
+                                 else ScalarDataFromRecord.if_not_exists()
                                  .create)
-    record_from_scalar_create = (RecordFromScalar.create if force_overwrite
-                                 else RecordFromScalar.if_not_exists()
+    record_from_scalar_create = (RecordFromScalarData.create if force_overwrite
+                                 else RecordFromScalarData.if_not_exists()
                                  .create)
 
     scalar_from_record_create(record_id=record_id,
@@ -186,34 +186,37 @@ def cross_populate_scalar_and_record(name,
                               )
 
 
-def cross_populate_value_and_record(name,
-                                    value,
-                                    record_id,
-                                    tags=None,
-                                    units=None,
-                                    force_overwrite=False):
+def cross_populate_string_and_record(name,
+                                     value,
+                                     record_id,
+                                     tags=None,
+                                     units=None,
+                                     force_overwrite=False):
     """
-    Add entries to both the Value_from_Record and Record_from_Value tables.
+    Add string-value data entries to StringData_from_Record and Record_from_StringData tables.
 
-    These tables have the same data (but are organized differently) to allow
+    These tables have the same data but are organized differently to allow
     for various queries.
 
-    :param name: The name of the value (non-scalar)
-    :param value: The value's value
-    :param record_id: The id of the record containing the value
-    :param tags: Tags to be applied to this value
-    :param units: Units of the value.
+    Each call handles one entry from one Record's "data" attribute. For mass
+    (batch) insertion, see RecordDAO.insert_many().
+
+    :param name: The name of the entry
+    :param value: The entry's value (must be a string)
+    :param record_id: The id of the record containing the entry
+    :param tags: Tags to be applied to this entry
+    :param units: Units of the entry.
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
-    LOGGER.debug('Cross populating value and record with: name={}, value={}, '
+    LOGGER.debug('Cross populating string data and record tables with: name={}, value={}, '
                  'record_id={}, tags={}, units={}, and force_overwrite={}.'
                  .format(name, value, record_id, tags, units, force_overwrite))
-    value_from_record_create = (ValueFromRecord.create if force_overwrite
-                                else ValueFromRecord.if_not_exists()
+    value_from_record_create = (StringDataFromRecord.create if force_overwrite
+                                else StringDataFromRecord.if_not_exists()
                                 .create)
-    record_from_value_create = (RecordFromValue.create if force_overwrite
-                                else RecordFromValue.if_not_exists()
+    record_from_value_create = (RecordFromStringData.create if force_overwrite
+                                else RecordFromStringData.if_not_exists()
                                 .create)
 
     value_from_record_create(record_id=record_id,
@@ -252,7 +255,7 @@ def form_connection(keyspace, node_ip_list=None):
     sync_table(ObjectFromSubject)
     sync_table(SubjectFromObject)
     sync_table(DocumentFromRecord)
-    sync_table(RecordFromScalar)
-    sync_table(ScalarFromRecord)
-    sync_table(ValueFromRecord)
-    sync_table(RecordFromValue)
+    sync_table(RecordFromScalarData)
+    sync_table(ScalarDataFromRecord)
+    sync_table(StringDataFromRecord)
+    sync_table(RecordFromStringData)

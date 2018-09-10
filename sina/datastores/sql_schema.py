@@ -64,20 +64,20 @@ class Record(Base):
                 .format(self.record_id, self.record_type))
 
 
-class Scalar(Base):
+class ScalarData(Base):
     """
-    Implementation of scalar table.
+    Implementation of a table to store scalar-type data.
 
-    The scalar table relates record ids to contained "values" if (and only if)
-    those "values" themselves have numerical values. For example,
+    The scalar table relates record ids to contained data if (and only if)
+    those data entries have numerical values. For example,
     "density":200.14 would be represented here, but "strategy":"best-fit" would
     not be. Instead, "strategy":"best-fit" would go in the Value table.
 
     These tables are not exposed to the user. It's decided based on type
-    which table should be access.
+    which table should be accessed.
     """
 
-    __tablename__ = 'Scalar'
+    __tablename__ = 'ScalarData'
     record_id = Column(String(255),
                        ForeignKey(Record.record_id),
                        nullable=False,
@@ -97,8 +97,8 @@ class Scalar(Base):
         self.tags = tags
 
     def __repr__(self):
-        """Return a string representation of a sql schema Scalar."""
-        return ('SQL Schema Scalar: <record_id={}, name={}, value={}, tags={},'
+        """Return a string representation of a sql schema ScalarData entry."""
+        return ('SQL Schema ScalarData: <record_id={}, name={}, value={}, tags={},'
                 'units={}>'
                 .format(self.record_id,
                         self.name,
@@ -107,12 +107,12 @@ class Scalar(Base):
                         self.units))
 
 
-class Value(Base):
+class StringData(Base):
     """
-    Implementation of value table.
+    Implementation of a table to store string-type data.
 
-    The value table relates record ids to contained "values" if (and only if)
-    those "values" themselves have non-numerical values. For example,
+    The string table relates record ids to contained data if (and only if)
+    those data entries have non-numerical values. For example,
     "density":"200.14" would be represented here, but "density":200.14 would
     not be, and would instead go in the scalar table. This is done so we can
     store non-scalar values while still giving users the benefit of numerical
@@ -122,7 +122,7 @@ class Value(Base):
     which table should be accessed.
     """
 
-    __tablename__ = 'Value'
+    __tablename__ = 'StringData'
     record_id = Column(String(255),
                        ForeignKey(Record.record_id),
                        nullable=False,
@@ -144,8 +144,8 @@ class Value(Base):
         self.tags = tags
 
     def __repr__(self):
-        """Return a string representation of a sql schema Value."""
-        return ('SQL Schema Value: <record_id={}, name={}, value={}, tags={}, '
+        """Return a string representation of a sql schema StringData entry."""
+        return ('SQL Schema StringData: <record_id={}, name={}, value={}, tags={}, '
                 'units={}>'
                 .format(self.record_id,
                         self.name,

@@ -22,8 +22,9 @@ attributes, each being an array:
 Records
 -------
 
-Every Record has, at minimum, an :code:`id` (or a :code:`local_id`) and a :code:`type` (run, msub, etc).
-Records can also have :code:`values`, :code:`files`, application data, arbitrary user-defined data, and more.
+Every Record has, at minimum, an :code:`id` (or a :code:`local_id`) and a
+:code:`type` (run, msub, etc). Records can also have :code:`data`, :code:`files`,
+application metadata, arbitrary user-defined information, and more.
 A minimal example of a Record:
 
 .. code-block:: javascript
@@ -53,9 +54,9 @@ A more fleshed-out example, with field descriptions:
            "mimetype": "image/png",
            "tags": ["summary_image","output"]}
       ],
-      // A list of values associated with the Record
-      "values": [
-          // Each value must have a name and value. Optionally, they can have tags and/or units.
+      // A list of data associated with the Record
+      "data": [
+          // Entries must have a name and value. Optionally, they can have tags and/or units.
           // We recommend standard SI units with / for division and ^ for exponentiation. This format may have future support in Sina.
           { "name": "max_density", "value": 3, "units": "kg/m^3" },
           { "name": "total_energy", "value": 12.2, "units": "MJ", "tags": ["output"]},
@@ -63,7 +64,7 @@ A more fleshed-out example, with field descriptions:
           { "name": "solver", "value": "GMRES", "tags": ["input", "left_quad"]}
       ],
       "user_defined": {
-          // Data that is not a value or file should be placed here.
+          // Information that does not make sense as a data or file entry should be placed here.
           // None of this will be interpreted by Sina. Instead, it will simply
           // be saved as part of the Record.
       }
@@ -128,7 +129,7 @@ may also support additional queries. What follows is a list of the
 special Record types supported by Sina, and the fields that can be added
 to a Mnoda Record to take advantage of that additional support. Note that **all
 fields supported by generic Mnoda Records are supported by the special types**,
-such as :code:`local_id`, :code:`values`, etc. Additionally, **all fields
+such as :code:`local_id`, :code:`data`, etc. Additionally, **all fields
 supported by special types that aren't included in the generic Record are optional.**
 
 Run
@@ -149,7 +150,7 @@ a user and version:
       "files": [
           {"uri": "run_image_1.png", "mimetype": "png"}
       ],
-      "values": [
+      "data": [
           { "name": "final_energy", "value": 4005.52, "units": "kJ"}
       ]
     }
@@ -171,7 +172,7 @@ Record fields represented:
           "files": [
               {"uri": "", "mimetype": "", "tags": []}
           ],
-          "values": [
+          "data": [
               { "name": "", "value": "", "units": "", "tags": []}
           ],
           "user_defined": {}
@@ -182,7 +183,7 @@ Record fields represented:
           "files": [
               {"uri": "", "mimetype": "", "tags": []}
           ],
-          "values": [
+          "data": [
               { "name": "", "value": "", "units": "", "tags": []}
           ],
           "user_defined": {}

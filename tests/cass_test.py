@@ -152,7 +152,7 @@ class TestSearch(unittest.TestCase):
 
         mock_record = MagicMock(record_id="spam", record_type="eggs",
                                 user_defined=None,
-                                values=[{"name": "eggs",
+                                data=[{"name": "eggs",
                                          "value": 12,
                                          "units": None,
                                          "tags": ["runny"]}],
@@ -163,7 +163,7 @@ class TestSearch(unittest.TestCase):
                                        "record_id": "spam",
                                        "record_type": "eggs",
                                        "user_defined": "None",
-                                       "values": [{
+                                       "data": [{
                                                    "name": "eggs",
                                                    "value": 12,
                                                    "units": "None",
@@ -184,11 +184,12 @@ class TestSearch(unittest.TestCase):
         self.assertEquals(returned_record.record_type, mock_record.record_type)
         self.assertEquals(returned_record.user_defined, mock_record.user_defined)
         returned_scalars = record_dao.get_scalars("spam", ["eggs"])
-        self.assertEquals(returned_scalars, mock_record.values)
+        self.assertEquals(returned_scalars, mock_record.data)
         returned_files = record_dao.get_files("spam")
         self.assertEquals(returned_files, mock_record.files)
-        # Note that the values and files are checked in a later test,
+        # Note that the data and files are checked in a later test,
         # as they're not returned with the Record.
+        # TODO: this will be changing when Records are built from raws
         overwrite = MagicMock(record_id="spam",
                               record_type="new_eggs",
                               user_defined={"water": "bread",
@@ -217,11 +218,11 @@ class TestSearch(unittest.TestCase):
         vals_files = MagicMock(record_id="spam",
                                record_type="new_eggs",
                                user_defined=None,
-                               values=[{"name": "foo", "value": 12,
-                                        "units": None,
-                                        "tags": ["in", "on"]},
-                                       {"name": "bar", "value": "1",
-                                        "units": None}],
+                               data=[{"name": "foo", "value": 12,
+                                      "units": None,
+                                      "tags": ["in", "on"]},
+                                     {"name": "bar", "value": "1",
+                                      "units": None}],
                                files=[{"uri": "ham.png", "mimetype": "png"},
                                       {"uri": "ham.curve",
                                        "contents": "eggs"}],
@@ -229,7 +230,7 @@ class TestSearch(unittest.TestCase):
                                       "record_id": "spam",
                                       "record_type": "new_eggs",
                                       "user_defined": "None",
-                                      "values": [{
+                                      "data": [{
                                                   "name": "foo",
                                                   "value": 12,
                                                   "units": "None",
@@ -477,7 +478,7 @@ class TestSearch(unittest.TestCase):
                                     },
                                     "version": "1.2.3",
                                     "files": "None",
-                                    "values": "None"
+                                    "data": "None"
                                 })
         run_dao.insert(mock_run)
         returned_run = run_dao.get("spam")
@@ -508,7 +509,7 @@ class TestSearch(unittest.TestCase):
                                     "record_type": "task",
                                     "user_defined": "None",
                                     "files": "None",
-                                    "values": "None"
+                                    "data": "None"
                                 })
         run = Run(record_id="spam", user="bep", application="foo",
                   version="1.2", user_defined={"spam": "eggs"})

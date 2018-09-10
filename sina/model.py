@@ -15,8 +15,7 @@ class Record(object):
     A record is any arbitrary object we've chosen to store.
 
     A record is guaranteed to have exactly two things: an id and a type.
-    Records may also have values and/or documents associated with them, as well
-    as a "raw" (the JSON string it was created from, if applicable).
+    Records may also have data and/or documents associated with them.
 
     There are subtypes of Records with additional field support, such as Runs.
     On ingestion, the "type" field determines whether the object is a Record or
@@ -28,21 +27,21 @@ class Record(object):
     of that child.
     """
 
-    def __init__(self, record_id, record_type, values=[], files=[],
+    def __init__(self, record_id, record_type, data=[], files=[],
                  user_defined={}):
         """
         Create Record with its id, type, and optional args.
 
-        Currently, values and files are expected to be lists of dicts.
+        Currently, data and files are expected to be lists of dicts.
         Lists of strings (ex: ['{"name":"foo"}']) won't be read correctly.
-        See the Mnoda section of the documentation for what values and
+        See the Mnoda section of the documentation for what data and
         files should contain, and try Record.is_valid(print_warnings=True)
         if you run into issues.
 
         :param record_id: The id of the record. Should be unique within a dataset
         :param record_type: The type of record. Some types are reserved for
                             children, see sina.model.RESERVED_TYPES
-        :param values: A list of dicts representing the Record's values
+        :param data: A list of dicts representing the Record's data.
         :param files: A list of dicts representing the Record's files
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
@@ -50,7 +49,7 @@ class Record(object):
         self.raw = {}
         self.record_id = record_id
         self.record_type = record_type
-        self.values = values
+        self.data = data
         self.files = files
         self.user_defined = user_defined
 
@@ -75,12 +74,12 @@ class Record(object):
         self['record_type'] = record_type
 
     @property
-    def values(self):
-        return self['values']
+    def data(self):
+        return self['data']
 
-    @values.setter
-    def values(self, values):
-        self['values'] = values
+    @data.setter
+    def data(self, data):
+        self['data'] = data
 
     @property
     def files(self):
@@ -127,8 +126,8 @@ class Record(object):
         :returns: A JSON string representing this Record
         """
         json_obj = {"id": self.record_id, "type": self.record_type}
-        if self.values:
-            json_obj["values"] = self.values
+        if self.data:
+            json_obj["data"] = self.data
         if self.files:
             json_obj["files"] = self.files
         if self.user_defined:
@@ -138,7 +137,7 @@ class Record(object):
     def _is_valid(self, print_warnings=False):
         """Test whether a Record's members are formatted correctly.
 
-        The ingester expects certain types to be reserved, and for values
+        The ingester expects certain types to be reserved, and for data
         and files to follow a specific format. This method will describe any
         issues with a Record.
 
@@ -152,10 +151,10 @@ class Record(object):
         # actually a reserved object. This check is removed for now because it
         # warrants significant code changes in sql/cass modules.
 
-        # For files/values, we break immediately on finding any error--in
+        # For files/data, we break immediately on finding any error--in
         # practice these lists can be thousands of entries long, in which case
         # the error is probably in an importer script (and so present in all
-        # files/values) and doesn't warrant spamming the logger.
+        # files/data) and doesn't warrant spamming the logger.
         if self.files:
             for entry in self.files:
                 if not isinstance(entry, dict):
@@ -176,8 +175,8 @@ class Record(object):
                     (warnings.append("At least one file entry belonging to "
                                      "Record {} has a malformed tag list. File: {}"
                                      .format(self.record_id, entry)))
-        if self.values:
-            for entry in self.values:
+        if self.data:
+            for entry in self.data:
                 if not isinstance(entry, dict):
                     (warnings.append("At least one value entry belonging to "
                                      "Record {} is not a dictionary. Value: {}"
@@ -257,12 +256,12 @@ class Run(Record):
 
     def __init__(self, record_id, application,
                  user=None, version=None, user_defined=None,
-                 values=None, files=None):
+                 data=None, files=None):
         """Create Run from Record info plus metadata."""
         super(Run, self).__init__(record_id=record_id,
                                   record_type="run",
                                   user_defined=user_defined,
-                                  values=values,
+                                  data=data,
                                   files=files)
         self.application = application
         self.user = user
@@ -337,7 +336,7 @@ def generate_record_from_json(json_input):
         record = Record(record_id=json_input['id'],
                         record_type=json_input['type'],
                         user_defined=json_input.get('user_defined'),
-                        values=json_input.get('values'),
+                        data=json_input.get('data'),
                         files=json_input.get('files'))
     except KeyError as e:
         msg = 'Missing required key <{}>.'.format(e)
@@ -345,7 +344,7 @@ def generate_record_from_json(json_input):
         raise ValueError(msg)
     # Then set raw to json_input to grab any additional information.
     record.raw.update({key: val for key, val in json_input.items()
-                      if key not in ['id', 'type', 'user_defined', 'values',
+                      if key not in ['id', 'type', 'user_defined', 'data',
                                      'files']})
     return record
 
@@ -365,7 +364,7 @@ def generate_run_from_json(json_input):
                   user_defined=json_input.get('user_defined'),
                   version=json_input.get('version'),
                   application=json_input['application'],
-                  values=json_input.get('values'),
+                  data=json_input.get('data'),
                   files=json_input.get('files'))
     except KeyError as e:
         msg = 'Missing required key <{}>.'.format(e)
@@ -374,5 +373,5 @@ def generate_run_from_json(json_input):
     # Then set raw to json_input to grab any additional information.
     run.raw.update({key: val for key, val in json_input.items()
                     if key not in ['id', 'user', 'user_defined', 'version',
-                                   'type', 'application', 'values', 'files']})
+                                   'type', 'application', 'data', 'files']})
     return run

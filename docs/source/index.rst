@@ -7,12 +7,14 @@ Sina documentation index
 +++++++++++++++++++++++++++
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
 
-   basic_usage
+   readme
    mnoda
-   cli_examples
-   api_examples
+   cli_basics
+   api_basics
+   examples
+   faq
    modules
 
 * :ref:`genindex`

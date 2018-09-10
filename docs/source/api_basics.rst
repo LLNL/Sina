@@ -1,4 +1,3 @@
-API Examples
 ============
 
 This page contains minimal examples to cover Sina's most important concepts.
@@ -6,8 +5,9 @@ For further examples, please see the `sina-examples repository
 <https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina-examples>`__.
 
 
+=======
 API Basics
-~~~~~~~~~~
+==========
 
 The Sina API is organized around Records and Relationships. A Record is
 a piece of data conforming to the Mnoda JSON schema. It typically represents
@@ -107,9 +107,9 @@ Filtering Based on Scalar Criteria
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Records can also be selected based on the scalars they contain. A Record "contains"
-a scalar if the scalar is both named in its value list and assigned a numerical value.
-For example, :code:`"values": ["volume":1.2]` describes a scalar.
-:code:`"values": ["version":"1.2"]` does not. Scalar criteria can be described
+a scalar if the scalar is both named in its data list and assigned a numerical value.
+For example, :code:`"data": ["volume":1.2]` describes a scalar.
+:code:`"data": ["version":"1.2"]` does not. Scalar criteria can be described
 using either strings (see the `CLI query examples <cli_examples.html#query>`__)
 or ScalarRanges, which are provided/documented in
 `sina.utils <generated_docs/sina.utils.html>`__. In short, a ScalarRange represents
