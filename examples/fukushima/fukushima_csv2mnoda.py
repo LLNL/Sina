@@ -46,6 +46,7 @@ Data Source: https://catalog.data.gov/dataset/\
 
 import argparse
 import csv
+import datetime
 import json
 import os
 import shutil
@@ -77,6 +78,8 @@ KEY_LONGITUDE = "longitude"
 MORE_FILES = [
     ('AMS C12 Sea Data Dictionary.pdf', 'data dictionary',
         'application/pdf'),
+    ('amsdatamarch25udpated1-110325170504-phpapp02.pptx', 'assessment', 
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation')
     ]
 
 # Name of the Mnoda file we will generate
@@ -120,64 +123,59 @@ def process_data(dataset_fn, dest_dn):
     # available to the user in the destination directory
     input_fn = os.path.realpath(dataset_fn)
     shutil.copy(input_fn, files_dn)
-    for extra_fn, _tag, _mtype in MORE_FILES:
+    for extra_fn, _, _ in MORE_FILES:
         shutil.copy(os.path.realpath(os.path.join(os.path.dirname(input_fn),
                                                   extra_fn)), files_dn)
 
     # Now process the Fukushima data CSV file
     mdata = FukushimaData(files_dn)
     with open(input_fn, "r") as ifd:
-        last_ymd = ''
-        hdr = ''
-        lexp = []
+        last_exp_id = ''
+        header = ''
+        obs = []
 
-        rdr = csv.reader(ifd, delimiter=',')
+        creader = csv.reader(ifd, delimiter=',')
         try:
-            for i, row in enumerate(rdr):
+            for i, row in enumerate(creader):
                 if i > 0 and len(row[0]) > 0:
-                    tm = row[0].split()
+                    obs_dt = datetime.datetime.strptime(row[0],
+                                                        '%m/%d/%Y %I:%M:%S %p')
 
                     # The "experiment" is the flight date
-                    ld = tm[0].split('/')
-                    ymd = '-'.join(['%02d' % int(e) for e in [ld[2],
-                        ld[0], ld[1]]])
+                    exp_id = obs_dt.strftime('%Y-%m-%d')
+                    if exp_id != last_exp_id:
+                        if last_exp_id != '':
+                            mdata.write_exp(last_exp_id, obs)
+                            mdata.add_exp(last_exp_id)
 
-                    if ymd != last_ymd:
-                        if last_ymd != '':
-                            mdata.add_exp(last_ymd, lexp)
-
-                        last_ymd = ymd
-                        lexp = [hdr, row]
+                        last_exp_id = exp_id
+                        obs = [header, row]
                     else:
-                        lexp.append(row)
-
-                    # The observation id is a reformatted date-time
-                    lt = [int(e) for e in tm[1].split(':')]
-                    if tm[2] == 'PM':
-                        lt[0] += 12
-                    hms = '-'.join(['%02d' % int(e) for e in lt])
-                    oid = '-'.join([ymd, hms])
+                        obs.append(row)
 
                     # Add the relation between the experiment and observation
-                    mdata.add_exp2obs(ymd, oid)
+                    # .. The observation id is a reformatted date-time
+                    obs_id = '-'.join([exp_id, obs_dt.strftime('%H-%M-%S')])
+                    mdata.add_exp2obs(exp_id, obs_id)
 
                     # Add the observation data
-                    mdata.add_obs(oid, row)
+                    mdata.add_obs(obs_id, row)
 
                 elif i == 0:
-                    hdr = row
+                    header = row
 
-            # Add last experiment
-            if last_ymd != '' and len(lexp) > 0:
-                mdata.add_exp(last_ymd, lexp)
+            # Add last experiment and its associated observations
+            if last_exp_id != '' and len(obs) > 0:
+                mdata.write_exp(last_exp_id, obs)
+                mdata.add_exp(last_exp_id)
 
-        except csv.Error, ce:
-            print("ERROR: %s: line %s: %s" % (dataset_fn, rdr.line_num,
-                                              str(ce)))
+        except csv.Error as cerr:
+            print("ERROR: %s: line %s: %s" % (dataset_fn, creader.line_num,
+                                              str(cerr)))
             sys.exit(1)
 
-        except Exception, exc:
-            print("ERROR: %s: line %s: %s: %s" % (dataset_fn, rdr.line_num,
+        except Exception as exc:
+            print("ERROR: %s: line %s: %s: %s" % (dataset_fn, creader.line_num,
                                                   exc.__class__.__name__,
                                                   str(exc)))
             traceback.print_exc()
@@ -203,54 +201,45 @@ class FukushimaData(object):
         self.add_source()
         self.add_units()
 
-    def add_exp(self, exp, lexp):
+    def add_exp(self, exp_id):
         """
-        Add an experiment record and write the associated observations to
-        a file.
+        Add an experiment record.
 
-        :param exp:      experiment id string
-        :param lexp:     list of observations associated with the experiment
+        :param exp_id: experiment id string
         """
-        # Write the associated observations to a new CSV file and add it
-        exp_fn = os.path.join(self.files_dn, '%s-data.csv' % exp)
-        with open(os.path.join(exp_fn), 'w') as ofd:
-            for row in lexp:
-                ofd.write('%s\n' % ','.join(row))
-        lfiles = [{"uri": exp_fn, "mimetype": "text/csv", "tags": ["data"]}]
-
-        # Add the experiment record
         self.recs.append({
             "type": "exp",
-            "id": exp,
-            "files": lfiles
+            "id": exp_id,
+            "files": [{"uri": self.get_exp_fn(exp_id), "mimetype": "text/csv",
+                      "tags": ["data"]}]
             })
 
-    def add_exp2obs(self, exp, obs):
+    def add_exp2obs(self, exp_id, obs_id):
         """
         Add an experiment-to-observation relationship.
 
-        :param exp: experiment id string
-        :param obs: observation id string
+        :param exp_id: experiment id string
+        :param obs_id: observation id string
         """
         self.rels.append({
-            "subject": exp,
+            "subject": exp_id,
             "predicate": "contains",
-            "object": obs,
+            "object": obs_id,
             })
 
-    def add_obs(self, oid, row):
+    def add_obs(self, obs_id, row):
         """
         Add the observation data.
 
-        :param oid: observation id string
-        :param row: list of observation or measurement data
+        :param obs_id: observation id string
+        :param row:    list of observation or measurement data
         """
         # Add the observation record
         timestamp, lat, lon, alt, agl, _numdet, live, _gc, gcnorm = row
         ts = timestamp.split()
         self.recs.append({
             "type": "obs",
-            "id": oid,
+            "id": obs_id,
             "data": [
                 {"name": "date", "value": ts[0]},
                 {"name": "time", "value": ' '.join(ts[1:])},
@@ -286,18 +275,26 @@ class FukushimaData(object):
 
     def add_units(self):
         """
-        Add the units records since the units are consistent across all 
+        Add the units records since the units are consistent across all
         observations.
         """
-        for key, units, desc in UNITS:
+        for units_id, units, desc in UNITS:
             self.recs.append({
                 "type": "units",
-                "id": key,
+                "id": units_id,
                 "data": [
                           {"name": "measure", "value": units},
                           {"name": "description", "value": desc},
                 ],
             })
+
+    def get_exp_fn(self, exp_id):
+        """
+        Return the file name associated with the experiment.
+
+        :param exp_id: experiment id string
+        """
+        return os.path.join(self.files_dn, '%s-data.csv' % exp_id)
 
     def write(self):
         """
@@ -313,6 +310,17 @@ class FukushimaData(object):
         with open(os.path.join(self.files_dn, MNODA_FN), 'w') as ofd:
             json.dump(mnoda, ofd, indent=4, separators=(',', ': '),
                       sort_keys=True)
+
+    def write_exp(self, exp_id, obs):
+        """
+        Write the associated observations to a flight-specific file.
+
+        :param exp_id: experiment id string
+        :param obs:    list of observations associated with the experiment
+        """
+        with open(self.get_exp_fn(exp_id), 'w') as ofd:
+            for row in obs:
+                ofd.write('%s\n' % ','.join(row))
 
 
 # ----------------------------------- MAIN -----------------------------------
