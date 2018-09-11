@@ -125,8 +125,9 @@ def process_data(dataset_fn, dest_dn):
     input_fn = os.path.realpath(dataset_fn)
     shutil.copy(input_fn, files_dn)
     for extra_fn, _, _ in MORE_FILES:
-        shutil.copy(os.path.realpath(os.path.join(os.path.dirname(input_fn),
-                                                  extra_fn)), files_dn)
+        path = os.path.join(os.path.dirname(input_fn), extra_fn)
+        if os.path.isfile(path):
+            shutil.copy(path, files_dn)
 
     # Now process the Fukushima data CSV file
     mdata = FukushimaData(files_dn)
@@ -264,9 +265,9 @@ class FukushimaData(object):
                        "tags": ["data"]})
 
         for extra_fn, tag, mtype in MORE_FILES:
-            lfiles.append({"uri": os.path.join(self.files_dn,
-                                               os.path.basename(extra_fn)),
-                           "mimetype": mtype, "tags": [tag]})
+            path = os.path.join(os.path.dirname(self.files_dn), extra_fn)
+            if os.path.isfile(path):
+                lfiles.append({"uri": path, "mimetype": mtype, "tags": [tag]})
 
         self.recs.append({
             "type": "source",
