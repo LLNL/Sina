@@ -15,8 +15,8 @@ Record types are:
 
 Relationships associated observations to experiments.
 
-Files are created for each flight date (aka experiment) based on data dictionary
-comments that each date should be treaded as a separate snapshot.
+Files are created for each flight date (aka experiment) based on data
+dictionary comments that each date should be treaded as a separate snapshot.
 
 The following is a list of the relevant column number-value pairings:
     1: Time (MM/DD/YYYY HH:MM:SS AM)
@@ -78,8 +78,9 @@ KEY_LONGITUDE = "longitude"
 MORE_FILES = [
     ('AMS C12 Sea Data Dictionary.pdf', 'data dictionary',
         'application/pdf'),
-    ('amsdatamarch25udpated1-110325170504-phpapp02.pptx', 'assessment', 
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+    ('amsdatamarch25udpated1-110325170504-phpapp02.pptx', 'assessment',
+        'application/vnd.openxmlformats-officedocument.presentationml.'
+        'presentation')
     ]
 
 # Name of the Mnoda file we will generate
