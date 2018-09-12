@@ -15,6 +15,10 @@ Record types are:
 
 Relationships associated observations to experiments.
 
+Note that units records were created (versus adding them to each of the nearly
+32.5K observation records) for efficiency.  Doing so also provides the
+opportunity to illustrate the concept of "joins" across record types.
+
 Files are created for each flight date (aka experiment) based on data dictionary
 comments that each date should be treaded as a separate snapshot.
 
@@ -78,7 +82,7 @@ KEY_LONGITUDE = "longitude"
 MORE_FILES = [
     ('AMS C12 Sea Data Dictionary.pdf', 'data dictionary',
         'application/pdf'),
-    ('amsdatamarch25udpated1-110325170504-phpapp02.pptx', 'assessment', 
+    ('amsdatamarch25udpated1-110325170504-phpapp02.pptx', 'assessment',
         'application/vnd.openxmlformats-officedocument.presentationml.presentation')
     ]
 
