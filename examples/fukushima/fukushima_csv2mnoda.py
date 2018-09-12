@@ -19,8 +19,8 @@ Note that units records were created (versus adding them to each of the nearly
 32.5K observation records) for efficiency.  Doing so also provides the
 opportunity to illustrate the concept of "joins" across record types.
 
-Files are created for each flight date (aka experiment) based on data dictionary
-comments that each date should be treaded as a separate snapshot.
+Files are created for each flight date (aka experiment) based on data 
+dictionary comments that each date should be treaded as a separate snapshot.
 
 The following is a list of the relevant column number-value pairings:
     1: Time (MM/DD/YYYY HH:MM:SS AM)
@@ -83,7 +83,8 @@ MORE_FILES = [
     ('AMS C12 Sea Data Dictionary.pdf', 'data dictionary',
         'application/pdf'),
     ('amsdatamarch25udpated1-110325170504-phpapp02.pptx', 'assessment',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+        'application/vnd.openxmlformats-officedocument.presentationml.'
+        'presentation')
     ]
 
 # Name of the Mnoda file we will generate
@@ -128,8 +129,9 @@ def process_data(dataset_fn, dest_dn):
     input_fn = os.path.realpath(dataset_fn)
     shutil.copy(input_fn, files_dn)
     for extra_fn, _, _ in MORE_FILES:
-        shutil.copy(os.path.realpath(os.path.join(os.path.dirname(input_fn),
-                                                  extra_fn)), files_dn)
+        path = os.path.join(os.path.dirname(input_fn), extra_fn)
+        if os.path.isfile(path):
+            shutil.copy(path, files_dn)
 
     # Now process the Fukushima data CSV file
     mdata = FukushimaData(files_dn)
@@ -267,9 +269,9 @@ class FukushimaData(object):
                        "tags": ["data"]})
 
         for extra_fn, tag, mtype in MORE_FILES:
-            lfiles.append({"uri": os.path.join(self.files_dn,
-                                               os.path.basename(extra_fn)),
-                           "mimetype": mtype, "tags": [tag]})
+            path = os.path.join(os.path.dirname(self.files_dn), extra_fn)
+            if os.path.isfile(path):
+                lfiles.append({"uri": path, "mimetype": mtype, "tags": [tag]})
 
         self.recs.append({
             "type": "source",
