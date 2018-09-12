@@ -19,7 +19,7 @@ Note that units records were created (versus adding them to each of the nearly
 32.5K observation records) for efficiency.  Doing so also provides the
 opportunity to illustrate the concept of "joins" across record types.
 
-Files are created for each flight date (aka experiment) based on data 
+Files are created for each flight date (aka experiment) based on data
 dictionary comments that each date should be treaded as a separate snapshot.
 
 The following is a list of the relevant column number-value pairings:
