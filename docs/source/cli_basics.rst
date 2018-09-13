@@ -83,7 +83,7 @@ The only form of export currently supported is csv::
 This would produce a csv file called :code:`out.csv` containing the values for
 "density" and "volume" stored in :code:`somefile.sqlite` for records "rec_1" and "rec_2". That might look something like this::
 
-  record_id,density,volume
+  id,density,volume
   rec_1,12.2,400
   rec_2,14,299.5
 

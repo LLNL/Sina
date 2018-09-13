@@ -65,34 +65,31 @@ Inserting objects is otherwise straightforward::
 
   ...
   from sina.model import Record, Run
+  from sina.datastores.sql import sql
 
-  my_record = Record(record_id="some_record_id",
-                     record_type="some_type",
-                     values=[{"name":"foo", "value": 12}],
+  factory = sql.DAOFactory(db_path='path_to_sqlite_file')
+
+  my_record = Record(id="some_id",
+                     type="some_type",
+                     data=[{"name":"foo", "value": 12}],
                      files=[{"uri":"bar/baz.qux", "tags":["output"]}])
 
-  # Use is_valid(print_warnings=True) to help with troubleshooting
-  if not my_record.is_valid(print_warnings=True):
-      raise ValueError("Malformed record")
-
   my_other_record = Record("another_id", "some_type")
+  record_dao = factory.createRecordDAO()
   record_dao.insert_many([my_record, my_other_record])
 
-  my_run = Run(record_id="some_run_id",
+  my_run = Run(id="some_run_id",
                application="some_application",
                user="John Doe",
-               values=[{"name":"oof", "value": 21}],
+               data=[{"name":"oof", "value": 21}],
                files=[{"uri":"bar/baz.qux"}])
+
   run_dao = factory.createRunDAO()
   run_dao.insert(my_run)
 
 Note that the (sub)type of Record is important--use the right constructor and
 DAO or, if you won't know the type in advance, consider using the CLI
 importer.
-
-Programmatically-created objects will not have the raw form of their JSON
-inserted into the database. Instead, it can be generated using
-:code:`my_record.to_json()`.
 
 
 Filtering Based on Scalar Criteria
@@ -190,5 +187,5 @@ methods that skip the json loading step entirely::
   print(record_dao.get_files("my_record_id"))
 
 This snippet would print a list of files associated with the record whose
-:code:`record_id="my_record_id"` For a full list of convenience methods,
+:code:`id="my_record_id"` For a full list of convenience methods,
 please see the `DAO documentation <generated_docs/sina.dao.html>`__.

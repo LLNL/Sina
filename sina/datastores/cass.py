@@ -5,8 +5,9 @@ import logging
 import fnmatch
 import six
 import collections
+import json
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery
-import ast
+
 
 import sina.dao as dao
 import sina.model as model
@@ -32,18 +33,15 @@ class RecordDAO(dao.RecordDAO):
                      .format(record, force_overwrite))
         create = (schema.Record.create if force_overwrite
                   else schema.Record.if_not_exists().create)
-        user_defined = (str(record.user_defined)
-                        if record.user_defined else None)
-        create(record_id=record.record_id,
-               record_type=record.record_type,
-               raw=str(record.raw),
-               user_defined=user_defined)
+        create(id=record.id,
+               type=record.type,
+               raw=json.dumps(record.raw))
         if record.data:
-            self._insert_data(record_id=record.record_id,
+            self._insert_data(id=record.id,
                               data=record.data,
                               force_overwrite=force_overwrite)
         if record.files:
-            self._insert_files(record_id=record.record_id,
+            self._insert_files(id=record.id,
                                files=record.files,
                                force_overwrite=force_overwrite)
 
@@ -72,26 +70,23 @@ class RecordDAO(dao.RecordDAO):
         # Because batch is done by partition key, we'll need to store info for
         # tables whose full per-partition info isn't supplied by one Record
         from_scalar_batch = collections.defaultdict(list)
-        from_value_batch = collections.defaultdict(list)
+        from_string_batch = collections.defaultdict(list)
 
         for record in list_to_insert:
             # Insert the Record itself
             create = (schema.Record.create if force_overwrite
                       else schema.Record.if_not_exists().create)
-            user_defined = (str(record.user_defined)
-                            if record.user_defined else None)
-            create(record_id=record.record_id,
-                   record_type=record.record_type,
-                   raw=str(record.raw),
-                   user_defined=user_defined)
+            create(id=record.id,
+                   type=record.type,
+                   raw=json.dumps(record.raw))
             if record.data:
-                value_from_rec_batch = []
+                string_from_rec_batch = []
                 scalar_from_rec_batch = []
                 for datum in record.data:
                     tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
                     if isinstance(datum['value'], numbers.Real):
                         from_scalar_batch[datum['name']].append((datum['value'],
-                                                                 record.record_id,
+                                                                 record.id,
                                                                  datum.get('units'),
                                                                  tags))
                         scalar_from_rec_batch.append((datum['name'],
@@ -99,23 +94,23 @@ class RecordDAO(dao.RecordDAO):
                                                       datum.get('units'),
                                                       tags))
                     else:
-                        from_value_batch[datum['name']].append((datum['value'],
-                                                                record.record_id,
+                        from_string_batch[datum['name']].append((datum['value'],
+                                                                record.id,
                                                                 datum.get('units'),
                                                                 tags))
-                        value_from_rec_batch.append((datum['name'],
+                        string_from_rec_batch.append((datum['name'],
                                                      datum['value'],
                                                      datum.get('units'),
                                                      tags))
 
                 # We've finished this record's data--do the batch inserts
                 for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
-                                         (schema.StringDataFromRecord, value_from_rec_batch)):
+                                         (schema.StringDataFromRecord, string_from_rec_batch)):
                     with BatchQuery() as b:
                         create = (table.batch(b).create if force_overwrite
                                   else table.batch(b).if_not_exists().create)
                         for entry in data_list:
-                            create(record_id=record.record_id,
+                            create(id=record.id,
                                    name=entry[0],
                                    value=entry[1],
                                    units=entry[2],
@@ -132,18 +127,18 @@ class RecordDAO(dao.RecordDAO):
                     create = (table.batch(b).create if force_overwrite
                               else table.batch(b).if_not_exists().create)
                     for doc in document_batch:
-                        create(record_id=record.record_id,
+                        create(id=record.id,
                                uri=doc[0],
                                mimetype=doc[1],
                                tags=doc[2])
             if not _type_managed:
-                if record.record_type == "run":
+                if record.type == "run":
                     self.RunDAO._insert_sans_rec(record, force_overwrite)
 
         # We've gone through every record we were given. The from_scalar_batch
-        # and from_value_batch dictionaries are ready for batch inserting.
+        # and from_string_batch dictionaries are ready for batch inserting.
         for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
-                                      (schema.RecordFromStringData, from_value_batch)):
+                                      (schema.RecordFromStringData, from_string_batch)):
             for partition, data_list in six.iteritems(partition_data):
                 with BatchQuery() as b:
                     create = (table.batch(b).create if force_overwrite
@@ -151,11 +146,11 @@ class RecordDAO(dao.RecordDAO):
                     for entry in data_list:
                         create(name=partition,
                                value=entry[0],
-                               record_id=entry[1],
+                               id=entry[1],
                                units=entry[2],
                                tags=entry[3])
 
-    def _insert_data(self, data, record_id, force_overwrite=False):
+    def _insert_data(self, data, id, force_overwrite=False):
         """
         Insert data into two of the four query tables depending on value.
 
@@ -163,92 +158,72 @@ class RecordDAO(dao.RecordDAO):
         aren't ("Tuesday","12.0") go in the StringData tables.
 
         :param data: The list of data to insert.
-        :param record_id: The Record ID to associate the data to.
+        :param id: The Record ID to associate the data to.
         :param force_overwrite: Whether to forcibly overwrite preexisting data.
                                 Currently only used by Cassandra DAOs.
         """
         LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
-                     .format(len(data), record_id, force_overwrite))
+                     .format(len(data), id, force_overwrite))
         for datum in data:
             tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
             # Check if it's a scalar
             insert_data = (schema.cross_populate_scalar_and_record
                            if isinstance(datum['value'], numbers.Real)
                            else schema.cross_populate_string_and_record)
-            insert_data(record_id=record_id,
+            insert_data(id=id,
                         name=datum['name'],
                         value=datum['value'],
                         units=datum.get('units'),
                         tags=tags,
                         force_overwrite=True)
 
-    def _insert_files(self, record_id, files, force_overwrite=False):
+    def _insert_files(self, id, files, force_overwrite=False):
         """
         Insert files into the DocumentFromRecord table.
 
-        :param record_id: The Record ID to associate the files to.
+        :param id: The Record ID to associate the files to.
         :param files: The list of files to insert.
         :param force_overwrite: Whether to forcibly overwrite preexisting files.
                                 Currently only used by Cassandra DAOs.
         """
         LOGGER.debug('Inserting {} files to record id={} and force_overwrite={}.'
-                     .format(len(files), record_id, force_overwrite))
+                     .format(len(files), id, force_overwrite))
         create = (schema.DocumentFromRecord.create if force_overwrite
                   else schema.DocumentFromRecord.if_not_exists().create)
         for entry in files:
-            create(record_id=record_id,
+            create(id=id,
                    uri=entry['uri'],
                    mimetype=entry.get('mimetype'),
                    tags=entry.get('tags'))
 
-    def get(self, record_id):
+    def get(self, id):
         """
-        Given a record_id, return match (if any) from Cassandra database.
+        Given a id, return match (if any) from Cassandra database.
 
-        :param record_id: The id of the record to return
+        :param id: The id of the record to return
 
         :returns: A record matching that id or None
         """
-        LOGGER.debug('Getting record with id={}'.format(record_id))
-        query = schema.Record.objects.filter(record_id=record_id).get()
-        record = model.Record(record_id=query.record_id,
-                              record_type=query.record_type,
-                              user_defined=(ast.literal_eval(
-                                            query.user_defined)
-                                            if query.user_defined
-                                            else None))
-        record.raw.update({key: val
-                          for key, val in ast.literal_eval(query.raw).items()
-                          if key not in ['record_id',
-                                         'record_type',
-                                         'user_defined']})
-        return record
+        LOGGER.debug('Getting record with id={}'.format(id))
+        query = schema.Record.objects.filter(id=id).get()
+        return model.generate_record_from_json(
+            json_input=json.loads(query.raw))
 
-    def get_all_of_type(self, record_type):
+    def get_all_of_type(self, type):
         """
         Given a type of record, return all Records of that type.
 
-        :param record_type: The type of record to return, ex: run
+        :param type: The type of record to return, ex: run
 
         :returns: a list of Records of that type
         """
-        LOGGER.debug('Getting all records of type {}.'.format(record_type))
-        query = (schema.Record.objects.filter(record_type=record_type))
+        LOGGER.debug('Getting all records of type {}.'.format(type))
+        query = (schema.Record.objects.filter(type=type))
         # TODO: If type query table introduced, change this:
         records = []
         for x in query.allow_filtering().all():
-            record = model.Record(record_id=x.record_id,
-                                  record_type=x.record_type,
-                                  user_defined=(ast.literal_eval(
-                                                x.user_defined)
-                                                if x.user_defined
-                                                else None))
-            record.raw.update({key: val
-                              for key, val in ast.literal_eval(x.raw).items()
-                              if key not in ['record_id',
-                                             'record_type',
-                                             'user_defined']})
-            records.append(record)
+            records.append(model.generate_record_from_json(
+                json_input=json.loads(x.raw)))
         return records
 
     def get_given_document_uri(self, uri, accepted_ids_list=None):
@@ -276,13 +251,13 @@ class RecordDAO(dao.RecordDAO):
         base_query = (schema.DocumentFromRecord.objects.allow_filtering()
                       if accepted_ids_list is None else
                       schema.DocumentFromRecord.objects
-                      .filter(record_id__in=accepted_ids_list))
+                      .filter(id__in=accepted_ids_list))
         # If there's a wildcard
         if '%' in uri:
-            # Special case: get all record_ids with associated docs.
+            # Special case: get all ids with associated docs.
             if len(uri) == 1:
                 all_documents = (base_query.all())
-                return self.get_many(set(x.record_id for x in all_documents))
+                return self.get_many(set(x.id for x in all_documents))
             # If a wildcard is in any position besides last, we do it in Python
             if '%' in uri[:-1]:
                 matches = set()
@@ -290,7 +265,7 @@ class RecordDAO(dao.RecordDAO):
                 search_uri = uri.replace('*', '[*]').replace('%', '*')
                 for entry in base_query.all():
                     if fnmatch.fnmatch(entry.uri, search_uri):
-                        matches.add(entry.record_id)
+                        matches.add(entry.id)
                 return self.get_many(matches)
 
             # As long as the wildcard's in last place, we can do it in CQL
@@ -301,11 +276,11 @@ class RecordDAO(dao.RecordDAO):
                 alphabetical_end = uri[:-2]+chr(ord(uri[-2]) + 1)
                 query = (base_query.filter(uri__gte=uri[:-1])
                          .filter(uri__lt=alphabetical_end).all())
-                return self.get_many(set(x.record_id for x in query))
+                return self.get_many(set(x.id for x in query))
         # If no wildcard
         # Note: it's completely possible for multiple documents to have the
-        # same URI but different record_ids. Should this be changed?
-        return self.get_many([x.record_id for x in
+        # same URI but different ids. Should this be changed?
+        return self.get_many([x.id for x in
                               base_query.filter(uri=uri).all()])
 
     def get_given_scalars(self, scalar_range_list):
@@ -327,12 +302,12 @@ class RecordDAO(dao.RecordDAO):
         rec_ids = list(self
                        ._configure_query_for_scalar_range(query,
                                                           scalar_range_list[0])
-                       .values_list('record_id', flat=True).all())
+                       .values_list('id', flat=True).all())
         for scalar_range in scalar_range_list[1:]:
             query = (schema.ScalarDataFromRecord.objects
-                     .filter(record_id__in=rec_ids))
+                     .filter(id__in=rec_ids))
             query = self._configure_query_for_scalar_range(query, scalar_range)
-            rec_ids = list(query.values_list('record_id', flat=True).all())
+            rec_ids = list(query.values_list('id', flat=True).all())
         return self.get_many(rec_ids)
 
     def get_given_scalar(self, scalar_range):
@@ -349,7 +324,7 @@ class RecordDAO(dao.RecordDAO):
         query = schema.RecordFromScalarData.objects
         out = self._configure_query_for_scalar_range(query, scalar_range).all()
         if out:
-            return self.get_many(x.record_id for x in out)
+            return self.get_many(x.id for x in out)
         else:
             return []
 
@@ -381,19 +356,19 @@ class RecordDAO(dao.RecordDAO):
                 query = query.filter(value__lt=scalar_range.max)
         return query
 
-    def get_scalars(self, record_id, scalar_names):
+    def get_scalars(self, id, scalar_names):
         """
         Retrieve scalars for a given record id.
 
         Scalars are returned in alphabetical order.
 
-        :param record_id: The record id to find scalars for
+        :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
 
         :return: A list of scalar JSON objects matching the Mnoda specification
         """
         LOGGER.debug('Getting scalars={} for record id={}'
-                     .format(scalar_names, record_id))
+                     .format(scalar_names, id))
         scalars = []
         # Cassandra has special restrictions on list types that prevents us
         # from filtering on IN when they're present in a table. Hence this
@@ -401,7 +376,7 @@ class RecordDAO(dao.RecordDAO):
         for name in sorted(scalar_names):
             try:
                 entry = (schema.ScalarDataFromRecord.objects
-                         .filter(record_id=record_id)
+                         .filter(id=id)
                          .filter(name=name)
                          .values_list('name', 'value', 'units', 'tags')).get()
                 scalars.append({'name': entry[0],
@@ -413,18 +388,18 @@ class RecordDAO(dao.RecordDAO):
                 pass
         return scalars
 
-    def get_files(self, record_id):
+    def get_files(self, id):
         """
         Retrieve files for a given record id.
 
         Files are returned in the alphabetical order of their URIs
 
-        :param record_id: The record id to find files for
+        :param id: The record id to find files for
         :return: A list of file JSON objects matching the Mnoda specification
         """
-        LOGGER.debug('Getting files for record id={}'.format(record_id))
+        LOGGER.debug('Getting files for record id={}'.format(id))
         files = (schema.DocumentFromRecord.objects
-                 .filter(record_id=record_id)
+                 .filter(id=id)
                  .values_list('uri', 'mimetype', 'tags')).all()
         return [{'uri': x[0], 'mimetype': x[1], 'tags': x[2]} for x in files]
 
@@ -446,8 +421,8 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         Task44 contains Run2001
 
-        :param subject_id: The record_id of the subject.
-        :param object_id: The record_id of the object.
+        :param subject_id: The id of the subject.
+        :param object_id: The id of the object.
         :param predicate: A string describing the relationship.
         :param relationship: A Relationship object to build entry from.
 
@@ -610,7 +585,7 @@ class RunDAO(dao.RunDAO):
                      .format(run, force_overwrite))
         create = (schema.Run.create if force_overwrite
                   else schema.Run.if_not_exists().create)
-        create(record_id=run.record_id,
+        create(id=run.id,
                application=run.application,
                user=run.user,
                version=run.version)
@@ -633,7 +608,7 @@ class RunDAO(dao.RunDAO):
                      .format(run, force_overwrite))
         create = (schema.Run.create if force_overwrite
                   else schema.Run.if_not_exists().create)
-        create(record_id=run.record_id,
+        create(id=run.id,
                application=run.application,
                user=run.user,
                version=run.version)
@@ -660,35 +635,17 @@ class RunDAO(dao.RunDAO):
         for item in list_to_insert:
             self._insert_sans_rec(item, force_overwrite)
 
-    def get(self, run_id):
+    def get(self, id):
         """
         Given a run's id, return match (if any) from Cassandra database.
 
-        :param run_id: The id of some run
+        :param id: The id of some run
 
         :returns: A run matching that identifier or None
         """
-        LOGGER.debug('Getting run with id: {}'.format(run_id))
-        record = schema.Record.filter(record_id=run_id).get()
-        run = schema.Run.filter(record_id=run_id).get()
-
-        run_return = model.Run(record_id=run_id,
-                               application=run.application,
-                               user=run.user,
-                               user_defined=(ast.literal_eval(
-                                             record.user_defined)
-                                             if record.user_defined
-                                             else None),
-                               version=run.version)
-        run_return.raw.update({key: val
-                              for key, val in ast.literal_eval(record.raw).items()
-                              if key not in ['record_id',
-                                             'record_type',
-                                             'application',
-                                             'user',
-                                             'user_defined',
-                                             'version']})
-        return run_return
+        LOGGER.debug('Getting run with id: {}'.format(id))
+        record = schema.Record.filter(id=id).get()
+        return model.generate_run_from_json(json_input=json.loads(record.raw))
     # Who should this belong to?
 
     def _convert_record_to_run(self, record):
@@ -702,24 +659,13 @@ class RunDAO(dao.RunDAO):
 
         :param record: A Record object to build the Run from.
 
-        :returns: A Run representing the Record plus metadata.
+        :returns: A Run representing the Record plus metadata. None if given
+            a record that isn't a run as input.
         """
         LOGGER.debug('Converting {} to run.'.format(record))
-        run_portion = (schema.Run.filter(record_id=record.record_id).get())
-        run = model.Run(record_id=record.record_id,
-                        application=run_portion.application,
-                        user=run_portion.user,
-                        user_defined=record.user_defined,
-                        version=run_portion.version)
-        run.raw.update({key: val
-                        for key, val in record.raw.items()
-                        if key not in ['record_id',
-                                       'record_type',
-                                       'application',
-                                       'user',
-                                       'user_defined',
-                                       'version']})
-        return run
+        if record.type == 'run':
+            return model.generate_run_from_json(record.raw)
+        return None
 
 
 class DAOFactory(dao.DAOFactory):

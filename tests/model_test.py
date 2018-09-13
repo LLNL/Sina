@@ -12,7 +12,7 @@ class TestModel(unittest.TestCase):
     # Record
     def test_is_valid(self):
         """Ensure Record validation is working."""
-        spam = model.Record(record_id="spam_and_eggs", record_type="recipe")
+        spam = model.Record(id="spam_and_eggs", type="recipe")
 
         # Minimal, valid run
         self.assertTrue(spam._is_valid())
@@ -40,7 +40,7 @@ class TestModel(unittest.TestCase):
 
         spam.files = [{"uri": "spam.log", "mimetype": "text/plain", "tags": ["output"]}]
 
-        spam.record_type = "recipe"
+        spam.type = "recipe"
 
         spam.user_defined = {"eggs_in_dozen": 12}
 
@@ -102,8 +102,8 @@ class TestModel(unittest.TestCase):
                                    ]
                      }
         record = model.generate_record_from_json(json_input=json_input)
-        self.assertEqual(json_input['id'], record.record_id)
-        self.assertEqual(json_input['type'], record.record_type)
+        self.assertEqual(json_input['id'], record.id)
+        self.assertEqual(json_input['type'], record.type)
         self.assertEqual(json_input['user_defined'], record.user_defined)
         self.assertEqual(json_input['data'], record.data)
         self.assertEqual(json_input['files'], record.files)
@@ -160,8 +160,8 @@ class TestModel(unittest.TestCase):
                                    ]
                      }
         run = model.generate_run_from_json(json_input=json_input)
-        self.assertEqual(json_input['id'], run.record_id)
-        self.assertEqual(json_input['type'], run.record_type)
+        self.assertEqual(json_input['id'], run.id)
+        self.assertEqual(json_input['type'], run.type)
         self.assertEqual(json_input['user'], run.user)
         self.assertEqual(json_input['application'], run.application)
         self.assertEqual(json_input['version'], run.version)

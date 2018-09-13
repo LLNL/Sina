@@ -160,7 +160,7 @@ def add_export_subparser(subparsers):
     required.add_argument('-s', '--scalars', required=True, type=str,
                           help='A comma separated list of scalar names '
                                'to output.')
-    required.add_argument('-r', '--record_ids', required=True, type=str,
+    required.add_argument('-i', '--ids', required=True, type=str,
                           help='A comma separated list of record ids to '
                                'output.')
 
@@ -351,8 +351,8 @@ def export(args):
 
     :raises ValueError: if there's an issue with flags (bad filetype, etc)
     """
-    LOGGER.info('Exporting record_ids={} and scalars={} from database_type={} '
-                'to target={}.'.format(args.record_ids,
+    LOGGER.info('Exporting ids={} and scalars={} from database_type={} '
+                'to target={}.'.format(args.ids,
                                        args.scalars,
                                        args.database_type,
                                        args.target))
@@ -371,7 +371,7 @@ def export(args):
         error_message.append("Currently, exporting is only supported when "
                              "using sql files or Cassandra as the "
                              "database to export from.")
-    if not args.record_ids:
+    if not args.ids:
         error_message.append('Require one or more record ids to export.')
     if not args.scalars:
         error_message.append('Require one or more scalar names to export.')
@@ -381,7 +381,7 @@ def export(args):
         raise ValueError(msg)
 
     utils.export(factory=_make_factory(args=args),
-                 id_list=args.record_ids.split(','),
+                 id_list=args.ids.split(','),
                  scalar_names=args.scalars.split(','),
                  output_file=args.target,
                  output_type=args.export_type)
@@ -451,7 +451,7 @@ def query(args):
         matches = record_dao.get_given_scalars(
                              scalar_range_list=scalar_range_list)
     if args.uri:
-        accepted_ids_list = [x.record_id for x in matches] if args.scalar else None
+        accepted_ids_list = [x.id for x in matches] if args.scalar else None
         matches = record_dao.get_given_document_uri(
                              uri=args.uri, accepted_ids_list=accepted_ids_list)
     # TODO: Not ideal, if we only need the ids we're doing an unnecessary query
@@ -459,7 +459,7 @@ def query(args):
     # (but then call get_many()). Easily solved with optargs. But is that
     # against "good sense" for the DAO?
     if args.id:
-        print([x.record_id for x in matches])
+        print([x.id for x in matches])
     else:
         print([x.raw for x in matches])
     # Return value primarily used for testing

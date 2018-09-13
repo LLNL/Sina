@@ -154,7 +154,7 @@ def export(factory, id_list, scalar_names, output_type, output_file=None):
     data_to_export = OrderedDict()
     record_dao = factory.createRecordDAO()
     for id in id_list:
-        data_to_export[id] = record_dao.get_scalars(record_id=id,
+        data_to_export[id] = record_dao.get_scalars(id=id,
                                                     scalar_names=scalar_names)
     _export_csv(data=data_to_export,
                 scalar_names=scalar_names,
@@ -171,13 +171,13 @@ def _export_csv(data, scalar_names, output_file):
     :param output_file: The file to output.
     """
     LOGGER.debug('About to write data to csv file: {}'.format(output_file))
-    header = ['run_id'] + scalar_names
+    header = ['id'] + scalar_names
     with open(output_file, 'w') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(header)
-        for record_id, scalars in data.items():
+        for id, scalars in data.items():
             if scalars:
-                writer.writerow([record_id] +
+                writer.writerow([id] +
                                 [scalar['value'] for scalar in scalars])
 
 

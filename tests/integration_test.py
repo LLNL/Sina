@@ -50,7 +50,7 @@ class TestSQLIntegration(unittest.TestCase):
         self.args.raw = ''
         self.args.id = False
         matches = launcher.query(self.args)
-        self.assertEqual(matches[0].record_id, "child_1")
+        self.assertEqual(matches[0].id, "child_1")
         self.args.scalar = 'scalar-4=0'
         matches = launcher.query(self.args)
         self.assertEqual(matches, [])
@@ -97,7 +97,7 @@ class TestCassIntegration(unittest.TestCase):
         self.args.raw = ''
         self.args.id = False
         matches = launcher.query(self.args)
-        self.assertEqual(matches[0].record_id, "child_1")
+        self.assertEqual(matches[0].id, "child_1")
         self.args.scalar = 'scalar-4=0'
         matches = launcher.query(self.args)
         self.assertEqual(matches, [])

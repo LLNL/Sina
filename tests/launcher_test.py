@@ -67,7 +67,7 @@ class TestCLI(unittest.TestCase):
         factory = sina_sql.DAOFactory()
         import_json(factory=factory, json_path=test_json)
         local_rec = factory.createRecordDAO().get_all_of_type("eggs")
-        global_id = local_rec[0].record_id
+        global_id = local_rec[0].id
         relationship = (factory.createRelationshipDAO()
                                ._get_given_object_id(global_id))
         self.assertEqual(len(relationship), 1)
@@ -120,7 +120,7 @@ class TestCLI(unittest.TestCase):
     @patch('sina.launcher.sql.RecordDAO.get_given_document_uri',
            return_value=[MagicMock(raw='hello')])
     @patch('sina.launcher.sql.RecordDAO.get_given_scalars',
-           return_value=[MagicMock(raw='hello', record_id='general')])
+           return_value=[MagicMock(raw='hello', id='general')])
     def test_query_sql(self, mock_scalars, mock_uri):
         """Verify CLI fetches and feeds query info to the DAO (sql)."""
         self.args.database_type = 'sql'
@@ -141,13 +141,13 @@ class TestCLI(unittest.TestCase):
         mock_uri_args = mock_uri.call_args[1]  # Named args
         self.assertEqual(mock_uri_args['uri'], self.args.uri)
         self.assertEqual(mock_uri_args['accepted_ids_list'][0],
-                         mock_scalars.return_value[0].record_id)
+                         mock_scalars.return_value[0].id)
 
     @attr('cassandra')
     @patch('sina.launcher.cass.RecordDAO.get_given_document_uri',
            return_value=[MagicMock(raw='hello')])
     @patch('sina.launcher.cass.RecordDAO.get_given_scalars',
-           return_value=[MagicMock(raw='hello', record_id='general')])
+           return_value=[MagicMock(raw='hello', id='general')])
     @patch('sina.datastores.cass.schema.form_connection', return_value=True)
     def test_query_cass(self, mock_connect, mock_scalars, mock_uri):
         """Verify CLI fetches and feeds query info to the DAO (cass)."""
@@ -171,7 +171,7 @@ class TestCLI(unittest.TestCase):
         mock_uri_args = mock_uri.call_args[1]  # Named args
         self.assertEqual(mock_uri_args['uri'], self.args.uri)
         self.assertEqual(mock_uri_args['accepted_ids_list'][0],
-                         mock_scalars.return_value[0].record_id)
+                         mock_scalars.return_value[0].id)
 
     @patch('sina.launcher.cass.RecordDAO.get_given_document_uri')
     @patch('sina.launcher.sql.RecordDAO.get_given_document_uri')
