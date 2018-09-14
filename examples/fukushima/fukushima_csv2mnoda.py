@@ -259,7 +259,7 @@ class FukushimaData(object):
                 {"name": KEY_ALTITUDE_GPS, "value": alt},
                 {"name": KEY_ALTITUDE_GS, "value": agl},
                 {"name": KEY_LIVE_TIME, "value": live},
-                {"name": KEY_GCNORM , "value": gcnorm},
+                {"name": KEY_GCNORM, "value": gcnorm},
                 ],
             })
 
