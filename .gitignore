@@ -10,6 +10,7 @@ tests/test_venv
 cover/
 build/
 dist/
+examples/*/.ipynb_checkpoints/*
 # Ignore auto-generated doc files
 docs/source/generated_docs
 docs/build/
