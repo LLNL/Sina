@@ -608,3 +608,50 @@ class TestSQL(unittest.TestCase):
         spam_run = multi_scalar[0]
         self.assertEquals(spam_run.user, run.user)
         self.assertEquals(spam_run.raw, run.raw)
+
+    def test_convert_record_to_run_good(self):
+        """Test we return a Run when given a Record with valid input."""
+        mock_rec = MagicMock(id="spam", type="run",
+                             user_defined={},
+                             application="skillet",
+                             user="bob",
+                             version="1.0",
+                             raw={
+                                    "id": "spam",
+                                    "type": "run",
+                                    "application": "skillet",
+                                    "user": "bob",
+                                    "user_defined": {},
+                                    "version": "1.0",
+                                    "files": [],
+                                    "data": []
+                                })
+        factory = sina_sql.DAOFactory()
+        run_dao = factory.createRunDAO()
+        converted_run = run_dao._convert_record_to_run(record=mock_rec)
+        self.assertEqual(converted_run.raw, mock_rec.raw)
+        self.assertEqual(type(converted_run), Run)
+
+    def test_convert_record_to_run_bad(self):
+        """Test we raise a ValueError when given a Record with bad input."""
+        mock_rec = MagicMock(id="spam", type="task",
+                             user_defined={},
+                             application="skillet",
+                             user="bob",
+                             version="1.0",
+                             raw={
+                                    "id": "spam",
+                                    "type": "run",
+                                    "application": "skillet",
+                                    "user": "bob",
+                                    "user_defined": {},
+                                    "version": "1.0",
+                                    "files": [],
+                                    "data": []
+                                })
+        factory = sina_sql.DAOFactory()
+        run_dao = factory.createRunDAO()
+        with self.assertRaises(ValueError) as context:
+            run_dao._convert_record_to_run(record=mock_rec)
+        self.assertIn('Record must be of subtype Run to convert to Run. Given',
+                      str(context.exception))

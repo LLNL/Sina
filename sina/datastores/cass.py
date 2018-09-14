@@ -665,7 +665,11 @@ class RunDAO(dao.RunDAO):
         LOGGER.debug('Converting {} to run.'.format(record))
         if record.type == 'run':
             return model.generate_run_from_json(record.raw)
-        return None
+        else:
+            msg = ('Record must be of subtype Run to convert to Run. Given '
+                   '{}.'.format(record.id))
+            LOGGER.warn(msg)
+            raise ValueError(msg)
 
 
 class DAOFactory(dao.DAOFactory):

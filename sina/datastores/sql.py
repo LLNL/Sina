@@ -487,10 +487,13 @@ class RunDAO(dao.RunDAO):
             a record that isn't a run as input.
         """
         LOGGER.debug('Converting {} to run.'.format(record))
-        LOGGER.debug('Record raw: {}'.format(record.raw))
         if record.type == 'run':
             return model.generate_run_from_json(json_input=record.raw)
-        return None
+        else:
+            msg = ('Record must be of subtype Run to convert to Run. Given '
+                   '{}.'.format(record.id))
+            LOGGER.warn(msg)
+            raise ValueError(msg)
 
 
 class DAOFactory(dao.DAOFactory):
