@@ -42,7 +42,8 @@ The following is a list of the relevant column number-value pairings:
            6 crystals for a volume of 2 liters
       7 is the collection live time in microseconds
       8 is the gross counts in the detector array
-      9 is the gross counts in the array, normalized by the live time
+      9 is the gross counts in the array, normalized by the live time, with
+        results in counts per second (according to the data dictionary)
 
 Data Source: https://catalog.data.gov/dataset/\
         us-doe-nnsa-response-to-2011-fukushima-incident-at-sea-aerial-data
@@ -67,6 +68,9 @@ KEY_ALTITUDE_GPS = "alt_hae"
 
 # .. Ground/Sea altitude
 KEY_ALTITUDE_GS = "agl"
+
+# .. Gross Count normalized by Live time (reportedly in count per second)
+KEY_GCNORM = "gcnorm"
 
 # .. Latitude
 KEY_LATITUDE = "latitude"
@@ -97,7 +101,8 @@ UNITS = [
         (KEY_ALTITUDE_GPS, "meters",
             "Height above the ellipsoid from the GPS receiver"),
         (KEY_ALTITUDE_GS, "meters", "Height above the ground/sea"),
-        (KEY_LIVE_TIME, "microseconds", "Collection live time")]
+        (KEY_LIVE_TIME, "microseconds", "Collection live time"),
+        (KEY_GCNORM, "cps", "Normalized gross count in count per second")]
 
 
 # -------------------------------- Process Data -------------------------------
@@ -254,7 +259,7 @@ class FukushimaData(object):
                 {"name": KEY_ALTITUDE_GPS, "value": alt},
                 {"name": KEY_ALTITUDE_GS, "value": agl},
                 {"name": KEY_LIVE_TIME, "value": live},
-                {"name": "gcnorm", "value": gcnorm},
+                {"name": KEY_GCNORM , "value": gcnorm},
                 ],
             })
 
