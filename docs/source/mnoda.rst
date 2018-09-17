@@ -136,7 +136,8 @@ Run
 ~~~
 
 A Run is a Record that represents a single "run" of code within an application.
-As such, Runs require an application identification:
+As such, Runs **require** an application identification, and optionally take
+a user and version:
 
 .. code-block:: javascript
 
