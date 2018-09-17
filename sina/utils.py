@@ -67,24 +67,15 @@ def import_json(factory, json_path):
             id = str(uuid.uuid4())
             try:
                 local[entry['local_id']] = id
+                # Save the UUID to be used for record generation
+                entry['id'] = id
             except KeyError:
                 raise ValueError("Record requires one of: local_id, id: {}"
                                  .format(entry))
         if type == 'run':
-            runs.append(model.Run(record_id=id,
-                                  user=entry.get('user'),
-                                  user_defined=entry.get('user_defined'),
-                                  version=entry.get('version'),
-                                  application=entry.get('application'),
-                                  data=entry.get('data'),
-                                  files=entry.get('files'),
-                                  raw=json.dumps(entry)))
+            runs.append(model.generate_run_from_json(json_input=entry))
         else:
-            records.append(model.Record(record_id=id,
-                                        record_type=type,
-                                        raw=json.dumps(entry),
-                                        data=entry.get('data'),
-                                        files=entry.get('files')))
+            records.append(model.generate_record_from_json(json_input=entry))
     factory.createRunDAO().insert_many(runs)
     factory.createRecordDAO().insert_many(records)
     relationships = []
@@ -163,7 +154,7 @@ def export(factory, id_list, scalar_names, output_type, output_file=None):
     data_to_export = OrderedDict()
     record_dao = factory.createRecordDAO()
     for id in id_list:
-        data_to_export[id] = record_dao.get_scalars(record_id=id,
+        data_to_export[id] = record_dao.get_scalars(id=id,
                                                     scalar_names=scalar_names)
     _export_csv(data=data_to_export,
                 scalar_names=scalar_names,
@@ -180,13 +171,13 @@ def _export_csv(data, scalar_names, output_file):
     :param output_file: The file to output.
     """
     LOGGER.debug('About to write data to csv file: {}'.format(output_file))
-    header = ['run_id'] + scalar_names
+    header = ['id'] + scalar_names
     with open(output_file, 'w') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(header)
-        for record_id, scalars in data.items():
+        for id, scalars in data.items():
             if scalars:
-                writer.writerow([record_id] +
+                writer.writerow([id] +
                                 [scalar['value'] for scalar in scalars])
 
 

@@ -20,15 +20,15 @@ class Record(Model):
     Stores the raw form of the record.
     """
 
-    record_id = columns.Text(primary_key=True)
-    record_type = columns.Text()
+    id = columns.Text(primary_key=True)
+    type = columns.Text()
     raw = columns.Text()
 
 
 class DocumentFromRecord(Model):
     """Query table for finding documents given records."""
 
-    record_id = columns.Text(primary_key=True)
+    id = columns.Text(primary_key=True)
     uri = columns.Text(primary_key=True)
     mimetype = columns.Text()
     tags = columns.Set(columns.Text())
@@ -39,7 +39,7 @@ class RecordFromScalarData(Model):
 
     name = columns.Text(primary_key=True)
     value = columns.Double(primary_key=True)
-    record_id = columns.Text(primary_key=True)
+    id = columns.Text(primary_key=True)
     units = columns.Text()
     tags = columns.Set(columns.Text())
 
@@ -47,7 +47,7 @@ class RecordFromScalarData(Model):
 class ScalarDataFromRecord(Model):
     """Query table for finding a scalar-valued Record.data entry given record ID."""
 
-    record_id = columns.Text(primary_key=True)
+    id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
     value = columns.Double(primary_key=True)
     units = columns.Text()
@@ -64,7 +64,7 @@ class RecordFromStringData(Model):
 
     name = columns.Text(primary_key=True)
     value = columns.Text(primary_key=True)
-    record_id = columns.Text(primary_key=True)
+    id = columns.Text(primary_key=True)
     units = columns.Text()
     tags = columns.Set(columns.Text())
 
@@ -72,7 +72,7 @@ class RecordFromStringData(Model):
 class StringDataFromRecord(Model):
     """Query table for finding a string-valued Record.data entry given record ID."""
 
-    record_id = columns.Text(primary_key=True)
+    id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
     value = columns.Text(primary_key=True)
     units = columns.Text()
@@ -82,10 +82,9 @@ class StringDataFromRecord(Model):
 class Run(Model):
     """Query table for finding runs based on special, supported metadata."""
 
-    record_id = columns.Text(primary_key=True)
+    id = columns.Text(primary_key=True)
     application = columns.Text(required=True)
     user = columns.Text()
-    user_defined = columns.Map(columns.Text(), columns.Text())
     version = columns.Text()
 
 
@@ -141,7 +140,7 @@ def cross_populate_object_and_subject(subject_id,
 
 def cross_populate_scalar_and_record(name,
                                      value,
-                                     record_id,
+                                     id,
                                      tags=None,
                                      units=None,
                                      force_overwrite=False):
@@ -156,15 +155,15 @@ def cross_populate_scalar_and_record(name,
 
     :param name: The name of the entry
     :param value: The entry's value (must be a scalar)
-    :param record_id: The id of the record containing the entry
+    :param id: The id of the record containing the entry
     :param tags: Tags to be applied to this entry
     :param units: Units of the entry.
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
     LOGGER.debug('Cross populating scalar data and record tables with: name={}, value={}, '
-                 'record_id={}, tags={}, units={}, and force_overwrite={}.'
-                 .format(name, value, record_id, tags, units, force_overwrite))
+                 'id={}, tags={}, units={}, and force_overwrite={}.'
+                 .format(name, value, id, tags, units, force_overwrite))
     scalar_from_record_create = (ScalarDataFromRecord.create if force_overwrite
                                  else ScalarDataFromRecord.if_not_exists()
                                  .create)
@@ -172,13 +171,13 @@ def cross_populate_scalar_and_record(name,
                                  else RecordFromScalarData.if_not_exists()
                                  .create)
 
-    scalar_from_record_create(record_id=record_id,
+    scalar_from_record_create(id=id,
                               name=name,
                               value=value,
                               tags=tags,
                               units=units,
                               )
-    record_from_scalar_create(record_id=record_id,
+    record_from_scalar_create(id=id,
                               name=name,
                               value=value,
                               tags=tags,
@@ -188,7 +187,7 @@ def cross_populate_scalar_and_record(name,
 
 def cross_populate_string_and_record(name,
                                      value,
-                                     record_id,
+                                     id,
                                      tags=None,
                                      units=None,
                                      force_overwrite=False):
@@ -203,15 +202,15 @@ def cross_populate_string_and_record(name,
 
     :param name: The name of the entry
     :param value: The entry's value (must be a string)
-    :param record_id: The id of the record containing the entry
+    :param id: The id of the record containing the entry
     :param tags: Tags to be applied to this entry
     :param units: Units of the entry.
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
     LOGGER.debug('Cross populating string data and record tables with: name={}, value={}, '
-                 'record_id={}, tags={}, units={}, and force_overwrite={}.'
-                 .format(name, value, record_id, tags, units, force_overwrite))
+                 'id={}, tags={}, units={}, and force_overwrite={}.'
+                 .format(name, value, id, tags, units, force_overwrite))
     value_from_record_create = (StringDataFromRecord.create if force_overwrite
                                 else StringDataFromRecord.if_not_exists()
                                 .create)
@@ -219,13 +218,13 @@ def cross_populate_string_and_record(name,
                                 else RecordFromStringData.if_not_exists()
                                 .create)
 
-    value_from_record_create(record_id=record_id,
+    value_from_record_create(id=id,
                              name=name,
                              value=value,
                              tags=tags,
                              units=units,
                              )
-    record_from_value_create(record_id=record_id,
+    record_from_value_create(id=id,
                              name=name,
                              value=value,
                              tags=tags,

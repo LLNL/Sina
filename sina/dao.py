@@ -48,30 +48,30 @@ class RecordDAO(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get(self, record_id):
+    def get(self, id):
         """
         Given the id of a Record, return matching Record or None.
 
-        :param record_id: The id of the Record to return.
+        :param id: The id of the Record to return.
 
         :returns: The matching Record or None.
         """
         raise NotImplementedError
 
-    def get_many(self, list_of_record_ids):
+    def get_many(self, list_of_ids):
         """
-        Given a list of record_ids, retrieve each corresponding Record.
+        Given a list of ids, retrieve each corresponding Record.
 
         If a given DAO's backend can bulk read more cleverly,
         this should be reimplemented there.
 
-        :param list_of_record_ids: A list of record_ids to find.
+        :param list_of_ids: A list of ids to find.
 
         :returns: A list of found records
         """
         records = []
-        for record_id in list_of_record_ids:
-            records.append(self.get(record_id))
+        for id in list_of_ids:
+            records.append(self.get(id))
         return records
 
     @abstractmethod
@@ -96,11 +96,11 @@ class RecordDAO(object):
             self.insert(item)
 
     @abstractmethod
-    def get_all_of_type(self, record_type):
+    def get_all_of_type(self, type):
         """
         Given a type of Record, return all Records of that type.
 
-        :param record_type: The type of Record to return
+        :param type: The type of Record to return
         """
         raise NotImplementedError
 
@@ -148,26 +148,26 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def get_scalars(self, record_id, scalar_names):
+    def get_scalars(self, id, scalar_names):
         """
         Retrieve scalars for a given record id.
 
         Scalars are returned in alphabetical order.
 
-        :param record_id: The record id to find scalars for
+        :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
         :return: A list of scalar JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
 
     @abstractmethod
-    def get_files(self, record_id):
+    def get_files(self, id):
         """
         Retrieve files for a given record id.
 
         Files are returned in the alphabetical order of their URIs
 
-        :param record_id: The record id to find files for
+        :param id: The record id to find files for
         :return: A list of file JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
@@ -193,8 +193,8 @@ class RelationshipDAO(object):
 
         Task44 contains Run2001
 
-        :param subject_id: The record_id of the subject.
-        :param object_id: The record_id of the object.
+        :param subject_id: The id of the subject.
+        :param object_id: The id of the object.
         :param predicate: A string describing the relationship.
         :param relationship: A Relationship object to build entry from.
 
@@ -294,26 +294,26 @@ class RunDAO(object):
         self.record_DAO = record_DAO
 
     @abstractmethod
-    def get(self, run_id):
+    def get(self, id):
         """
         Given id, return matching Run from the DAO's backend, or None.
 
-        :param run_id: The id of the run to return.
+        :param id: The id of the run to return.
 
         :returns: The matching Run or None.
         """
         raise NotImplementedError
 
-    def get_many(self, list_of_run_ids):
+    def get_many(self, list_of_ids):
         """
-        Given a list of run_ids, retrieve each corresponding run from backend.
+        Given a list of ids, retrieve each corresponding run from backend.
 
         If a given DAO's backend can bulk read more cleverly,
         this should be reimplemented there.
 
-        :param list_of_run_ids: A list of run_ids to find.
+        :param list_of_ids: A list of ids to find.
         """
-        return [self.get(id) for id in list_of_run_ids]
+        return [self.get(id) for id in list_of_ids]
 
     @abstractmethod
     def insert(self, run):
@@ -364,7 +364,7 @@ class RunDAO(object):
         runs = []
         if records:
             for record in records:
-                if record.record_type == "run":
+                if record.type == "run":
                     runs.append(self._convert_record_to_run(record))
         return runs
 
@@ -382,6 +382,6 @@ class RunDAO(object):
         runs = []
         if records:
             for record in records:
-                if record.record_type == "run":
+                if record.type == "run":
                     runs.append(self._convert_record_to_run(record))
         return runs
