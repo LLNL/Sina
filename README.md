@@ -158,6 +158,9 @@ organized by dataset, with data_overview.rst containing descriptions of each
 set. To use the notebooks, you'll first need to run getting_started.ipynb
 (also in the examples directory) from the LC Jupyter server at
 lc.llnl.gov/jupyter. After that, you'll be ready to run the rest of the notebooks.
+To clean all output from the notebooks::
+
+  $(venv) make clean-notebooks
 
 
 Testing

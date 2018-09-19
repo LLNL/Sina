@@ -32,11 +32,16 @@ web_deps: install
 	  echo "Web dependencies installed" && echo $(PR_ACT)) || \
 	  echo "Unable to install web dependencies. Refer to README.md."
 
-clean:
+clean: clean-notebooks
 	@rm -rf build docs/build docs/source/generated_docs .tox
-	@rm -rf fake.sqlite nosetests.xml 
+	@rm -rf fake.sqlite nosetests.xml
 	@rm -rf sina.egg-info $(VENV)
 	@rm -rf tests/test_venv
 	@find . -name "*.pyc" -exec rm -f {} \; >& /dev/null
 	@find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
 
+clean-notebooks:
+	@!(!(jupyter nbconvert --ClearOutputPreprocessor.enabled=True --log-level WARN --inplace \
+			 examples/*/*.ipynb \
+			 examples/*.ipynb) \
+	   && echo "You must have Jupyter available; activate the sina venv or install it locally")
