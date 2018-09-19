@@ -1,6 +1,6 @@
 """Logic for handling inserting, extracting, and transforming data between backends."""
 
-__VERSION__ = "1.1.0"
+__VERSION__ = "1.2.0"
 
 
 def get_version():
