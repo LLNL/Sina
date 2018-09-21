@@ -3,6 +3,7 @@ SHELL=/bin/bash
 VENV=venv
 VACT=$(VENV)/bin/activate
 PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual env"
+LC_VENV="/collab/usr/gapps/wf/releases/sina"
 
 .PHONY: all clean docs install tests web_deps
 
@@ -32,7 +33,9 @@ web_deps: install
 	  echo "Web dependencies installed" && echo $(PR_ACT)) || \
 	  echo "Unable to install web dependencies. Refer to README.md."
 
-clean: clean-notebooks
+clean: clean-files clean-notebooks
+
+clean-files:
 	@rm -rf build docs/build docs/source/generated_docs .tox
 	@rm -rf fake.sqlite nosetests.xml
 	@rm -rf sina.egg-info $(VENV)
@@ -41,7 +44,8 @@ clean: clean-notebooks
 	@find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
 
 clean-notebooks:
-	@!(!(jupyter nbconvert --ClearOutputPreprocessor.enabled=True --log-level WARN --inplace \
+	@!(!(source $(LC_VENV) && jupyter nbconvert \
+	    		 --ClearOutputPreprocessor.enabled=True --log-level WARN --inplace \
 			 examples/*/*.ipynb \
 			 examples/*.ipynb) \
-	   && echo "You must have Jupyter available; activate the sina venv or install it locally")
+	   && echo "You must be on an LC machine to clean Jupyter notebooks automatically")
