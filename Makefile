@@ -3,7 +3,6 @@ SHELL=/bin/bash
 VENV=venv
 VACT=$(VENV)/bin/activate
 PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual env"
-LC_VENV="/collab/usr/gapps/wf/releases/sina"
 
 .PHONY: all clean docs install tests web_deps
 
@@ -17,7 +16,7 @@ install:
 	fi; \
 	$(VENV)/bin/pip install --upgrade pip; \
 	$(VENV)/bin/pip install -r requirements.txt; \
-	$(VENV)/bin/pip install -e .; \
+	$(VENV)/bin/pip install -e .[jupyter]; \
 	echo $(PR_ACT)
 
 all: clean docs tests web_deps
@@ -44,8 +43,8 @@ clean-files:
 	@find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
 
 clean-notebooks:
-	@!(!(source $(LC_VENV) && jupyter nbconvert \
+	@!(!(source $(VACT) && jupyter nbconvert \
 	    		 --ClearOutputPreprocessor.enabled=True --log-level WARN --inplace \
 			 examples/*/*.ipynb \
 			 examples/*.ipynb) \
-	   && echo "You must be on an LC machine to clean Jupyter notebooks automatically")
+	   && echo "You must have Sina installed to clean Jupyter notebooks automatically--run 'make'")
