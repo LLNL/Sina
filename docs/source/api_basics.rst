@@ -51,6 +51,47 @@ than 400. For examples of all the filters present, please see the
 `DAO documentation <generated_docs/sina.dao.html>`__.
 
 
+Inserting Records and Relationships Programmatically
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can use Sina's API to insert objects into its databases directly, allowing
+databases to grow as a script progresses, rather than writing to file and
+ingesting all at once later on.
+
+**SQLite does not support concurrent modification**, so you should never
+perform parallel inserts with that backend!
+
+Inserting objects is otherwise straightforward::
+
+  ...
+  from sina.model import Record, Run
+  from sina.datastores.sql import sql
+
+  factory = sql.DAOFactory(db_path='path_to_sqlite_file')
+
+  my_record = Record(id="some_id",
+                     type="some_type",
+                     data=[{"name":"foo", "value": 12}],
+                     files=[{"uri":"bar/baz.qux", "tags":["output"]}])
+
+  my_other_record = Record("another_id", "some_type")
+  record_dao = factory.createRecordDAO()
+  record_dao.insert_many([my_record, my_other_record])
+
+  my_run = Run(id="some_run_id",
+               application="some_application",
+               user="John Doe",
+               data=[{"name":"oof", "value": 21}],
+               files=[{"uri":"bar/baz.qux"}])
+
+  run_dao = factory.createRunDAO()
+  run_dao.insert(my_run)
+
+Note that the (sub)type of Record is important--use the right constructor and
+DAO or, if you won't know the type in advance, consider using the CLI
+importer.
+
+
 Filtering Based on Scalar Criteria
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -112,9 +153,10 @@ The objects returned by the DAOs can be used for further processing. Full
 descriptions of object attributes are available in the
 `model documentation <generated_docs/sina.model.html>`__, but Records and their
 supported special types (runs, etc) all have, at minimum, three attributes:
-:code:`id`, :code:`type`, and :code:`raw`. The :code:`id` is mostly used for locating Records within a backend,
-and the type for sorting them, but as Mnoda-compliant objects are JSON-based,
-a Record's raw provides easy access to its contents::
+:code:`id`, :code:`type`, and :code:`raw`. The :code:`id` is mostly used for
+locating Records within a backend, and the type for sorting them, but as
+Mnoda-compliant objects are JSON-based, a Record's raw provides easy access
+to its contents::
 
   import sina.datastores.sql as sina_sql
 
@@ -127,24 +169,22 @@ a Record's raw provides easy access to its contents::
 
   # Then, we can extract specific fields from those records
   for record in doc_records:
-    raw = json.loads(record.raw)
-    print(raw.get("graph_author"))
+    print(record.raw.get("graph_author"))
 
 This snippet would find all Records in :code:`somefile.sqlite` that have some
 file of interest mentioned in their file list. Note the use of :code:`%` as
 a wildcard character--this would return Records associated with
 "results/final_graph.png", "results/final_graph.gif", etc. Once we have our
-list of Records, we simply load their raw form using Python's JSON module, which
-allows us to access all of their information as though it was loaded into a
-dictionary. Here, we use it to print a special toplevel field ("graph_author")
+list of Records, we have direct access to all information through the raw
+attribute. Here, we use it to print a special toplevel field ("graph_author")
 that the Mnoda schema wouldn't recognize. Of course, this can be used for much
 more, such as editing Records and then inserting them into a new, "clean"
 database, providing specific scalar sets to other applications, etc. For common
 cases, such as accessing all files belonging to a Record, there are convenience
-methods that skip the json loading step entirely::
+methods::
 
   print(record_dao.get_files("my_record_id"))
 
 This snippet would print a list of files associated with the record whose
-:code:`record_id="my_record_id"` For a full list of convenience methods,
+:code:`id="my_record_id"` For a full list of convenience methods,
 please see the `DAO documentation <generated_docs/sina.dao.html>`__.

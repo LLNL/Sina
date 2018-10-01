@@ -17,10 +17,10 @@ class Relationship(Base):
     __tablename__ = 'Relationship'
     id = Column(Integer, primary_key=True)
     subject_id = Column(String(255),
-                        ForeignKey('Record.record_id'),
+                        ForeignKey('Record.id'),
                         nullable=False)
     object_id = Column(String(255),
-                       ForeignKey('Record.record_id'),
+                       ForeignKey('Record.id'),
                        nullable=False)
     predicate = Column(String(255), nullable=False)
 
@@ -46,20 +46,20 @@ class Record(Base):
     """
 
     __tablename__ = 'Record'
-    record_id = Column(String(255), primary_key=True)
-    record_type = Column(String(255), nullable=False)
+    id = Column(String(255), primary_key=True)
+    type = Column(String(255), nullable=False)
     raw = Column(Text(), nullable=True)
 
-    def __init__(self, record_id, record_type, raw=None):
+    def __init__(self, id, type, raw=None):
         """Create Record table entry with id, type, raw."""
-        self.record_id = record_id
-        self.record_type = record_type
+        self.id = id
+        self.type = type
         self.raw = raw
 
     def __repr__(self):
         """Return a string representation of a sql schema Record."""
-        return ('SQL Schema Record <record_id={}, record_type={}>'
-                .format(self.record_id, self.record_type))
+        return ('SQL Schema Record <id={}, type={}>'
+                .format(self.id, self.type))
 
 
 class ScalarData(Base):
@@ -76,19 +76,19 @@ class ScalarData(Base):
     """
 
     __tablename__ = 'ScalarData'
-    record_id = Column(String(255),
-                       ForeignKey(Record.record_id),
-                       nullable=False,
-                       primary_key=True)
+    id = Column(String(255),
+                ForeignKey(Record.id),
+                nullable=False,
+                primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
     value = Column(Float(), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
-    Index('record_scalar_idx', record_id, name)
+    Index('record_scalar_idx', id, name)
 
-    def __init__(self, record_id, name, value, tags=None, units=None):
+    def __init__(self, id, name, value, tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
-        self.record_id = record_id
+        self.id = id
         self.name = name
         self.value = value
         self.units = units
@@ -96,9 +96,9 @@ class ScalarData(Base):
 
     def __repr__(self):
         """Return a string representation of a sql schema ScalarData entry."""
-        return ('SQL Schema ScalarData: <record_id={}, name={}, value={}, tags={},'
+        return ('SQL Schema ScalarData: <id={}, name={}, value={}, tags={},'
                 'units={}>'
-                .format(self.record_id,
+                .format(self.id,
                         self.name,
                         self.value,
                         self.tags,
@@ -121,18 +121,18 @@ class StringData(Base):
     """
 
     __tablename__ = 'StringData'
-    record_id = Column(String(255),
-                       ForeignKey(Record.record_id),
-                       nullable=False,
-                       primary_key=True)
+    id = Column(String(255),
+                ForeignKey(Record.id),
+                nullable=False,
+                primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
     value = Column(String(255), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
 
-    def __init__(self, record_id, name, value, tags=None, units=None):
+    def __init__(self, id, name, value, tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
-        self.record_id = record_id
+        self.id = id
         self.name = name
         self.value = value
         # Arguably, string-based values don't need units. But because the
@@ -143,9 +143,9 @@ class StringData(Base):
 
     def __repr__(self):
         """Return a string representation of a sql schema StringData entry."""
-        return ('SQL Schema StringData: <record_id={}, name={}, value={}, tags={}, '
+        return ('SQL Schema StringData: <id={}, name={}, value={}, tags={}, '
                 'units={}>'
-                .format(self.record_id,
+                .format(self.id,
                         self.name,
                         self.value,
                         self.tags,
@@ -162,10 +162,10 @@ class Document(Base):
     """
 
     __tablename__ = 'Document'
-    record_id = Column(String(255),
-                       ForeignKey(Record.record_id),
-                       nullable=False,
-                       primary_key=True)
+    id = Column(String(255),
+                ForeignKey(Record.id),
+                nullable=False,
+                primary_key=True)
     uri = Column(String(255), nullable=False, primary_key=True)
     # TODO: What does a file that doesn't have a mimetype look like? Should
     # this be required? Should we fallback to getting file extension
@@ -173,9 +173,9 @@ class Document(Base):
     mimetype = Column(String(255), nullable=True)
     tags = Column(Text(), nullable=True)
 
-    def __init__(self, record_id, uri, contents=None, mimetype=None, tags=None):
-        """Create from record_id, uri, and optionally contents and mimetype."""
-        self.record_id = record_id
+    def __init__(self, id, uri, contents=None, mimetype=None, tags=None):
+        """Create from id, uri, and optionally contents and mimetype."""
+        self.id = id
         self.uri = uri
         self.contents = contents
         self.mimetype = mimetype
@@ -183,8 +183,8 @@ class Document(Base):
 
     def __repr__(self):
         """Return a string representation of a sql schema Document."""
-        return ('SQL Schema Document: <record_id={}, uri={}, mimetype={}, tags={}>'
-                .format(self.record_id, self.uri, self.mimetype, self.tags))
+        return ('SQL Schema Document: <id={}, uri={}, mimetype={}, tags={}>'
+                .format(self.id, self.uri, self.mimetype, self.tags))
 
 
 class Run(Base):
@@ -195,27 +195,24 @@ class Run(Base):
     """
 
     __tablename__ = 'Run'
-    record_id = Column(String(255),
-                       ForeignKey(Record.record_id),
-                       primary_key=True)
+    id = Column(String(255),
+                ForeignKey(Record.id),
+                primary_key=True)
     application = Column(String(255), nullable=False)
     user = Column(String(255), nullable=True)
-    user_defined = Column(Text(), nullable=True)
     version = Column(String(255), nullable=True)
 
-    def __init__(self, record_id, application, user=None,
-                 user_defined=None, version=None):
+    def __init__(self, id, application, user=None, version=None):
         """Create Run table entry with id, metadata."""
-        self.record_id = record_id
+        self.id = id
         self.application = application
         self.user = user
-        self.user_defined = user_defined
         self.version = version
 
     def __repr__(self):
         """Return a string representation of a sql schema Run."""
-        return ('SQL Schema Run: <record_id={}, application={}, user={},'
-                'version={}>'.format(self.record_id,
+        return ('SQL Schema Run: <id={}, application={}, user={},'
+                'version={}>'.format(self.id,
                                      self.application,
                                      self.user,
                                      self.version))

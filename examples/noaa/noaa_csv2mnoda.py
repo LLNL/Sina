@@ -173,12 +173,12 @@ def process_data(dataset_fn, dest_dn):
                     mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
                                   o2_qc, ph, ph_qc)
 
-        except csv.Error, ce:
+        except csv.Error as ce:
             print("ERROR: %s: line %s: %s" % (dataset_fn, rdr.line_num,
                                               str(ce)))
             sys.exit(1)
 
-        except Exception, exc:
+        except Exception as exc:
             print("ERROR: %s: line %s: %s: %s" % (dataset_fn, rdr.line_num,
                                                   exc.__class__.__name__,
                                                   str(exc)))

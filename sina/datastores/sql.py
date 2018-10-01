@@ -29,26 +29,26 @@ class RecordDAO(dao.RecordDAO):
         :param record: A Record to insert
         """
         LOGGER.debug('Inserting {} into SQL.'.format(record))
-        self.session.add(schema.Record(record_id=record.record_id,
-                                       record_type=record.record_type,
-                                       raw=record.raw))
+        self.session.add(schema.Record(id=record.id,
+                                       type=record.type,
+                                       raw=json.dumps(record.raw)))
         if record.data:
-            self._insert_data(record.record_id, record.data)
+            self._insert_data(record.id, record.data)
         if record.files:
-            self._insert_files(record.record_id, record.files)
+            self._insert_files(record.id, record.files)
         self.session.commit()
 
-    def _insert_data(self, record_id, data):
+    def _insert_data(self, id, data):
         """
         Insert data entries into the ScalarData and StringData tables.
 
         Does not commit(), caller needs to do that.
 
-        :param record_id: The Record ID to associate the data to.
+        :param id: The Record ID to associate the data to.
         :param data: The list of data to insert.
         """
         LOGGER.debug('Inserting {} data entries to Record ID {}.'
-                     .format(len(data), record_id))
+                     .format(len(data), id))
         for datum in data:
             # Note: SQL doesn't support maps, so we have to convert the
             # tags to a string (if they exist).
@@ -57,60 +57,61 @@ class RecordDAO(dao.RecordDAO):
             # Check if it's a scalar
             kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
                     else schema.StringData)
-            self.session.add(kind(record_id=record_id,
+            self.session.add(kind(id=id,
                                   name=datum['name'],
                                   value=datum['value'],
                                   # units might be None, always use get()
                                   units=datum.get('units'),
                                   tags=tags))
 
-    def _insert_files(self, record_id, files):
+    def _insert_files(self, id, files):
         """
         Insert files into the Document table.
 
         Does not commit(), caller needs to do that.
 
-        :param record_id: The Record ID to associate the files to.
+        :param id: The Record ID to associate the files to.
         :param files: The list of files to insert.
         """
         LOGGER.debug('Inserting {} files to record id={}.'
-                     .format(len(files), record_id))
+                     .format(len(files), id))
         for entry in files:
             tags = (json.dumps(entry['tags']) if 'tags' in entry else None)
-            self.session.add(schema.Document(record_id=record_id,
+            self.session.add(schema.Document(id=id,
                                              uri=entry['uri'],
                                              mimetype=entry.get('mimetype'),
                                              tags=tags))
 
-    def get(self, record_id):
+    def get(self, id):
         """
-        Given a record_id, return match (if any) from SQL database.
+        Given a id, return match (if any) from SQL database.
 
-        :param record_id: The id of the record to return
+        :param id: The id of the record to return
 
         :returns: A record matching that id or None
         """
-        LOGGER.debug('Getting record with id={}'.format(record_id))
+        LOGGER.debug('Getting record with id={}'.format(id))
         query = (self.session.query(schema.Record)
-                 .filter(schema.Record.record_id == record_id).one())
-        return model.Record(record_id=query.record_id,
-                            record_type=query.record_type,
-                            raw=query.raw)
+                 .filter(schema.Record.id == id).one())
+        return model.generate_record_from_json(
+            json_input=json.loads(query.raw))
 
-    def get_all_of_type(self, record_type):
+    def get_all_of_type(self, type):
         """
         Given a type of record, return all Records of that type.
 
-        :param record_type: The type of record to return, ex: run
+        :param type: The type of record to return, ex: run
 
         :returns: a list of Records of that type
         """
-        LOGGER.debug('Getting all records of type {}.'.format(record_type))
+        LOGGER.debug('Getting all records of type {}.'.format(type))
         query = (self.session.query(schema.Record)
-                 .filter(schema.Record.record_type == record_type))
-        return [model.Record(record_id=x.record_id,
-                             record_type=x.record_type,
-                             raw=x.raw) for x in query.all()]
+                 .filter(schema.Record.type == type))
+        records = []
+        for x in query.all():
+            records.append(model.generate_record_from_json(
+                json_input=json.loads(x.raw)))
+        return records
 
     def get_given_document_uri(self, uri, accepted_ids_list=None):
         """
@@ -130,20 +131,20 @@ class RecordDAO(dao.RecordDAO):
         # Note: Mixed results on whether SQLAlchemy's optimizer is smart enough
         # to have %-less LIKE operate on par with ==, hence this:
         if '%' in uri:
-            query = (self.session.query(schema.Document.record_id)
+            query = (self.session.query(schema.Document.id)
                      .filter(schema.Document.uri.like(uri)).distinct())
         else:
-            query = (self.session.query(schema.Document.record_id)
+            query = (self.session.query(schema.Document.id)
                      .filter(schema.Document.uri == uri).distinct())
         if accepted_ids_list is not None:
             query = query.filter(schema.Document
-                                 .record_id.in_(accepted_ids_list))
+                                 .id.in_(accepted_ids_list))
         return self.get_many(x[0] for x in query.all())
 
     # TODO: While not part of the original implementation, we now have
-    # the ability to store non-scalar values as well, so we'll need a query
+    # the ability to store non-scalar data as well, so we'll need a query
     # to search on them, as well as a more user-facing query that can be
-    # given a list of values and call both this and the aforementioned method.
+    # given a list of data and call both this and the aforementioned method.
     def get_given_scalars(self, scalar_range_list):
         """
         Return all records with scalars fulfilling some criteria.
@@ -159,7 +160,7 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Getting all records with scalars within the following '
                      'ranges: {}'.format(scalar_range_list))
-        query = self.session.query(schema.ScalarData.record_id)
+        query = self.session.query(schema.ScalarData.id)
         query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
         out = query.all()
         if out:
@@ -199,10 +200,10 @@ class RecordDAO(dao.RecordDAO):
         query = query.filter(sqlalchemy
                              .or_(self._build_range_filter(scalar, index)
                                   for index, scalar in enumerate(scalars)))
-        query = (query.group_by(schema.ScalarData.record_id)
+        query = (query.group_by(schema.ScalarData.id)
                       .having(sqlalchemy.text("{} = {}"
                               .format(sqlalchemy.func
-                                      .count(schema.ScalarData.record_id),
+                                      .count(schema.ScalarData.id),
                                       len(scalars)))))
         query = query.params(search_args)
         return query
@@ -255,24 +256,24 @@ class RecordDAO(dao.RecordDAO):
         conditions.append(")")
         return sqlalchemy.text(''.join(conditions))
 
-    def get_scalars(self, record_id, scalar_names):
+    def get_scalars(self, id, scalar_names):
         """
         Retrieve scalars for a given record id.
 
         Scalars are returned in alphabetical order.
 
-        :param record_id: The record id to find scalars for
+        :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
         :return: A list of scalar JSON objects matching the Mnoda specification
         """
         # Note lack of filtering on tags. Something to consider.
         # Also, how to handle values? Separate method? Search both tables?
         LOGGER.debug('Getting scalars={} for record id={}'
-                     .format(scalar_names, record_id))
+                     .format(scalar_names, id))
         scalars = []
         query = (self.session.query(schema.ScalarData.name, schema.ScalarData.value,
                                     schema.ScalarData.units, schema.ScalarData.tags)
-                 .filter(schema.ScalarData.record_id == record_id)
+                 .filter(schema.ScalarData.id == id)
                  .filter(schema.ScalarData.name.in_(scalar_names))
                  .order_by(schema.ScalarData.name.asc()).all())
         for entry in query:
@@ -285,19 +286,19 @@ class RecordDAO(dao.RecordDAO):
                             'tags': tags})
         return scalars
 
-    def get_files(self, record_id):
+    def get_files(self, id):
         """
         Retrieve files for a given record id.
 
         Files are returned in the alphabetical order of their URIs
 
-        :param record_id: The record id to find files for
+        :param id: The record id to find files for
         :return: A list of file JSON objects matching the Mnoda specification
         """
-        LOGGER.debug('Getting files for record id={}'.format(record_id))
+        LOGGER.debug('Getting files for record id={}'.format(id))
         query = (self.session.query(schema.Document.uri, schema.Document.mimetype,
                                     schema.Document.tags)
-                             .filter(schema.Document.record_id == record_id)
+                             .filter(schema.Document.id == id)
                              .order_by(schema.Document.uri.asc()).all())
         files = []
         for entry in query:
@@ -327,8 +328,8 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         Task44 contains Run2001
 
-        :param subject_id: The record_id of the subject.
-        :param object_id: The record_id of the object.
+        :param subject_id: The id of the subject.
+        :param object_id: The id of the object.
         :param predicate: A string describing the relationship.
         :param relationship: A Relationship object to build entry from.
         """
@@ -448,13 +449,9 @@ class RunDAO(dao.RunDAO):
         :param run: A Run to import
         """
         LOGGER.debug('Inserting {} into SQL.'.format(run))
-        # Note: SQL doesn't support maps, so we have to convert the
-        # user_defined to a string (if it exists).
-        user_defined = (str(run.user_defined) if run.user_defined else None)
-        self.session.add(schema.Run(record_id=run.record_id,
+        self.session.add(schema.Run(id=run.id,
                                     application=run.application,
                                     user=run.user,
-                                    user_defined=user_defined,
                                     version=run.version))
         self.record_DAO.insert(run)
         self.session.commit()
@@ -462,25 +459,18 @@ class RunDAO(dao.RunDAO):
         # When inserting to Run, should we also insert to Record?
         # Or should the "all Runs are Records" be expressed elsewhere?
 
-    def get(self, run_id):
+    def get(self, id):
         """
         Given a run's id, return match (if any) from SQL database.
 
-        :param run_id: The id of some run
+        :param id: The id of some run
 
         :returns: A run matching that identifier or None
         """
-        LOGGER.debug('Getting run with id: {}'.format(run_id))
-        record_portion = (self.session.query(schema.Record)
-                          .filter(schema.Record.record_id == run_id).one())
-        run_portion = (self.session.query(schema.Run)
-                       .filter(schema.Run.record_id == run_id).one())
-        return model.Run(record_id=run_id,
-                         raw=record_portion.raw,
-                         application=run_portion.application,
-                         user=run_portion.user,
-                         user_defined=run_portion.user_defined,
-                         version=run_portion.version)
+        LOGGER.debug('Getting run with id: {}'.format(id))
+        record = (self.session.query(schema.Record)
+                  .filter(schema.Record.id == id).one())
+        return model.generate_run_from_json(json.loads(record.raw))
 
     def _convert_record_to_run(self, record):
         """
@@ -493,17 +483,17 @@ class RunDAO(dao.RunDAO):
 
         :param record: A Record object to build the Run from.
 
-        :returns: A Run representing the Record plus metadata.
+        :returns: A Run representing the Record plus metadata. None if given
+            a record that isn't a run as input.
         """
         LOGGER.debug('Converting {} to run.'.format(record))
-        run_portion = (self.session.query(schema.Run)
-                       .filter(schema.Run.record_id == record.record_id).one())
-        return model.Run(record_id=record.record_id,
-                         raw=record.raw,
-                         application=run_portion.application,
-                         user=run_portion.user,
-                         user_defined=run_portion.user_defined,
-                         version=run_portion.version)
+        if record.type == 'run':
+            return model.generate_run_from_json(json_input=record.raw)
+        else:
+            msg = ('Record must be of subtype Run to convert to Run. Given '
+                   '{}.'.format(record.id))
+            LOGGER.warn(msg)
+            raise ValueError(msg)
 
 
 class DAOFactory(dao.DAOFactory):
