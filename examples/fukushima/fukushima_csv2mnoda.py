@@ -254,12 +254,12 @@ class FukushimaData(object):
             "data": [
                 {"name": "date", "value": ts[0]},
                 {"name": "time", "value": ' '.join(ts[1:])},
-                {"name": KEY_LATITUDE, "value": lat},
-                {"name": KEY_LONGITUDE, "value": lon},
-                {"name": KEY_ALTITUDE_GPS, "value": alt},
-                {"name": KEY_ALTITUDE_GS, "value": agl},
-                {"name": KEY_LIVE_TIME, "value": live},
-                {"name": KEY_GCNORM, "value": gcnorm},
+                {"name": KEY_LATITUDE, "value": float(lat)},
+                {"name": KEY_LONGITUDE, "value": float(lon)},
+                {"name": KEY_ALTITUDE_GPS, "value": float(alt)},
+                {"name": KEY_ALTITUDE_GS, "value": float(agl)},
+                {"name": KEY_LIVE_TIME, "value": float(live)},
+                {"name": KEY_GCNORM, "value": float(gcnorm)},
                 ],
             })
 
