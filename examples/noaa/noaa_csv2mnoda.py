@@ -74,12 +74,12 @@ MNODA_FN = 'WCOA11-01-06-2015.json'
 
 # Quality control values and meanings
 QC_DATA = [
-    (2, 'good value'),
-    (3, 'questionable value'),
-    (4, 'bad value'),
-    (5, 'value not reported'),
-    (6, 'mean of replicated measurements'),
-    (9, 'sample not drawn')
+    ('2', 'good value'),
+    ('3', 'questionable value'),
+    ('4', 'bad value'),
+    ('5', 'value not reported'),
+    ('6', 'mean of replicated measurements'),
+    ('9', 'sample not drawn')
 ]
 
 # Observation data file format
@@ -275,9 +275,9 @@ class NoaaData(object):
                 {"name": "ctd_oxy", "value": float(oxy),
                  "units": "micromol/kg"},
                 {"name": "o2", "value": float(o2), "units": "micromol/kg"},
-                {"name": "o2_qc", "value": int(o2_qc), "tags": ["qc"]},
+                {"name": "o2_qc", "value": o2_qc, "tags": ["qc"]},
                 {"name": "ph", "value": float(ph)},
-                {"name": "ph_qc", "value": int(ph_qc), "tags": ["qc"]},
+                {"name": "ph_qc", "value": ph_qc, "tags": ["qc"]},
                 ],
             })
 
