@@ -251,16 +251,16 @@ class FukushimaData(object):
         self.recs.append({
             "type": "obs",
             "id": obs_id,
-            "data": [
-                {"name": "date", "value": ts[0]},
-                {"name": "time", "value": ' '.join(ts[1:])},
-                {"name": KEY_LATITUDE, "value": float(lat)},
-                {"name": KEY_LONGITUDE, "value": float(lon)},
-                {"name": KEY_ALTITUDE_GPS, "value": float(alt)},
-                {"name": KEY_ALTITUDE_GS, "value": float(agl)},
-                {"name": KEY_LIVE_TIME, "value": float(live)},
-                {"name": KEY_GCNORM, "value": float(gcnorm)},
-                ],
+            "data": {
+                "date": {"value": ts[0]},
+                "time": {"value": ' '.join(ts[1:])},
+                KEY_LATITUDE: {"value": float(lat)},
+                KEY_LONGITUDE: {"value": float(lon)},
+                KEY_ALTITUDE_GPS: {"value": float(alt)},
+                KEY_ALTITUDE_GS: {"value": float(agl)},
+                KEY_LIVE_TIME: {"value": float(live)},
+                KEY_GCNORM: {"value": float(gcnorm)},
+                },
             })
 
     def add_source(self):
@@ -293,10 +293,10 @@ class FukushimaData(object):
             self.recs.append({
                 "type": "units",
                 "id": units_id,
-                "data": [
-                          {"name": "measure", "value": units},
-                          {"name": "description", "value": desc},
-                ],
+                "data": {
+                          "measure": {"value": units},
+                          "description": {"value": desc}
+                },
             })
 
     def get_exp_fn(self, exp_id):
