@@ -82,26 +82,26 @@ class RecordDAO(dao.RecordDAO):
             if record.data:
                 string_from_rec_batch = []
                 scalar_from_rec_batch = []
-                for datum in record.data:
+                for datum_name, datum in record.data.items():
                     tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
                     if isinstance(datum['value'], numbers.Real):
-                        from_scalar_batch[datum['name']].append((datum['value'],
-                                                                 record.id,
-                                                                 datum.get('units'),
-                                                                 tags))
-                        scalar_from_rec_batch.append((datum['name'],
+                        from_scalar_batch[datum_name].append((datum['value'],
+                                                              record.id,
+                                                              datum.get('units'),
+                                                              tags))
+                        scalar_from_rec_batch.append((datum_name,
                                                       datum['value'],
                                                       datum.get('units'),
                                                       tags))
                     else:
-                        from_string_batch[datum['name']].append((datum['value'],
-                                                                record.id,
-                                                                datum.get('units'),
-                                                                tags))
-                        string_from_rec_batch.append((datum['name'],
-                                                     datum['value'],
-                                                     datum.get('units'),
-                                                     tags))
+                        from_string_batch[datum_name].append((datum['value'],
+                                                              record.id,
+                                                              datum.get('units'),
+                                                              tags))
+                        string_from_rec_batch.append((datum_name,
+                                                      datum['value'],
+                                                      datum.get('units'),
+                                                      tags))
 
                 # We've finished this record's data--do the batch inserts
                 for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
@@ -157,21 +157,21 @@ class RecordDAO(dao.RecordDAO):
         Data entries that are numbers (12.0) go in the ScalarData tables. Any that
         aren't ("Tuesday","12.0") go in the StringData tables.
 
-        :param data: The list of data to insert.
+        :param data: The dictionary of data to insert.
         :param id: The Record ID to associate the data to.
         :param force_overwrite: Whether to forcibly overwrite preexisting data.
                                 Currently only used by Cassandra DAOs.
         """
         LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
                      .format(len(data), id, force_overwrite))
-        for datum in data:
+        for datum_name, datum in data.items():
             tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
             # Check if it's a scalar
             insert_data = (schema.cross_populate_scalar_and_record
                            if isinstance(datum['value'], numbers.Real)
                            else schema.cross_populate_string_and_record)
             insert_data(id=id,
-                        name=datum['name'],
+                        name=datum_name,
                         value=datum['value'],
                         units=datum.get('units'),
                         tags=tags,
@@ -360,16 +360,17 @@ class RecordDAO(dao.RecordDAO):
         """
         Retrieve scalars for a given record id.
 
-        Scalars are returned in alphabetical order.
+        Scalars are returned as a dictionary with the same format as a Record's
+        data attribute (it's a subset of it)
 
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
 
-        :return: A list of scalar JSON objects matching the Mnoda specification
+        :return: A dict of scalars matching the Mnoda data specification
         """
         LOGGER.debug('Getting scalars={} for record id={}'
                      .format(scalar_names, id))
-        scalars = []
+        scalars = {}
         # Cassandra has special restrictions on list types that prevents us
         # from filtering on IN when they're present in a table. Hence this
         # workaround.
@@ -379,10 +380,9 @@ class RecordDAO(dao.RecordDAO):
                          .filter(id=id)
                          .filter(name=name)
                          .values_list('name', 'value', 'units', 'tags')).get()
-                scalars.append({'name': entry[0],
-                                'value': entry[1],
-                                'units': entry[2],
-                                'tags': entry[3]})
+                scalars[entry[0]] = {'value': entry[1],
+                                     'units': entry[2],
+                                     'tags': entry[3]}
             except DoesNotExist:
                 # If scalar doesn't exist, continue
                 pass

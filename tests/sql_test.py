@@ -244,10 +244,10 @@ class TestSQL(unittest.TestCase):
         scalar_names = ['fake_scalar_1', 'fake_scalar_2']
         ids = ['a_fake_id_1', 'a_fake_id_2']
         data = OrderedDict()
-        data[ids[0]] = [{'name': scalar_names[0], 'value': 123},
-                        {'name': scalar_names[1], 'value': 456}]
-        data[ids[1]] = [{'name': scalar_names[0], 'value': 0.1},
-                        {'name': scalar_names[1], 'value': -12}]
+        data[ids[0]] = {scalar_names[0]: {'value': 123},
+                        scalar_names[1]: {'value': 456}}
+        data[ids[1]] = {scalar_names[0]: {'value': 0.1},
+                        scalar_names[1]: {'value': -12}}
         # Write to csv file
         _export_csv(data=data,
                     scalar_names=scalar_names,
@@ -267,10 +267,9 @@ class TestSQL(unittest.TestCase):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = sina_sql.DAOFactory().createRecordDAO()
         mock_record = MagicMock(id="spam", type="eggs",
-                                data=[{"name": "eggs",
-                                       "value": 12,
-                                       "units": None,
-                                       "tags": ["runny"]}],
+                                data={"eggs": {"value": 12,
+                                               "units": None,
+                                               "tags": ["runny"]}},
                                 files=[{"uri": "eggs.brek",
                                         "mimetype": "egg",
                                         "tags": ["fried"]}],
@@ -279,13 +278,10 @@ class TestSQL(unittest.TestCase):
                                      "id": "spam",
                                      "type": "eggs",
                                      "user_defined": {},
-                                     "data": [{
-                                                 "name": "eggs",
-                                                 "value": 12,
-                                                 "units": "None",
-                                                 "tags": ["runny"]
-                                                }
-                                              ],
+                                     "data": {"eggs": {"value": 12,
+                                                       "units": "None",
+                                                       "tags": ["runny"]
+                                                       }},
                                      "files": [{
                                                  "uri": "eggs.brek",
                                                  "mimetype": "egg",
@@ -318,9 +314,9 @@ class TestSQL(unittest.TestCase):
         record_dao = sina_sql.DAOFactory().createRecordDAO()
         vals_files = MagicMock(id="spam",
                                type="new_eggs",
-                               data=[{"name": "foo", "value": 12},
-                                     {"name": "bar", "value": "1",
-                                      "tags": ("in")}],
+                               data={"foo": {"value": 12},
+                                     "bar": {"value": "1",
+                                             "tags": ["in"]}},
                                files=[{"uri": "ham.png", "mimetype": "png"},
                                       {"uri": "ham.curve", "tags": ["hammy"]}],
                                user_defined={},
@@ -328,16 +324,10 @@ class TestSQL(unittest.TestCase):
                                     "id": "spam",
                                     "type": "new_eggs",
                                     "user_defined": {},
-                                    "data": [{
-                                                "name": "foo",
-                                                "value": 12
-                                               },
-                                             {
-                                                "name": "bar",
-                                                "value": "1",
-                                                "tags": ["in"]
-                                               }
-                                             ],
+                                    "data": {"foo": {"value": 12},
+                                             "bar": {"value": "1",
+                                                     "tags": ["in"]}
+                                             },
                                     "files": [{
                                                 "uri": "ham.png",
                                                 "mimetype": "png"
@@ -506,16 +496,14 @@ class TestSQL(unittest.TestCase):
         get_one = record_dao.get_scalars(id="spam",
                                          scalar_names=["spam_scal"])
         self.assertEqual(len(get_one), 1)
-        self.assertEqual(get_one[0]["name"], "spam_scal")
-        self.assertEqual(get_one[0]["units"], "pigs")
+        self.assertEqual(get_one["spam_scal"]["units"], "pigs")
         get_more = record_dao.get_scalars(id="spam",
                                           scalar_names=["spam_scal_2",
                                                         "spam_scal"])
         self.assertEqual(len(get_more), 2)
-        self.assertEqual(get_more[0]["name"], "spam_scal")
-        self.assertEqual(get_more[0]["tags"], ["hammy"])
-        self.assertFalse(get_more[1]["units"])
-        self.assertFalse(get_more[1]["tags"])
+        self.assertEqual(get_more["spam_scal"]["tags"], ["hammy"])
+        self.assertFalse(get_more["spam_scal_2"]["units"])
+        self.assertFalse(get_more["spam_scal_2"]["tags"])
         get_gone = record_dao.get_scalars(id="spam",
                                           scalar_names=["value-1"])
         self.assertFalse(get_gone)
@@ -624,7 +612,7 @@ class TestSQL(unittest.TestCase):
                                     "user_defined": {},
                                     "version": "1.0",
                                     "files": [],
-                                    "data": []
+                                    "data": {}
                                 })
         factory = sina_sql.DAOFactory()
         run_dao = factory.createRunDAO()
@@ -647,7 +635,7 @@ class TestSQL(unittest.TestCase):
                                     "user_defined": {},
                                     "version": "1.0",
                                     "files": [],
-                                    "data": []
+                                    "data": {}
                                 })
         factory = sina_sql.DAOFactory()
         run_dao = factory.createRunDAO()

@@ -152,10 +152,9 @@ class TestSearch(unittest.TestCase):
 
         mock_record = MagicMock(id="spam", type="eggs",
                                 user_defined={},
-                                data=[{"name": "eggs",
-                                       "value": 12,
-                                       "units": None,
-                                       "tags": ["runny"]}],
+                                data={"eggs": {"value": 12,
+                                               "units": None,
+                                               "tags": ["runny"]}},
                                 files=[{"uri": "eggs.brek",
                                         "mimetype": "egg",
                                         "tags": ["fried"]}],
@@ -163,13 +162,10 @@ class TestSearch(unittest.TestCase):
                                        "id": "spam",
                                        "type": "eggs",
                                        "user_defined": {},
-                                       "data": [{
-                                                   "name": "eggs",
-                                                   "value": 12,
-                                                   "units": "None",
-                                                   "tags": ["runny"]
-                                                  }
-                                                ],
+                                       "data": {"eggs": {"value": 12,
+                                                         "units": "None",
+                                                         "tags": ["runny"]
+                                                         }},
                                        "files": [{
                                                    "uri": "eggs.brek",
                                                    "mimetype": "egg",
@@ -219,11 +215,11 @@ class TestSearch(unittest.TestCase):
         vals_files = MagicMock(id="spam",
                                type="new_eggs",
                                user_defined={},
-                               data=[{"name": "foo", "value": 12,
-                                      "units": None,
-                                      "tags": ["in", "on"]},
-                                     {"name": "bar", "value": "1",
-                                      "units": None}],
+                               data={"foo": {"value": 12,
+                                             "units": None,
+                                             "tags": ["in", "on"]},
+                                     "bar": {"value": "1",
+                                             "units": None}},
                                files=[{"uri": "ham.png", "mimetype": "png"},
                                       {"uri": "ham.curve",
                                        "contents": "eggs"}],
@@ -231,18 +227,13 @@ class TestSearch(unittest.TestCase):
                                       "id": "spam",
                                       "type": "new_eggs",
                                       "user_defined": {},
-                                      "data": [{
-                                                  "name": "foo",
-                                                  "value": 12,
-                                                  "units": "None",
-                                                  "tags": ["in", "on"]
-                                                 },
-                                               {
-                                                 "name": "bar",
-                                                 "value": "1",
-                                                 "units": "None"
-                                                 }
-                                               ],
+                                      "data": {
+                                              "foo": {"value": 12,
+                                                      "units": "None",
+                                                      "tags": ["in", "on"]},
+                                              "bar": {"value": "1",
+                                                      "units": "None"
+                                                      }},
                                       "files": [{
                                                   "uri": "ham.png",
                                                   "mimetype": "png"
@@ -414,16 +405,14 @@ class TestSearch(unittest.TestCase):
         get_one = record_dao.get_scalars(id="spam",
                                          scalar_names=["spam_scal"])
         self.assertEqual(len(get_one), 1)
-        self.assertEqual(get_one[0]["name"], "spam_scal")
-        self.assertEqual(get_one[0]["units"], "pigs")
+        self.assertEqual(get_one["spam_scal"]["units"], "pigs")
         get_more = record_dao.get_scalars(id="spam",
                                           scalar_names=["spam_scal_2",
                                                         "spam_scal"])
         self.assertEqual(len(get_more), 2)
-        self.assertEqual(get_more[0]["name"], "spam_scal")
-        self.assertEqual(get_more[0]["tags"], ["hammy"])
-        self.assertFalse(get_more[1]["units"])
-        self.assertFalse(get_more[1]["tags"])
+        self.assertEqual(get_one["spam_scal"]["tags"], ["hammy"])
+        self.assertFalse(get_more["spam_scal_2"]["units"])
+        self.assertFalse(get_more["spam_scal_2"]["tags"])
         # Value is not a scalar
         # TODO: Maybe we should return values as well as scalars for this?
         # Seems more in line with what customers might expect.
@@ -479,7 +468,7 @@ class TestSearch(unittest.TestCase):
                                     },
                                     "version": "1.2.3",
                                     "files": [],
-                                    "data": []
+                                    "data": {}
                                 })
         run_dao.insert(mock_run)
         returned_run = run_dao.get("spam")
@@ -510,10 +499,7 @@ class TestSearch(unittest.TestCase):
                                     "type": "task",
                                     "user_defined": {},
                                     "files": [],
-                                    "data": [{
-                                                "name": "spam_scal",
-                                                "value": 10.99999
-                                            }]
+                                    "data": {"spam_scal": {"value": 10.99999}}
                                 })
         run = Run(id="spam", user="bep", application="foo",
                   version="1.2", user_defined={"spam": "eggs"})
@@ -544,7 +530,7 @@ class TestSearch(unittest.TestCase):
                                     "user_defined": {},
                                     "version": "1.0",
                                     "files": [],
-                                    "data": []
+                                    "data": {}
                                 })
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         run_dao = factory.createRunDAO()
@@ -567,7 +553,7 @@ class TestSearch(unittest.TestCase):
                                     "user_defined": {},
                                     "version": "1.0",
                                     "files": [],
-                                    "data": []
+                                    "data": {}
                                 })
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         run_dao = factory.createRunDAO()

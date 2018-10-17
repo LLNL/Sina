@@ -37,7 +37,7 @@ class Record(object):
         :param id: The id of the record. Should be unique within a dataset
         :param type: The type of record. Some types are reserved for
                             children, see sina.model.RESERVED_TYPES
-        :param data: A list of dicts representing the Record's data.
+        :param data: A dict of dicts representing the Record's data.
         :param files: A list of dicts representing the Record's files
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
@@ -45,13 +45,15 @@ class Record(object):
         self.raw = {}
         self.id = id
         self.type = type
-        self.data = data if data else []
+        self.data = data if data else {}
         self.files = files if files else []
         self.user_defined = user_defined if user_defined else {}
 
-        is_valid, warnings = self._is_valid()
-        if not is_valid:
-            raise ValueError(warnings)
+        # is_valid() was originally called in testing, was this meant to be
+        # left in?
+        # is_valid, warnings = self._is_valid()
+        # if not is_valid:
+        #    raise ValueError(warnings)
 
     @property
     def id(self):
@@ -281,7 +283,7 @@ class Run(Record):
 
 def generate_record_from_json(json_input):
     """
-    Generates a Record from the json input.
+    Generate a Record from the json input.
 
     :param json_input: A JSON representation of a Record.
     :raises: ValueError if given invalid json input.
@@ -307,7 +309,7 @@ def generate_record_from_json(json_input):
 
 def generate_run_from_json(json_input):
     """
-    Generates a Run from the json input.
+    Generate a Run from the json input.
 
     :param json_input: A JSON representation of a Run.
     :raises: ValueError if given invalid json input.

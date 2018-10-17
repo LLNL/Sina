@@ -45,11 +45,11 @@ class RecordDAO(dao.RecordDAO):
         Does not commit(), caller needs to do that.
 
         :param id: The Record ID to associate the data to.
-        :param data: The list of data to insert.
+        :param data: The dictionary of data to insert.
         """
         LOGGER.debug('Inserting {} data entries to Record ID {}.'
                      .format(len(data), id))
-        for datum in data:
+        for datum_name, datum in data.items():
             # Note: SQL doesn't support maps, so we have to convert the
             # tags to a string (if they exist).
             # Using json.dumps() instead of str() (or join()) gives valid JSON
@@ -58,7 +58,7 @@ class RecordDAO(dao.RecordDAO):
             kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
                     else schema.StringData)
             self.session.add(kind(id=id,
-                                  name=datum['name'],
+                                  name=datum_name,
                                   value=datum['value'],
                                   # units might be None, always use get()
                                   units=datum.get('units'),
@@ -260,17 +260,19 @@ class RecordDAO(dao.RecordDAO):
         """
         Retrieve scalars for a given record id.
 
-        Scalars are returned in alphabetical order.
+        Scalars are returned as a dictionary with the same format as a Record's
+        data attribute (it's a subset of it)
 
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
-        :return: A list of scalar JSON objects matching the Mnoda specification
+
+        :return: A dict of scalars matching the Mnoda data specification
         """
         # Note lack of filtering on tags. Something to consider.
         # Also, how to handle values? Separate method? Search both tables?
         LOGGER.debug('Getting scalars={} for record id={}'
                      .format(scalar_names, id))
-        scalars = []
+        scalars = {}
         query = (self.session.query(schema.ScalarData.name, schema.ScalarData.value,
                                     schema.ScalarData.units, schema.ScalarData.tags)
                  .filter(schema.ScalarData.id == id)
@@ -280,10 +282,9 @@ class RecordDAO(dao.RecordDAO):
             # SQL doesn't handle maps. so tags are stored as JSON lists.
             # This converts them to Python.
             tags = json.loads(entry[3]) if entry[3] else None
-            scalars.append({'name': entry[0],
-                            'value': entry[1],
-                            'units': entry[2],
-                            'tags': tags})
+            scalars[entry[0]] = {'value': entry[1],
+                                 'units': entry[2],
+                                 'tags': tags}
         return scalars
 
     def get_files(self, id):
