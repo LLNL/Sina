@@ -37,7 +37,7 @@ nlohmann::json Record::toJson() const {
     //Loop through vector of data and append Json
     nlohmann::json datumRef;
     for(auto &datum : data)
-        datumRef.emplace_back(datum.toJson());
+        datumRef[datum.first] = datum.second.toJson();
     asJson[DATA_FIELD] = datumRef;
     asJson[USER_DEFINED_KEY] = userDefined;
     return asJson;
@@ -48,9 +48,10 @@ Record::Record(nlohmann::json const &asJson) :
         type{getRequiredString(TYPE_FIELD, asJson, "record")} {
     auto dataIter = asJson.find(DATA_FIELD);
     if(dataIter != asJson.end()){
-        for(auto &datum : *dataIter){
-            data.emplace_back(datum);
-       }
+        //Loop through DATA_FIELD objects and add them to data:
+        for(auto &datum : dataIter->items()){
+            data.emplace(std::make_pair(datum.key(), Datum(datum.value())));
+        }
     }
     auto filesIter = asJson.find(FILES_FIELD);
     if (filesIter != asJson.end()) {
@@ -64,8 +65,8 @@ Record::Record(nlohmann::json const &asJson) :
     }
 }
 
-void Record::add(Datum datum) {
-    data.emplace_back(std::move(datum));
+void Record::add(std::string name, Datum datum) {
+    data.emplace(std::make_pair(name, datum));
 }
 
 void Record::add(File file) {

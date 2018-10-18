@@ -30,19 +30,19 @@ namespace mnoda {
  * mnoda::ID myID{"my_record", mnoda::IDType::Local};
  * std::unique_ptr<mnoda::Record> myRecord{new mnoda::Record{myID, "my_type"}};
  * std::vector<std::string> myTags{"input"};
- * mnoda::Datum myDatum{"my_scalar", 12, myTags};
- * myRecord->add(std::move(myDatum));
+ * mnoda::Datum myDatum{12, myTags};
+ * myRecord->add("my_scalar",std::move(myDatum));
  * std::cout << myRecord->toJson() << std::endl;
  * \endcode
  *
  * The output would be:
  * \code{.json} 
- * {"local_id":"my_record","type":"my_type","data":[{"name":"my_scalar","tags":["input"],"value":12.0}]}
+ * {"local_id":"my_record","type":"my_type","data":{"my_scalar":{"tags":["input"],"value":12.0}}}
  * \endcode
  */
 class Record {
 public:
-    using DatumList = std::vector<Datum>;
+    using DatumMap = std::unordered_map<std::string, Datum>;
     using FileList = std::vector<File>;
 
     /**
@@ -87,16 +87,17 @@ public:
      *
      * @return the Record's data
      */
-    DatumList const &getData() const noexcept {
+    DatumMap const &getData() const noexcept {
         return data;
     }
 
     /**
      * Add a Datum to this record.
      *
+     * @param name the key for the Datum to add
      * @param datum the Datum to add
      */
-    void add(Datum datum);
+    void add(std::string name, Datum datum);
 
     /**
      * Add a File to this record.
@@ -151,7 +152,7 @@ public:
 private:
     internal::IDField id;
     std::string type;
-    DatumList data;
+    DatumMap data;
     FileList files;
     nlohmann::json userDefined;
 };

@@ -8,7 +8,6 @@
 
 namespace {
 
-char const NAME_FIELD[] = "name";
 char const VALUE_FIELD[] = "value";
 char const UNITS_FIELD[] = "units";
 char const TAGS_FIELD[] = "tags";
@@ -18,22 +17,19 @@ char const DATA_PARENT_TYPE[] = "data";
 
 namespace mnoda {
 
-Datum::Datum(std::string name_, std::string value_) :
-        name{std::move(name_)},
+Datum::Datum(std::string value_) :
         stringValue{std::move(value_)}{
     //Set type to String, as we know it uses strings
     type = ValueType::String;
 }
 
-Datum::Datum(std::string name_, double value_) :
-        name{std::move(name_)},
+Datum::Datum(double value_) :
         scalarValue{std::move(value_)}{
     //Set type to Scalar, as we know it uses doubles
     type = ValueType::Scalar;
 }
 
-Datum::Datum(nlohmann::json const &asJson) :
-    name{getRequiredString(NAME_FIELD, asJson, DATA_PARENT_TYPE)} {
+Datum::Datum(nlohmann::json const &asJson) {
     //Need to determine what type of Datum we have: Scalar (double) or String.
     nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, DATA_PARENT_TYPE);
     if(valueField.is_string()){
@@ -79,7 +75,6 @@ void Datum::setTags(std::vector<std::string> tags_){
 
 nlohmann::json Datum::toJson() const {
     nlohmann::json asJson;
-    asJson[NAME_FIELD] = name;
     switch(type){
         case ValueType::Scalar:
             asJson[VALUE_FIELD] = scalarValue;
