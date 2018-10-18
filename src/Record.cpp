@@ -49,8 +49,8 @@ Record::Record(nlohmann::json const &asJson) :
     auto dataIter = asJson.find(DATA_FIELD);
     if(dataIter != asJson.end()){
         //Loop through DATA_FIELD objects and add them to data:
-        for(auto &datum : dataIter->items()){
-            data.emplace(std::make_pair(datum.key(), Datum(datum.value())));
+        for(auto &namedDatum : dataIter->items()){
+            data.emplace(std::make_pair(namedDatum.key(), Datum(namedDatum.value())));
         }
     }
     auto filesIter = asJson.find(FILES_FIELD);
