@@ -73,6 +73,7 @@ class RecordDAO(dao.RecordDAO):
         # Because batch is done by partition key, we'll need to store info for
         # tables whose full per-partition info isn't supplied by one Record
         from_scalar_batch = collections.defaultdict(list)
+        from_string_batch = collections.defaultdict(list)
         for record in list_to_insert:
             # Insert the Record itself
             is_valid, warnings = record.is_valid()

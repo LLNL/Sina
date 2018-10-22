@@ -294,13 +294,8 @@ class FukushimaData(object):
                 "type": "units",
                 "id": units_id,
                 "data": {
-<<<<<<< HEAD
                     "measure": {"value": units},
                     "description": {"value": desc},
-=======
-                          "measure": {"value": units},
-                          "description": {"value": desc}
->>>>>>> f2050b4948d958f901072538ad4908b4ded2b084
                 },
             })
 

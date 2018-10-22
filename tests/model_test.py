@@ -80,7 +80,6 @@ class TestModel(unittest.TestCase):
         self.assertEqual(sorted(set(json.loads(target_json))),
                          sorted(set(json.loads(test_record.to_json()))))
 
-
     def test_generate_json_run(self):
         """Ensure Run JSON is generating properly."""
         target_json = ('{"id":"hello", "type":"run",'
