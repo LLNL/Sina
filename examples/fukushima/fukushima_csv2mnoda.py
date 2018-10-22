@@ -259,7 +259,7 @@ class FukushimaData(object):
                 KEY_ALTITUDE_GPS: {"value": float(alt)},
                 KEY_ALTITUDE_GS: {"value": float(agl)},
                 KEY_LIVE_TIME: {"value": float(live)},
-                KEY_GCNORM: {"value": float(gcnorm)}
+                KEY_GCNORM: {"value": float(gcnorm)},
                 },
             })
 
@@ -294,8 +294,13 @@ class FukushimaData(object):
                 "type": "units",
                 "id": units_id,
                 "data": {
+<<<<<<< HEAD
                     "measure": {"value": units},
                     "description": {"value": desc},
+=======
+                          "measure": {"value": units},
+                          "description": {"value": desc}
+>>>>>>> f2050b4948d958f901072538ad4908b4ded2b084
                 },
             })
 
