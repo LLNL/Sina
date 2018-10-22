@@ -227,7 +227,7 @@ TEST(Document, saveDocument) {
     EXPECT_EQ("the type", readRecord["type"]);
 }
 
-TEST(Document, load_secifiedRecordLoader) {
+TEST(Document, load_specifiedRecordLoader) {
     using RecordType = TestRecord<int>;
     auto originalRecord = internal::make_unique<RecordType>(
             "the ID", "my type", 123);

@@ -20,18 +20,19 @@ enum class ValueType {
 };
 
 /**
- * A Datum tracks the name, value, and (optionally) tags and/or units of a
+ * A Datum tracks the value and (optionally) tags and/or units of a
  * value associated with a Record, e.g. a scalar, a piece of metadata,
  * or an input parameter. In the Mnoda schema, a Datum always
  * belongs to a Record or one of Record's inheriting types.
  *
- * Every Datum must have a name and value; units and tags are optional.
+ * Every Datum must have a value; units and tags are optional.
  *
  * The value of a Datum may be either a string or a double.
  *
  * \code
- * mnoda::Datum myDatum{"my_scalar", 12.34};
- * mnoda::Datum myOtherDatum{"my_string", "foobar"};
+ * mnoda::Datum myDatum{12.34};
+ * std::string value = "foobar";
+ * mnoda::Datum myOtherDatum{value};
  * //prints 1, corresponding to Scalar
  * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myDatum.getType()) << std::endl;
  * //prints 0, corresponding to String
@@ -46,18 +47,16 @@ public:
     /**
      * Construct a new Datum.
      *
-     * @param name the name of the Datum
-     * @param value the string value relating to the key
+     * @param value the string value of the datum
      */
-    Datum(std::string name, std::string value);
+    Datum(std::string value);
 
     /**
      * Construct a new Datum.
      *
-     * @param name the name of the Datum
-     * @param value the double value relating to the key
+     * @param value the double value of the datum
      */
-    Datum(std::string name, double value);
+    Datum(double value);
 
     /**
      * Construct a Datum from its JSON representation.
@@ -82,15 +81,6 @@ public:
      */
     double const &getScalar() const noexcept {
             return scalarValue;
-    }
-
-    /**
-     * Get the name of the Datum.
-     *
-     * @return the name of the value
-     */
-    std::string const &getName() const noexcept {
-        return name;
     }
 
     /**
@@ -142,7 +132,6 @@ public:
      */
     nlohmann::json toJson() const;
 private:
-    std::string name;
     std::string stringValue;
     double scalarValue;
     std::string units;
