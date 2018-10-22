@@ -29,6 +29,9 @@ class RecordDAO(dao.RecordDAO):
         :param record: A Record to insert
         """
         LOGGER.debug('Inserting {} into SQL.'.format(record))
+        is_valid, warnings = record.is_valid()
+        if not is_valid:
+            raise ValueError(warnings)
         self.session.add(schema.Record(id=record.id,
                                        type=record.type,
                                        raw=json.dumps(record.raw)))

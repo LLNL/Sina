@@ -42,67 +42,39 @@ class Record(object):
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
         """
-        self.raw = {}
+        # Using __dict__ to avoid keyerrors with set_attr()
+        self.__dict__['raw'] = {}
+        # Note these are all going to raw behind the scenes (see __setattr__)
         self.id = id
         self.type = type
         self.data = data if data else {}
         self.files = files if files else []
         self.user_defined = user_defined if user_defined else {}
 
-        # is_valid() was originally called in testing, was this meant to be
-        # left in?
-        # is_valid, warnings = self._is_valid()
-        # if not is_valid:
-        #    raise ValueError(warnings)
-
-    @property
-    def id(self):
-        return self['id']
-
-    @id.setter
-    def id(self, id):
-        self['id'] = id
-
-    @property
-    def type(self):
-        return self['type']
-
-    @type.setter
-    def type(self, type):
-        self['type'] = type
-
-    @property
-    def data(self):
-        return self['data']
-
-    @data.setter
-    def data(self, data):
-        self['data'] = data
-
-    @property
-    def files(self):
-        return self['files']
-
-    @files.setter
-    def files(self, files):
-        self['files'] = files
-
-    @property
-    def user_defined(self):
-        return self['user_defined']
-
-    @user_defined.setter
-    def user_defined(self, user_defined):
-        self['user_defined'] = user_defined
-
     def __getitem__(self, key):
+        """Change some_rec["spam"] to some_rec["raw"]["spam"]."""
         return self.raw[key]
 
     def __setitem__(self, key, value):
+        """Change some_rec["spam"] = 42 to some_rec["raw"]["spam"] = 42."""
         self.raw[key] = value
 
     def __delitem__(self, key):
+        """Change del some_rec['spam'] to del some_rec['raw']['spam']."""
         del self.raw[key]
+
+    def __getattr__(self, key):
+        """Change some_rec.spam to some_rec["raw"]["spam"]."""
+        # Reference __dict__ directly to avoid recursive calls to __getattr__()
+        return self.__dict__['raw'][key]
+
+    def __setattr__(self, key, value):
+        """Change some_rec.spam = 42 to some_rec["raw"]["spam"] = 42."""
+        self.__dict__['raw'][key] = value
+
+    def __delattr__(self, key):
+        """Change del some_rec.spam to del some_rec['raw']['spam']."""
+        del self.__dict__['raw'][key]
 
     def __repr__(self):
         """Return a string representation of a model Record."""
@@ -117,7 +89,7 @@ class Record(object):
         """
         return json.dumps(self.raw)
 
-    def _is_valid(self, print_warnings=None):
+    def is_valid(self, print_warnings=None):
         """Test whether a Record's members are formatted correctly.
 
         The ingester expects certain types to be reserved, and for data
@@ -140,7 +112,7 @@ class Record(object):
         # files/data) and doesn't warrant spamming the logger.
         for entry in self.files:
             if not isinstance(entry, dict):
-                (warnings.append("At least one value entry belonging to "
+                (warnings.append("At least one file entry belonging to "
                                  "Record {} is not a dictionary. Value: {}"
                                  .format(self.id, entry)))
                 break
@@ -158,28 +130,27 @@ class Record(object):
                                  "Record {} has a malformed tag list. File: {}"
                                  .format(self.id, entry)))
 
-        for entry in self.data:
-            if not isinstance(entry, dict):
-                (warnings.append("At least one value entry belonging to "
-                                 "Record {} is not a dictionary. Value: {}"
-                                 .format(self.id, entry)))
-                break
-            if "name" not in entry:
-                (warnings.append("At least one value entry belonging to "
-                                 "Record {} is missing a name. Value: {}"
-                                 .format(self.id, entry)))
-                break
-            if "value" not in entry:
-                (warnings.append("At least one value entry belonging to "
-                                 "Record {} is missing a value. Value: {}"
-                                 .format(self.id, entry)))
-                break
-            if (entry.get("tags") and
-                (isinstance(entry.get("tags"), six.string_types) or
-                 not isinstance(entry.get("tags"), collections.Sequence))):
-                (warnings.append("At least one value entry belonging to "
-                                 "Record {} has a malformed tag list. Value: {}"
-                                 .format(self.id, entry)))
+        if not isinstance(self.data, dict):
+            (warnings.append("Record {}'s data field must be a dictionary!"
+                             .format(self.id)))
+        else:
+            for entry in self.data:
+                if not isinstance(self.data[entry], dict):
+                    (warnings.append("At least one value entry belonging to "
+                                     "Record {} is not a dictionary. Value: {}"
+                                     .format(self.id, entry)))
+                    break
+                if "value" not in self.data[entry]:
+                    (warnings.append("At least one value entry belonging to "
+                                     "Record {} is missing a value. Value: {}"
+                                     .format(self.id, entry)))
+                    break
+                if (self.data[entry].get("tags") and
+                    (isinstance(self.data[entry].get("tags"), six.string_types) or
+                     not isinstance(self.data[entry].get("tags"), collections.Sequence))):
+                    (warnings.append("At least one value entry belonging to "
+                                     "Record {} has a malformed tag list. Value: {}"
+                                     .format(self.id, entry)))
         try:
             json.dumps(self.raw)
         except ValueError:
@@ -315,8 +286,9 @@ def generate_run_from_json(json_input):
     :raises: ValueError if given invalid json input.
     """
     LOGGER.debug('Generating run from json input: {}'.format(json_input))
-    # Must create record first
+    # Programatically-created Records
     try:
+        print(json_input)
         run = Run(id=json_input['id'],
                   user=json_input.get('user'),
                   user_defined=json_input.get('user_defined'),
