@@ -207,7 +207,7 @@ class NoaaData(object):
             self.recs.append({
                 "type": "qc",
                 "id": qid,
-                "data": [{"name": "desc", "value": desc}, ],
+                "data": {"desc": {"value": desc}, },
                 })
 
     def add_exp(self, exp):
@@ -268,17 +268,16 @@ class NoaaData(object):
             "files": [
                 {"uri": obs_fn, "mimetype": "text/plain"},
                 ],
-            "data": [
-                {"name": "depth", "value": float(depth), "units": "meters"},
-                {"name": "press", "value": float(press), "units": "decibars"},
-                {"name": "temp", "value": float(temp), "units": "C"},
-                {"name": "ctd_oxy", "value": float(oxy),
-                 "units": "micromol/kg"},
-                {"name": "o2", "value": float(o2), "units": "micromol/kg"},
-                {"name": "o2_qc", "value": o2_qc, "tags": ["qc"]},
-                {"name": "ph", "value": float(ph)},
-                {"name": "ph_qc", "value": ph_qc, "tags": ["qc"]},
-                ],
+            "data": {
+                "depth": {"value": float(depth), "units": "meters"},
+                "press": {"value": float(press), "units": "decibars"},
+                "temp": {"value": float(temp), "units": "C"},
+                "ctd_oxy": {"value": float(oxy), "units": "micromol/kg"},
+                "o2": {"value": float(o2), "units": "micromol/kg"},
+                "o2_qc": {"value": o2_qc, "tags": ["qc"]},
+                "ph": {"value": float(ph)},
+                "ph_qc": {"value": ph_qc, "tags": ["qc"]},
+                },
             })
 
     def write(self):
