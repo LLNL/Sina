@@ -385,7 +385,7 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(ids_only), 4)
         self.assertIsInstance(ids_only, list)
         self.assertIsInstance(ids_only[0], six.string_types)
-        for record_id in ["spam", "spam1", "spam2", "spam4"]:
+        for record_id in ["spam", "spam1", "spam3", "spam4"]:
                 self.assertIn(record_id, ids_only)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
@@ -421,7 +421,7 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(ids_only), 3)
         self.assertIsInstance(ids_only, list)
         self.assertIsInstance(ids_only[0], six.string_types)
-        for record_id in ["spam", "spam2", "spam4"]:
+        for record_id in ["spam", "spam2", "spam3"]:
             self.assertIn(record_id, ids_only)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
