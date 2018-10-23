@@ -272,7 +272,7 @@ class TestSearch(unittest.TestCase):
         _populate_database_with_files()
         end_wildcard = record_dao.get_given_document_uri(uri="beep.%")
         # Note that we're expecting 3 even though there's 4 matches.
-        # That's because id "beep" matches twice. So 3 unique.
+        # That's because id "spam" matches twice. So 3 unique.
         # Similar unique-match logic is present in the other asserts
         self.assertEqual(len(end_wildcard), 3)
         mid_wildcard = record_dao.get_given_document_uri(uri="beep%png")
@@ -337,10 +337,8 @@ class TestSearch(unittest.TestCase):
                                              none_fulfill])
         self.assertFalse(none)
 
-    @patch(__name__+'.sina_cass.RecordDAO.get')
-    def test_recorddao_type(self, mock_get):
+    def test_recorddao_type(self):
         """Test the RecordDAO is retrieving based on type correctly."""
-        mock_get.return_value = True
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
         mock_rec = MagicMock(id="spam", type="run",

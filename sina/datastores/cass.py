@@ -204,29 +204,36 @@ class RecordDAO(dao.RecordDAO):
 
         :returns: A record matching that id or None
         """
+        # TODO: A get_many() that uses batching
         LOGGER.debug('Getting record with id={}'.format(id))
         query = schema.Record.objects.filter(id=id).get()
         return model.generate_record_from_json(
             json_input=json.loads(query.raw))
 
-    def get_all_of_type(self, type):
+    def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of record, return all Records of that type.
 
         :param type: The type of record to return, ex: run
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: a list of Records of that type
+        :returns: a list of Records of that type or (if ids_only) a list of
+                  their ids
         """
         LOGGER.debug('Getting all records of type {}.'.format(type))
-        query = (schema.Record.objects.filter(type=type))
-        # TODO: If type query table introduced, change this:
-        records = []
-        for x in query.allow_filtering().all():
-            records.append(model.generate_record_from_json(
-                json_input=json.loads(x.raw)))
-        return records
+        # Allow_filtering() is, as a rule, inadvisable; if speed becomes a
+        # concern, an id - type query table should be easy to set up.
+        query = (schema.Record.objects.filter(type=type)
+                                      .allow_filtering()
+                                      .values_list('id', flat=True))
+        filtered_ids = list(query)
+        if ids_only:
+            return list(filtered_ids)
+        else:
+            return self.get_many(filtered_ids)
 
-    def get_given_document_uri(self, uri, accepted_ids_list=None):
+    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
@@ -239,8 +246,11 @@ class RecordDAO(dao.RecordDAO):
         :param uri: The uri to use as a search term, such as "foo.png"
         :param accepted_ids_list: A list of ids to restrict the search to.
                                   If not provided, all ids will be used.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of matching records (or an empty list)
+        :returns: a list of Records associated with that uri or (if ids_only) a
+                  list of their ids
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
         if accepted_ids_list:
@@ -248,25 +258,26 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.warning('Temporary implementation of getting Records based on '
                        'Document URI. This is a very slow, brute-force '
                        'strategy.')
-        base_query = (schema.DocumentFromRecord.objects.allow_filtering()
-                      if accepted_ids_list is None else
-                      schema.DocumentFromRecord.objects
-                      .filter(id__in=accepted_ids_list))
+        if accepted_ids_list is not None:
+            base_query = schema.DocumentFromRecord.objects.filter(id__in=accepted_ids_list)
+        else:
+            # If we haven't had an accepted_ids_list passed, any filtering we do
+            # will NOT include the partition key, so we need to allow filtering.
+            base_query = schema.DocumentFromRecord.objects.allow_filtering()
         # If there's a wildcard
         if '%' in uri:
             # Special case: get all ids with associated docs.
             if len(uri) == 1:
-                all_documents = (base_query.all())
-                return self.get_many(set(x.id for x in all_documents))
+                match_ids = set(base_query.values_list('id', flat=True))
+
             # If a wildcard is in any position besides last, we do it in Python
-            if '%' in uri[:-1]:
-                matches = set()
+            elif '%' in uri[:-1]:
+                match_ids = set()
                 # Change searched URI into a fnmatch-friendly version
                 search_uri = uri.replace('*', '[*]').replace('%', '*')
                 for entry in base_query.all():
                     if fnmatch.fnmatch(entry.uri, search_uri):
-                        matches.add(entry.id)
-                return self.get_many(matches)
+                        match_ids.add(entry.id)
 
             # As long as the wildcard's in last place, we can do it in CQL
             else:
@@ -274,16 +285,20 @@ class RecordDAO(dao.RecordDAO):
                 # Thus, we can search from ex: 'foo' through 'fop' to
                 # simulate a 'LIKE foo%' query.
                 alphabetical_end = uri[:-2]+chr(ord(uri[-2]) + 1)
-                query = (base_query.filter(uri__gte=uri[:-1])
-                         .filter(uri__lt=alphabetical_end).all())
-                return self.get_many(set(x.id for x in query))
-        # If no wildcard
-        # Note: it's completely possible for multiple documents to have the
-        # same URI but different ids. Should this be changed?
-        return self.get_many([x.id for x in
-                              base_query.filter(uri=uri).all()])
+                match_ids = set(base_query.filter(uri__gte=uri[:-1])
+                                .filter(uri__lt=alphabetical_end)
+                                .values_list('id', flat=True))
+        # If there's no wildcard, we're looking for exact matches.
+        else:
+            match_ids = set(base_query.filter(uri=uri)
+                            .values_list('id', flat=True))
 
-    def get_given_scalars(self, scalar_range_list):
+        if ids_only:
+            return list(match_ids)
+        else:
+            return self.get_many(match_ids)
+
+    def get_given_scalars(self, scalar_range_list, ids_only=False):
         """
         Return all records with scalars fulfilling some criteria.
 
@@ -293,40 +308,54 @@ class RecordDAO(dao.RecordDAO):
 
         :param scalar_range_list: A list of 'sina.ScalarRange's describing the
                                   different criteria.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of Records fitting the criteria
+        :returns: a list of Records fitting those criteria or (if ids_only) a
+                  list of their ids
         """
         LOGGER.debug('Getting all records with scalars within the following '
                      'ranges: {}'.format(scalar_range_list))
         query = schema.RecordFromScalarData.objects
-        rec_ids = list(self
-                       ._configure_query_for_scalar_range(query,
-                                                          scalar_range_list[0])
-                       .values_list('id', flat=True).all())
-        for scalar_range in scalar_range_list[1:]:
-            query = (schema.ScalarDataFromRecord.objects
-                     .filter(id__in=rec_ids))
-            query = self._configure_query_for_scalar_range(query, scalar_range)
-            rec_ids = list(query.values_list('id', flat=True).all())
-        return self.get_many(rec_ids)
+        # Because query results are AND-ed, and queries are more efficient
+        # when the partition key is specified, we use the first criteria to
+        # narrow down the rest to partitions
+        filtered_ids = list(self.get_given_scalar(scalar_range_list[0], ids_only=True))
+        # Only do the next part if there's more scalars and at least one id
+        if len(scalar_range_list) > 1:
+            for scalar_range in scalar_range_list[1:]:
+                if filtered_ids:
+                    query = (schema.ScalarDataFromRecord.objects
+                             .filter(id__in=filtered_ids))
+                    query = self._configure_query_for_scalar_range(query,
+                                                                   scalar_range)
+                    filtered_ids = list(query.values_list('id', flat=True).all())
+        if ids_only:
+            return list(filtered_ids)
+        else:
+            return self.get_many(filtered_ids)
 
-    def get_given_scalar(self, scalar_range):
+    def get_given_scalar(self, scalar_range, ids_only=False):
         """
         Return all records with scalars fulfilling some criteria.
 
         :param scalar_range: A 'sina.ScalarRange's describing the
                              different criteria.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of Records fitting the criteria
+        :returns: a list of Records fitting that criterion or (if ids_only) a
+                  list of their ids
         """
         LOGGER.debug('Getting all records with scalars within the range: {}'
                      .format(scalar_range))
         query = schema.RecordFromScalarData.objects
-        out = self._configure_query_for_scalar_range(query, scalar_range).all()
-        if out:
-            return self.get_many(x.id for x in out)
+        filtered_ids = (self._configure_query_for_scalar_range(query, scalar_range)
+                        .values_list('id', flat=True).all())
+        if ids_only:
+            return list(filtered_ids)
         else:
-            return []
+            return self.get_many(filtered_ids)
 
     def _configure_query_for_scalar_range(self, query, scalar_range):
         """
