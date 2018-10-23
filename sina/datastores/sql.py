@@ -192,7 +192,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: a list of Records fitting that criterion or (if ids_only) a
                   list of their ids
         """
-        return self.get_given_scalars([scalar_range])
+        return self.get_given_scalars([scalar_range], ids_only=ids_only)
 
     def _apply_scalar_ranges_to_query(self, query, scalars):
         """

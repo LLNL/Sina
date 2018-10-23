@@ -4,6 +4,7 @@ import os
 import json
 import logging
 from mock import MagicMock, patch
+import six
 
 import cassandra.cqlengine.connection as connection
 import cassandra.cqlengine.management as management
@@ -283,6 +284,11 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(len(multi_wildcard), 4)
         all_wildcard = record_dao.get_given_document_uri(uri="%")
         self.assertEqual(len(all_wildcard), 5)
+        ids_only = record_dao.get_given_document_uri(uri="%.%", ids_only=True)
+        self.assertEqual(len(ids_only), 4)
+        self.assertIsInstance(ids_only, list)
+        self.assertIsInstance(ids_only[0], six.string_types)
+        self.assertIn("spam", ids_only)
 
     @patch(__name__+'.sina_cass.RecordDAO.get')
     def test_recorddao_scalar(self, mock_get):
@@ -317,6 +323,11 @@ class TestSearch(unittest.TestCase):
         multi = record_dao.get_given_scalar(multi_range)
         self.assertEqual(len(multi), 3)
         self.assertEqual(mock_get.call_count, 6)
+        ids_only = record_dao.get_given_scalar(multi_range, ids_only=True)
+        self.assertEqual(len(ids_only), 3)
+        self.assertIsInstance(ids_only, list)
+        self.assertIsInstance(ids_only[0], six.string_types)
+        self.assertIn("spam2", ids_only)
 
     @patch(__name__+'.sina_cass.RecordDAO.get')
     def test_recorddao_many_scalar(self, mock_get):
@@ -336,6 +347,12 @@ class TestSearch(unittest.TestCase):
                                              spam_3_only,
                                              none_fulfill])
         self.assertFalse(none)
+        id_only = record_dao.get_given_scalars([spam_and_spam_3,
+                                                spam_3_only],
+                                               ids_only=True)
+        self.assertEqual(len(id_only), 1)
+        self.assertIsInstance(id_only, list)
+        self.assertEqual(id_only[0], "spam3")
 
     def test_recorddao_type(self):
         """Test the RecordDAO is retrieving based on type correctly."""
@@ -391,6 +408,11 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(len(get_many), 3)
         get_none = record_dao.get_all_of_type("butterscotch")
         self.assertFalse(get_none)
+        ids_only = record_dao.get_all_of_type("run", ids_only=True)
+        self.assertEqual(len(ids_only), 3)
+        self.assertIsInstance(ids_only, list)
+        self.assertIsInstance(ids_only[0], six.string_types)
+        self.assertIn("spam2", ids_only)
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
