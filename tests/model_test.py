@@ -48,20 +48,13 @@ class TestModel(unittest.TestCase):
         self.assertTrue(spam.is_valid()[0])
 
     def test_record_access(self):
-        """Ensure accessing record attribs using rec.spam and rec["spam"]."""
+        """Ensure accessing record attribs using rec["spam"]."""
         rec = model.Record(id="spam_test", type="test")
-
-        rec.eggs = "nutritious"
+        rec["eggs"] = "nutritious"
         self.assertEqual(rec['eggs'], "nutritious")
         self.assertEqual(rec.__dict__["raw"]["eggs"], "nutritious")
-        del rec.eggs
+        del rec["eggs"]
         self.assertTrue('eggs' not in rec.__dict__["raw"])
-
-        rec['bacon'] = "crispy"
-        self.assertEqual(rec.bacon, "crispy")
-        self.assertEqual(rec.__dict__["raw"]["bacon"], "crispy")
-        del rec['bacon']
-        self.assertTrue('bacon' not in rec.__dict__["raw"])
 
     def test_generate_json(self):
         """Ensure JSON is generating properly."""

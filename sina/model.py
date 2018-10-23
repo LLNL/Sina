@@ -51,6 +51,46 @@ class Record(object):
         self.files = files if files else []
         self.user_defined = user_defined if user_defined else {}
 
+    @property
+    def id(self):
+        return self['id']
+
+    @id.setter
+    def id(self, id):
+        self['id'] = id
+
+    @property
+    def type(self):
+        return self['type']
+
+    @type.setter
+    def type(self, type):
+        self['type'] = type
+
+    @property
+    def data(self):
+        return self['data']
+
+    @data.setter
+    def data(self, data):
+        self['data'] = data
+
+    @property
+    def files(self):
+        return self['files']
+
+    @files.setter
+    def files(self, files):
+        self['files'] = files
+
+    @property
+    def user_defined(self):
+        return self['user_defined']
+
+    @user_defined.setter
+    def user_defined(self, user_defined):
+        self['user_defined'] = user_defined
+
     def __getitem__(self, key):
         """Change some_rec["spam"] to some_rec["raw"]["spam"]."""
         return self.raw[key]
@@ -62,19 +102,6 @@ class Record(object):
     def __delitem__(self, key):
         """Change del some_rec['spam'] to del some_rec['raw']['spam']."""
         del self.raw[key]
-
-    def __getattr__(self, key):
-        """Change some_rec.spam to some_rec["raw"]["spam"]."""
-        # Reference __dict__ directly to avoid recursive calls to __getattr__()
-        return self.__dict__['raw'][key]
-
-    def __setattr__(self, key, value):
-        """Change some_rec.spam = 42 to some_rec["raw"]["spam"] = 42."""
-        self.__dict__['raw'][key] = value
-
-    def __delattr__(self, key):
-        """Change del some_rec.spam to del some_rec['raw']['spam']."""
-        del self.__dict__['raw'][key]
 
     def __repr__(self):
         """Return a string representation of a model Record."""

@@ -540,10 +540,9 @@ class TestSQL(unittest.TestCase):
     def test_convert_record_to_run_good(self):
         """Test we return a Run when given a Record with valid input."""
         rec = Record(id="spam", type="run")
-        rec.user = "bob"
-        rec.application = "skillet"
-        rec.version = "1.0"
-        print(rec.raw)
+        rec["user"] = "bob"
+        rec["application"] = "skillet"
+        rec["version"] = "1.0"
         factory = sina_sql.DAOFactory()
         run_dao = factory.createRunDAO()
         converted_run = run_dao._convert_record_to_run(record=rec)
@@ -553,9 +552,9 @@ class TestSQL(unittest.TestCase):
     def test_convert_record_to_run_bad(self):
         """Test we raise a ValueError when given a Record with bad input."""
         rec = Record(id="spam", type="task ")
-        rec.user = "bob"
-        rec.application = "skillet"
-        rec.version = "1.0"
+        rec["user"] = "bob"
+        rec["application"] = "skillet"
+        rec["version"] = "1.0"
         factory = sina_sql.DAOFactory()
         run_dao = factory.createRunDAO()
         with self.assertRaises(ValueError) as context:
