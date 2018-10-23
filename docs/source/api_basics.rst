@@ -150,10 +150,10 @@ Combining Filters using "IDs Only" Logic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Filtering methods (such as get_all_of_type, get_given_scalar, etc) take an
-optional argument, ids_only. If passed as true, they'll return only the ids
-of Records that fulfill their criteria, rather than the entire Record. This
-is faster than assembling the entire Record object(s), and is also the
-recommended way of combining queries or implementing more complex logic::
+optional argument, :code:`ids_only`. If passed as :code:`True`, they'll return
+only the ids of Records that fulfill their criteria, rather than the entire
+Record. This is faster than assembling the entire Record object(s), and is also
+the recommended way of combining queries or implementing more complex logic::
 
   ...
 

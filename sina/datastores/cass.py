@@ -204,7 +204,6 @@ class RecordDAO(dao.RecordDAO):
 
         :returns: A record matching that id or None
         """
-        # TODO: A get_many() that uses batching
         LOGGER.debug('Getting record with id={}'.format(id))
         query = schema.Record.objects.filter(id=id).get()
         return model.generate_record_from_json(
@@ -229,7 +228,7 @@ class RecordDAO(dao.RecordDAO):
                                       .values_list('id', flat=True))
         filtered_ids = list(query)
         if ids_only:
-            return list(filtered_ids)
+            return filtered_ids
         else:
             return self.get_many(filtered_ids)
 

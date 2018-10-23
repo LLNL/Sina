@@ -385,7 +385,8 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(ids_only), 4)
         self.assertIsInstance(ids_only, list)
         self.assertIsInstance(ids_only[0], six.string_types)
-        self.assertIn("spam", ids_only)
+        for record_id in ["spam", "spam1", "spam2", "spam4"]:
+                self.assertIn(record_id, ids_only)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
     def test_recorddao_scalar(self, mock_get):
@@ -420,7 +421,8 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(ids_only), 3)
         self.assertIsInstance(ids_only, list)
         self.assertIsInstance(ids_only[0], six.string_types)
-        self.assertIn("spam2", ids_only)
+        for record_id in ["spam", "spam2", "spam4"]:
+            self.assertIn(record_id, ids_only)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
     def test_recorddao_many_scalar(self, mock_get):
@@ -498,7 +500,8 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(ids_only), 3)
         self.assertIsInstance(ids_only, list)
         self.assertIsInstance(ids_only[0], six.string_types)
-        self.assertIn("spam2", ids_only)
+        for record_id in ["spam", "spam1", "spam2"]:
+            self.assertIn(record_id, ids_only)
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
