@@ -383,7 +383,8 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(all_wildcard), 5)
         ids_only = record_dao.get_given_document_uri(uri="%.%", ids_only=True)
         self.assertEqual(len(ids_only), 4)
-        self.assertIsInstance(ids_only, list)
+        self.assertIsInstance(ids_only, list,
+                              "Method must return a list to allow subscripting and modification")
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam3", "spam4"])
 
@@ -418,7 +419,8 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(mock_get.call_count, 6)
         ids_only = record_dao.get_given_scalar(multi_range, ids_only=True)
         self.assertEqual(len(ids_only), 3)
-        self.assertIsInstance(ids_only, list)
+        self.assertIsInstance(ids_only, list,
+                              "Method must return a list to allow subscripting and modification")
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam2", "spam3"])
 
@@ -444,7 +446,8 @@ class TestSQL(unittest.TestCase):
                                                 spam_3_only],
                                                ids_only=True)
         self.assertEqual(len(id_only), 1)
-        self.assertIsInstance(id_only, list)
+        self.assertIsInstance(id_only, list,
+                              "Method must return a list to allow subscripting and modification")
         self.assertEqual(id_only[0], "spam3")
 
     def test_recorddao_type(self):
@@ -496,7 +499,8 @@ class TestSQL(unittest.TestCase):
         self.assertFalse(get_none)
         ids_only = record_dao.get_all_of_type("run", ids_only=True)
         self.assertEqual(len(ids_only), 3)
-        self.assertIsInstance(ids_only, list)
+        self.assertIsInstance(ids_only, list,
+                              "Method must return a list to allow subscripting and modification")
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam2"])
 
