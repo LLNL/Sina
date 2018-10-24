@@ -288,8 +288,7 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(len(ids_only), 4)
         self.assertIsInstance(ids_only, list)
         self.assertIsInstance(ids_only[0], six.string_types)
-        for record_id in ["spam", "spam1", "spam3", "spam4"]:
-            self.assertIn(record_id, ids_only)
+        six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam3", "spam4"])
 
     @patch(__name__+'.sina_cass.RecordDAO.get')
     def test_recorddao_scalar(self, mock_get):
@@ -328,8 +327,7 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(len(ids_only), 3)
         self.assertIsInstance(ids_only, list)
         self.assertIsInstance(ids_only[0], six.string_types)
-        for record_id in ["spam", "spam2", "spam3"]:
-            self.assertIn(record_id, ids_only)
+        six.assertCountEqual(self, ids_only, ["spam", "spam2", "spam3"])
 
     @patch(__name__+'.sina_cass.RecordDAO.get')
     def test_recorddao_many_scalar(self, mock_get):
@@ -414,8 +412,7 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(len(ids_only), 3)
         self.assertIsInstance(ids_only, list)
         self.assertIsInstance(ids_only[0], six.string_types)
-        for record_id in ["spam", "spam1", "spam2"]:
-            self.assertIn(record_id, ids_only)
+        six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam2"])
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
