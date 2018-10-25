@@ -53,22 +53,25 @@ class TestSQLIntegration(unittest.TestCase):
         self.args.raw = ''
         self.args.id = False
 
-        # Grab stdout and send to string io
-        sys.stdout = StringIO()
-        launcher.query(self.args)
-        std_output = sys.stdout.getvalue()
-        matches = ast.literal_eval(std_output)
-        # Reset stdout
-        sys.stdout = sys.__stdout__
-        self.assertEqual(matches[0]['id'], 'child_1')
-
-        sys.stdout = StringIO()
-        self.args.scalar = 'scalar-4=0'
-        launcher.query(self.args)
-        std_output = sys.stdout.getvalue()
-        matches = ast.literal_eval(std_output)
-        sys.stdout = sys.__stdout__
-        self.assertEqual(matches, [])
+        try:
+            # Grab stdout and send to string io
+            sys.stdout = StringIO()
+            launcher.query(self.args)
+            std_output = sys.stdout.getvalue()
+            matches = ast.literal_eval(std_output)
+            self.assertEqual(matches[0]['id'], 'child_1')
+        finally:
+            # Reset stdout
+            sys.stdout = sys.__stdout__
+        try:
+            sys.stdout = StringIO()
+            self.args.scalar = 'scalar-4=0'
+            launcher.query(self.args)
+            std_output = sys.stdout.getvalue()
+            matches = ast.literal_eval(std_output)
+            self.assertEqual(matches, [])
+        finally:
+            sys.stdout = sys.__stdout__
 
 
 @attr('cassandra')
@@ -111,19 +114,23 @@ class TestCassIntegration(unittest.TestCase):
         self.args.raw = ''
         self.args.id = False
 
-        # Grab stdout and send to string io
-        sys.stdout = StringIO()
-        launcher.query(self.args)
-        std_output = sys.stdout.getvalue()
-        matches = ast.literal_eval(std_output)
-        # Reset stdout
-        sys.stdout = sys.__stdout__
-        self.assertEqual(matches[0]['id'], "child_1")
+        try:
+            # Grab stdout and send to string io
+            sys.stdout = StringIO()
+            launcher.query(self.args)
+            std_output = sys.stdout.getvalue()
+            matches = ast.literal_eval(std_output)
+            self.assertEqual(matches[0]['id'], "child_1")
+        finally:
+            # Reset stdout
+            sys.stdout = sys.__stdout__
 
-        sys.stdout = StringIO()
-        self.args.scalar = 'scalar-4=0'
-        launcher.query(self.args)
-        std_output = sys.stdout.getvalue()
-        matches = ast.literal_eval(std_output)
-        sys.stdout = sys.__stdout__
-        self.assertEqual(matches, [])
+        try:
+            sys.stdout = StringIO()
+            self.args.scalar = 'scalar-4=0'
+            launcher.query(self.args)
+            std_output = sys.stdout.getvalue()
+            matches = ast.literal_eval(std_output)
+            self.assertEqual(matches, [])
+        finally:
+            sys.stdout = sys.__stdout__
