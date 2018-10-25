@@ -351,11 +351,11 @@ class TestSQL(unittest.TestCase):
         record_dao.insert(vals_files)
         scal = ScalarRange(name="foo", min=12, min_inclusive=True,
                            max=12, max_inclusive=True)
-        returned_record = record_dao.get_given_scalar(scal)[0]
+        returned_record = next(record_dao.get_given_scalar(scal))
         self.assertEquals(returned_record.id, vals_files.id)
         no_scal = ScalarRange(name="bar", min=1, min_inclusive=True)
-        self.assertFalse(record_dao.get_given_scalar(no_scal))
-        file_match = record_dao.get_given_document_uri(uri="ham.png")[0]
+        self.assertFalse(list(record_dao.get_given_scalar(no_scal)))
+        file_match = next(record_dao.get_given_document_uri(uri="ham.png"))
         self.assertEquals(file_match.id, vals_files.id)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
@@ -366,20 +366,20 @@ class TestSQL(unittest.TestCase):
         record_dao = factory.createRecordDAO()
         _populate_database_with_files(factory.session)
         exact_match = record_dao.get_given_document_uri(uri="beep.png")
-        self.assertEqual(len(exact_match), 1)
+        self.assertEqual(len(list(exact_match)), 1)
         end_wildcard = record_dao.get_given_document_uri(uri="beep.%")
         # Note that we're expecting 3 even though there's 4 matches.
         # That's because id "beep" matches twice. So 3 unique.
         # Similar unique-match logic is present in the other asserts
-        self.assertEqual(len(end_wildcard), 3)
+        self.assertEqual(len(list(end_wildcard)), 3)
         mid_wildcard = record_dao.get_given_document_uri(uri="beep%png")
-        self.assertEqual(len(mid_wildcard), 2)
+        self.assertEqual(len(list(mid_wildcard)), 2)
         first_wildcard = record_dao.get_given_document_uri(uri="%png")
-        self.assertEqual(len(first_wildcard), 3)
+        self.assertEqual(len(list(first_wildcard)), 3)
         multi_wildcard = record_dao.get_given_document_uri(uri="%.%")
-        self.assertEqual(len(multi_wildcard), 4)
+        self.assertEqual(len(list(multi_wildcard)), 4)
         all_wildcard = record_dao.get_given_document_uri(uri="%")
-        self.assertEqual(len(all_wildcard), 5)
+        self.assertEqual(len(list(all_wildcard)), 5)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
     def test_recorddao_scalar(self, mock_get):
@@ -391,24 +391,24 @@ class TestSQL(unittest.TestCase):
         too_big_range = ScalarRange(name="spam_scal", max=9,
                                     max_inclusive=True)
         too_big = record_dao.get_given_scalar(too_big_range)
-        self.assertFalse(too_big)
+        self.assertFalse(list(too_big))
         too_small_range = ScalarRange(name="spam_scal", min=10.99999,
                                       min_inclusive=False)
         too_small = record_dao.get_given_scalar(too_small_range)
-        self.assertFalse(too_small)
+        self.assertFalse(list(too_small))
         just_right_range = ScalarRange(name="spam_scal", min=0,
                                        min_inclusive=True, max=300,
                                        max_inclusive=True)
         just_right = record_dao.get_given_scalar(just_right_range)
-        self.assertEqual(len(just_right), 3)
+        self.assertEqual(len(list(just_right)), 3)
         nonexistant_range = ScalarRange(name="not_here", min=0,
                                         min_inclusive=True, max=300,
                                         max_inclusive=True)
         no_scalar = record_dao.get_given_scalar(nonexistant_range)
-        self.assertFalse(no_scalar)
+        self.assertFalse(list(no_scalar))
         multi_range = ScalarRange(name="spam_scal")
         multi = record_dao.get_given_scalar(multi_range)
-        self.assertEqual(len(multi), 3)
+        self.assertEqual(len(list(multi)), 3)
         self.assertEqual(mock_get.call_count, 6)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
@@ -423,12 +423,12 @@ class TestSQL(unittest.TestCase):
         spam_3_only = ScalarRange(name="spam_scal_2", max=100)
         one = record_dao.get_given_scalars([spam_and_spam_3,
                                             spam_3_only])
-        self.assertEqual(len(one), 1)
+        self.assertEqual(len(list(one)), 1)
         none_fulfill = ScalarRange(name="nonexistant", max=100)
         none = record_dao.get_given_scalars([spam_and_spam_3,
                                              spam_3_only,
                                              none_fulfill])
-        self.assertFalse(none)
+        self.assertFalse(list(none))
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
     def test_recorddao_type(self, mock_get):

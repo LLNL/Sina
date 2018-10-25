@@ -67,12 +67,10 @@ class RecordDAO(object):
 
         :param list_of_ids: A list of ids to find.
 
-        :returns: A list of found records
+        :returns: A generator of found records
         """
-        records = []
         for id in list_of_ids:
-            records.append(self.get(id))
-        return records
+            yield self.get(id)
 
     @abstractmethod
     def insert(self, record):
@@ -113,7 +111,7 @@ class RecordDAO(object):
 
         :param uri: The uri to use as a search term, such as "foo.png"
 
-        :returns: A list of matching records (or None)
+        :returns: A generator of matching records
         """
         raise NotImplementedError
 
@@ -129,7 +127,7 @@ class RecordDAO(object):
         :param scalar_range_list: A list of 'sina.ScalarRange's describing the
                                  different criteria.
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteria
         """
         raise NotImplementedError
 
@@ -143,7 +141,7 @@ class RecordDAO(object):
 
         :param scalar_range: A 'sina.ScalarRange' describing the criteria.
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteria
         """
         raise NotImplementedError
 
@@ -156,7 +154,8 @@ class RecordDAO(object):
 
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
-        :return: A list of scalar JSON objects matching the Mnoda specification
+
+        :returns: A list of scalar JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
 
@@ -168,7 +167,8 @@ class RecordDAO(object):
         Files are returned in the alphabetical order of their URIs
 
         :param id: The record id to find files for
-        :return: A list of file JSON objects matching the Mnoda specification
+        
+        :returns: A list of file JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
 
@@ -312,8 +312,11 @@ class RunDAO(object):
         this should be reimplemented there.
 
         :param list_of_ids: A list of ids to find.
+
+        :returns: A generator of found runs
         """
-        return [self.get(id) for id in list_of_ids]
+        for id in list_of_ids:
+            yield self.get(id)
 
     @abstractmethod
     def insert(self, run):

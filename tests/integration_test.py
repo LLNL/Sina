@@ -1,6 +1,9 @@
 """Integration tests for the CLI and API working together."""
 import unittest
 import os
+from six.moves import cStringIO as StringIO
+import sys
+import ast
 
 import cassandra.cqlengine.connection as connection
 import cassandra.cqlengine.management as management
@@ -49,12 +52,23 @@ class TestSQLIntegration(unittest.TestCase):
         self.args.uri = 'foo.png'
         self.args.raw = ''
         self.args.id = False
-        matches = launcher.query(self.args)
-        self.assertEqual(matches[0].id, "child_1")
+
+        # Grab stdout and send to string io
+        sys.stdout = StringIO()
+        launcher.query(self.args)
+        std_output = sys.stdout.getvalue()
+        matches = ast.literal_eval(std_output)
+        # Reset stdout
+        sys.stdout = sys.__stdout__
+        self.assertEqual(matches[0]['id'], 'child_1')
+
+        sys.stdout = StringIO()
         self.args.scalar = 'scalar-4=0'
-        matches = launcher.query(self.args)
+        launcher.query(self.args)
+        std_output = sys.stdout.getvalue()
+        matches = ast.literal_eval(std_output)
+        sys.stdout = sys.__stdout__
         self.assertEqual(matches, [])
-        # Export test goes here
 
 
 @attr('cassandra')
@@ -96,9 +110,20 @@ class TestCassIntegration(unittest.TestCase):
         self.args.uri = 'foo.png'
         self.args.raw = ''
         self.args.id = False
-        matches = launcher.query(self.args)
-        self.assertEqual(matches[0].id, "child_1")
+
+        # Grab stdout and send to string io
+        sys.stdout = StringIO()
+        launcher.query(self.args)
+        std_output = sys.stdout.getvalue()
+        matches = ast.literal_eval(std_output)
+        # Reset stdout
+        sys.stdout = sys.__stdout__
+        self.assertEqual(matches[0]['id'], "child_1")
+
+        sys.stdout = StringIO()
         self.args.scalar = 'scalar-4=0'
-        matches = launcher.query(self.args)
+        launcher.query(self.args)
+        std_output = sys.stdout.getvalue()
+        matches = ast.literal_eval(std_output)
+        sys.stdout = sys.__stdout__
         self.assertEqual(matches, [])
-        # Export test goes here

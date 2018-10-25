@@ -123,7 +123,7 @@ class RecordDAO(dao.RecordDAO):
         :param accepted_ids_list: A list of ids to restrict the search to.
                                   If not provided, all ids will be used.
 
-        :returns: A list of matching records (or None)
+        :returns: A generator of matching records
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
         if accepted_ids_list:
@@ -156,17 +156,13 @@ class RecordDAO(dao.RecordDAO):
         :param scalar_range_list: A list of 'sina.ScalarRange's describing the
                                  different criteria.
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteria
         """
         LOGGER.debug('Getting all records with scalars within the following '
                      'ranges: {}'.format(scalar_range_list))
         query = self.session.query(schema.ScalarData.id)
         query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
-        out = query.all()
-        if out:
-            return self.get_many(x[0] for x in query.all())
-        else:
-            return []
+        return self.get_many(x[0] for x in query.all())
 
     def get_given_scalar(self, scalar_range):
         """
@@ -174,7 +170,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param scalar_range: A sina.ScalarRange describing the criteria.
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteria
         """
         return self.get_given_scalars([scalar_range])
 
