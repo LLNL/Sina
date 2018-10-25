@@ -42,8 +42,7 @@ class Record(object):
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
         """
-        # Using __dict__ to avoid keyerrors with set_attr()
-        self.__dict__['raw'] = {}
+        self.raw = {}
         # Note these are all going to raw behind the scenes (see __setattr__)
         self.id = id
         self.type = type
@@ -53,6 +52,7 @@ class Record(object):
 
     @property
     def id(self):
+        """Get or set the Record's id."""
         return self['id']
 
     @id.setter
@@ -61,6 +61,7 @@ class Record(object):
 
     @property
     def type(self):
+        """Get or set the Record's type."""
         return self['type']
 
     @type.setter
@@ -69,6 +70,7 @@ class Record(object):
 
     @property
     def data(self):
+        """Get or set the Record's data dictionary."""
         return self['data']
 
     @data.setter
@@ -77,6 +79,7 @@ class Record(object):
 
     @property
     def files(self):
+        """Get or set the Record's file list."""
         return self['files']
 
     @files.setter
@@ -85,6 +88,7 @@ class Record(object):
 
     @property
     def user_defined(self):
+        """Get or set the Record's user-defined dictionary."""
         return self['user_defined']
 
     @user_defined.setter
@@ -92,11 +96,25 @@ class Record(object):
         self['user_defined'] = user_defined
 
     def __getitem__(self, key):
-        """Change some_rec["spam"] to some_rec["raw"]["spam"]."""
+        """
+        Get the entry in this record with the given key.
+
+        A Record object mimics a dictionary in how it's accessed, with the data
+        it represents available within a dictionary called "raw". Here,
+        we reroute ex: foo = my_rec["data"] to go through this raw dictionary.
+        Essentially, it becomes foo = my_rec["raw"]["data"].
+        """
         return self.raw[key]
 
     def __setitem__(self, key, value):
-        """Change some_rec["spam"] = 42 to some_rec["raw"]["spam"] = 42."""
+        """
+        Set the entry in this record with the given key.
+
+        A Record object mimics a dictionary in how it's accessed, with the data
+        it represents available within a dictionary called "raw". Here,
+        we reroute ex: my_rec["data"] = 2 to go through this raw dictionary.
+        Essentially, it becomes my_rec["raw"]["data"] = 2.
+        """
         self.raw[key] = value
 
     def __delitem__(self, key):
