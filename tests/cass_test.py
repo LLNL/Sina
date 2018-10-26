@@ -4,6 +4,7 @@ import os
 import json
 import logging
 from mock import MagicMock, patch
+import six
 
 import cassandra.cqlengine.connection as connection
 import cassandra.cqlengine.management as management
@@ -127,11 +128,11 @@ class TestSearch(unittest.TestCase):
         self.assertEquals(canonical['records'][1]['application'],
                           child.application)
 
-        child_from_uri = run_factory.get_given_document_uri("foo.png")
+        child_from_uri = list(run_factory.get_given_document_uri("foo.png"))
         child_scalar = ScalarRange(name="scalar-1", min=387.6,
                                    min_inclusive=True, max=387.6,
                                    max_inclusive=True)
-        child_from_scalar = run_factory.get_given_scalar(child_scalar)
+        child_from_scalar = list(run_factory.get_given_scalar(child_scalar))
 
         self.assertEquals(child.id, child_from_uri[0].id)
         self.assertEquals(child.id, child_from_scalar[0].id)
@@ -272,7 +273,7 @@ class TestSearch(unittest.TestCase):
         _populate_database_with_files()
         end_wildcard = record_dao.get_given_document_uri(uri="beep.%")
         # Note that we're expecting 3 even though there's 4 matches.
-        # That's because id "beep" matches twice. So 3 unique.
+        # That's because id "spam" matches twice. So 3 unique.
         # Similar unique-match logic is present in the other asserts
         self.assertEqual(len(list(end_wildcard)), 3)
         mid_wildcard = record_dao.get_given_document_uri(uri="beep%png")
@@ -283,6 +284,12 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(len(list(multi_wildcard)), 4)
         all_wildcard = record_dao.get_given_document_uri(uri="%")
         self.assertEqual(len(list(all_wildcard)), 5)
+        ids_only = list(record_dao.get_given_document_uri(uri="%.%", ids_only=True))
+        self.assertEqual(len(ids_only), 4)
+        self.assertIsInstance(ids_only, list,
+                              "Method must return a list to allow subscripting and modification")
+        self.assertIsInstance(ids_only[0], six.string_types)
+        six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam3", "spam4"])
 
     @patch(__name__+'.sina_cass.RecordDAO.get')
     def test_recorddao_scalar(self, mock_get):
@@ -317,6 +324,12 @@ class TestSearch(unittest.TestCase):
         multi = record_dao.get_given_scalar(multi_range)
         self.assertEqual(len(list(multi)), 3)
         self.assertEqual(mock_get.call_count, 6)
+        ids_only = list(record_dao.get_given_scalar(multi_range, ids_only=True))
+        self.assertEqual(len(ids_only), 3)
+        self.assertIsInstance(ids_only, list,
+                              "Method must return a list to allow subscripting and modification")
+        self.assertIsInstance(ids_only[0], six.string_types)
+        six.assertCountEqual(self, ids_only, ["spam", "spam2", "spam3"])
 
     @patch(__name__+'.sina_cass.RecordDAO.get')
     def test_recorddao_many_scalar(self, mock_get):
@@ -332,15 +345,20 @@ class TestSearch(unittest.TestCase):
                                             spam_3_only])
         self.assertEqual(len(list(one)), 1)
         none_fulfill = ScalarRange(name="nonexistant", max=100)
-        nonexistant = record_dao.get_given_scalars([spam_and_spam_3,
-                                                   spam_3_only,
-                                                   none_fulfill])
-        self.assertFalse(list(nonexistant))
+        none = list(record_dao.get_given_scalars([spam_and_spam_3,
+                                                 spam_3_only,
+                                                 none_fulfill]))
+        self.assertFalse(none)
+        id_only = list(record_dao.get_given_scalars([spam_and_spam_3,
+                                                    spam_3_only],
+                                                    ids_only=True))
+        self.assertEqual(len(id_only), 1)
+        self.assertIsInstance(id_only, list,
+                              "Method must return a list to allow subscripting and modification")
+        self.assertEqual(id_only[0], "spam3")
 
-    @patch(__name__+'.sina_cass.RecordDAO.get')
-    def test_recorddao_type(self, mock_get):
+    def test_recorddao_type(self):
         """Test the RecordDAO is retrieving based on type correctly."""
-        mock_get.return_value = True
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
         mock_rec = MagicMock(id="spam", type="run",
@@ -383,16 +401,22 @@ class TestSearch(unittest.TestCase):
         record_dao.insert(mock_rec3)
         record_dao.insert(mock_rec4)
         record_dao.insert(mock_rec5)
-        get_one = record_dao.get_all_of_type("bar")
+        get_one = list(record_dao.get_all_of_type("bar"))
         self.assertEqual(len(get_one), 1)
         self.assertIsInstance(get_one[0], Record)
         self.assertEqual(get_one[0].id, mock_rec4.id)
         self.assertEqual(get_one[0].type, mock_rec4.type)
         self.assertEqual(get_one[0].user_defined, mock_rec4.user_defined)
-        get_many = record_dao.get_all_of_type("run")
+        get_many = list(record_dao.get_all_of_type("run"))
         self.assertEqual(len(get_many), 3)
-        get_none = record_dao.get_all_of_type("butterscotch")
+        get_none = list(record_dao.get_all_of_type("butterscotch"))
         self.assertFalse(get_none)
+        ids_only = list(record_dao.get_all_of_type("run", ids_only=True))
+        self.assertEqual(len(ids_only), 3)
+        self.assertIsInstance(ids_only, list,
+                              "Method must return a list to allow subscripting and modification")
+        self.assertIsInstance(ids_only[0], six.string_types)
+        six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam2"])
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
@@ -522,7 +546,7 @@ class TestSearch(unittest.TestCase):
         run_dao.record_DAO.insert(mock_rec)
         run_dao.insert_many([run, run2])
         multi_range = ScalarRange(name="spam_scal")
-        multi_scalar = run_dao.get_given_scalar(multi_range)
+        multi_scalar = list(run_dao.get_given_scalar(multi_range))
         self.assertEqual(len(multi_scalar), 2)
         # They're returned in primary key order
         spam_run = multi_scalar[0]

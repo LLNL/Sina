@@ -59,7 +59,10 @@ class TestSQLIntegration(unittest.TestCase):
             launcher.query(self.args)
             std_output = sys.stdout.getvalue()
             matches = ast.literal_eval(std_output)
-            self.assertEqual(matches[0]['id'], 'child_1')
+            self.assertEqual(len(matches), 2)
+            id_list = [matches[0]['id'], matches[1]['id']]
+            self.assertIn("child_1", id_list)
+            self.assertIn("subset_1", id_list)
         finally:
             # Reset stdout
             sys.stdout = sys.__stdout__
@@ -120,7 +123,10 @@ class TestCassIntegration(unittest.TestCase):
             launcher.query(self.args)
             std_output = sys.stdout.getvalue()
             matches = ast.literal_eval(std_output)
-            self.assertEqual(matches[0]['id'], "child_1")
+            self.assertEqual(len(matches), 2)
+            id_list = [matches[0]['id'], matches[1]['id']]
+            self.assertIn("child_1", id_list)
+            self.assertIn("subset_1", id_list)
         finally:
             # Reset stdout
             sys.stdout = sys.__stdout__
