@@ -92,8 +92,8 @@ DAO or, if you won't know the type in advance, consider using the CLI
 importer.
 
 
-Filtering Based on Scalar Criteria
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Filtering Records Based on Scalar Criteria
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Records can also be selected based on the scalars they contain. A Record "contains"
 a scalar if the scalar is both named in its data list and assigned a numerical value.
@@ -144,6 +144,27 @@ using some additional Python logic. Example scripts have been provided in the
 demo/apis folder (cass_equation.py and sql_equation.py) that will print a
 list of all record ids found in some database that fulfill some equation-based
 criterion.
+
+
+Combining Filters using "IDs Only" Logic
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Filtering methods (such as get_all_of_type, get_given_scalar, etc) take an
+optional argument, :code:`ids_only`. If passed as :code:`True`, they'll return
+only the ids of Records that fulfill their criteria, rather than the entire
+Record. This is faster than assembling the entire Record object(s), and is also
+the recommended way of combining queries or implementing more complex logic::
+
+  ...
+
+  ids_volume_filter = record_dao.get_given_scalar(less_than_three,
+                                                  ids_only=True)
+  ids_density_filter = record_dao.get_given_scalars(gt_0_lte_1,
+                                                    ids_only=True)
+
+  # This will print ids of all records whose volume is less than three or
+  # whose density is in the range (0, 1], *but not both* (XOR)
+  print(set(ids_volume_filter).symmetric_difference(ids_density_filter))
 
 
 Working with Records, Runs, Etc.

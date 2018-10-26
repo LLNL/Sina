@@ -99,6 +99,6 @@ class TestCassIntegration(unittest.TestCase):
         matches = launcher.query(self.args)
         self.assertEqual(matches[0].id, "child_1")
         self.args.scalar = 'scalar-4=0'
-        matches = launcher.query(self.args)
-        self.assertEqual(matches, [])
+        no_matches = launcher.query(self.args)
+        self.assertEqual(no_matches, [])
         # Export test goes here
