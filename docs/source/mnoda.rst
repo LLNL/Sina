@@ -56,15 +56,15 @@ A more fleshed-out example, with field descriptions:
            "mimetype": "image/png",
            "tags": ["summary_image","output"]}
       ],
-      // A list of data associated with the Record
-      "data": [
-          // Entries must have a name and value. Optionally, they can have tags and/or units.
+      // A dictionary of data associated with the Record
+      "data": {
+          // Entries must have a value. Optionally, they can have tags and/or units.
           // We recommend standard SI units with / for division and ^ for exponentiation. This format may have future support in Sina.
-          { "name": "max_density", "value": 3, "units": "kg/m^3" },
-          { "name": "total_energy", "value": 12.2, "units": "MJ", "tags": ["output"]},
-          { "name": "revision", "value": "12-4-11"},
-          { "name": "solver", "value": "GMRES", "tags": ["input", "left_quad"]}
-      ],
+          "max_density": { "value": 3, "units": "kg/m^3" },
+          "total_energy": { "value": 12.2, "units": "MJ", "tags": ["output"]},
+          "revision": { "value": "12-4-11"},
+          "solver": { "value": "GMRES", "tags": ["input", "left_quad"]}
+      },
       "user_defined": {
           // Information that does not make sense as a data or file entry should be placed here.
           // None of this will be interpreted by Sina. Instead, it will simply
@@ -152,17 +152,18 @@ a user and version:
       "files": [
           {"uri": "run_image_1.png", "mimetype": "png"}
       ],
-      "data": [
-          { "name": "final_energy", "value": 4005.52, "units": "kJ"}
-      ]
+      "data": {
+          "final_energy": {"value": 4005.52, "units": "kJ"}
+      }
     }
 
 
 Complete, Empty Document
 ------------------------
 
-For convenience, here is an empty Mnoda document with all Relationship and generic
-Record fields represented:
+For convenience, below is a roughly empty Mnoda document with all Relationship and generic
+Record fields represented except that "name" must be replaced by the actual name, or key, of a
+data value.
 
 .. code-block:: javascript
 
@@ -174,9 +175,9 @@ Record fields represented:
           "files": [
               {"uri": "", "mimetype": "", "tags": []}
           ],
-          "data": [
-              { "name": "", "value": "", "units": "", "tags": []}
-          ],
+          "data": {
+              "name": {"value": "", "units": "", "tags": []}
+          },
           "user_defined": {}
         },
         {
@@ -185,9 +186,9 @@ Record fields represented:
           "files": [
               {"uri": "", "mimetype": "", "tags": []}
           ],
-          "data": [
-              { "name": "", "value": "", "units": "", "tags": []}
-          ],
+          "data": {
+              "name": {"value": "", "units": "", "tags": []}
+          },
           "user_defined": {}
         }
       ],

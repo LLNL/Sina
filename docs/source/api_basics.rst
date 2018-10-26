@@ -55,11 +55,12 @@ documentation of all the methods available to each DAO, please see the
 Filtering Based on Scalar Criteria
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Records can be selected based on the scalar data they contain. Anything in a
-Record's data dictionary (ex: :code:`my_rec.data["volume"]`) with a numeric value
-is a scalar. If the value of volume is 1.2, it's a scalar; if it's "1.2", it
-isn't. Scalar criteria can be described using either strings
-(see the `CLI query examples <cli_examples.html#query>`__)
+Records can also be selected based on the scalars they contain. A Record "contains"
+a scalar if the scalar is both named in its data dictionary and assigned a numerical value.
+For example, :code:`"data": {"volume":{"value": 1.2}}` describes a scalar.
+:code:`"data": {"version":{"value":"1.2"}}` does not. Scalar criteria can be
+described
+using either strings (see the `CLI query examples <cli_examples.html#query>`__)
 or ScalarRanges, which are provided/documented in
 `sina.utils <generated_docs/sina.utils.html>`__. In short, a ScalarRange represents
 an interval, such as (0,1] or (,3), with two endpoints and
