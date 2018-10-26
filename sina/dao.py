@@ -161,6 +161,33 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
+    def get_data_for_records(self, id_list, data_list):
+        """
+        Retrieve a subset of data for Records in id_list.
+
+        For example, it might get "debugger_version" and "volume" for the
+        Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
+        dictionaries; the outer key is the record_id, the inner key is the
+        name of the data piece (ex: "volume"). So::
+
+            {"foo_1": {"volume": {"value": 12, "units": cm^3},
+                       "debugger_version": {"value": "alpha"}}
+             "foo_3": {"debugger_version": {"value": "alpha"}}
+
+        As seen in foo_3 above, if a piece of data is missing, it won't be
+        included; think of this as a subset of a Record's own data. Similarly,
+        if a Record ends up containing none of the requested data, it will be
+        omitted.
+
+        :param id_list: A list of the record ids to find data for
+        :param data_list: A list of the names of data fields to find
+
+        :returns: a dictionary of dictionaries containing the requested data,
+                 keyed by record_id and then data field name.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_files(self, id):
         """
         Retrieve files for a given record id.

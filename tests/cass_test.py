@@ -3,6 +3,7 @@ import unittest
 import os
 import json
 import logging
+import six
 from mock import MagicMock, patch
 
 import cassandra.cqlengine.connection as connection
@@ -406,6 +407,38 @@ class TestSearch(unittest.TestCase):
         get_more = record_dao.get_files(id="spam")
         self.assertEqual(len(get_more), 2)
         self.assertEqual(get_more[0]["uri"], "beep.pong")
+
+    def test_recorddao_get_data_for_records(self):
+        """Test that we're getting data for many records correctly."""
+        record_dao = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME).createRecordDAO()
+        _populate_database_with_scalars()
+        all_ids = ["spam", "spam2", "spam3", "eggs"]
+        all_scalars = ["spam_scal", "eggs_scal", "spam_scal_2"]
+
+        for_one = record_dao.get_data_for_records(id_list=["spam"],
+                                                  data_list=all_scalars)
+        self.assertEqual(for_one["spam"]["spam_scal"],
+                         {"value": 10, "units": "pigs", "tags": ["hammy"]})
+        self.assertFalse("eggs_scal" in for_one["spam"].keys())
+
+        for_many = record_dao.get_data_for_records(id_list=all_ids,
+                                                   data_list=["spam_scal",
+                                                              "spam_scal_2"])
+        six.assertCountEqual(self, for_many.keys(), ["spam", "spam2", "spam3"])
+        six.assertCountEqual(self, for_many["spam3"].keys(), ["spam_scal",
+                                                              "spam_scal_2"])
+        six.assertCountEqual(self, for_many["spam3"]["spam_scal"].keys(),
+                                                    ["value"])
+        self.assertEqual(for_many["spam3"]["spam_scal_2"]["value"], 10.5)
+
+        for_none = record_dao.get_data_for_records(id_list=["nope", "nada"],
+                                                   data_list=["gone", "away"])
+        self.assertFalse(for_none)
+        no_tags = record_dao.get_data_for_records(id_list=["spam"],
+                                                  data_list=all_scalars,
+                                                  omit_tags=True)
+        self.assertEqual(no_tags["spam"]["spam_scal"],
+                         {"value": 10, "units": "pigs"})
 
     def test_recorddao_get_scalars(self):
         """Test the RecordDAO is getting specific scalars correctly."""
