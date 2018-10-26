@@ -1,3 +1,5 @@
+.. _mnoda:
+
 Mnoda Schema
 ============
 
@@ -74,8 +76,8 @@ A more fleshed-out example, with field descriptions:
 Relationships
 -------------
 
-Every Relationship involves exactly three things: a :code:`subject`, a :code:`predicate`, and
-an :code:`object`. Together, they form a statement about the relation between
+Every Relationship is a triple involving exactly three things: a :code:`subject`,
+a :code:`predicate`, and an :code:`object`. Together, they form a statement about the relation between
 :code:`subject` and :code:`object`. For example, in the phrase "Alice knows Bob", "Alice" is
 the :code:`subject`, "knows" is the :code:`predicate`, and "Bob" is the :code:`object`. Other examples:
 
