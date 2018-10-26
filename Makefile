@@ -41,6 +41,8 @@ clean-files:
 	@rm -rf tests/test_venv
 	@find . -name "*.pyc" -exec rm -f {} \; >& /dev/null
 	@find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
+	@find . -name "test_*.ipynb.py" -exec rm -f {} \; >& /dev/null
+	@find . -name pythonmagics.tpl -exec rm -f {} \; >& /dev/null
 
 clean-notebooks:
 	@!(!(source $(VACT) && jupyter nbconvert \
