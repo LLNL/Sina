@@ -5,7 +5,6 @@ import json
 import logging
 import six
 from mock import MagicMock, patch
-import six
 
 import cassandra.cqlengine.connection as connection
 import cassandra.cqlengine.management as management
@@ -25,7 +24,7 @@ TESTING_IPS = None  # None for localhost, else a list of node ips.
 LOGGER = logging.getLogger(__name__)
 
 
-def _populate_database_with_scalars():
+def _populate_database_with_data():
     """Build a database to test against."""
     schema.cross_populate_scalar_and_record(id="spam",
                                             name="spam_scal",
@@ -47,6 +46,10 @@ def _populate_database_with_scalars():
     schema.cross_populate_scalar_and_record(id="spam3",
                                             name="spam_scal_2",
                                             value=10.5)
+    schema.cross_populate_string_and_record(id="spam3",
+                                            name="val_data",
+                                            value="runny",
+                                            tags=["edible"])
 
 
 def _populate_database_with_files():
@@ -302,7 +305,7 @@ class TestSearch(unittest.TestCase):
         mock_get.return_value = True
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
-        _populate_database_with_scalars()
+        _populate_database_with_data()
         too_big_range = ScalarRange(name="spam_scal", max=9,
                                     max_inclusive=True)
         too_big = record_dao.get_given_scalar(too_big_range)
@@ -338,7 +341,7 @@ class TestSearch(unittest.TestCase):
         mock_get.return_value = True
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
-        _populate_database_with_scalars()
+        _populate_database_with_data()
         spam_and_spam_3 = ScalarRange(name="spam_scal", min=10,
                                       min_inclusive=True)
         spam_3_only = ScalarRange(name="spam_scal_2", max=100)
@@ -435,9 +438,9 @@ class TestSearch(unittest.TestCase):
     def test_recorddao_get_data_for_records(self):
         """Test that we're getting data for many records correctly."""
         record_dao = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME).createRecordDAO()
-        _populate_database_with_scalars()
+        _populate_database_with_data()
         all_ids = ["spam", "spam2", "spam3", "eggs"]
-        all_scalars = ["spam_scal", "eggs_scal", "spam_scal_2"]
+        all_scalars = ["spam_scal", "eggs_scal", "spam_scal_2", "val_data"]
 
         for_one = record_dao.get_data_for_records(id_list=["spam"],
                                                   data_list=all_scalars)
@@ -447,13 +450,16 @@ class TestSearch(unittest.TestCase):
 
         for_many = record_dao.get_data_for_records(id_list=all_ids,
                                                    data_list=["spam_scal",
-                                                              "spam_scal_2"])
+                                                              "spam_scal_2",
+                                                              "val_data"])
         six.assertCountEqual(self, for_many.keys(), ["spam", "spam2", "spam3"])
         six.assertCountEqual(self, for_many["spam3"].keys(), ["spam_scal",
-                                                              "spam_scal_2"])
-        six.assertCountEqual(self, for_many["spam3"]["spam_scal"].keys(),
-                                                    ["value"])
-        self.assertEqual(for_many["spam3"]["spam_scal_2"]["value"], 10.5)
+                                                              "spam_scal_2",
+                                                              "val_data"])
+        six.assertCountEqual(self, for_many["spam3"]["val_data"].keys(),
+                                                    ["value", "tags"])
+        self.assertEqual(for_many["spam3"]["val_data"]["value"], "runny")
+        self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible"])
 
         for_none = record_dao.get_data_for_records(id_list=["nope", "nada"],
                                                    data_list=["gone", "away"])
@@ -467,7 +473,7 @@ class TestSearch(unittest.TestCase):
     def test_recorddao_get_scalars(self):
         """Test the RecordDAO is getting specific scalars correctly."""
         record_dao = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME).createRecordDAO()
-        _populate_database_with_scalars()
+        _populate_database_with_data()
         get_one = record_dao.get_scalars(id="spam",
                                          scalar_names=["spam_scal"])
         self.assertEqual(len(get_one), 1)
@@ -558,7 +564,7 @@ class TestSearch(unittest.TestCase):
         # TODO: Test raises question of whether type should be tracked in
         # the scalars table.
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
-        _populate_database_with_scalars()
+        _populate_database_with_data()
         run_dao = factory.createRunDAO()
         mock_rec = MagicMock(id="spam2", type="task",
                              user_defined={},
