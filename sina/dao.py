@@ -361,15 +361,13 @@ class RunDAO(object):
 
         :param scalar_range: A sina.ScalarRange describing the criteria
 
-        :returns: A list of Runs fitting the criteria
+        :returns: A generator of Runs fitting the criteria
         """
         records = self.record_DAO.get_given_scalar(scalar_range)
-        runs = []
         if records:
             for record in records:
                 if record.type == "run":
-                    runs.append(self._convert_record_to_run(record))
-        return runs
+                    yield self._convert_record_to_run(record)
 
     def get_given_document_uri(self, uri):
         """
@@ -379,12 +377,10 @@ class RunDAO(object):
 
         :param uri: The uri to match.
 
-        :returns: A list of Runs fitting the criteria
+        :returns: A generator of Runs fitting the criteria
         """
         records = self.record_DAO.get_given_document_uri(uri)
-        runs = []
         if records:
             for record in records:
                 if record.type == "run":
-                    runs.append(self._convert_record_to_run(record))
-        return runs
+                    yield self._convert_record_to_run(record)

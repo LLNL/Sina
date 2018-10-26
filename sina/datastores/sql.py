@@ -200,7 +200,6 @@ class RecordDAO(dao.RecordDAO):
         """
         return self.get_given_scalars([scalar_range], ids_only=ids_only)
 
-
     def _apply_scalar_ranges_to_query(self, query, scalars):
         """
         Filter query object based on list of ScalarRanges.
