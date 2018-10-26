@@ -102,7 +102,7 @@ class Record(object):
         A Record object mimics a dictionary in how it's accessed, with the data
         it represents available within a dictionary called "raw". Here,
         we reroute ex: foo = my_rec["data"] to go through this raw dictionary.
-        Essentially, it becomes foo = my_rec["raw"]["data"].
+        Essentially, it becomes foo = my_rec.raw["data"].
         """
         return self.raw[key]
 
@@ -113,12 +113,19 @@ class Record(object):
         A Record object mimics a dictionary in how it's accessed, with the data
         it represents available within a dictionary called "raw". Here,
         we reroute ex: my_rec["data"] = 2 to go through this raw dictionary.
-        Essentially, it becomes my_rec["raw"]["data"] = 2.
+        Essentially, it becomes my_rec.raw["data"] = 2.
         """
         self.raw[key] = value
 
     def __delitem__(self, key):
-        """Change del some_rec['spam'] to del some_rec['raw']['spam']."""
+        """
+        Delete the entry in this record with the given key.
+
+        A Record object mimics a dictionary in how it's accessed, with the data
+        it represents available within a dictionary called "raw". Here, we
+        reroute ex: del my_rec["data"] to go through this raw dictionary.
+        Essentially, it becomes del my_rec.raw["data"]
+        """
         del self.raw[key]
 
     def __repr__(self):
