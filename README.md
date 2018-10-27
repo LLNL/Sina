@@ -4,9 +4,11 @@ Contents
 - Software Dependencies
 - Standard Setup
 - Manual Setup
-  * Creating the Environment
-  * Installing Software Dependencies
-  * Completing the Installation
+
+    - Creating the Environment
+    - Installing Software Dependencies
+    - Completing the Installation
+    
 - Activating the Virtual Environment
 - Deactivating the Virtual Environment
 - Using the Example Notebooks

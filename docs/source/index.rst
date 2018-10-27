@@ -15,6 +15,7 @@ Sina documentation index
    api_basics
    examples
    faq
+   changelog
    modules
 
 * :ref:`genindex`
