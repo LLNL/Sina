@@ -37,24 +37,22 @@ class Record(object):
         :param id: The id of the record. Should be unique within a dataset
         :param type: The type of record. Some types are reserved for
                             children, see sina.model.RESERVED_TYPES
-        :param data: A list of dicts representing the Record's data.
+        :param data: A dict of dicts representing the Record's data.
         :param files: A list of dicts representing the Record's files
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
         """
         self.raw = {}
+        # Note these are all going to raw behind the scenes (see __setattr__)
         self.id = id
         self.type = type
-        self.data = data if data else []
+        self.data = data if data else {}
         self.files = files if files else []
         self.user_defined = user_defined if user_defined else {}
 
-        is_valid, warnings = self._is_valid()
-        if not is_valid:
-            raise ValueError(warnings)
-
     @property
     def id(self):
+        """Get or set the Record's id."""
         return self['id']
 
     @id.setter
@@ -63,6 +61,7 @@ class Record(object):
 
     @property
     def type(self):
+        """Get or set the Record's type."""
         return self['type']
 
     @type.setter
@@ -71,6 +70,7 @@ class Record(object):
 
     @property
     def data(self):
+        """Get or set the Record's data dictionary."""
         return self['data']
 
     @data.setter
@@ -79,6 +79,7 @@ class Record(object):
 
     @property
     def files(self):
+        """Get or set the Record's file list."""
         return self['files']
 
     @files.setter
@@ -87,6 +88,7 @@ class Record(object):
 
     @property
     def user_defined(self):
+        """Get or set the Record's user-defined dictionary."""
         return self['user_defined']
 
     @user_defined.setter
@@ -94,12 +96,36 @@ class Record(object):
         self['user_defined'] = user_defined
 
     def __getitem__(self, key):
+        """
+        Get the entry in this record with the given key.
+
+        A Record object mimics a dictionary in how it's accessed, with the data
+        it represents available within a dictionary called "raw". Here,
+        we reroute ex: foo = my_rec["data"]["spam"] to go through this raw dictionary.
+        Essentially, it becomes foo = my_rec.raw["data"]["spam"].
+        """
         return self.raw[key]
 
     def __setitem__(self, key, value):
+        """
+        Set the entry in this record with the given key.
+
+        A Record object mimics a dictionary in how it's accessed, with the data
+        it represents available within a dictionary called "raw". Here,
+        we reroute ex: my_rec["data"]["spam"] = 2 to go through this raw dictionary.
+        Essentially, it becomes my_rec.raw["data"]["spam"] = 2.
+        """
         self.raw[key] = value
 
     def __delitem__(self, key):
+        """
+        Delete the entry in this record with the given key.
+
+        A Record object mimics a dictionary in how it's accessed, with the data
+        it represents available within a dictionary called "raw". Here, we
+        reroute ex: del my_rec["data"]["spam"] to go through this raw dictionary.
+        Essentially, it becomes del my_rec.raw["data"]["spam"]
+        """
         del self.raw[key]
 
     def __repr__(self):
@@ -115,7 +141,7 @@ class Record(object):
         """
         return json.dumps(self.raw)
 
-    def _is_valid(self, print_warnings=None):
+    def is_valid(self, print_warnings=None):
         """Test whether a Record's members are formatted correctly.
 
         The ingester expects certain types to be reserved, and for data
@@ -138,7 +164,7 @@ class Record(object):
         # files/data) and doesn't warrant spamming the logger.
         for entry in self.files:
             if not isinstance(entry, dict):
-                (warnings.append("At least one value entry belonging to "
+                (warnings.append("At least one file entry belonging to "
                                  "Record {} is not a dictionary. Value: {}"
                                  .format(self.id, entry)))
                 break
@@ -156,28 +182,27 @@ class Record(object):
                                  "Record {} has a malformed tag list. File: {}"
                                  .format(self.id, entry)))
 
-        for entry in self.data:
-            if not isinstance(entry, dict):
-                (warnings.append("At least one value entry belonging to "
-                                 "Record {} is not a dictionary. Value: {}"
-                                 .format(self.id, entry)))
-                break
-            if "name" not in entry:
-                (warnings.append("At least one value entry belonging to "
-                                 "Record {} is missing a name. Value: {}"
-                                 .format(self.id, entry)))
-                break
-            if "value" not in entry:
-                (warnings.append("At least one value entry belonging to "
-                                 "Record {} is missing a value. Value: {}"
-                                 .format(self.id, entry)))
-                break
-            if (entry.get("tags") and
-                (isinstance(entry.get("tags"), six.string_types) or
-                 not isinstance(entry.get("tags"), collections.Sequence))):
-                (warnings.append("At least one value entry belonging to "
-                                 "Record {} has a malformed tag list. Value: {}"
-                                 .format(self.id, entry)))
+        if not isinstance(self.data, dict):
+            (warnings.append("Record {}'s data field must be a dictionary!"
+                             .format(self.id)))
+        else:
+            for entry in self.data:
+                if not isinstance(self.data[entry], dict):
+                    (warnings.append("At least one value entry belonging to "
+                                     "Record {} is not a dictionary. Value: {}"
+                                     .format(self.id, entry)))
+                    break
+                if "value" not in self.data[entry]:
+                    (warnings.append("At least one value entry belonging to "
+                                     "Record {} is missing a value. Value: {}"
+                                     .format(self.id, entry)))
+                    break
+                if (self.data[entry].get("tags") and
+                    (isinstance(self.data[entry].get("tags"), six.string_types) or
+                     not isinstance(self.data[entry].get("tags"), collections.Sequence))):
+                    (warnings.append("At least one value entry belonging to "
+                                     "Record {} has a malformed tag list. Value: {}"
+                                     .format(self.id, entry)))
         try:
             json.dumps(self.raw)
         except ValueError:
@@ -281,7 +306,7 @@ class Run(Record):
 
 def generate_record_from_json(json_input):
     """
-    Generates a Record from the json input.
+    Generate a Record from the json input.
 
     :param json_input: A JSON representation of a Record.
     :raises: ValueError if given invalid json input.
@@ -307,14 +332,15 @@ def generate_record_from_json(json_input):
 
 def generate_run_from_json(json_input):
     """
-    Generates a Run from the json input.
+    Generate a Run from the json input.
 
     :param json_input: A JSON representation of a Run.
     :raises: ValueError if given invalid json input.
     """
     LOGGER.debug('Generating run from json input: {}'.format(json_input))
-    # Must create record first
+    # Programatically-created Records
     try:
+        print(json_input)
         run = Run(id=json_input['id'],
                   user=json_input.get('user'),
                   user_defined=json_input.get('user_defined'),
