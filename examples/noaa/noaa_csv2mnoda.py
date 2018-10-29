@@ -207,7 +207,7 @@ class NoaaData(object):
             self.recs.append({
                 "type": "qc",
                 "id": qid,
-                "data": {"desc": {"value": desc}, },
+                "data": {"desc": {"value": desc}},
                 })
 
     def add_exp(self, exp):
