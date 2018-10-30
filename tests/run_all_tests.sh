@@ -6,7 +6,10 @@ set +u
 # Wheelhouse used with venv --extra-search-dir to find pip/setuptools
 WHEELHOUSE=/usr/gapps/python/wheelhouse
 # Comma-separated directories to ignore when doing style checks
-IGNORE_STYLE=venv,docs,tests/test_venv,web,demos,.tox
+#
+# Note: Example files -- Python and Notebooks -- are expected to have their 
+# style checks performed in per-file regression tests (see SIBO-481, SIBO-469).
+IGNORE_STYLE=venv,examples,docs,tests/test_venv,web,demos,.tox
 # Make sure python 3 is available on LC
 export PATH=/usr/apps/python-3.6.0/bin/:$PATH
 
@@ -37,7 +40,7 @@ source $EXEC_HOME/tests/test_venv/bin/activate
 # Workaround due to overlong shebang in Bamboo agents
 BIN=$EXEC_HOME/tests/test_venv/bin
 
-# Nose installed seperately to make sure xunit's available
+# Nose installed separately to make sure xunit's available
 # Pip settings supplied by requirements.txt, etc.
 python $BIN/pip install -r requirements.txt
 

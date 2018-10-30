@@ -125,10 +125,6 @@ def _is_compliant_notebook(path):
     testname = "{}.py".format(testbase)
 
     try:
-        #
-        # Ignoring the following errors:
-        # - W391 blank line at end of file (apparently result of conversion)
-        #
         args = ["jupyter", "nbconvert", "--to", "python", "--log-level=ERROR",
                 "--PythonExporter.exclude_input_prompt=True",
                 "--PythonExporter.exclude_markdown=True",
@@ -145,11 +141,11 @@ def _is_compliant_notebook(path):
         #
         # Ignore the following error(s):
         # - E303 too many blank lines (always a problem with the notebooks)
+        # - E501 line too long (problem with cell magic cells)
         # - W391 blank line at end of file (apparently result of conversion)
         #
         # and set the max length to be the same we use for our tests.
-        args = ["flake8", "--max-line-length=99", "--ignore=E303,W391",
-                testname, "; exit 0"]
+        args = ["flake8", "--ignore=E303,E501,W391", testname, "; exit 0"]
         result = subprocess.check_output(" ".join(args), shell=True,
                                          stderr=subprocess.STDOUT)
 
@@ -231,7 +227,10 @@ class TestJupyterNotebooks(type):
                 test_name = "test_%s" % \
                     os.path.splitext(os.path.basename(filename))[0]
                 _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
-                _dict["{}_style".format(test_name)] = gen_test_style(filename)
+
+                # TODO: SIBO-481: Uncomment to enable flake8 test generation
+                # _dict["{}_style".format(test_name)] = gen_test_style(filename)
+
         return type.__new__(meta, name, bases, _dict)
 
 
