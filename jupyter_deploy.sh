@@ -1,62 +1,45 @@
 #!/bin/bash
 
+SRC_ROOT=$HOME/siboka
+SRC_DIR=$SRC_ROOT/sina
 
-VDIR=venv2.7
-VIRT_CREATE=/usr/apps/python/bin/virtualenv
+VENV=sina
+VENV_ACTIVATE=$SRC_DIR/venv/bin/activate
 
-if [ ! -f $VIRT_CREATE ]; then
-	echo "virtualenv does not exist: "$VIRT_CREATE
-	return 1;
-fi
-
-
-#  make sure that the user does not have a virtual environment currently active
+#  Make sure that the user does not have a virtual environment currently active
 #  because removing an activated virtual environment could cause problems
-deactivate
-
-#   if any command fails, the script will fail with an error code
-set -e
-
-rm -rf $VDIR
- 
-#  Create a virtual environment
-$VIRT_CREATE --system-site-package $VDIR
- 
-#  Start virtual env.
-source $VDIR/bin/activate
-
-if [ ! -d sina ]; then
-	git clone ssh://git@cz-bitbucket.llnl.gov:7999/sibo/sina.git
+if [ "$VIRTUAL_ENV" -neq "" ]; then
+    echo "Deactivating $VIRTUAL_ENV..."
+    deactivate
 fi
 
-cd sina
-pip install  -r requirements.txt
+# Download and build the latest repository snapshot
+# .. First ensure the project directory is in place
+if [ ! -d $SRC_ROOT ]; then
+    echo; echo "Creating missing $SRC_ROOT..."
+    mkdir -p $SRC_ROOT
+fi
 
-pip install --upgrade pip
- 
-python -m pip install ipykernel
- 
-#  Create a kernel
-python -m ipykernel install --prefix=$HOME/.local/ --name $VDIR --display-name $VDIR
+# .. Now ensure a fresh clone of the repository
+if [ -d $SRC_DIR ]; then
+    echo; echo "Removing current $SRC_DIR..."
+    rm -rf $SRC_DIR
+fi
 
-echo ''
-echo ''
-echo ''
-echo '-------------------------------------------------------------------------------'
-echo 'pip install xxxx'
-echo '-------------------------------------------------------------------------------'
- 
-#  These widgets give you sliders, drop downs, input fields, date pickers, etc
-pip install ipywidgets
- 
-#  For creating charts and plots with hover overs, etc.
-pip install plotly
- 
-#  Needed for running Sina
-pip install sqlalchemy
- 
-#  Needed  for running example code, to output in a table
-pip install tabulate
+echo; echo "Cloning the Sina repository..."
+cd $SRC_ROOT
+git clone ssh://git@cz-bitbucket.llnl.gov:7999/sibo/sina.git
+cd $SRC_DIR
 
+# Leverage the existing makefile rules to set up the virtual environment,
+# which is called 'venv'
+make install
 
+source $VENV_ACTIVATE
 
+#  Create the kernel
+echo; echo "Creating the $VENV kernel..."
+python -m ipykernel install --prefix=$HOME/.local/ --name $VENV \
+    --display-name $VENV
+
+deactivate
