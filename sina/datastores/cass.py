@@ -245,7 +245,10 @@ class RecordDAO(dao.RecordDAO):
 
         Temporary implementation. THIS IS A VERY SLOW, BRUTE-FORCE STRATEGY!
         You use it at your own risk! Do not expect it to be performant or
-        particularly stable.
+        particularly stable. Due to some cassandra limitations, this returns
+        potentially duplicate items. One work around for this is to wrap this
+        call in a set() like this:
+        get_many(set(get_given_document_uri(<args>, ids_only=True))).
 
         Supports the use of % as a wildcard character.
 
@@ -256,8 +259,7 @@ class RecordDAO(dao.RecordDAO):
                          (used for further filtering)
 
         :returns: A generator of found records or (if ids_only) a
-                  generator of their ids. Returns potentially
-                  duplicate items.
+                  generator of their ids.
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
         if accepted_ids_list:
@@ -283,7 +285,7 @@ class RecordDAO(dao.RecordDAO):
                 search_uri = uri.replace('*', '[*]').replace('%', '*')
                 match_ids = (
                     entry.id
-                    for entry in base_query.all()
+                    for entry in base_query
                     if fnmatch.fnmatch(entry.uri, search_uri)
                 )
             # As long as the wildcard's in last place, we can do it in CQL
@@ -342,7 +344,7 @@ class RecordDAO(dao.RecordDAO):
                         filtered_ids = list(query.values_list('id', flat=True).all())
                     else:
                         # We are on the last iteration, no need for a list, use a generator
-                        filtered_ids = query.values_list('id', flat=True).all()
+                        filtered_ids = query.values_list('id', flat=True)
         if ids_only:
             for id in filtered_ids:
                 yield id
@@ -352,21 +354,21 @@ class RecordDAO(dao.RecordDAO):
 
     def get_given_scalar(self, scalar_range, ids_only=False):
         """
-        Return all records with scalars fulfilling some criteria.
+        Return all records with scalars fulfilling some criterion.
 
         :param scalar_range: A 'sina.ScalarRange's describing the
-                             different criteria.
+                             criterion.
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
-        :returns: A generator of Records fitting the criteria or (if ids_only) a
+        :returns: A generator of Records fitting the criterion or (if ids_only) a
                   generator of their ids
         """
         LOGGER.debug('Getting all records with scalars within the range: {}'
                      .format(scalar_range))
         query = schema.RecordFromScalarData.objects
         filtered_ids = (self._configure_query_for_scalar_range(query, scalar_range)
-                        .values_list('id', flat=True).all())
+                        .values_list('id', flat=True))
         if ids_only:
             for id in filtered_ids:
                 yield id
