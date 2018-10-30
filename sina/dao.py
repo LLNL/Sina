@@ -335,7 +335,7 @@ class RunDAO(object):
 
     def get_many(self, iter_of_ids):
         """
-        Given a list of ids, retrieve each corresponding run from backend.
+        Given an iterable of ids, retrieve each corresponding run from backend.
 
         If a given DAO's backend can bulk read more cleverly,
         this should be reimplemented there.
