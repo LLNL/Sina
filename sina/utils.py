@@ -175,10 +175,10 @@ def _export_csv(data, scalar_names, output_file):
     with open(output_file, 'w') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(header)
-        for id, scalars in data.items():
-            if scalars:
-                writer.writerow([id] +
-                                [scalar['value'] for scalar in scalars])
+        for run, dataset in data.items():
+            # Each entry is a dict of scalars
+            if dataset:
+                writer.writerow([run] + [dataset[scalar]['value'] for scalar in scalar_names])
 
 
 def parse_scalars(scalar_args):

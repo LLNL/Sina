@@ -15,28 +15,28 @@ class TestModel(unittest.TestCase):
         spam = model.Record(id="spam_and_eggs", type="recipe")
 
         # Minimal, valid run
-        self.assertTrue(spam._is_valid())
-        # Value that's missing a name
-        spam.data = [{"value": "runny"}]
-        self.assertFalse(spam._is_valid()[0])
+        self.assertTrue(spam.is_valid())
         # Value that's a missing value
-        spam.data = [{"name": "eggstate"}]
-        self.assertFalse(spam._is_valid()[0])
+        spam.data = {"eggstate": {"tags": ["tEGGxture"]}}
+        self.assertFalse(spam.is_valid()[0])
         # Correct minimal value that has a bad tag list
-        spam.data = [{"name": "eggstate", "value": "runny", "tags": "tEGGxture"}]
-        self.assertFalse(spam._is_valid()[0])
+        spam.data = {"eggstate": {"value": "runny", "tags": "tEGGxture"}}
+        self.assertFalse(spam.is_valid()[0])
         # Second value is the bad one
-        spam.data = [{"name": "eggstate", "value": "runny", "tags": ["tEGGxture"]},
-                     'spam']
-        self.assertFalse(spam._is_valid()[0])
+        spam.data = {"eggstate": {"value": "runny", "tags": "tEGGxture"},
+                     'spam': 'spam'}
+        self.assertFalse(spam.is_valid()[0])
+        # Data needs to be a dict, not a list!
+        spam.data = [{"value": "runny", "tags": ["tEGGxture"]}]
+        self.assertFalse(spam.is_valid()[0])
 
-        spam.data = [{"name": "eggstate", "value": "runny", "tags": ["tEGGxture"]}]
+        spam.data = {"eggstate": {"value": "runny", "tags": ["tEGGxture"]}}
         # File that's missing a uri
         spam.files = [{"mimetype": "text/plain"}]
-        self.assertFalse(spam._is_valid()[0])
+        self.assertFalse(spam.is_valid()[0])
         # Correct minimal file that has a bad tag list
         spam.files = [{"uri": "spam.log", "tags": "output"}]
-        self.assertFalse(spam._is_valid()[0])
+        self.assertFalse(spam.is_valid()[0])
 
         spam.files = [{"uri": "spam.log", "mimetype": "text/plain", "tags": ["output"]}]
 
@@ -45,22 +45,31 @@ class TestModel(unittest.TestCase):
         spam.user_defined = {"eggs_in_dozen": 12}
 
         # all previous errors fixed: "maximal" valid run
-        self.assertTrue(spam._is_valid()[0])
+        self.assertTrue(spam.is_valid()[0])
+
+    def test_record_access(self):
+        """Ensure accessing record attribs using rec["spam"]."""
+        rec = model.Record(id="spam_test", type="test")
+        rec["eggs"] = "nutritious"
+        self.assertEqual(rec['eggs'], "nutritious")
+        self.assertEqual(rec.__dict__["raw"]["eggs"], "nutritious")
+        del rec["eggs"]
+        self.assertTrue('eggs' not in rec.__dict__["raw"])
 
     def test_generate_json(self):
         """Ensure JSON is generating properly."""
         target_json = ('{"id":"hello", "type":"greeting", '
-                       '"data":[{"name":"language", "value":"english"},'
-                       '{"name":"mood","value":"friendly"}],'
-                       '"files":[{"uri":"pronounce.wav"}],'
+                       '"data":{"language": {"value": "english"},'
+                       '"mood": {"value": "friendly"}},'
+                       '"files":[{"uri": "pronounce.wav"}],'
                        '"user_defined":{"good": "morning"}}')
         test_record = model.Record("hello", "greeting")
-        test_record.data = [{"name": "language", "value": "english"},
-                            {"name": "mood", "value": "friendly"}]
+        test_record.data = {"language": {"value": "english"},
+                            "mood": {"value": "friendly"}}
         test_record.files = [{"uri": "pronounce.wav"}]
         test_record.user_defined = {"good": "morning"}
         # Raw is explicitly not reproduced in to_json()
-        self.assertTrue(test_record._is_valid())
+        self.assertTrue(test_record.is_valid())
         self.assertEqual(sorted(set(json.loads(target_json))),
                          sorted(set(json.loads(test_record.to_json()))))
 
@@ -68,16 +77,16 @@ class TestModel(unittest.TestCase):
         """Ensure Run JSON is generating properly."""
         target_json = ('{"id":"hello", "type":"run",'
                        '"application":"foo", "user":"JohnD", "version":0,'
-                       '"data":[{"name":"language", "value":"english"},'
-                       '{"name":"mood","value":"friendly"}],'
+                       '"data": {"language": {"value":"english"},'
+                       '"mood": {"value":"friendly"}},'
                        '"files":[{"uri":"pronounce.wav"}],'
                        '"user_defined":{"good": "morning"}}')
         test_run = model.Run("hello", "foo", user="JohnD", version=0)
-        test_run.data = [{"name": "language", "value": "english"},
-                         {"name": "mood", "value": "friendly"}]
+        test_run.data = {"language": {"value": "english"},
+                         "mood": {"value": "friendly"}}
         test_run.files = [{"uri": "pronounce.wav"}]
         test_run.user_defined = {"good": "morning"}
-        self.assertTrue(test_run._is_valid())
+        self.assertTrue(test_run.is_valid())
         self.assertEqual(sorted(set(json.loads(target_json))),
                          sorted(set(json.loads(test_run.to_json()))))
 
@@ -87,13 +96,10 @@ class TestModel(unittest.TestCase):
                          "id": "spam",
                          "type": "eggs",
                          "user_defined": {"water": "bread"},
-                         "data": [{
-                                     "name": "eggs",
-                                     "value": 12,
-                                     "units": "cm",
-                                     "tags": ["runny"]
-                                    }
-                                  ],
+                         "data": {"eggs": {"value": 12,
+                                           "units": "cm",
+                                           "tags": ["runny"]
+                                           }},
                          "files": [{
                                      "uri": "eggs.brek",
                                      "mimetype": "egg",
@@ -118,13 +124,11 @@ class TestModel(unittest.TestCase):
         json_input = {
                          "type": "eggs",
                          "user_defined": {"water": "bread"},
-                         "data": [{
-                                     "name": "eggs",
-                                     "value": 12,
-                                     "units": "cm",
-                                     "tags": ["runny"]
-                                    }
-                                  ],
+                         "data": {"eggs": {"value": 12,
+                                           "units": "cm",
+                                           "tags": ["runny"]
+                                           }
+                                  },
                          "files": [{
                                      "uri": "eggs.brek",
                                      "mimetype": "egg",
@@ -145,13 +149,11 @@ class TestModel(unittest.TestCase):
                          "application": "skillet",
                          "version": "1.2",
                          "user_defined": {"water": "bread"},
-                         "data": [{
-                                     "name": "eggs",
-                                     "value": 12,
-                                     "units": "cm",
-                                     "tags": ["runny"]
-                                    }
-                                  ],
+                         "data": {"eggs": {"value": 12,
+                                           "units": "cm",
+                                           "tags": ["runny"]
+                                           }
+                                  },
                          "files": [{
                                      "uri": "eggs.brek",
                                      "mimetype": "egg",
@@ -180,13 +182,11 @@ class TestModel(unittest.TestCase):
                          "id": "spam",
                          "type": "eggs",
                          "user_defined": {"water": "bread"},
-                         "data": [{
-                                     "name": "eggs",
-                                     "value": 12,
-                                     "units": "cm",
-                                     "tags": ["runny"]
-                                    }
-                                  ],
+                         "data": {"eggs": {"value": 12,
+                                           "units": "cm",
+                                           "tags": ["runny"]
+                                           }
+                                  },
                          "files": [{
                                      "uri": "eggs.brek",
                                      "mimetype": "egg",
