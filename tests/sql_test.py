@@ -9,6 +9,7 @@ import csv
 import logging
 from collections import OrderedDict
 from mock import MagicMock, patch
+import types
 import six
 
 import sina.datastores.sql as sina_sql
@@ -381,10 +382,11 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(list(multi_wildcard)), 4)
         all_wildcard = record_dao.get_given_document_uri(uri="%")
         self.assertEqual(len(list(all_wildcard)), 5)
-        ids_only = list(record_dao.get_given_document_uri(uri="%.%", ids_only=True))
+        ids_only = record_dao.get_given_document_uri(uri="%.%", ids_only=True)
+        self.assertIsInstance(ids_only, types.GeneratorType,
+                              "Method must return a generator.")
+        ids_only = list(ids_only)
         self.assertEqual(len(ids_only), 4)
-        self.assertIsInstance(ids_only, list,
-                              "Method must return a list to allow subscripting and modification")
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam3", "spam4"])
 
@@ -417,10 +419,11 @@ class TestSQL(unittest.TestCase):
         multi = record_dao.get_given_scalar(multi_range)
         self.assertEqual(len(list(multi)), 3)
         self.assertEqual(mock_get.call_count, 6)
-        ids_only = list(record_dao.get_given_scalar(multi_range, ids_only=True))
+        ids_only = record_dao.get_given_scalar(multi_range, ids_only=True)
+        self.assertIsInstance(ids_only, types.GeneratorType,
+                              "Method must return generator.")
+        ids_only = list(ids_only)
         self.assertEqual(len(ids_only), 3)
-        self.assertIsInstance(ids_only, list,
-                              "Method must return a list to allow subscripting and modification")
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam2", "spam3"])
 
@@ -442,12 +445,13 @@ class TestSQL(unittest.TestCase):
                                              spam_3_only,
                                              none_fulfill])
         self.assertFalse(list(none))
-        id_only = list(record_dao.get_given_scalars([spam_and_spam_3,
-                                                    spam_3_only],
-                                                    ids_only=True))
+        id_only = record_dao.get_given_scalars([spam_and_spam_3,
+                                               spam_3_only],
+                                               ids_only=True)
+        self.assertIsInstance(id_only, types.GeneratorType,
+                              "Method must return a generator.")
+        id_only = list(id_only)
         self.assertEqual(len(id_only), 1)
-        self.assertIsInstance(id_only, list,
-                              "Method must return a list to allow subscripting and modification")
         self.assertEqual(id_only[0], "spam3")
 
     def test_recorddao_type(self):
@@ -497,10 +501,11 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(get_many), 3)
         get_none = list(record_dao.get_all_of_type("butterscotch"))
         self.assertFalse(get_none)
-        ids_only = list(record_dao.get_all_of_type("run", ids_only=True))
+        ids_only = record_dao.get_all_of_type("run", ids_only=True)
+        self.assertIsInstance(ids_only, types.GeneratorType,
+                              "Method must return a generator.")
+        ids_only = list(ids_only)
         self.assertEqual(len(ids_only), 3)
-        self.assertIsInstance(ids_only, list,
-                              "Method must return a list to allow subscripting and modification")
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam2"])
 

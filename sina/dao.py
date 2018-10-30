@@ -58,19 +58,20 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
-    def get_many(self, list_of_ids):
+    def get_many(self, iter_of_ids):
         """
-        Given a list of ids, retrieve each corresponding Record.
+        Given an iterable of ids, retrieve each corresponding Record.
 
         If a given DAO's backend can bulk read more cleverly,
         this should be reimplemented there.
 
-        :param list_of_ids: A list of ids to find.
+        :param iter_of_ids: An iterable object of ids to find.
 
         :returns: A generator of found records
         """
-        for id in list_of_ids:
-            yield self.get(id)
+        for id in iter_of_ids:
+            record = self.get(id)
+            yield record
 
     @abstractmethod
     def insert(self, record):
@@ -107,7 +108,8 @@ class RecordDAO(object):
         """
         Return all records associated with documents whose uris match some arg.
 
-        Supports the use of % as a wildcard character.
+        Supports the use of % as a wildcard character. Note that you may or may
+        not get duplicates depending on the backend.
 
         :param uri: The uri to use as a search term, such as "foo.png"
 
@@ -304,18 +306,18 @@ class RunDAO(object):
         """
         raise NotImplementedError
 
-    def get_many(self, list_of_ids):
+    def get_many(self, iter_of_ids):
         """
         Given a list of ids, retrieve each corresponding run from backend.
 
         If a given DAO's backend can bulk read more cleverly,
         this should be reimplemented there.
 
-        :param list_of_ids: A list of ids to find.
+        :param iter_of_ids: An iterable object of ids to find.
 
         :returns: A generator of found runs
         """
-        for id in list_of_ids:
+        for id in iter_of_ids:
             yield self.get(id)
 
     @abstractmethod

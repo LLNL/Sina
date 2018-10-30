@@ -217,8 +217,8 @@ class RecordDAO(dao.RecordDAO):
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
-        :returns: a list of Records of that type or (if ids_only) a list of
-                  their ids
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
         """
         LOGGER.debug('Getting all records of type {}.'.format(type))
         # Allow_filtering() is, as a rule, inadvisable; if speed becomes a
@@ -226,11 +226,12 @@ class RecordDAO(dao.RecordDAO):
         query = (schema.Record.objects.filter(type=type)
                                       .allow_filtering()
                                       .values_list('id', flat=True))
-        filtered_ids = list(query)
         if ids_only:
-            return filtered_ids
+            for id in query:
+                yield str(id)
         else:
-            return self.get_many(filtered_ids)
+            for record in self.get_many(query):
+                yield record
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
@@ -249,7 +250,8 @@ class RecordDAO(dao.RecordDAO):
                          (used for further filtering)
 
         :returns: A generator of found records or (if ids_only) a
-                  generator of their ids
+                  generator of their ids. Returns potentially
+                  duplicate items.
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
         if accepted_ids_list:
@@ -267,30 +269,29 @@ class RecordDAO(dao.RecordDAO):
         if '%' in uri:
             # Special case: get all ids with associated docs.
             if len(uri) == 1:
-                match_ids = set(base_query.values_list('id', flat=True))
+                match_ids = base_query.values_list('id', flat=True)
 
             # If a wildcard is in any position besides last, we do it in Python
             elif '%' in uri[:-1]:
-                match_ids = set()
                 # Change searched URI into a fnmatch-friendly version
                 search_uri = uri.replace('*', '[*]').replace('%', '*')
-                for entry in base_query.all():
-                    if fnmatch.fnmatch(entry.uri, search_uri):
-                        match_ids.add(entry.id)
-
+                match_ids = (
+                    entry.id
+                    for entry in base_query.all()
+                    if fnmatch.fnmatch(entry.uri, search_uri)
+                )
             # As long as the wildcard's in last place, we can do it in CQL
             else:
                 # Cassandra orders lexographically by UTF-8
                 # Thus, we can search from ex: 'foo' through 'fop' to
                 # simulate a 'LIKE foo%' query.
                 alphabetical_end = uri[:-2]+chr(ord(uri[-2]) + 1)
-                match_ids = set(base_query.filter(uri__gte=uri[:-1])
-                                .filter(uri__lt=alphabetical_end)
-                                .values_list('id', flat=True))
+                match_ids = (base_query.filter(uri__gte=uri[:-1])
+                                       .filter(uri__lt=alphabetical_end)
+                                       .values_list('id', flat=True))
         # If there's no wildcard, we're looking for exact matches.
         else:
-            match_ids = set(base_query.filter(uri=uri)
-                            .values_list('id', flat=True))
+            match_ids = base_query.filter(uri=uri).values_list('id', flat=True)
 
         if ids_only:
             for id in match_ids:
@@ -324,13 +325,18 @@ class RecordDAO(dao.RecordDAO):
         filtered_ids = list(self.get_given_scalar(scalar_range_list[0], ids_only=True))
         # Only do the next part if there's more scalars and at least one id
         if len(scalar_range_list) > 1:
-            for scalar_range in scalar_range_list[1:]:
+            for counter, scalar_range in enumerate(scalar_range_list[1:]):
                 if filtered_ids:
                     query = (schema.ScalarDataFromRecord.objects
                              .filter(id__in=filtered_ids))
                     query = self._configure_query_for_scalar_range(query,
                                                                    scalar_range)
-                    filtered_ids = list(query.values_list('id', flat=True).all())
+                    if counter < (len(scalar_range_list[1:]) - 1):
+                        # Cassandra requires a list for the id__in attribute
+                        filtered_ids = list(query.values_list('id', flat=True).all())
+                    else:
+                        # We are on the last iteration, no need for a list, use a generator
+                        filtered_ids = query.values_list('id', flat=True).all()
         if ids_only:
             for id in filtered_ids:
                 yield id

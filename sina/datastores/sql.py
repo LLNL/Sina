@@ -114,7 +114,7 @@ class RecordDAO(dao.RecordDAO):
             for x in query.all():
                 yield str(x[0])
         else:
-            filtered_ids = [str(x[0]) for x in query.all()]
+            filtered_ids = (str(x[0]) for x in query.all())
             for record in self.get_many(filtered_ids):
                 yield record
 
@@ -131,7 +131,7 @@ class RecordDAO(dao.RecordDAO):
                          (used for further filtering)
 
         :returns: A generator of matching records or (if ids_only) a
-                  generator of their ids
+                  generator of their ids. Returns distinct items.
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
         if accepted_ids_list:
@@ -151,7 +151,7 @@ class RecordDAO(dao.RecordDAO):
             for x in query.all():
                 yield x[0]
         else:
-            filtered_ids = [x[0] for x in query.all()]
+            filtered_ids = (x[0] for x in query.all())
             for record in self.get_many(filtered_ids):
                 yield record
 
@@ -183,7 +183,7 @@ class RecordDAO(dao.RecordDAO):
             for x in query.all():
                 yield x[0]
         else:
-            filtered_ids = [x[0] for x in query.all()]
+            filtered_ids = (x[0] for x in query.all())
             for record in self.get_many(filtered_ids):
                 yield record
 
