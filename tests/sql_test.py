@@ -7,9 +7,9 @@ import time
 import json
 import csv
 import logging
+import six
 from collections import OrderedDict
 from mock import MagicMock, patch
-import six
 
 import sina.datastores.sql as sina_sql
 import sina.datastores.sql_schema as schema
@@ -19,7 +19,7 @@ from sina.model import Run, Record
 LOGGER = logging.getLogger(__name__)
 
 
-def _populate_database_with_scalars(session):
+def _populate_database_with_data(session):
     """Add test scalars to a database."""
     session.add(schema.ScalarData(id="spam",
                                   name="spam_scal",
@@ -41,6 +41,10 @@ def _populate_database_with_scalars(session):
     session.add(schema.ScalarData(id="spam3",
                                   name="spam_scal_2",
                                   value=10.5))
+    session.add(schema.StringData(id="spam3",
+                                  name="val_data",
+                                  value="runny",
+                                  tags='["edible"]'))
     session.commit()
 
 
@@ -143,7 +147,7 @@ class TestSQL(unittest.TestCase):
         _export_csv() so we don't actually write to file.
         """
         factory = sina_sql.DAOFactory()
-        _populate_database_with_scalars(factory.session)
+        _populate_database_with_data(factory.session)
         scalars = ['spam_scal']
         export(
             factory=factory,
@@ -166,7 +170,7 @@ class TestSQL(unittest.TestCase):
         case is an output_type that is not supported.
         """
         factory = sina_sql.DAOFactory()
-        _populate_database_with_scalars(factory.session)
+        _populate_database_with_data(factory.session)
         scalars = ['spam_scal']
         with self.assertRaises(ValueError) as context:
             export(
@@ -183,7 +187,7 @@ class TestSQL(unittest.TestCase):
     def test_export_one_scalar_csv_good_input(self):
         """Test export one scalar correctly to csv from a sql database."""
         factory = sina_sql.DAOFactory()
-        _populate_database_with_scalars(factory.session)
+        _populate_database_with_data(factory.session)
         export(
             factory=factory,
             id_list=['spam'],
@@ -201,7 +205,7 @@ class TestSQL(unittest.TestCase):
     def test_export_two_scalar_csv_good_input(self):
         """Test exporting two scalars & runs correctly to csv from sql."""
         factory = sina_sql.DAOFactory()
-        _populate_database_with_scalars(factory.session)
+        _populate_database_with_data(factory.session)
         export(
             factory=factory,
             id_list=['spam3', 'spam'],
@@ -351,7 +355,7 @@ class TestSQL(unittest.TestCase):
         mock_get.return_value = True
         factory = sina_sql.DAOFactory()
         record_dao = factory.createRecordDAO()
-        _populate_database_with_scalars(factory.session)
+        _populate_database_with_data(factory.session)
         too_big_range = ScalarRange(name="spam_scal", max=9,
                                     max_inclusive=True)
         too_big = record_dao.get_given_scalar(too_big_range)
@@ -387,7 +391,7 @@ class TestSQL(unittest.TestCase):
         mock_get.return_value = True
         factory = sina_sql.DAOFactory()
         record_dao = factory.createRecordDAO()
-        _populate_database_with_scalars(factory.session)
+        _populate_database_with_data(factory.session)
         spam_and_spam_3 = ScalarRange(name="spam_scal", min=10,
                                       min_inclusive=True)
         spam_3_only = ScalarRange(name="spam_scal_2", max=100)
@@ -462,15 +466,46 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(get_more), 2)
         self.assertEqual(get_more[0]["uri"], "beep.pong")
 
+    def test_recorddao_get_data_for_records(self):
+        """Test that we're getting data for many records correctly."""
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        all_ids = ["spam", "spam2", "spam3", "eggs"]
+        all_scalars = ["spam_scal", "eggs_scal", "spam_scal_2", "val_data"]
+
+        for_one = record_dao.get_data_for_records(id_list=["spam"],
+                                                  data_list=all_scalars)
+        self.assertEqual(for_one["spam"]["spam_scal"],
+                         {"value": 10, "units": "pigs", "tags": ["hammy"]})
+        self.assertFalse("eggs_scal" in for_one["spam"].keys())
+
+        for_many = record_dao.get_data_for_records(id_list=all_ids,
+                                                   data_list=["spam_scal",
+                                                              "spam_scal_2",
+                                                              "val_data"])
+        six.assertCountEqual(self, for_many.keys(), ["spam", "spam2", "spam3"])
+        six.assertCountEqual(self, for_many["spam3"].keys(), ["spam_scal",
+                                                              "spam_scal_2",
+                                                              "val_data"])
+        six.assertCountEqual(self, for_many["spam3"]["val_data"].keys(),
+                                                    ["value", "tags"])
+        self.assertEqual(for_many["spam3"]["val_data"]["value"], "runny")
+        self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible"])
+
+        for_none = record_dao.get_data_for_records(id_list=["nope", "nada"],
+                                                   data_list=["gone", "away"])
+        self.assertFalse(for_none)
+
     def test_recorddao_get_scalars(self):
         """
-        Test that the RecordDAO is getting scalars for records correctly.
+        Test that the RecordDAO is getting scalars for a record correctly.
 
         While covered (mostly) by other tests, it's included for explicity.
         """
         factory = sina_sql.DAOFactory()
         record_dao = factory.createRecordDAO()
-        _populate_database_with_scalars(factory.session)
+        _populate_database_with_data(factory.session)
         get_one = record_dao.get_scalars(id="spam",
                                          scalar_names=["spam_scal"])
         self.assertEqual(len(get_one), 1)
@@ -543,7 +578,7 @@ class TestSQL(unittest.TestCase):
         # TODO: Test raises question of whether type should be tracked in
         # the scalars table.
         factory = sina_sql.DAOFactory()
-        _populate_database_with_scalars(factory.session)
+        _populate_database_with_data(factory.session)
         run_dao = factory.createRunDAO()
         rec = Record(id="spam2", type="task",
                      user_defined={})

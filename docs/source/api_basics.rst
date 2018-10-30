@@ -52,8 +52,8 @@ documentation of all the methods available to each DAO, please see the
 `DAO documentation <generated_docs/sina.dao.html>`__.
 
 
-Filtering Based on Scalar Criteria
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Filtering Records Based on Scalar Criteria
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Records can also be selected based on the scalars they contain. A Record "contains"
 a scalar if the scalar is both named in its data dictionary and assigned a numerical value.
@@ -112,7 +112,30 @@ the recommended way of combining queries or implementing more complex logic::
 
   # This will print ids of all records whose volume is less than three or
   # whose density is in the range (0, 1], *but not both* (XOR)
-  print(set(ids_volume_filter).symmetric_difference(ids_density_filter))
+  xor_recs = set(ids_volume_filter).symmetric_difference(ids_density_filter)
+  print(xor_recs)
+
+
+Getting Specific Data for Many Scalars
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You may want, for example, to get the final_speed and shape of each
+Record matching the above criteria. Rather than building Record objects for
+all matches and then selecting only the data you want, you can use
+get_data_for_records() to find specific data entries across a list of Records::
+
+ ...
+
+ desired_data = ["final_speed", "shape"]
+
+ data = record_dao.get_data_for_records(id_list = xor_recs,
+                                        data_list = desired_data)
+
+ for id in data:
+     msg = "For record {}: final speed {}, shape {}"
+     print(msg.format(id,
+                      data[id]["final_speed"]["value"],
+                      data[id]["shape"]["value"]))
 
 
 Math-Based Queries
