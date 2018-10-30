@@ -4,7 +4,7 @@ import logging
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
 import six
-import collections
+from collections import defaultdict
 import json
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery
 
@@ -72,8 +72,9 @@ class RecordDAO(dao.RecordDAO):
                              _type_managed))
         # Because batch is done by partition key, we'll need to store info for
         # tables whose full per-partition info isn't supplied by one Record
-        from_scalar_batch = collections.defaultdict(list)
-        from_string_batch = collections.defaultdict(list)
+        from_scalar_batch = defaultdict(list)
+        from_string_batch = defaultdict(list)
+
         for record in list_to_insert:
             # Insert the Record itself
             is_valid, warnings = record.is_valid()
@@ -401,9 +402,75 @@ class RecordDAO(dao.RecordDAO):
                 query = query.filter(value__lt=scalar_range.max)
         return query
 
+    def get_data_for_records(self, id_list, data_list, omit_tags=False):
+        """
+        Retrieve a subset of data for Records in id_list.
+
+        For example, it might get "debugger_version" and "volume" for the
+        Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
+        dictionaries; the outer key is the record_id, the inner key is the
+        name of the data piece (ex: "volume"). So::
+
+            {"foo_1": {"volume": {"value": 12, "units": cm^3},
+                       "debugger_version": {"value": "alpha"}}
+             "foo_3": {"debugger_version": {"value": "alpha"}}
+
+        As seen in foo_3 above, if a piece of data is missing, it won't be
+        included; think of this as a subset of a Record's own data. Similarly,
+        if a Record ends up containing none of the requested data, it will be
+        omitted.
+
+        :param id_list: A list of the record ids to find data for
+        :param data_list: A list of the names of data fields to find
+        :param omit_tags: Whether to avoid returning tags. A Cassandra
+                          limitation results in up to id_list*data_list+1
+                          queries to include the tags, rather than the single
+                          query we'd do otherwise. If you don't need the tags/
+                          are on a machine with a slow network connection
+                          to the cluster, consider setting this to True.
+
+        :returns: a dictionary of dictionaries containing the requested data,
+                 keyed by record_id and then data field name.
+        """
+        LOGGER.debug('Getting data in {} for record ids in {}'
+                     .format(data_list, id_list))
+        data = defaultdict(lambda: defaultdict(dict))
+        query_tables = [schema.ScalarDataFromRecord,
+                        schema.StringDataFromRecord]
+        for query_table in query_tables:
+            query = (query_table.objects
+                     .filter(query_table.id.in_(id_list))
+                     .filter(query_table.name.in_(data_list))
+                     .values_list('id', 'name', 'value', 'units'))
+            for result in query:
+                id, name, value, units = result
+                datapoint = {"value": value}
+                if units:
+                    datapoint["units"] = units
+                data[id][name] = datapoint
+            # Cassandra has a limitation wherein any "IN" query stops working
+            # if one of the columns requested contains collections. 'tags' is a
+            # collection column. Unfortunately, there's a further limitation
+            # that a BatchQuery can't select (only create, update, or delete),
+            # so the best we can do (until they fix one of the above) is:
+            if not omit_tags:
+                for id in data:
+                    for name in data[id]:
+                        if "tags" not in data[id][name]:
+                            tags = (query_table.objects
+                                    .filter(query_table.id == id)
+                                    .filter(query_table.name == name)
+                                    .values_list('tags', flat=True)).all()
+                            if tags and tags[0] is not None:
+                                data[id][name]["tags"] = tags[0]
+        return data
+
     def get_scalars(self, id, scalar_names):
         """
-        Retrieve scalars for a given record id.
+        LEGACY: retrieve scalars for a given record id.
+
+        This is a legacy method. Consider accessing data from Records directly,
+        ex scalar_info = my_rec["data"][scalar_name]
 
         Scalars are returned as a dictionary with the same format as a Record's
         data attribute (it's a subset of it)
@@ -509,8 +576,8 @@ class RelationshipDAO(dao.RelationshipDAO):
         LOGGER.debug('Inserting {} relationships.'.format(len(list_to_insert)))
         # Batching is done per partition key--we won't know per-partition
         # contents until we've gone through the full list of Relationships.
-        from_subject_batch = collections.defaultdict(list)
-        from_object_batch = collections.defaultdict(list)
+        from_subject_batch = defaultdict(list)
+        from_object_batch = defaultdict(list)
 
         for rel in list_to_insert:
             from_subject_batch[rel.subject_id].append((rel.predicate,

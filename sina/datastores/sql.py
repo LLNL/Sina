@@ -4,6 +4,7 @@ import numbers
 import logging
 import sqlalchemy
 import json
+from collections import defaultdict
 
 import sina.dao as dao
 import sina.model as model
@@ -281,9 +282,58 @@ class RecordDAO(dao.RecordDAO):
         conditions.append(")")
         return sqlalchemy.text(''.join(conditions))
 
+    def get_data_for_records(self, id_list, data_list):
+        """
+        Retrieve a subset of data for Records in id_list.
+
+        For example, it might get "debugger_version" and "volume" for the
+        Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
+        dictionaries; the outer key is the record_id, the inner key is the
+        name of the data piece (ex: "volume"). So::
+
+            {"foo_1": {"volume": {"value": 12, "units": cm^3},
+                       "debugger_version": {"value": "alpha"}}
+             "foo_3": {"debugger_version": {"value": "alpha"}}
+
+        As seen in foo_3 above, if a piece of data is missing, it won't be
+        included; think of this as a subset of a Record's own data. Similarly,
+        if a Record ends up containing none of the requested data, it will be
+        omitted.
+
+        :param id_list: A list of the record ids to find data for
+        :param data_list: A list of the names of data fields to find
+
+        :returns: a dictionary of dictionaries containing the requested data,
+                 keyed by record_id and then data field name.
+        """
+        LOGGER.debug('Getting data in {} for record ids in {}'
+                     .format(data_list, id_list))
+        data = defaultdict(lambda: defaultdict(dict))
+        query_tables = [schema.ScalarData, schema.StringData]
+        for query_table in query_tables:
+            query = (self.session.query(query_table.id,
+                                        query_table.name,
+                                        query_table.value,
+                                        query_table.units,
+                                        query_table.tags)
+                     .filter(query_table.id.in_(id_list))
+                     .filter(query_table.name.in_(data_list)))
+            for result in query:
+                datapoint = {"value": result.value}
+                if result.units:
+                    datapoint["units"] = result.units
+                if result.tags:
+                    # Convert from string to ks
+                    datapoint["tags"] = json.loads(result.tags)
+                data[result.id][result.name] = datapoint
+        return data
+
     def get_scalars(self, id, scalar_names):
         """
-        Retrieve scalars for a given record id.
+        LEGACY: retrieve scalars for a given record id.
+
+        This is a legacy method. Consider accessing data from Records directly,
+        ex scalar_info = my_rec["data"][scalar_name]
 
         Scalars are returned as a dictionary with the same format as a Record's
         data attribute (it's a subset of it)
@@ -293,8 +343,8 @@ class RecordDAO(dao.RecordDAO):
 
         :return: A dict of scalars matching the Mnoda data specification
         """
-        # Note lack of filtering on tags. Something to consider.
-        # Also, how to handle values? Separate method? Search both tables?
+        # Not a strict subset of get_data_for_records() in that this will
+        # never return stringdata
         LOGGER.debug('Getting scalars={} for record id={}'
                      .format(scalar_names, id))
         scalars = {}
