@@ -108,17 +108,19 @@ class RecordDAO(dao.RecordDAO):
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
-        :returns: a list of Records of that type or (if ids_only) a list of
-                  their ids
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
         """
         LOGGER.debug('Getting all records of type {}.'.format(type))
         query = (self.session.query(schema.Record.id)
                              .filter(schema.Record.type == type))
-        filtered_ids = [str(x[0]) for x in query.all()]
         if ids_only:
-            return filtered_ids
+            for x in query.all():
+                yield str(x[0])
         else:
-            return self.get_many(filtered_ids)
+            filtered_ids = (str(x[0]) for x in query.all())
+            for record in self.get_many(filtered_ids):
+                yield record
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
@@ -132,8 +134,8 @@ class RecordDAO(dao.RecordDAO):
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
-        :returns: a list of Records associated with that uri or (if ids_only) a
-                  list of their ids
+        :returns: A generator of matching records or (if ids_only) a
+                  generator of their ids. Returns distinct items.
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
         if accepted_ids_list:
@@ -149,11 +151,13 @@ class RecordDAO(dao.RecordDAO):
         if accepted_ids_list is not None:
             query = query.filter(schema.Document
                                  .id.in_(accepted_ids_list))
-        filtered_ids = [x[0] for x in query.all()]
         if ids_only:
-            return filtered_ids
+            for x in query.all():
+                yield x[0]
         else:
-            return self.get_many(filtered_ids)
+            filtered_ids = (x[0] for x in query.all())
+            for record in self.get_many(filtered_ids):
+                yield record
 
     # TODO: While not part of the original implementation, we now have
     # the ability to store non-scalar data as well, so we'll need a query
@@ -172,18 +176,20 @@ class RecordDAO(dao.RecordDAO):
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
-        :returns: a list of Records fitting those criteria or (if ids_only) a
-                  list of their ids
+        :returns: A generator of Records fitting the criteriaor (if ids_only) a
+                  generator of their ids
         """
         LOGGER.debug('Getting all records with scalars within the following '
                      'ranges: {}'.format(scalar_range_list))
         query = self.session.query(schema.ScalarData.id)
         query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
-        filtered_ids = [x[0] for x in query.all()]
         if ids_only:
-            return filtered_ids
+            for x in query.all():
+                yield x[0]
         else:
-            return self.get_many(filtered_ids)
+            filtered_ids = (x[0] for x in query.all())
+            for record in self.get_many(filtered_ids):
+                yield record
 
     def get_given_scalar(self, scalar_range, ids_only=False):
         """
@@ -193,8 +199,8 @@ class RecordDAO(dao.RecordDAO):
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
-        :returns: a list of Records fitting that criterion or (if ids_only) a
-                  list of their ids
+        :returns: A generator of Records fitting the criteria or (if ids_only) a
+                  generator of their ids
         """
         return self.get_given_scalars([scalar_range], ids_only=ids_only)
 

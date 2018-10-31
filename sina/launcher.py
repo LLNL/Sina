@@ -394,8 +394,6 @@ def query(args):
     :params args: (ArgumentParser, req) Command line args that tell us what
         pattern and database to use.
 
-    :returns: a list of matching record raws (ids if --id flag used)
-
     :raises ValueError: if there's an issue with flags (bad filetype, etc)
     """
     LOGGER.info('Querying {}.'.format(args.database_type))
@@ -462,8 +460,6 @@ def query(args):
         print([x.id for x in matches])
     else:
         print([x.raw for x in matches])
-    # Return value primarily used for testing
-    return matches
 
 
 def version():

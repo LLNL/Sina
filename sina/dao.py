@@ -58,21 +58,20 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
-    def get_many(self, list_of_ids):
+    def get_many(self, iter_of_ids):
         """
-        Given a list of ids, retrieve each corresponding Record.
+        Given an iterable of ids, retrieve each corresponding Record.
 
         If a given DAO's backend can bulk read more cleverly,
         this should be reimplemented there.
 
-        :param list_of_ids: A list of ids to find.
+        :param iter_of_ids: An iterable object of ids to find.
 
-        :returns: A list of found records
+        :returns: A generator of found records
         """
-        records = []
-        for id in list_of_ids:
-            records.append(self.get(id))
-        return records
+        for id in iter_of_ids:
+            record = self.get(id)
+            yield record
 
     @abstractmethod
     def insert(self, record):
@@ -109,11 +108,12 @@ class RecordDAO(object):
         """
         Return all records associated with documents whose uris match some arg.
 
-        Supports the use of % as a wildcard character.
+        Supports the use of % as a wildcard character. Note that you may or may
+        not get duplicates depending on the backend.
 
         :param uri: The uri to use as a search term, such as "foo.png"
 
-        :returns: A list of matching records (or None)
+        :returns: A generator of matching records
         """
         raise NotImplementedError
 
@@ -129,7 +129,7 @@ class RecordDAO(object):
         :param scalar_range_list: A list of 'sina.ScalarRange's describing the
                                  different criteria.
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteria
         """
         raise NotImplementedError
 
@@ -143,7 +143,7 @@ class RecordDAO(object):
 
         :param scalar_range: A 'sina.ScalarRange' describing the criteria.
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteria
         """
         raise NotImplementedError
 
@@ -156,7 +156,8 @@ class RecordDAO(object):
 
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
-        :return: A list of scalar JSON objects matching the Mnoda specification
+
+        :returns: A list of scalar JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
 
@@ -195,7 +196,8 @@ class RecordDAO(object):
         Files are returned in the alphabetical order of their URIs
 
         :param id: The record id to find files for
-        :return: A list of file JSON objects matching the Mnoda specification
+
+        :returns: A list of file JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
 
@@ -331,16 +333,19 @@ class RunDAO(object):
         """
         raise NotImplementedError
 
-    def get_many(self, list_of_ids):
+    def get_many(self, iter_of_ids):
         """
-        Given a list of ids, retrieve each corresponding run from backend.
+        Given an iterable of ids, retrieve each corresponding run from backend.
 
         If a given DAO's backend can bulk read more cleverly,
         this should be reimplemented there.
 
-        :param list_of_ids: A list of ids to find.
+        :param iter_of_ids: An iterable object of ids to find.
+
+        :returns: A generator of found runs
         """
-        return [self.get(id) for id in list_of_ids]
+        for id in iter_of_ids:
+            yield self.get(id)
 
     @abstractmethod
     def insert(self, run):
@@ -385,15 +390,13 @@ class RunDAO(object):
 
         :param scalar_range: A sina.ScalarRange describing the criteria
 
-        :returns: A list of Runs fitting the criteria
+        :returns: A generator of Runs fitting the criteria
         """
         records = self.record_DAO.get_given_scalar(scalar_range)
-        runs = []
         if records:
             for record in records:
                 if record.type == "run":
-                    runs.append(self._convert_record_to_run(record))
-        return runs
+                    yield self._convert_record_to_run(record)
 
     def get_given_document_uri(self, uri):
         """
@@ -403,12 +406,10 @@ class RunDAO(object):
 
         :param uri: The uri to match.
 
-        :returns: A list of Runs fitting the criteria
+        :returns: A generator of Runs fitting the criteria
         """
         records = self.record_DAO.get_given_document_uri(uri)
-        runs = []
         if records:
             for record in records:
                 if record.type == "run":
-                    runs.append(self._convert_record_to_run(record))
-        return runs
+                    yield self._convert_record_to_run(record)
