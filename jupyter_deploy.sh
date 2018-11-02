@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 SRC_ROOT=$HOME/siboka
 SRC_DIR=$SRC_ROOT/sina

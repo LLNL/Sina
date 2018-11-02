@@ -25,6 +25,10 @@ EXAMPLES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__),
 # Python magics template filename
 MAGICS_TEMPLATE = "pythonmagics.tpl"
 
+# Jupyter Notebook Sina Kernel
+SINA_KERNEL = os.getenv('SINA_TEST_KERNEL')
+SINA_KERNEL = 'sina' if SINA_KERNEL is None else SINA_KERNEL
+
 
 def _build_pep8_output(result):
     """
@@ -62,6 +66,7 @@ def _execute_notebook(path):
     try:
         with tempfile.NamedTemporaryFile(suffix=".ipynb") as fout:
             args = ["jupyter", "nbconvert", "--to", "notebook", "--execute",
+                    "--ExecutePreprocessor.kernel_name={}".format(SINA_KERNEL),
                     "--ExecutePreprocessor.timeout=-1", "--log-level=ERROR",
                     "--output", fout.name, path]
             subprocess.check_call(args)
