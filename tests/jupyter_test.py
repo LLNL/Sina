@@ -1,5 +1,7 @@
 """
-Tests for example Jupyter Notebooks.
+Tests for example Jupyter Notebooks, which include:
+- executing them on the default or, if relevant, a test database; and
+- performing flake8 checks on them (once re-enabled).
 
 Sources:
 1) Parameterized unit test generation follows the post by Guy at:
@@ -34,22 +36,38 @@ def _build_pep8_output(result):
     """
     Build the PEP8 output based on flake8 results.
 
+    Flake8 output results conform to the following format:
+
+      <filename>:<line number>:<column number>: <issue code> <issue desc>
+
+    with some issues providing more details in the description within
+    parentheses.
+
     :param result: output from flake8
-    :returns list of flake8 output lines by error
+    :returns: list of flake8 output lines by error
     """
     # Aggregate individual errors by error
     _dict = collections.defaultdict(list)
     for line in result.split("\n"):
         if line:
+            # Preserve only the code and brief description for each issue to
+            # facilitate aggregating the results.  For example,
+            #
+            #    E501 line too long (178 > 79 characters) -> E501 line too long
+            #    E303 too many blank lines (4) -> E303 too many blank lines
             parts = line.replace("(", ":").split(":")
+            line_num, col_num, base_issue = parts[1:4]
 
-            # Restore the colon in a 'missing whitespace' error if removed
-            error = parts[3].strip()
-            key = "{}:'".format(error) if error.endswith("after '") else error
+            # Strip the whitespace around the base <issue code> <description>.
+            #
+            # Also restore the missing colon, stripped above, if the issue
+            # was 'missing whitespace' surrounding a colon.
+            issue = base_issue.strip()
+            key = "{}:'".format(issue) if issue.endswith("after '") else issue
 
-            _dict[key].append("{} ({})".format(parts[1], parts[2]))
+            _dict[key].append("{} ({})".format(line_num, col_num))
 
-    # Build the output as one error per entry
+    # Build the output as one issue per entry
     return ["{}: {}".format(k, ", ".join(_dict[k])) for k in
             sorted(_dict.keys())]
 
@@ -59,7 +77,7 @@ def _execute_notebook(path):
     Execute a notebook and collect any output errors.
 
     :param path: fully qualified path to the notebook
-    :returns (parsed notebook object, execution errors)
+    :returns: (parsed notebook object, execution errors)
     """
     notebook = None
     errors = []
@@ -92,25 +110,16 @@ def _find_notebooks():
     """
     Find all of the notebooks in the repository examples directory.
 
-    :returns pathname list
+    :returns: pathname list
     """
-    try:
-        files = []
-        child = subprocess.Popen("find {} -name '*.ipynb' -print".
-                                 format(EXAMPLES_PATH), shell=True,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-        (_stdoutdata, _stderrdata) = child.communicate()
+    child = subprocess.Popen("find {} -name '*.ipynb' -print".
+                             format(EXAMPLES_PATH), shell=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (_stdoutdata, _stderrdata) = child.communicate()
 
-        # Skip checkpoint notebooks in generated subdirectories
-        files = sorted([filename for filename in _stdoutdata.split("\n")[:-1]
-                        if filename.find(".ipynb_checkpoints") < 0])
-
-    except Exception as exc:
-        print("ERROR: {}: {}".format(exc.__class__.__name__, str(exc)))
-        files = []
-
-    return files
+    # Skip checkpoint notebooks in generated subdirectories
+    return sorted([filename for filename in _stdoutdata.split("\n")[:-1]
+                  if filename.find(".ipynb_checkpoints") < 0])
 
 
 def _is_compliant_notebook(path):
@@ -118,7 +127,7 @@ def _is_compliant_notebook(path):
     Check the notebook style against PEP8 requirements.
 
     :param path: fully qualified path to the notebook
-    :returns True if the notebook is compliant, False otherwise
+    :returns: True if the notebook is compliant, False otherwise
     """
     dirname, basename = os.path.split(path)
 
@@ -175,14 +184,19 @@ def _is_compliant_notebook(path):
 def _write_magics_template():
     """
     Write the python template to skip cell magic statements.
+
+    This template is used to tell nbconvert to comment out get_ipython calls
+    it adds for cell magic statements (e.g., calling bash).  This is necessary
+    so flake8 does not generate an F821 error (undefined name), for the call.
     """
     with open(MAGICS_TEMPLATE, "w") as outfile:
         outfile.write("""\
 {% extends 'python.tpl'%}
-# Magics removal source: https://github.com/ipython/ipython/issues/3707/
+## Source @shett044: https://github.com/ipython/ipython/issues/3707/
+## Comment magic statement
 {% block codecell %}
 {{ super().replace('get_ipython','# get_ipython')
-                      if "get_ipython" in super() else super() }}
+                   if "get_ipython" in super() else super() }}
 {% endblock codecell %}
 """)
 
