@@ -8,7 +8,7 @@ Contents
     - Creating the Environment
     - Installing Software Dependencies
     - Completing the Installation
-    
+
 - Activating the Virtual Environment
 - Deactivating the Virtual Environment
 - Using the Example Notebooks
@@ -45,7 +45,10 @@ LC Setup
 If you're on an LC machine, you can use a virtual environment with dependencies
 already installed::
 
-    $ source /collab/usr/gapps/wf/releases/sina
+    $ source /collab/usr/gapps/wf/releases/sina/bin/activate
+
+(The above is for bash; other activation scripts, ex: activate.fish, can be found
+in the same directory.)
 
 Sina will now be available for use via Python virtual environment, and can be
 tested with `sina -h` (which should display a help message). When you're done,
