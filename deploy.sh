@@ -50,8 +50,8 @@ $RUN_DIR/tests/run_all_tests.sh
 rm -rf $TEMP_WHEEL_HOME
 mkdir $TEMP_WHEEL_HOME
 
-# Need to source a venv so that pip install 'wheel' can be installed
-# That's necessary to prevent an error when bdist_wheel gets used.
+# Need a venv so that pip install 'wheel' can be used; we reuse the test venv
+# This install is necessary to prevent an error when bdist_wheel gets used.
 source $RUN_DIR/tests/test_venv/bin/activate
 # Calling "pip" by itself results in errors from the shebang line being too long
 python -m pip install wheel
@@ -76,7 +76,7 @@ cd $RUN_DIR/docs/build && mv html $DOC_PATH
 chown -R :$PERM_GROUP $DOC_PATH
 
 # Wheel and docs ready, create a second venv
-# Unfortunately, Python venvs can break in strange ways if moved, so we do make one from scratch
+# Unfortunately, Python venvs can break in strange ways if moved, so we make one from scratch
 cd $RUN_DIR
 VENV_PATH="$DEPLOY_DIR"`basename $WHEEL_PATH .whl`/$VENV_SYM_NAME
 python -m virtualenv --clear --extra-search-dir $WHEELHOUSE $VENV_PATH
@@ -89,4 +89,4 @@ deactivate
 chown -R :$PERM_GROUP $DEPLOY_DIR
 
 # Add/update venv symlink
-ln -sf $VENV_PATH/bin/activate $DEPLOY_DIR$VENV_SYM_NAME
+ln -sf $VENV_PATH $DEPLOY_DIR/$VENV_SYM_NAME
