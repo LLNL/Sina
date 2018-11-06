@@ -47,7 +47,7 @@ already installed::
 
     $ source /collab/usr/gapps/wf/releases/sina/bin/activate
 
-(The above is for bash; other activation scripts, ex: activate.fish, can be found
+(The above is for bash; other activation scripts, e.g. activate.csh, can be found
 in the same directory.)
 
 Sina will now be available for use via Python virtual environment, and can be
