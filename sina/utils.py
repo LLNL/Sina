@@ -277,6 +277,48 @@ def create_file(path):
             f.close()
 
 
+def get_example_path(relpath, suffix="-new",
+                     example_dirs=["/collab/usr/gapps/wf/examples/data"]):
+    """
+    Return the fully qualified path name for the appropriate example data store.
+
+    The results starts with the test data store if SINA_TEST_KERNEL is set and
+    the file with the suffix exists.  Otherwise, it will return the path to
+    the current example data store if it exists.  If neither exist, then
+    an exception is raised.
+
+    :param relpath: The path, relative to the example_dirs, of the data store
+    :param suffix: The test filename suffix
+    :param example_dirs: A list of fully qualified paths to root directories
+        containing example data
+    :returns: The path to the appropriate example data store
+    :raises ValueError: if an example data store file does not exists
+    """
+
+    LOGGER.debug("Retrieving example data store path: {}, {}, {}".
+                 format(relpath, suffix, example_dirs))
+
+    paths = [relpath]
+    if os.getenv("SINA_TEST_KERNEL") is not None:
+        base, ext = os.path.splitext(relpath)
+        paths.insert(0, os.path.join("{}{}".format(base, suffix), ext))
+
+    filename = None
+    for db_path in paths:
+        for root in example_dirs:
+            datastore = os.path.join(root, db_path)
+            if os.path.isfile(datastore):
+                filename = datastore
+                break
+        if filename is not None:
+            break
+
+    if filename is None:
+        raise ValueError("No example data store exists for {}".format(relpath))
+
+    return filename
+
+
 class ScalarRange(object):
     """Store scalar name and range, and provide parsing utility functions."""
 

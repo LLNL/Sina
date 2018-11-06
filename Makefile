@@ -32,7 +32,7 @@ web_deps: install
 	  echo "Web dependencies installed" && echo $(PR_ACT)) || \
 	  echo "Unable to install web dependencies. Refer to README.md."
 
-clean: clean-files clean-notebooks
+clean: clean-notebooks clean-files 
 
 clean-files:
 	@rm -rf build docs/build docs/source/generated_docs .tox
@@ -41,6 +41,8 @@ clean-files:
 	@rm -rf tests/test_venv
 	@find . -name "*.pyc" -exec rm -f {} \; >& /dev/null
 	@find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
+	@find . -name "test_*.ipynb.py" -exec rm -f {} \; >& /dev/null
+	@find . -name pythonmagics.tpl -exec rm -f {} \; >& /dev/null
 
 clean-notebooks:
 	@!(!(source $(VACT) && jupyter nbconvert \
