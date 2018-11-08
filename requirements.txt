@@ -1,10 +1,10 @@
 # For use on LLNL Network. Remove these flags if outside LC.
- --no-index
- --find-links /usr/gapps/python/wheelhouse/
- --trusted-host www-lc.llnl.gov
- --find-links http://www-lc.llnl.gov/python/wheelhouse/
-# Used for wheels not yet in the LC wheelhouse. 
- --find-links /usr/gapps/wf/packages/third-party
+# --no-index
+# --find-links /usr/gapps/python/wheelhouse/
+# --trusted-host www-lc.llnl.gov
+# --find-links http://www-lc.llnl.gov/python/wheelhouse/
+# Used for wheels not yet in the LC wheelhouse.
+# --find-links /usr/gapps/wf/packages/third-party
 
 sqlalchemy
 six
@@ -12,6 +12,7 @@ cassandra-driver
 tox
 flake8
 mock
+jsonschema
 
 # Note: nose installed independently of tox to ensure xunit functionality is available
 nose
