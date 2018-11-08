@@ -1,4 +1,4 @@
-"""Test that example converters reate valid mnoda files."""
+"""Test that example converters create valid mnoda files."""
 import unittest
 import tempfile
 import shutil
@@ -22,7 +22,6 @@ class TestFukushima(unittest.TestCase):
 
     def test_converter(self):
         """Verify the fukushima converter can create a valid mnoda file."""
-
         args = ['python',
                 os.path.join(self.cwd,
                              '../examples/fukushima/fukushima_csv2mnoda.py'),
