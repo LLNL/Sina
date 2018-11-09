@@ -106,4 +106,16 @@ for f in `find $RUN_DIR/examples -name "build_db.sh"`; do
     mv files $EXAMPLE_DEST/files
     mv data.sqlite $EXAMPLE_DEST
 done
+for f in `find $RUN_DIR/examples -name "*.ipynb"`; do
+    NOTEBOOK_DATASET=$(basename $(dirname "$f"))
+    NOTEBOOK_NAME=$(basename "$f")
+    if [ "$NOTEBOOK_DATASET" == "examples" ]
+    then
+        # it's a "top-level" notebook like getting_started
+        NOTEBOOK_DEST=$EXAMPLE_DIR/$NOTEBOOK_NAME 
+    else
+        NOTEBOOK_DEST=$EXAMPLE_DIR/$NOTEBOOK_DATASET/$NOTEBOOK_NAME
+    fi
+    cp "$f" $NOTEBOOK_DEST
+done
 
