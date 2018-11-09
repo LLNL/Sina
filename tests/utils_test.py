@@ -11,7 +11,7 @@ import shutil
 import unittest
 import sina.utils
 
-# Path to the directory for running tests involving temporary files.  (Use this 
+# Path to the directory for running tests involving temporary files.  (Use this
 # file's directory as the basis for the path for now.)
 RUN_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
                                         "tests", "run_tests", "sina_utils"))
