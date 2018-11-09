@@ -13,12 +13,12 @@ Sources:
     https://nbconvert.readthedocs.io/en/latest/execute_api.html
 """
 import collections
-from nbconvert.preprocessors import CellExecutionError, ExecutePreprocessor
+import io
+from nbconvert.preprocessors import ExecutePreprocessor
 import nbformat
 import os
 import shutil
 import subprocess
-import tempfile
 import unittest
 
 # Assumed root directory for examples, etc.
@@ -29,7 +29,7 @@ DIR_ROOT = os.path.dirname(__file__)
 
 # Path to the directory for running notebooks
 RUN_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "tests",
-                                        "run_tests"))
+                                        "run_tests", "notebooks"))
 
 # Path to the examples directory containing Jupyter notebooks to be tested.
 EXAMPLES_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "examples"))
@@ -86,8 +86,8 @@ def _execute_notebook(path):
     """
     Execute a notebook and collect any output errors.
 
-    Using the API to help reduce the amount of output and better associate 
-    errors with the kernel and notebook..
+    Using the API to help reduce the amount of output and better associate
+    errors with the kernel and notebook.
 
     :param path: fully qualified path to the notebook
     :returns: list of execution errors
@@ -120,7 +120,7 @@ def _execute_notebook(path):
         _, basename = os.path.split(path)
         execname = os.path.join(RUN_PATH, "execute_{}".format(basename))
         try:
-            with open(execname, mode='wt') as fout:
+            with io.open(execname, mode='wt') as fout:
                 nbformat.write(notebook, fout)
         except Exception as _exception:
             errors.append('{}: {}: Writing {}: {}'.

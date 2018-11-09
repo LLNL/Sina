@@ -9,7 +9,7 @@ WHEELHOUSE=/usr/gapps/python/wheelhouse
 #
 # Note: Example files -- Python and Notebooks -- are expected to have their 
 # style checks performed in per-file regression tests (see SIBO-481, SIBO-469).
-IGNORE_STYLE=venv,examples,docs,tests/test_venv,web,demos,.tox
+IGNORE_STYLE=venv,examples,docs,tests/test_venv,tests/run_tests,web,demos,.tox
 # Make sure python 3 is available on LC
 export PATH=/usr/apps/python-3.6.0/bin/:$PATH
 

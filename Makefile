@@ -50,4 +50,4 @@ clean-notebooks:
 clean-tests:
 	@rm -rf .tox fake.sqlite nosetests.xml
 	@rm -rf tests/test_venv
-	@rm -rf tests/tests
+	@rm -rf tests/run_tests

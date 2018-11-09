@@ -4,6 +4,7 @@ import numbers
 import logging
 import sqlalchemy
 import json
+from collections import defaultdict
 
 import sina.dao as dao
 import sina.model as model
@@ -29,6 +30,9 @@ class RecordDAO(dao.RecordDAO):
         :param record: A Record to insert
         """
         LOGGER.debug('Inserting {} into SQL.'.format(record))
+        is_valid, warnings = record.is_valid()
+        if not is_valid:
+            raise ValueError(warnings)
         self.session.add(schema.Record(id=record.id,
                                        type=record.type,
                                        raw=json.dumps(record.raw)))
@@ -45,11 +49,11 @@ class RecordDAO(dao.RecordDAO):
         Does not commit(), caller needs to do that.
 
         :param id: The Record ID to associate the data to.
-        :param data: The list of data to insert.
+        :param data: The dictionary of data to insert.
         """
         LOGGER.debug('Inserting {} data entries to Record ID {}.'
                      .format(len(data), id))
-        for datum in data:
+        for datum_name, datum in data.items():
             # Note: SQL doesn't support maps, so we have to convert the
             # tags to a string (if they exist).
             # Using json.dumps() instead of str() (or join()) gives valid JSON
@@ -58,7 +62,7 @@ class RecordDAO(dao.RecordDAO):
             kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
                     else schema.StringData)
             self.session.add(kind(id=id,
-                                  name=datum['name'],
+                                  name=datum_name,
                                   value=datum['value'],
                                   # units might be None, always use get()
                                   units=datum.get('units'),
@@ -86,9 +90,9 @@ class RecordDAO(dao.RecordDAO):
         """
         Given a id, return match (if any) from SQL database.
 
-        :param id: The id of the record to return
+        :param id: The id of the Record to return
 
-        :returns: A record matching that id or None
+        :returns: A Record matching id or None
         """
         LOGGER.debug('Getting record with id={}'.format(id))
         query = (self.session.query(schema.Record)
@@ -96,24 +100,29 @@ class RecordDAO(dao.RecordDAO):
         return model.generate_record_from_json(
             json_input=json.loads(query.raw))
 
-    def get_all_of_type(self, type):
+    def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of record, return all Records of that type.
 
         :param type: The type of record to return, ex: run
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: a list of Records of that type
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
         """
         LOGGER.debug('Getting all records of type {}.'.format(type))
-        query = (self.session.query(schema.Record)
-                 .filter(schema.Record.type == type))
-        records = []
-        for x in query.all():
-            records.append(model.generate_record_from_json(
-                json_input=json.loads(x.raw)))
-        return records
+        query = (self.session.query(schema.Record.id)
+                             .filter(schema.Record.type == type))
+        if ids_only:
+            for x in query.all():
+                yield str(x[0])
+        else:
+            filtered_ids = (str(x[0]) for x in query.all())
+            for record in self.get_many(filtered_ids):
+                yield record
 
-    def get_given_document_uri(self, uri, accepted_ids_list=None):
+    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
@@ -122,8 +131,11 @@ class RecordDAO(dao.RecordDAO):
         :param uri: The uri to use as a search term, such as "foo.png"
         :param accepted_ids_list: A list of ids to restrict the search to.
                                   If not provided, all ids will be used.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of matching records (or None)
+        :returns: A generator of matching records or (if ids_only) a
+                  generator of their ids. Returns distinct items.
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
         if accepted_ids_list:
@@ -139,13 +151,19 @@ class RecordDAO(dao.RecordDAO):
         if accepted_ids_list is not None:
             query = query.filter(schema.Document
                                  .id.in_(accepted_ids_list))
-        return self.get_many(x[0] for x in query.all())
+        if ids_only:
+            for x in query.all():
+                yield x[0]
+        else:
+            filtered_ids = (x[0] for x in query.all())
+            for record in self.get_many(filtered_ids):
+                yield record
 
     # TODO: While not part of the original implementation, we now have
     # the ability to store non-scalar data as well, so we'll need a query
     # to search on them, as well as a more user-facing query that can be
     # given a list of data and call both this and the aforementioned method.
-    def get_given_scalars(self, scalar_range_list):
+    def get_given_scalars(self, scalar_range_list, ids_only=False):
         """
         Return all records with scalars fulfilling some criteria.
 
@@ -155,28 +173,36 @@ class RecordDAO(dao.RecordDAO):
 
         :param scalar_range_list: A list of 'sina.ScalarRange's describing the
                                  different criteria.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteriaor (if ids_only) a
+                  generator of their ids
         """
         LOGGER.debug('Getting all records with scalars within the following '
                      'ranges: {}'.format(scalar_range_list))
         query = self.session.query(schema.ScalarData.id)
         query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
-        out = query.all()
-        if out:
-            return self.get_many(x[0] for x in query.all())
+        if ids_only:
+            for x in query.all():
+                yield x[0]
         else:
-            return []
+            filtered_ids = (x[0] for x in query.all())
+            for record in self.get_many(filtered_ids):
+                yield record
 
-    def get_given_scalar(self, scalar_range):
+    def get_given_scalar(self, scalar_range, ids_only=False):
         """
         Return all records with scalars fulfilling some criteria.
 
         :param scalar_range: A sina.ScalarRange describing the criteria.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteria or (if ids_only) a
+                  generator of their ids
         """
-        return self.get_given_scalars([scalar_range])
+        return self.get_given_scalars([scalar_range], ids_only=ids_only)
 
     def _apply_scalar_ranges_to_query(self, query, scalars):
         """
@@ -256,21 +282,72 @@ class RecordDAO(dao.RecordDAO):
         conditions.append(")")
         return sqlalchemy.text(''.join(conditions))
 
+    def get_data_for_records(self, id_list, data_list):
+        """
+        Retrieve a subset of data for Records in id_list.
+
+        For example, it might get "debugger_version" and "volume" for the
+        Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
+        dictionaries; the outer key is the record_id, the inner key is the
+        name of the data piece (ex: "volume"). So::
+
+            {"foo_1": {"volume": {"value": 12, "units": cm^3},
+                       "debugger_version": {"value": "alpha"}}
+             "foo_3": {"debugger_version": {"value": "alpha"}}
+
+        As seen in foo_3 above, if a piece of data is missing, it won't be
+        included; think of this as a subset of a Record's own data. Similarly,
+        if a Record ends up containing none of the requested data, it will be
+        omitted.
+
+        :param id_list: A list of the record ids to find data for
+        :param data_list: A list of the names of data fields to find
+
+        :returns: a dictionary of dictionaries containing the requested data,
+                 keyed by record_id and then data field name.
+        """
+        LOGGER.debug('Getting data in {} for record ids in {}'
+                     .format(data_list, id_list))
+        data = defaultdict(lambda: defaultdict(dict))
+        query_tables = [schema.ScalarData, schema.StringData]
+        for query_table in query_tables:
+            query = (self.session.query(query_table.id,
+                                        query_table.name,
+                                        query_table.value,
+                                        query_table.units,
+                                        query_table.tags)
+                     .filter(query_table.id.in_(id_list))
+                     .filter(query_table.name.in_(data_list)))
+            for result in query:
+                datapoint = {"value": result.value}
+                if result.units:
+                    datapoint["units"] = result.units
+                if result.tags:
+                    # Convert from string to ks
+                    datapoint["tags"] = json.loads(result.tags)
+                data[result.id][result.name] = datapoint
+        return data
+
     def get_scalars(self, id, scalar_names):
         """
-        Retrieve scalars for a given record id.
+        LEGACY: retrieve scalars for a given record id.
 
-        Scalars are returned in alphabetical order.
+        This is a legacy method. Consider accessing data from Records directly,
+        ex scalar_info = my_rec["data"][scalar_name]
+
+        Scalars are returned as a dictionary with the same format as a Record's
+        data attribute (it's a subset of it)
 
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
-        :return: A list of scalar JSON objects matching the Mnoda specification
+
+        :return: A dict of scalars matching the Mnoda data specification
         """
-        # Note lack of filtering on tags. Something to consider.
-        # Also, how to handle values? Separate method? Search both tables?
+        # Not a strict subset of get_data_for_records() in that this will
+        # never return stringdata
         LOGGER.debug('Getting scalars={} for record id={}'
                      .format(scalar_names, id))
-        scalars = []
+        scalars = {}
         query = (self.session.query(schema.ScalarData.name, schema.ScalarData.value,
                                     schema.ScalarData.units, schema.ScalarData.tags)
                  .filter(schema.ScalarData.id == id)
@@ -280,10 +357,9 @@ class RecordDAO(dao.RecordDAO):
             # SQL doesn't handle maps. so tags are stored as JSON lists.
             # This converts them to Python.
             tags = json.loads(entry[3]) if entry[3] else None
-            scalars.append({'name': entry[0],
-                            'value': entry[1],
-                            'units': entry[2],
-                            'tags': tags})
+            scalars[entry[0]] = {'value': entry[1],
+                                 'units': entry[2],
+                                 'tags': tags}
         return scalars
 
     def get_files(self, id):

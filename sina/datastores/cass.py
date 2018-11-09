@@ -4,7 +4,7 @@ import logging
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
 import six
-import collections
+from collections import defaultdict
 import json
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery
 
@@ -31,6 +31,9 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Inserting {} into Cassandra with force_overwrite={}.'
                      .format(record, force_overwrite))
+        is_valid, warnings = record.is_valid()
+        if not is_valid:
+            raise ValueError(warnings)
         create = (schema.Record.create if force_overwrite
                   else schema.Record.if_not_exists().create)
         create(id=record.id,
@@ -69,11 +72,14 @@ class RecordDAO(dao.RecordDAO):
                              _type_managed))
         # Because batch is done by partition key, we'll need to store info for
         # tables whose full per-partition info isn't supplied by one Record
-        from_scalar_batch = collections.defaultdict(list)
-        from_string_batch = collections.defaultdict(list)
+        from_scalar_batch = defaultdict(list)
+        from_string_batch = defaultdict(list)
 
         for record in list_to_insert:
             # Insert the Record itself
+            is_valid, warnings = record.is_valid()
+            if not is_valid:
+                raise ValueError(warnings)
             create = (schema.Record.create if force_overwrite
                       else schema.Record.if_not_exists().create)
             create(id=record.id,
@@ -82,26 +88,26 @@ class RecordDAO(dao.RecordDAO):
             if record.data:
                 string_from_rec_batch = []
                 scalar_from_rec_batch = []
-                for datum in record.data:
+                for datum_name, datum in record.data.items():
                     tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
                     if isinstance(datum['value'], numbers.Real):
-                        from_scalar_batch[datum['name']].append((datum['value'],
-                                                                 record.id,
-                                                                 datum.get('units'),
-                                                                 tags))
-                        scalar_from_rec_batch.append((datum['name'],
+                        from_scalar_batch[datum_name].append((datum['value'],
+                                                              record.id,
+                                                              datum.get('units'),
+                                                              tags))
+                        scalar_from_rec_batch.append((datum_name,
                                                       datum['value'],
                                                       datum.get('units'),
                                                       tags))
                     else:
-                        from_string_batch[datum['name']].append((datum['value'],
-                                                                record.id,
-                                                                datum.get('units'),
-                                                                tags))
-                        string_from_rec_batch.append((datum['name'],
-                                                     datum['value'],
-                                                     datum.get('units'),
-                                                     tags))
+                        from_string_batch[datum_name].append((datum['value'],
+                                                              record.id,
+                                                              datum.get('units'),
+                                                              tags))
+                        string_from_rec_batch.append((datum_name,
+                                                      datum['value'],
+                                                      datum.get('units'),
+                                                      tags))
 
                 # We've finished this record's data--do the batch inserts
                 for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
@@ -157,21 +163,21 @@ class RecordDAO(dao.RecordDAO):
         Data entries that are numbers (12.0) go in the ScalarData tables. Any that
         aren't ("Tuesday","12.0") go in the StringData tables.
 
-        :param data: The list of data to insert.
+        :param data: The dictionary of data to insert.
         :param id: The Record ID to associate the data to.
         :param force_overwrite: Whether to forcibly overwrite preexisting data.
                                 Currently only used by Cassandra DAOs.
         """
         LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
                      .format(len(data), id, force_overwrite))
-        for datum in data:
+        for datum_name, datum in data.items():
             tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
             # Check if it's a scalar
             insert_data = (schema.cross_populate_scalar_and_record
                            if isinstance(datum['value'], numbers.Real)
                            else schema.cross_populate_string_and_record)
             insert_data(id=id,
-                        name=datum['name'],
+                        name=datum_name,
                         value=datum['value'],
                         units=datum.get('units'),
                         tags=tags,
@@ -209,38 +215,51 @@ class RecordDAO(dao.RecordDAO):
         return model.generate_record_from_json(
             json_input=json.loads(query.raw))
 
-    def get_all_of_type(self, type):
+    def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of record, return all Records of that type.
 
         :param type: The type of record to return, ex: run
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: a list of Records of that type
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
         """
         LOGGER.debug('Getting all records of type {}.'.format(type))
-        query = (schema.Record.objects.filter(type=type))
-        # TODO: If type query table introduced, change this:
-        records = []
-        for x in query.allow_filtering().all():
-            records.append(model.generate_record_from_json(
-                json_input=json.loads(x.raw)))
-        return records
+        # Allow_filtering() is, as a rule, inadvisable; if speed becomes a
+        # concern, an id - type query table should be easy to set up.
+        query = (schema.Record.objects.filter(type=type)
+                                      .allow_filtering()
+                                      .values_list('id', flat=True))
+        if ids_only:
+            for id in query:
+                yield str(id)
+        else:
+            for record in self.get_many(query):
+                yield record
 
-    def get_given_document_uri(self, uri, accepted_ids_list=None):
+    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
         Temporary implementation. THIS IS A VERY SLOW, BRUTE-FORCE STRATEGY!
         You use it at your own risk! Do not expect it to be performant or
-        particularly stable.
+        particularly stable. Due to some cassandra limitations, this returns
+        potentially duplicate items. One work around for this is to wrap this
+        call in a set() like this:
+        get_many(set(get_given_document_uri(<args>, ids_only=True))).
 
         Supports the use of % as a wildcard character.
 
         :param uri: The uri to use as a search term, such as "foo.png"
         :param accepted_ids_list: A list of ids to restrict the search to.
                                   If not provided, all ids will be used.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of matching records (or an empty list)
+        :returns: A generator of found records or (if ids_only) a
+                  generator of their ids.
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
         if accepted_ids_list:
@@ -248,42 +267,48 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.warning('Temporary implementation of getting Records based on '
                        'Document URI. This is a very slow, brute-force '
                        'strategy.')
-        base_query = (schema.DocumentFromRecord.objects.allow_filtering()
-                      if accepted_ids_list is None else
-                      schema.DocumentFromRecord.objects
-                      .filter(id__in=accepted_ids_list))
+        if accepted_ids_list is not None:
+            base_query = schema.DocumentFromRecord.objects.filter(id__in=accepted_ids_list)
+        else:
+            # If we haven't had an accepted_ids_list passed, any filtering we do
+            # will NOT include the partition key, so we need to allow filtering.
+            base_query = schema.DocumentFromRecord.objects.allow_filtering()
         # If there's a wildcard
         if '%' in uri:
             # Special case: get all ids with associated docs.
             if len(uri) == 1:
-                all_documents = (base_query.all())
-                return self.get_many(set(x.id for x in all_documents))
+                match_ids = base_query.values_list('id', flat=True)
+
             # If a wildcard is in any position besides last, we do it in Python
-            if '%' in uri[:-1]:
-                matches = set()
+            elif '%' in uri[:-1]:
                 # Change searched URI into a fnmatch-friendly version
                 search_uri = uri.replace('*', '[*]').replace('%', '*')
-                for entry in base_query.all():
-                    if fnmatch.fnmatch(entry.uri, search_uri):
-                        matches.add(entry.id)
-                return self.get_many(matches)
-
+                match_ids = (
+                    entry.id
+                    for entry in base_query
+                    if fnmatch.fnmatch(entry.uri, search_uri)
+                )
             # As long as the wildcard's in last place, we can do it in CQL
             else:
                 # Cassandra orders lexographically by UTF-8
                 # Thus, we can search from ex: 'foo' through 'fop' to
                 # simulate a 'LIKE foo%' query.
                 alphabetical_end = uri[:-2]+chr(ord(uri[-2]) + 1)
-                query = (base_query.filter(uri__gte=uri[:-1])
-                         .filter(uri__lt=alphabetical_end).all())
-                return self.get_many(set(x.id for x in query))
-        # If no wildcard
-        # Note: it's completely possible for multiple documents to have the
-        # same URI but different ids. Should this be changed?
-        return self.get_many([x.id for x in
-                              base_query.filter(uri=uri).all()])
+                match_ids = (base_query.filter(uri__gte=uri[:-1])
+                                       .filter(uri__lt=alphabetical_end)
+                                       .values_list('id', flat=True))
+        # If there's no wildcard, we're looking for exact matches.
+        else:
+            match_ids = base_query.filter(uri=uri).values_list('id', flat=True)
 
-    def get_given_scalars(self, scalar_range_list):
+        if ids_only:
+            for id in match_ids:
+                yield id
+        else:
+            for record in self.get_many(match_ids):
+                yield record
+
+    def get_given_scalars(self, scalar_range_list, ids_only=False):
         """
         Return all records with scalars fulfilling some criteria.
 
@@ -293,40 +318,63 @@ class RecordDAO(dao.RecordDAO):
 
         :param scalar_range_list: A list of 'sina.ScalarRange's describing the
                                   different criteria.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criteria or (if ids_only) a
+                  generator of their ids
         """
         LOGGER.debug('Getting all records with scalars within the following '
                      'ranges: {}'.format(scalar_range_list))
         query = schema.RecordFromScalarData.objects
-        rec_ids = list(self
-                       ._configure_query_for_scalar_range(query,
-                                                          scalar_range_list[0])
-                       .values_list('id', flat=True).all())
-        for scalar_range in scalar_range_list[1:]:
-            query = (schema.ScalarDataFromRecord.objects
-                     .filter(id__in=rec_ids))
-            query = self._configure_query_for_scalar_range(query, scalar_range)
-            rec_ids = list(query.values_list('id', flat=True).all())
-        return self.get_many(rec_ids)
+        # Because query results are AND-ed, and queries are more efficient
+        # when the partition key is specified, we use the first criteria to
+        # narrow down the rest to partitions
+        filtered_ids = list(self.get_given_scalar(scalar_range_list[0], ids_only=True))
+        # Only do the next part if there's more scalars and at least one id
+        if len(scalar_range_list) > 1:
+            for counter, scalar_range in enumerate(scalar_range_list[1:]):
+                if filtered_ids:
+                    query = (schema.ScalarDataFromRecord.objects
+                             .filter(id__in=filtered_ids))
+                    query = self._configure_query_for_scalar_range(query,
+                                                                   scalar_range)
+                    if counter < (len(scalar_range_list[1:]) - 1):
+                        # Cassandra requires a list for the id__in attribute
+                        filtered_ids = list(query.values_list('id', flat=True).all())
+                    else:
+                        # We are on the last iteration, no need for a list, use a generator
+                        filtered_ids = query.values_list('id', flat=True)
+        if ids_only:
+            for id in filtered_ids:
+                yield id
+        else:
+            for record in self.get_many(filtered_ids):
+                yield record
 
-    def get_given_scalar(self, scalar_range):
+    def get_given_scalar(self, scalar_range, ids_only=False):
         """
-        Return all records with scalars fulfilling some criteria.
+        Return all records with scalars fulfilling some criterion.
 
         :param scalar_range: A 'sina.ScalarRange's describing the
-                             different criteria.
+                             criterion.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
 
-        :returns: A list of Records fitting the criteria
+        :returns: A generator of Records fitting the criterion or (if ids_only) a
+                  generator of their ids
         """
         LOGGER.debug('Getting all records with scalars within the range: {}'
                      .format(scalar_range))
         query = schema.RecordFromScalarData.objects
-        out = self._configure_query_for_scalar_range(query, scalar_range).all()
-        if out:
-            return self.get_many(x.id for x in out)
+        filtered_ids = (self._configure_query_for_scalar_range(query, scalar_range)
+                        .values_list('id', flat=True))
+        if ids_only:
+            for id in filtered_ids:
+                yield id
         else:
-            return []
+            for record in self.get_many(filtered_ids):
+                yield record
 
     def _configure_query_for_scalar_range(self, query, scalar_range):
         """
@@ -356,20 +404,87 @@ class RecordDAO(dao.RecordDAO):
                 query = query.filter(value__lt=scalar_range.max)
         return query
 
+    def get_data_for_records(self, id_list, data_list, omit_tags=False):
+        """
+        Retrieve a subset of data for Records in id_list.
+
+        For example, it might get "debugger_version" and "volume" for the
+        Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
+        dictionaries; the outer key is the record_id, the inner key is the
+        name of the data piece (ex: "volume"). So::
+
+            {"foo_1": {"volume": {"value": 12, "units": cm^3},
+                       "debugger_version": {"value": "alpha"}}
+             "foo_3": {"debugger_version": {"value": "alpha"}}
+
+        As seen in foo_3 above, if a piece of data is missing, it won't be
+        included; think of this as a subset of a Record's own data. Similarly,
+        if a Record ends up containing none of the requested data, it will be
+        omitted.
+
+        :param id_list: A list of the record ids to find data for
+        :param data_list: A list of the names of data fields to find
+        :param omit_tags: Whether to avoid returning tags. A Cassandra
+                          limitation results in up to id_list*data_list+1
+                          queries to include the tags, rather than the single
+                          query we'd do otherwise. If you don't need the tags/
+                          are on a machine with a slow network connection
+                          to the cluster, consider setting this to True.
+
+        :returns: a dictionary of dictionaries containing the requested data,
+                 keyed by record_id and then data field name.
+        """
+        LOGGER.debug('Getting data in {} for record ids in {}'
+                     .format(data_list, id_list))
+        data = defaultdict(lambda: defaultdict(dict))
+        query_tables = [schema.ScalarDataFromRecord,
+                        schema.StringDataFromRecord]
+        for query_table in query_tables:
+            query = (query_table.objects
+                     .filter(query_table.id.in_(id_list))
+                     .filter(query_table.name.in_(data_list))
+                     .values_list('id', 'name', 'value', 'units'))
+            for result in query:
+                id, name, value, units = result
+                datapoint = {"value": value}
+                if units:
+                    datapoint["units"] = units
+                data[id][name] = datapoint
+            # Cassandra has a limitation wherein any "IN" query stops working
+            # if one of the columns requested contains collections. 'tags' is a
+            # collection column. Unfortunately, there's a further limitation
+            # that a BatchQuery can't select (only create, update, or delete),
+            # so the best we can do (until they fix one of the above) is:
+            if not omit_tags:
+                for id in data:
+                    for name in data[id]:
+                        if "tags" not in data[id][name]:
+                            tags = (query_table.objects
+                                    .filter(query_table.id == id)
+                                    .filter(query_table.name == name)
+                                    .values_list('tags', flat=True)).all()
+                            if tags and tags[0] is not None:
+                                data[id][name]["tags"] = tags[0]
+        return data
+
     def get_scalars(self, id, scalar_names):
         """
-        Retrieve scalars for a given record id.
+        LEGACY: retrieve scalars for a given record id.
 
-        Scalars are returned in alphabetical order.
+        This is a legacy method. Consider accessing data from Records directly,
+        ex scalar_info = my_rec["data"][scalar_name]
+
+        Scalars are returned as a dictionary with the same format as a Record's
+        data attribute (it's a subset of it)
 
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
 
-        :return: A list of scalar JSON objects matching the Mnoda specification
+        :return: A dict of scalars matching the Mnoda data specification
         """
         LOGGER.debug('Getting scalars={} for record id={}'
                      .format(scalar_names, id))
-        scalars = []
+        scalars = {}
         # Cassandra has special restrictions on list types that prevents us
         # from filtering on IN when they're present in a table. Hence this
         # workaround.
@@ -379,10 +494,9 @@ class RecordDAO(dao.RecordDAO):
                          .filter(id=id)
                          .filter(name=name)
                          .values_list('name', 'value', 'units', 'tags')).get()
-                scalars.append({'name': entry[0],
-                                'value': entry[1],
-                                'units': entry[2],
-                                'tags': entry[3]})
+                scalars[entry[0]] = {'value': entry[1],
+                                     'units': entry[2],
+                                     'tags': entry[3]}
             except DoesNotExist:
                 # If scalar doesn't exist, continue
                 pass
@@ -464,8 +578,8 @@ class RelationshipDAO(dao.RelationshipDAO):
         LOGGER.debug('Inserting {} relationships.'.format(len(list_to_insert)))
         # Batching is done per partition key--we won't know per-partition
         # contents until we've gone through the full list of Relationships.
-        from_subject_batch = collections.defaultdict(list)
-        from_object_batch = collections.defaultdict(list)
+        from_subject_batch = defaultdict(list)
+        from_object_batch = defaultdict(list)
 
         for rel in list_to_insert:
             from_subject_batch[rel.subject_id].append((rel.predicate,
