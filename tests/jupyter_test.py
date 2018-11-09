@@ -9,27 +9,37 @@ Sources:
         how-do-you-generate-dynamic-parametrized-unit-tests-in-python
 2) Execution tests are a variant of the function found at:
     https://blog.thedataincubator.com/2016/06/testing-jupyter-notebooks
+3) Execution tests via the API at:
+    https://nbconvert.readthedocs.io/en/latest/execute_api.html
 """
 import collections
+from nbconvert.preprocessors import CellExecutionError, ExecutePreprocessor
 import nbformat
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
 
-# Path to the examples directory containing Jupyter notebooks to be tested.
+# Assumed root directory for examples, etc.
 #
 # Use the directory for this file as the basis until the need for another
 # mechanism arises.
-EXAMPLES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                             "../examples"))
+DIR_ROOT = os.path.dirname(__file__)
+
+# Path to the directory for running notebooks
+RUN_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "tests",
+                                        "run_tests"))
+
+# Path to the examples directory containing Jupyter notebooks to be tested.
+EXAMPLES_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "examples"))
 
 # Python magics template filename
-MAGICS_TEMPLATE = "pythonmagics.tpl"
+MAGICS_TEMPLATE = os.path.abspath(os.path.join(RUN_PATH, "pythonmagics.tpl"))
 
-# Jupyter Notebook Sina Kernel
-SINA_KERNEL = os.getenv('SINA_TEST_KERNEL')
-SINA_KERNEL = 'sina' if SINA_KERNEL is None else SINA_KERNEL
+# Jupyter Notebook test kernel name
+SINA_TEST_KERNEL = os.getenv("SINA_TEST_KERNEL")
+SINA_KERNEL = "sina" if SINA_TEST_KERNEL is None else SINA_TEST_KERNEL
 
 
 def _build_pep8_output(result):
@@ -76,34 +86,67 @@ def _execute_notebook(path):
     """
     Execute a notebook and collect any output errors.
 
+    Using the API to help reduce the amount of output and better associate 
+    errors with the kernel and notebook..
+
     :param path: fully qualified path to the notebook
-    :returns: (parsed notebook object, execution errors)
+    :returns: list of execution errors
     """
-    notebook = None
     errors = []
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".ipynb") as fout:
-            args = ["jupyter", "nbconvert", "--to", "notebook", "--execute",
-                    "--ExecutePreprocessor.kernel_name={}".format(SINA_KERNEL),
-                    "--ExecutePreprocessor.timeout=-1", "--log-level=ERROR",
-                    "--output", fout.name, path]
-            subprocess.check_call(args)
+        notebook = _read_notebook(path)
+    except Exception as _exception:
+        return ['{}: {}: Reading {}: {}'.format(_exception.__class__.__name__,
+                SINA_KERNEL, path, str(_exception))]
 
-            fout.seek(0)
-            notebook = nbformat.read(fout, nbformat.current_nbformat)
+    try:
+        # Does the notebook conform to the current format schema?
+        nbformat.validate(notebook)
+    except Exception as _exception:
+        errors.append('{}: {}: Validating {}: {}'.
+                      format(_exception.__class__.__name__, SINA_KERNEL, path,
+                             str(_exception)))
 
-            # Does the notebook conform to the current format schema?
-            nbformat.validate(notebook)
+    try:
+        exec_preprocessor = ExecutePreprocessor(timeout=-1,
+                                                kernel_name=SINA_KERNEL)
+        exec_preprocessor.preprocess(notebook, {'metadata': {'path': '.'}})
+    except Exception as _exception:
+        errors.append('{}: {}: Running {}: {}'.
+                      format(_exception.__class__.__name__, SINA_KERNEL, path,
+                             str(_exception)))
+    finally:
+        _, basename = os.path.split(path)
+        execname = os.path.join(RUN_PATH, "execute_{}".format(basename))
+        try:
+            with open(execname, mode='wt') as fout:
+                nbformat.write(notebook, fout)
+        except Exception as _exception:
+            errors.append('{}: {}: Writing {}: {}'.
+                          format(_exception.__class__.__name__, SINA_KERNEL,
+                                 execname, str(_exception)))
+            return errors
 
-            errors = [output for cell in notebook.cells if "outputs" in cell
-                      for output in cell["outputs"] if
-                      output.output_type == "error"]
+        if os.path.isfile(execname):
+            try:
+                notebook = _read_notebook(execname)
+                for cell in notebook.cells:
+                    if "outputs" in cell:
+                        for output in cell["outputs"]:
+                            if output.output_type == "error":
+                                errors.append('{}: {}: {}'.
+                                              format(SINA_TEST_KERNEL,
+                                                     output.ename,
+                                                     output.evalue))
+            except Exception as _exception:
+                errors.append('{}: {}: Checking for errors in {}: {}'.
+                              format(_exception.__class__.__name__, SINA_KERNEL,
+                                     execname, str(_exception)))
+            if len(errors) <= 0:
+                os.remove(execname)
 
-    except subprocess.CalledProcessError:
-        raise RuntimeError("Failed to convert or run {}. Refer to associated "
-                           "error output above.". format(path))
-
-    return notebook, errors
+    return errors
 
 
 def _find_notebooks():
@@ -115,7 +158,7 @@ def _find_notebooks():
     child = subprocess.Popen("find {} -name '*.ipynb' -print".
                              format(EXAMPLES_PATH), shell=True,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (_stdoutdata, _stderrdata) = child.communicate()
+    (_stdoutdata, _) = child.communicate()
 
     # Skip checkpoint notebooks in generated subdirectories
     return sorted([filename for filename in _stdoutdata.split("\n")[:-1]
@@ -129,13 +172,13 @@ def _is_compliant_notebook(path):
     :param path: fully qualified path to the notebook
     :returns: True if the notebook is compliant, False otherwise
     """
-    dirname, basename = os.path.split(path)
+    _, basename = os.path.split(path)
 
     # Jupyter nbconvert automatically appends ".py" to the path PLUS we need
     # an easy way to tell .gitignore to ignore the generated files and the
     # Makefile to remove them.  So base the generated file name on the full
     # notebook name.
-    testbase = os.path.join(dirname, "test_{}".format(basename))
+    testbase = os.path.join(RUN_PATH, "test_{}".format(basename))
     testname = "{}.py".format(testbase)
 
     try:
@@ -181,6 +224,23 @@ def _is_compliant_notebook(path):
     return len(result) <= 0
 
 
+def _read_notebook(path):
+    """
+    Read the noteook from the specified file path.
+
+    :param path: fully qualified path to the notebook
+    :returns: the notebook
+    """
+    try:
+        with open(path) as fout:
+            notebook = nbformat.read(fout, nbformat.current_nbformat)
+    except Exception as _exception:
+        _exception.args += ("reading {}".format(path),)
+        raise
+
+    return notebook
+
+
 def _write_magics_template():
     """
     Write the python template to skip cell magic statements.
@@ -220,7 +280,7 @@ class TestJupyterNotebooks(type):
             :param filename: fully qualifed notebook path
             """
             def test_exec(self):
-                nb, errors = _execute_notebook(filename)
+                errors = _execute_notebook(filename)
                 # Indent output of each error (if any)
                 self.assertEqual(errors, [], "Execution errors detect in "
                                  "{}:\n  {}".format(filename, "\n  ".
@@ -241,14 +301,11 @@ class TestJupyterNotebooks(type):
 
         files = _find_notebooks()
         if len(files) > 0:
-            _write_magics_template()
             for filename in files:
                 test_name = "test_%s" % \
                     os.path.splitext(os.path.basename(filename))[0]
                 _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
-
-                # TODO: SIBO-481: Uncomment to enable flake8 test generation
-                # _dict["{}_style".format(test_name)] = gen_test_style(filename)
+                _dict["{}_style".format(test_name)] = gen_test_style(filename)
 
         return type.__new__(meta, name, bases, _dict)
 
@@ -258,6 +315,16 @@ class TestNotebooks(unittest.TestCase):
     __metaclass__ = TestJupyterNotebooks
 
     @classmethod
+    def setUpClass(cls):
+        """Set up notebook tests."""
+        if os.path.isdir(RUN_PATH):
+            shutil.rmtree(RUN_PATH, True)
+
+        os.makedirs(RUN_PATH)
+        _write_magics_template()
+
+    @classmethod
     def tearDownClass(cls):
+        """Tear down notebook tests."""
         if os.path.isfile(MAGICS_TEMPLATE):
             os.remove(MAGICS_TEMPLATE)

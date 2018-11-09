@@ -6,8 +6,7 @@
 *.log
 *.coverage
 .tox/
-test_*.ipynb.py
-pythonmagics.tpl
+tests/run_tests
 tests/test_venv
 cover/
 build/

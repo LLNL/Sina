@@ -34,15 +34,11 @@ web_deps: install
 
 clean: clean-notebooks clean-files 
 
-clean-files:
-	@rm -rf build docs/build docs/source/generated_docs .tox
-	@rm -rf fake.sqlite nosetests.xml
+clean-files:  clean-tests
+	@rm -rf build docs/build docs/source/generated_docs
 	@rm -rf sina.egg-info $(VENV)
-	@rm -rf tests/test_venv
 	@find . -name "*.pyc" -exec rm -f {} \; >& /dev/null
 	@find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
-	@find . -name "test_*.ipynb.py" -exec rm -f {} \; >& /dev/null
-	@find . -name pythonmagics.tpl -exec rm -f {} \; >& /dev/null
 
 clean-notebooks:
 	@!(!(source $(VACT) && jupyter nbconvert \
@@ -50,3 +46,8 @@ clean-notebooks:
 			 examples/*/*.ipynb \
 			 examples/*.ipynb) \
 	   && echo "You must have Sina installed to clean Jupyter notebooks automatically--run 'make'")
+
+clean-tests:
+	@rm -rf .tox fake.sqlite nosetests.xml
+	@rm -rf tests/test_venv
+	@rm -rf tests/tests

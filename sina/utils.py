@@ -294,25 +294,31 @@ def get_example_path(relpath, suffix="-new",
     :returns: The path to the appropriate example data store
     :raises ValueError: if an example data store file does not exists
     """
-
     LOGGER.debug("Retrieving example data store path: {}, {}, {}".
                  format(relpath, suffix, example_dirs))
+
+    LOGGER.debug("TLD: example_dirs={}".format(example_dirs))
+    dirs = [example_dirs] if isinstance(example_dirs, str) else example_dirs
 
     paths = [relpath]
     if os.getenv("SINA_TEST_KERNEL") is not None:
         base, ext = os.path.splitext(relpath)
-        paths.insert(0, os.path.join("{}{}".format(base, suffix), ext))
+        paths.insert(0, "{}{}{}".format(base, suffix, ext))
+
+    LOGGER.debug("TLD: paths={}".format(paths))
 
     filename = None
     for db_path in paths:
-        for root in example_dirs:
+        for root in dirs:
             datastore = os.path.join(root, db_path)
+            LOGGER.debug("TLD: checking {}".format(datastore))
             if os.path.isfile(datastore):
                 filename = datastore
                 break
         if filename is not None:
             break
 
+    LOGGER.debug("TLD: filename={}".format(filename))
     if filename is None:
         raise ValueError("No example data store exists for {}".format(relpath))
 

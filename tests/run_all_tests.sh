@@ -46,10 +46,15 @@ python $BIN/pip install -r requirements.txt
 
 set -e
 
-# Perform a PEP8 style check
+# Test building across python versions, run actual tests
+# Note: if you don't have Cassandra running, Cassandra tests won't run either.
+$BIN/tox
+
+# Perform PEP8 style checks
 python $BIN/flake8 --max-line-length=99 --exclude=$IGNORE_STYLE | tee $EXEC_HOME/tests/test_venv/flake8.out
 if [ -s $EXEC_HOME/tests/test_venv/flake8.out ]
 then
+    deactivate
     exit -1
 fi
 
@@ -57,7 +62,4 @@ fi
 # Side effect: builds documentation
 $BIN/tox -e docs
 
-# Test building across python versions, run actual tests
-# Note: if you don't have Cassandra running, Cassandra tests won't run either.
-$BIN/tox
 deactivate
