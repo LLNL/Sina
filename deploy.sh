@@ -118,4 +118,5 @@ for f in `find $RUN_DIR/examples -name "*.ipynb"`; do
     fi
     cp "$f" $NOTEBOOK_DEST
 done
+chown -R :$PERM_GROUP $EXAMPLE_DIR
 
