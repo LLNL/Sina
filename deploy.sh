@@ -3,10 +3,14 @@
 # Full deployment script.
 # Builds venvs, runs tests, builds wheel, deploys documentation
 
-# Takes 2 arguments: where to deploy the wheel file, and where to deploy the documentation folder
+# Takes 3 arguments:
+#   1. where to deploy the wheel file
+#   2. where to deploy the documentation folder
+#   3. where to put the examples and their attending files
 # Creates(/updates) $SYM_NAME in dir specified by first arg
 # Creates(/updates) $DOC_NAME folder in dir specified by second arg
-# Both of these must exist, and the first (wheel folder) must have a subdirectory named "wheels".
+# Runs all the build_db.sh scripts and puts their results in their corresponding folders
+# All three must exist, and the first (wheel folder) must have a subdirectory named "wheels".
 
 TEMP_WHEEL_HOME=temp_whl # folder created for temp wheel storage
 SYM_NAME=sina # symlink for wheel
@@ -28,9 +32,9 @@ if [ ! -f setup.py ]
 fi
 
 # Arg check
-if [ $# != 2 ]
+if [ $# != 3 ]
   then
-    echo "Script takes exactly two arguments: <wheel_deploy_dir> <doc_deploy_dir>"
+    echo "Script takes exactly three arguments: <wheel_deploy_dir> <doc_deploy_dir> <examples_deploy_dir>"
     exit 1
 fi
 
@@ -40,6 +44,7 @@ grep "^$PERM_GROUP:" /etc/group > /dev/null || (echo "Group $PERM_GROUP doesn't 
 # Converts any relative paths to absolute and ensures ending in /
 DEPLOY_DIR=`readlink -f $1`/
 DOC_DIR=`readlink -f $2`/
+EXAMPLE_DIR=`readlink -f $3`/
 RUN_DIR=`pwd`
 TEMP_WHEEL_HOME=$RUN_DIR/$TEMP_WHEEL_HOME
 
@@ -60,7 +65,7 @@ python $RUN_DIR/setup.py bdist_wheel -d $TEMP_WHEEL_HOME
 deactivate
 
 WHEEL_PATH=$(find "$TEMP_WHEEL_HOME" -name "*.whl")
-WHEEL_DEST="$DEPLOY_DIR"wheels/
+WHEEL_DEST="$DEPLOY_DIR"/wheels/
 
 # Deploy the wheel
 mv $WHEEL_PATH $WHEEL_DEST
@@ -90,3 +95,30 @@ chown -R :$PERM_GROUP $DEPLOY_DIR
 
 # Add/update venv symlink
 ln -sf $VENV_PATH $DEPLOY_DIR/$VENV_SYM_NAME
+
+# Deploy the examples
+source $VENV_PATH/bin/activate
+for db_build_script in `find $RUN_DIR/examples -name "build_db.sh"`; do
+    DATASET_NAME=$(basename $(dirname "$db_build_script"))
+    EXAMPLE_DEST=$EXAMPLE_DIR/$DATASET_NAME
+    cd $RUN_DIR/examples/$DATASET_NAME
+    bash "$db_build_script" 
+    rm -rf $EXAMPLE_DEST && mkdir $EXAMPLE_DEST
+    mv files $EXAMPLE_DEST/files
+    mv data.sqlite $EXAMPLE_DEST
+done
+deactivate
+for notebook in `find $RUN_DIR/examples -name "*.ipynb"`; do
+    NOTEBOOK_DATASET=$(basename $(dirname "$notebook"))
+    NOTEBOOK_NAME=$(basename "$notebook")
+    if [ "$NOTEBOOK_DATASET" == "examples" ]
+    then
+        # it's a "top-level" notebook like getting_started
+        NOTEBOOK_DEST=$EXAMPLE_DIR/$NOTEBOOK_NAME 
+    else
+        NOTEBOOK_DEST=$EXAMPLE_DIR/$NOTEBOOK_DATASET/$NOTEBOOK_NAME
+    fi
+    cp "$notebook" $NOTEBOOK_DEST
+done
+chown -R :$PERM_GROUP $EXAMPLE_DIR
+
