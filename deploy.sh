@@ -97,18 +97,20 @@ chown -R :$PERM_GROUP $DEPLOY_DIR
 ln -sf $VENV_PATH $DEPLOY_DIR/$VENV_SYM_NAME
 
 # Deploy the examples
-for f in `find $RUN_DIR/examples -name "build_db.sh"`; do
-    DATASET_NAME=$(basename $(dirname "$f"))
+source $VENV_PATH/bin/activate
+for db_build_script in `find $RUN_DIR/examples -name "build_db.sh"`; do
+    DATASET_NAME=$(basename $(dirname "$db_build_script"))
     EXAMPLE_DEST=$EXAMPLE_DIR/$DATASET_NAME
     cd $RUN_DIR/examples/$DATASET_NAME
-    bash "$f" 
+    bash "$db_build_script" 
     rm -rf $EXAMPLE_DEST && mkdir $EXAMPLE_DEST
     mv files $EXAMPLE_DEST/files
     mv data.sqlite $EXAMPLE_DEST
 done
-for f in `find $RUN_DIR/examples -name "*.ipynb"`; do
-    NOTEBOOK_DATASET=$(basename $(dirname "$f"))
-    NOTEBOOK_NAME=$(basename "$f")
+deactivate
+for notebook in `find $RUN_DIR/examples -name "*.ipynb"`; do
+    NOTEBOOK_DATASET=$(basename $(dirname "$notebook"))
+    NOTEBOOK_NAME=$(basename "$notebook")
     if [ "$NOTEBOOK_DATASET" == "examples" ]
     then
         # it's a "top-level" notebook like getting_started
@@ -116,7 +118,7 @@ for f in `find $RUN_DIR/examples -name "*.ipynb"`; do
     else
         NOTEBOOK_DEST=$EXAMPLE_DIR/$NOTEBOOK_DATASET/$NOTEBOOK_NAME
     fi
-    cp "$f" $NOTEBOOK_DEST
+    cp "$notebook" $NOTEBOOK_DEST
 done
 chown -R :$PERM_GROUP $EXAMPLE_DIR
 
