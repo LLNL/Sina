@@ -134,7 +134,7 @@ def process_data(dataset_fn, dest_dn):
 
     # Now process the NOAA data CSV file
     mdata = NoaaData(files_dn)
-    with open(input_fn, "r") as ifd:
+    with open(input_fn, "r", encoding="ISO-8859-1") as ifd:
         last_exp = ''
 
         rdr = csv.reader(ifd, delimiter=',')
