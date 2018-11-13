@@ -59,7 +59,7 @@ class TestNOAA(unittest.TestCase):
         subprocess.check_call(args)
 
     def tearDown(self):
-        """Clean up []"""
+        """Clean up tar and mnoda directories."""
         shutil.rmtree(self.temp_mnoda_output)
         shutil.rmtree(self.temp_tar_output)
 
