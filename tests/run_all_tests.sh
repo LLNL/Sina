@@ -6,7 +6,7 @@ set +u
 # Wheelhouse used with venv --extra-search-dir to find pip/setuptools
 WHEELHOUSE=/usr/gapps/python/wheelhouse
 # Comma-separated directories to ignore when doing style checks
-IGNORE_STYLE=venv,docs,tests/test_venv,web,demos,.tox
+IGNORE_STYLE=venv,docs,tests/test_venv,tests/run_tests,web,demos,.tox
 # Make sure python 3 is available on LC
 export PATH=/usr/apps/python-3.6.0/bin/:$PATH
 
@@ -37,16 +37,21 @@ source $EXEC_HOME/tests/test_venv/bin/activate
 # Workaround due to overlong shebang in Bamboo agents
 BIN=$EXEC_HOME/tests/test_venv/bin
 
-# Nose installed seperately to make sure xunit's available
+# Nose installed separately to make sure xunit's available
 # Pip settings supplied by requirements.txt, etc.
 python $BIN/pip install -r requirements.txt
 
 set -e
 
-# Perform a PEP8 style check
+# Test building across python versions, run actual tests
+# Note: if you don't have Cassandra running, Cassandra tests won't run either.
+$BIN/tox
+
+# Perform PEP8 style checks
 python $BIN/flake8 --max-line-length=99 --exclude=$IGNORE_STYLE | tee $EXEC_HOME/tests/test_venv/flake8.out
 if [ -s $EXEC_HOME/tests/test_venv/flake8.out ]
 then
+    deactivate
     exit -1
 fi
 
@@ -54,7 +59,4 @@ fi
 # Side effect: builds documentation
 $BIN/tox -e docs
 
-# Test building across python versions, run actual tests
-# Note: if you don't have Cassandra running, Cassandra tests won't run either.
-$BIN/tox
 deactivate

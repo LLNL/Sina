@@ -6,6 +6,7 @@
 *.log
 *.coverage
 .tox/
+tests/run_tests
 tests/test_venv
 cover/
 build/
