@@ -277,6 +277,54 @@ def create_file(path):
             f.close()
 
 
+def get_example_path(relpath, suffix="-new",
+                     example_dirs=["/collab/usr/gapps/wf/examples/data"]):
+    """
+    Return the fully qualified path name for the appropriate example data store.
+
+    The results starts with the test data store if SINA_TEST_KERNEL is set and
+    the file with the suffix exists.  Otherwise, it will return the path to
+    the current example data store if it exists.  If neither exist, then
+    an exception is raised.
+
+    :param relpath: The path, relative to the example_dirs, of the data store
+    :param suffix: The test filename suffix
+    :param example_dirs: A list of fully qualified paths to root directories
+        containing example data
+    :returns: The path to the appropriate example data store
+    :raises ValueError: if an example data store file does not exists
+    """
+    LOGGER.debug("Retrieving example data store path: {}, {}, {}".
+                 format(relpath, suffix, example_dirs))
+
+    LOGGER.debug("TLD: example_dirs={}".format(example_dirs))
+    dirs = [example_dirs] if isinstance(example_dirs, str) else example_dirs
+
+    paths = [relpath]
+    if os.getenv("SINA_TEST_KERNEL") is not None:
+        base, ext = os.path.splitext(relpath)
+        paths.insert(0, "{}{}{}".format(base, suffix, ext))
+
+    LOGGER.debug("TLD: paths={}".format(paths))
+
+    filename = None
+    for db_path in paths:
+        for root in dirs:
+            datastore = os.path.join(root, db_path)
+            LOGGER.debug("TLD: checking {}".format(datastore))
+            if os.path.isfile(datastore):
+                filename = datastore
+                break
+        if filename is not None:
+            break
+
+    LOGGER.debug("TLD: filename={}".format(filename))
+    if filename is None:
+        raise ValueError("No example data store exists for {}".format(relpath))
+
+    return filename
+
+
 class ScalarRange(object):
     """Store scalar name and range, and provide parsing utility functions."""
 
