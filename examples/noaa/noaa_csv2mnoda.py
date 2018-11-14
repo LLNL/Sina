@@ -133,7 +133,7 @@ def process_data(dataset_fn, dest_dn):
 
     # Now process the NOAA data CSV file
     mdata = NoaaData(files_dn)
-    # Using io.open to handle encoding on both Python 2/3
+    # Need to open differently to handle encoding on both Python 2/3
     if sys.version_info[0] < 3:
         ifd = open(input_fn, "r")
     else:
