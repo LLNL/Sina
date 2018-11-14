@@ -120,7 +120,7 @@ def _execute_notebook(path):
         _, basename = os.path.split(path)
         execname = os.path.join(RUN_PATH, "execute_{}".format(basename))
         try:
-            with io.open(execname, mode='wt') as fout:
+            with io.open(execname, mode='wt', encoding='utf-8') as fout:
                 nbformat.write(notebook, fout)
         except Exception as _exception:
             errors.append('{}: {}: Writing {}: {}'.
