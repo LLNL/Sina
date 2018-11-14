@@ -64,7 +64,7 @@ class TestNOAA(unittest.TestCase):
         shutil.rmtree(self.temp_tar_output)
 
     def test_converter(self):
-        """Verify the noaa xoncerter can create a valid mnoda file."""
+        """Verify the noaa concerter can create a valid mnoda file."""
         args = ['python',
                 os.path.join(self.cwd,
                              '../examples/noaa/noaa_csv2mnoda.py'),

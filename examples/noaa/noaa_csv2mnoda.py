@@ -54,7 +54,6 @@ import shutil
 import sys
 import traceback
 
-
 # Relative paths and tags for additional files
 MORE_FILES = [
     ('WCOA11-01-06-2015_metadata.csv', 'metadata', 'text/csv'),
@@ -134,56 +133,62 @@ def process_data(dataset_fn, dest_dn):
 
     # Now process the NOAA data CSV file
     mdata = NoaaData(files_dn)
-    with open(input_fn, "r", encoding="ISO-8859-1") as ifd:
-        last_exp = ''
+    # Using io.open to handle encoding on both Python 2/3
+    if sys.version_info[0] < 3:
+        ifd = open(input_fn, "r")
+    else:
+        ifd = open(input_fn, "r", encoding="ISO-8859-1")
+    last_exp = ''
+    rdr = csv.reader(ifd, delimiter=',')
+    try:
+        for i, row in enumerate(rdr):
+            if i > 0 and len(row[0]) > 0:
+                exp = row[0]
+                if exp != last_exp:
+                    exp_dn = os.path.join(files_dn, exp)
+                    if not os.path.isdir(exp_dn):
+                        os.makedirs(exp_dn)
+                    last_exp = row[0]
+                    mdata.add_exp(exp)
 
-        rdr = csv.reader(ifd, delimiter=',')
-        try:
-            for i, row in enumerate(rdr):
-                if i > 0 and len(row[0]) > 0:
-                    exp = row[0]
-                    if exp != last_exp:
-                        exp_dn = os.path.join(files_dn, exp)
-                        if not os.path.isdir(exp_dn):
-                            os.makedirs(exp_dn)
-                        last_exp = row[0]
-                        mdata.add_exp(exp)
+                oid = '-'.join(row[1:6])
 
-                    oid = '-'.join(row[1:6])
+                # Add the relation between the experiment and observation
+                mdata.add_exp2obs(exp, oid)
 
-                    # Add the relation between the experiment and observation
-                    mdata.add_exp2obs(exp, oid)
+                # Extract the observation data
+                depth, press, temp = row[11:14]
+                oxy, o2, o2_qc = row[18:21]
+                ph, ph_qc = row[30:32]
 
-                    # Extract the observation data
-                    depth, press, temp = row[11:14]
-                    oxy, o2, o2_qc = row[18:21]
-                    ph, ph_qc = row[30:32]
+                # Write the observation data to a file
+                obs_dir = os.path.join(files_dn, exp, 'obs%05d' % i)
+                if not os.path.isdir(obs_dir):
+                    os.makedirs(obs_dir)
 
-                    # Write the observation data to a file
-                    obs_dir = os.path.join(files_dn, exp, 'obs%05d' % i)
-                    if not os.path.isdir(obs_dir):
-                        os.makedirs(obs_dir)
+                obs_fn = os.path.join(obs_dir, 'obs-data.txt')
+                with open(os.path.join(obs_fn), 'w') as ofd:
+                    ofd.write(DATA_FMT % (oid, depth, press, temp, oxy, o2,
+                                          o2_qc, ph, ph_qc))
 
-                    obs_fn = os.path.join(obs_dir, 'obs-data.txt')
-                    with open(os.path.join(obs_fn), 'w') as ofd:
-                        ofd.write(DATA_FMT % (oid, depth, press, temp, oxy, o2,
-                                              o2_qc, ph, ph_qc))
+                # Add the observation data (and create the example file)
+                mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
+                              o2_qc, ph, ph_qc)
+        ifd.close()
 
-                    # Add the observation data (and create the example file)
-                    mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
-                                  o2_qc, ph, ph_qc)
+    except csv.Error as ce:
+        ifd.close()
+        print("ERROR: %s: line %s: %s" % (dataset_fn, rdr.line_num,
+                                          str(ce)))
+        sys.exit(1)
 
-        except csv.Error as ce:
-            print("ERROR: %s: line %s: %s" % (dataset_fn, rdr.line_num,
-                                              str(ce)))
-            sys.exit(1)
-
-        except Exception as exc:
-            print("ERROR: %s: line %s: %s: %s" % (dataset_fn, rdr.line_num,
-                                                  exc.__class__.__name__,
-                                                  str(exc)))
-            traceback.print_exc()
-            sys.exit(1)
+    except Exception as exc:
+        ifd.close()
+        print("ERROR: %s: line %s: %s: %s" % (dataset_fn, rdr.line_num,
+                                              exc.__class__.__name__,
+                                              str(exc)))
+        traceback.print_exc()
+        sys.exit(1)
 
     mdata.write()
 
