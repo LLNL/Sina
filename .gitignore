@@ -19,4 +19,4 @@ docs/build/
 */migrations/*
 venv/*
 
-nosetests*.xml
+nosetests*.xml*

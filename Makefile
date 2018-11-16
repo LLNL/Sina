@@ -48,6 +48,6 @@ clean-notebooks:
 	   && echo "You must have Sina installed to clean Jupyter notebooks automatically--run 'make'")
 
 clean-tests:
-	@rm -rf .tox fake.sqlite nosetests*.xml
+	@rm -rf .tox fake.sqlite nosetests*.xml*
 	@rm -rf tests/test_venv
 	@rm -rf tests/run_tests
