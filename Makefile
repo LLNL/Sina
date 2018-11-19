@@ -4,7 +4,7 @@ VENV=venv
 VACT=$(VENV)/bin/activate
 PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual env"
 
-.PHONY: all clean docs install tests web_deps
+.PHONY: all clean clean-files clean-notebooks clean-tests docs install tests web_deps
 
 install:
 	@if test ! -d $(VENV); then \
@@ -32,6 +32,7 @@ web_deps: install
 	  echo "Web dependencies installed" && echo $(PR_ACT)) || \
 	  echo "Unable to install web dependencies. Refer to README.md."
 
+# WARNING: Order is very important
 clean: clean-notebooks clean-files 
 
 clean-files:  clean-tests
@@ -40,12 +41,20 @@ clean-files:  clean-tests
 	@find . -name "*.pyc" -exec rm -f {} \; >& /dev/null
 	@find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
 
+# It is assumed any version/installation of Jupyter will properly remove outputs
+# and that we do not want to have to [re-]install the virtual environment just
+# to remove outputs from notebooks.
 clean-notebooks:
-	@!(!(source $(VACT) && jupyter nbconvert \
-	    		 --ClearOutputPreprocessor.enabled=True --log-level WARN --inplace \
-			 examples/*/*.ipynb \
-			 examples/*.ipynb) \
-	   && echo "You must have Sina installed to clean Jupyter notebooks automatically--run 'make'")
+	@NOTEBOOKS=`find examples -name "*.ipynb" -print`; \
+	JUPYTER_EXE=`which jupyter 2> /dev/null`; \
+	NBCONVERT="--ClearOutputPreprocessor.enabled=True --log-level WARN --inplace"; \
+	if test -f $(VENV)/bin/jupyter; then \
+	  $(VENV)/bin/jupyter nbconvert $$NBCONVERT $$NOTEBOOKS; \
+	elif test -n "$$JUPYTER_EXE" && test -f $$JUPYTER_EXE; then \
+	  $$JUPYTER_EXE nbconvert $$NBCONVERT $$NOTEBOOKS; \
+	else \
+	  echo "Sina must be installed.  Run 'make'."; \
+	fi
 
 clean-tests:
 	@rm -rf .tox fake.sqlite nosetests*.xml*
