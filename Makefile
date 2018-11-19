@@ -32,14 +32,15 @@ web_deps: install
 	  echo "Web dependencies installed" && echo $(PR_ACT)) || \
 	  echo "Unable to install web dependencies. Refer to README.md."
 
-# WARNING: Order is very important
-clean: clean-notebooks clean-files 
+clean:
+	@make --no-print-directory clean-notebooks; \
+	make --no-print-directory clean-files
 
 clean-files:  clean-tests
-	@rm -rf build docs/build docs/source/generated_docs
-	@rm -rf sina.egg-info $(VENV)
-	@find . -name "*.pyc" -exec rm -f {} \; >& /dev/null
-	@find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
+	@rm -rf build docs/build docs/source/generated_docs; \
+	rm -rf sina.egg-info $(VENV); \
+	find . -name "*.pyc" -exec rm -f {} \; >& /dev/null; \
+	find . -name __pycache__ -exec rm -rf {} \; >& /dev/null; \
 
 # It is assumed any version/installation of Jupyter will properly remove outputs
 # and that we do not want to have to [re-]install the virtual environment just
@@ -57,6 +58,6 @@ clean-notebooks:
 	fi
 
 clean-tests:
-	@rm -rf .tox fake.sqlite nosetests*.xml
-	@rm -rf tests/test_venv
-	@rm -rf tests/run_tests
+	@rm -rf .tox fake.sqlite nosetests*.xml*; \
+	rm -rf tests/test_venv; \
+	rm -rf tests/run_tests
