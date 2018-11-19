@@ -9,7 +9,7 @@ PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual e
 install:
 	@if test ! -d $(VENV); then \
 	  echo "Making virtual environment in $(VENV)"; \
-	  python -m virtualenv $(VENV); \
+	  python3 -m virtualenv $(VENV); \
 	  set -e; \
 	else \
 	  echo "You already have the virtual environment $(VENV)"; \
@@ -54,7 +54,7 @@ clean-notebooks:
 	elif test -n "$$JUPYTER_EXE" && test -f $$JUPYTER_EXE; then \
 	  $$JUPYTER_EXE nbconvert $$NBCONVERT $$NOTEBOOKS; \
 	else \
-	  echo "Sina must be installed.  Run 'make'."; \
+	  echo "Sina must be installed to clean notebooks.  Run 'make'."; \
 	fi
 
 clean-tests:
