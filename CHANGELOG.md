@@ -5,6 +5,21 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.3
+===
+- Switched to storing data as a dictionary (JSON object)
+- Added Record validation on insert
+- Added ids_only mode for efficiency/filter combination
+- Began returning generators for get(), get_many(), etc.
+- Jupyter changes:
+
+  - Improved Fukushima dataset documentation
+  - Added Fukushima heatmap example
+  - Various example notebook cleanups
+  - Made many improvements to notebook testing/validation
+
+- Enabled using Sina virtual environment with non-bash shells
+
 1.2
 ===
 - Introduced Sina's Jupyter functionality
