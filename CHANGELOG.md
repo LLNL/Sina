@@ -14,11 +14,11 @@ https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 - Jupyter changes:
 
   - Improved Fukushima dataset documentation
-  - Added Fukushima heatmap example
+  - Added new Fukushima example for subsecting large data sets
   - Various example notebook cleanups
   - Made many improvements to notebook testing/validation
 
-- Enabled using Sina virtual environment with non-bash shells
+- Standardized using Sina virtual environment for non-bash shells
 
 1.2
 ===
