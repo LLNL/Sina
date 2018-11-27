@@ -24,7 +24,7 @@ class TestFukushima(unittest.TestCase):
         """Verify the fukushima converter can create a valid mnoda file."""
         args = ['python',
                 os.path.join(self.cwd,
-                             '../examples/fukushima/fukushima_csv2mnoda.py'),
+                             '../../examples/fukushima/fukushima_csv2mnoda.py'),
                 os.path.join(self.cwd,
                              'test_files/test_AMS C12 Sea Data.csv'),
                 self.temp_mnoda_output]
@@ -54,7 +54,7 @@ class TestNOAA(unittest.TestCase):
 
         args = ['tar', '-xf',
                 os.path.join(self.cwd,
-                             '../examples/raw_data/noaa.tar.gz'),
+                             '../../examples/raw_data/noaa.tar.gz'),
                 '-C', self.temp_tar_output]
         subprocess.check_call(args)
 
@@ -67,7 +67,7 @@ class TestNOAA(unittest.TestCase):
         """Verify the noaa concerter can create a valid mnoda file."""
         args = ['python',
                 os.path.join(self.cwd,
-                             '../examples/noaa/noaa_csv2mnoda.py'),
+                             '../../examples/noaa/noaa_csv2mnoda.py'),
                 os.path.join(self.temp_tar_output,
                              ('0123467/2.2/data/1-data/'
                               'WCOA11-01-06-2015_data.csv')),
