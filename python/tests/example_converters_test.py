@@ -64,7 +64,7 @@ class TestNOAA(unittest.TestCase):
         shutil.rmtree(self.temp_tar_output)
 
     def test_converter(self):
-        """Verify the noaa concerter can create a valid mnoda file."""
+        """Verify the noaa converter can create a valid mnoda file."""
         args = ['python',
                 os.path.join(self.cwd,
                              '../../examples/noaa/noaa_csv2mnoda.py'),
@@ -95,7 +95,7 @@ def _test_file_against_schema(file, schema=None):
     """
     if not schema:
         schema = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), '../mnoda.json')
+            os.path.dirname(os.path.realpath(__file__)), '../../mnoda.json')
     with open(file) as file_loaded:
         file_json = json.load(file_loaded)
         with open(schema) as schema_loaded:
