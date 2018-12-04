@@ -9,7 +9,7 @@ printUsage() {
     exit 1
 }
 
-if [$# -ne 2]; then
+if [ $# != 2 ]; then
     echo "ERROR: The Jupyter kernel name and path are required."
     printUsage
 fi

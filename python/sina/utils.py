@@ -278,26 +278,33 @@ def create_file(path):
 
 
 def get_example_path(relpath, suffix="-new",
-                     example_dirs=["/collab/usr/gapps/wf/examples/data"]):
+                     example_dirs=["/collab/usr/gapps/wf/examples/",
+                                   os.path.realpath(os.path.join(os.path.dirname(__file__),
+                                                    "../../examples/"))]):
     """
-    Return the fully qualified path name for the appropriate example data store.
+    Return the fully qualified path name for the appropriate example data store and
+    raises an exception if none is found.
 
-    The results starts with the test data store if SINA_TEST_KERNEL is set and
-    the file with the suffix exists.  Otherwise, it will return the path to
-    the current example data store if it exists.  If neither exist, then
-    an exception is raised.
+    This function checks the paths listed in <example_dirs> for the file specified
+    with <relpath>.
+
+    If $SINA_TEST_KERNEL is set, it will initially append <suffix> to relpath's
+    filename, ex foo/bar.txt becomes foo/bar<suffix>.txt. If it doesn't find
+    anything, it reverts (so it looks for relpath both with and without the suffix).
+
+    The order of example_dirs is important; as soon as something that matches is
+    found, the function returns.
 
     :param relpath: The path, relative to the example_dirs, of the data store
     :param suffix: The test filename suffix
     :param example_dirs: A list of fully qualified paths to root directories
         containing example data
     :returns: The path to the appropriate example data store
-    :raises ValueError: if an example data store file does not exists
+    :raises ValueError: if an example data store file does not exist
     """
     LOGGER.debug("Retrieving example data store path: {}, {}, {}".
                  format(relpath, suffix, example_dirs))
 
-    LOGGER.debug("TLD: example_dirs={}".format(example_dirs))
     dirs = [example_dirs] if isinstance(example_dirs, str) else example_dirs
 
     paths = [relpath]
@@ -305,22 +312,17 @@ def get_example_path(relpath, suffix="-new",
         base, ext = os.path.splitext(relpath)
         paths.insert(0, "{}{}{}".format(base, suffix, ext))
 
-    LOGGER.debug("TLD: paths={}".format(paths))
-
     filename = None
     for db_path in paths:
         for root in dirs:
             datastore = os.path.join(root, db_path)
-            LOGGER.debug("TLD: checking {}".format(datastore))
             if os.path.isfile(datastore):
                 filename = datastore
                 break
-        if filename is not None:
-            break
 
-    LOGGER.debug("TLD: filename={}".format(filename))
     if filename is None:
-        raise ValueError("No example data store exists for {}".format(relpath))
+        raise ValueError("No example data store found for {} in example dirs {}"
+                         .format(relpath, example_dirs))
 
     return filename
 
