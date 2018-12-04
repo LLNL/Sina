@@ -32,7 +32,7 @@ RUN_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "tests",
                                         "run_tests", "notebooks"))
 
 # Path to the examples directory containing Jupyter notebooks to be tested.
-EXAMPLES_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "examples"))
+EXAMPLES_PATH = os.path.abspath(os.path.join(DIR_ROOT, "../..", "examples"))
 
 # Python magics template filename
 MAGICS_TEMPLATE = os.path.abspath(os.path.join(RUN_PATH, "pythonmagics.tpl"))
