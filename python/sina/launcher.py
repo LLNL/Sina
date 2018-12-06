@@ -64,6 +64,7 @@ def setup_arg_parser():
     add_ingest_subparser(subparsers)
     add_export_subparser(subparsers)
     add_query_subparser(subparsers)
+    add_compare_subparser(subparsers)
     return parser
 
 
@@ -236,6 +237,17 @@ def add_query_subparser(subparsers):
                               'foo/bar.baz, foo/qux/bar.bin, etc.')
     parser_query.add_argument('--id', action='store_true',
                               help='Only return the IDs of matching Records.')
+
+
+def add_compare_subparser(subparsers):
+    """Add subparser for performing queries on backends."""
+    parser_compare = subparsers.add_parser(
+        'query', help='perform a comparison against two records. '
+                      'See "sina compare -h" for more information.')
+    parser_compare.add_argument('id_one', type=str,
+                                help='The first id of the record to compare.')
+    parser_compare.add_argument('id_two', type=str,
+                                help='The second id of the record to compare.')
 
 
 def setup_logging(args):
@@ -460,6 +472,14 @@ def query(args):
         print([x.id for x in matches])
     else:
         print([x.raw for x in matches])
+
+
+def compare_records(args):
+    """
+    Run logic for comparing records.
+
+    """
+    raise NotImplementedError()
 
 
 def version():

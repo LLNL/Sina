@@ -2,12 +2,43 @@
 
 import unittest
 import json
+from mock import patch, MagicMock
 
+from sina.model import Record
 import sina.model as model
 
 
 class TestModel(unittest.TestCase):
     """Unit tests for the model utility methods."""
+
+    def setUp(self):
+        """
+        Create records used for testing.
+        """
+        self.record_one = Record(id="spam",
+                                 type="new_eggs",
+                                 data={"foo": {"value": 12},
+                                       "bar": {"value": "1",
+                                               "tags": ["in"]}},
+                                 files=[{"uri": "ham.png", "mimetype": "png"},
+                                        {"uri": "ham.curve", "tags": ["hammy"]}],
+                                 user_defined={})
+        self.record_two = Record(id="spam",
+                                 type="new_eggs",
+                                 data={"foo": {"value": 12},
+                                       "bar": {"value": "1",
+                                               "tags": ["in"]}},
+                                 files=[{"uri": "ham.png", "mimetype": "png"},
+                                        {"uri": "ham.curve", "tags": ["hammy"]}],
+                                 user_defined={})
+        self.record_three = Record(id="spam2",
+                                   type="super_eggs",
+                                   data={"foo": {"value": 13},
+                                         "bar": {"value": "1",
+                                                 "tags": ["in"]}},
+                                   files=[{"uri": "ham.png", "mimetype": "png"},
+                                          {"uri": "ham.curve", "tags": ["hammy"]}],
+                                   user_defined={})
 
     # Record
     def test_is_valid(self):
@@ -197,3 +228,24 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             model.generate_run_from_json(json_input=json_input)
         self.assertIn("Missing required key <'application'>.", str(context.exception))
+
+    def test_compare_records_equal(self):
+        """
+        Check records that are equivalent return an empty DeepDiff object.
+        """
+        ddiff = model.compare_records(self.record_one, self.record_two)
+        self.assertFalse(ddiff)
+
+    def test_compare_records_not_equal(self):
+        """
+        Check records that are not equivalent return DeepDiff detailing diff.
+        """
+        ddiff = model.compare_records(self.record_one, self.record_three)
+        self.assertTrue(ddiff)
+        self.assertEqual(ddiff,  {'values_changed':
+                                  {"root['id']":
+                                   {'new_value': 'spam2', 'old_value': 'spam'},
+                                   "root['data']['foo']['value']":
+                                   {'new_value': 13, 'old_value': 12},
+                                   "root['type']":
+                                   {'new_value': 'super_eggs', 'old_value': 'new_eggs'}}})

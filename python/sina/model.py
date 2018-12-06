@@ -4,6 +4,8 @@ import json
 import logging
 import collections
 import six
+from deepdiff import DeepDiff
+
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
@@ -357,3 +359,53 @@ def generate_run_from_json(json_input):
                     if key not in ['id', 'user', 'user_defined', 'version',
                                    'type', 'application', 'data', 'files']})
     return run
+
+
+def compare_records(record_one,
+                    record_two,
+                    ignore_order=True,
+                    report_repetition=False,
+                    significant_digits=None,
+                    verbose_level=2,
+                    exclude_paths=[],
+                    exclude_types=[],
+                    view='text'):
+    """
+    Given two records, compare them.
+
+    A comparison of two records consists of the following: Reporting any
+    differences between their keys and reporting any differences between
+    the values of the keys that are in both records.
+
+    :param record_one: The first record object to compare.
+    :param record_two: The second record object to compare.
+    :param ignore_order: boolean, default False. Ignores orders for
+                         iterables.
+    :paramreport_repetition:  boolean, default False. Reports repetitions
+                              when set True.
+    :param significant_digits: int >= 0, default None. Digits after the
+                               decimal point.
+    :param verbose_level: int >=0. Default 2.
+                          0: Won’t report values when type changed.
+                          1: DeepDiff default.
+                          2: Will report values when custom objects or
+                             dictionaries have items added or removed.
+    :param exclude_paths: list, default empty list. List of paths to
+                          exclude from the report.
+    :param exclude_types: list, default empty list. List of object types to
+                           exclude from the report.
+    :param view: string, default 'text'. Support 'text' or 'tree'. Text is
+                 the regular output. Tree allows you to traverse through
+                 the tree of the changed items.
+    :returns: A DeepDiff object.
+    """
+    LOGGER.debug('Diffing records: {} and {}.'.format(record_one, record_two))
+    return DeepDiff(record_one.raw,
+                    record_two.raw,
+                    ignore_order=ignore_order,
+                    report_repetition=report_repetition,
+                    significant_digits=significant_digits,
+                    verbose_level=verbose_level,
+                    exclude_paths=exclude_paths,
+                    exclude_types=exclude_types,
+                    view=view)

@@ -6,6 +6,11 @@ each DAO. While function availabiliy may differ between objects, ex: Records
 and Relationships, it will not differ between backends, ex: Cassandra and sql.
 """
 from abc import ABCMeta, abstractmethod
+import logging
+
+from sina import model
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DAOFactory(object):
@@ -69,6 +74,7 @@ class RecordDAO(object):
 
         :returns: A generator of found records
         """
+        LOGGER.debug('Getting many records with iter: {}'.format(iter_of_ids))
         for id in iter_of_ids:
             record = self.get(id)
             yield record
@@ -91,6 +97,7 @@ class RecordDAO(object):
 
         :param list_to_insert: A list of Records to insert
         """
+        LOGGER.debug('Inserting {} records.'.format(len(list_to_insert)))
         for item in list_to_insert:
             self.insert(item)
 
@@ -200,6 +207,62 @@ class RecordDAO(object):
         :returns: A list of file JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
+
+    def compare_records_ids(self,
+                            id_one,
+                            id_two,
+                            ignore_order=True,
+                            report_repetition=False,
+                            significant_digits=None,
+                            verbose_level=2,
+                            exclude_paths=[],
+                            exclude_types=[],
+                            view='text'):
+        """
+        Given two record ids, get the records and compare them.
+
+        A comparison of two records consists of the following: Reporting any
+        differences between their keys and reporting any differences between
+        the values of the keys that are in both records.
+
+        This function uses the package DeepDiff. Many of the parameters given
+        here are passed directly to DeepDiff. See their docs at:
+        https://deepdiff.readthedocs.io/en/latest
+
+        :param id_one: string. The id of the first record to compare.
+        :param id_two: string. The id of the second record to compare.
+        :param ignore_order: boolean, default False. Ignores orders for
+                             iterables.
+        :paramreport_repetition:  boolean, default False. Reports repetitions
+                                  when set True.
+        :param significant_digits: int >= 0, default None. Digits after the
+                                   decimal point.
+        :param verbose_level: int >=0. Default 2.
+                              0: Won’t report values when type changed.
+                              1: DeepDiff default.
+                              2: Will report values when custom objects or
+                                 dictionaries have items added or removed.
+        :param exclude_paths: list, default empty list. List of paths to
+                              exclude from the report.
+        :param exclude_types: list, default empty list. List of object types to
+                               exclude from the report.
+        :param view: string, default 'text'. Support 'text' or 'tree'. Text is
+                     the regular output. Tree allows you to traverse through
+                     the tree of the changed items.
+        :returns: A DeepDiff object.
+        """
+        LOGGER.debug('Comparing id={} vs id={}'.format(id_one, id_two))
+        record_one = self.get(id=id_one)
+        record_two = self.get(id=id_two)
+        return model.compare_records(record_one=record_one,
+                                     record_two=record_two,
+                                     ignore_order=ignore_order,
+                                     report_repetition=report_repetition,
+                                     significant_digits=significant_digits,
+                                     verbose_level=verbose_level,
+                                     exclude_paths=exclude_paths,
+                                     exclude_types=exclude_types,
+                                     view=view)
 
 
 class RelationshipDAO(object):
