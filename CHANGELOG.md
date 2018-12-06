@@ -2,7 +2,7 @@ Overview
 ========
 
 This file summarizes the major changes in each version of Sina. For a full list,
-see the commit log at:
+see the commit log at: 
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
 1.3
@@ -41,6 +41,9 @@ https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 - Parallelizes Cassandra ingestion
 - Started batching in Cassandra ingestion
 - Various QoL changes to ScalarRanges
+- Added script to create tarball for use with Spack (C++)
+- Switched to nlohmann JSON library (C++)
+
 
 1.0
 ===
