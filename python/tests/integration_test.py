@@ -1,9 +1,10 @@
 """Integration tests for the CLI and API working together."""
-import unittest
+import ast
 import os
 from six.moves import cStringIO as StringIO
 import sys
-import ast
+import unittest
+import warnings
 
 import cassandra.cqlengine.connection as connection
 import cassandra.cqlengine.management as management
@@ -66,15 +67,18 @@ class TestSQLIntegration(unittest.TestCase):
         finally:
             # Reset stdout
             sys.stdout = sys.__stdout__
-        try:
-            sys.stdout = StringIO()
-            self.args.scalar = 'scalar-4=0'
-            launcher.query(self.args)
-            std_output = sys.stdout.getvalue()
-            matches = ast.literal_eval(std_output)
-            self.assertEqual(matches, [])
-        finally:
-            sys.stdout = sys.__stdout__
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                sys.stdout = StringIO()
+                self.args.scalar = 'scalar-4=0'
+                launcher.query(self.args)
+                std_output = sys.stdout.getvalue()
+                matches = ast.literal_eval(std_output)
+                self.assertEqual(matches, [])
+            finally:
+                sys.stdout = sys.__stdout__
 
 
 @attr('cassandra')
