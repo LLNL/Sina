@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <utility>
+#include <sstream>
 
 #include "mnoda/JsonUtil.hpp"
 
