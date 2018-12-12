@@ -7,9 +7,7 @@ Sources:
 1) Parameterized unit test generation follows the post by Guy at:
     https://stackoverflow.com/questions/32899/\
         how-do-you-generate-dynamic-parametrized-unit-tests-in-python
-2) Execution tests are a variant of the function found at:
-    https://blog.thedataincubator.com/2016/06/testing-jupyter-notebooks
-3) Execution tests via the API at:
+2) Execution tests via the API at:
     https://nbconvert.readthedocs.io/en/latest/execute_api.html
 """
 import collections
@@ -32,7 +30,7 @@ RUN_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "tests",
                                         "run_tests", "notebooks"))
 
 # Path to the examples directory containing Jupyter notebooks to be tested.
-EXAMPLES_PATH = os.path.abspath(os.path.join(DIR_ROOT, "../..", "examples"))
+EXAMPLES_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "..", "examples"))
 
 # Python magics template filename
 MAGICS_TEMPLATE = os.path.abspath(os.path.join(RUN_PATH, "pythonmagics.tpl"))
@@ -165,12 +163,12 @@ def _find_notebooks():
                   if filename.find(".ipynb_checkpoints") < 0])
 
 
-def _is_compliant_notebook(path):
+def _check_notebook_style(path):
     """
     Check the notebook style against PEP8 requirements.
 
     :param path: fully qualified path to the notebook
-    :returns: True if the notebook is compliant, False otherwise
+    :returns: list of error message(s)
     """
     _, basename = os.path.split(path)
 
@@ -192,7 +190,7 @@ def _is_compliant_notebook(path):
     except subprocess.CalledProcessError:
         if os.path.isfile(testname):
             os.remove(testname)
-        raise RuntimeError("Failed to create {}".format(testname))
+        return ["Failed to create {}".format(testname)]
 
     try:
         #
@@ -206,6 +204,7 @@ def _is_compliant_notebook(path):
         result = subprocess.check_output(" ".join(args), shell=True,
                                          stderr=subprocess.STDOUT)
 
+        errors = []
         if os.path.isfile(testname):
             if result:
                 with open(testname, "a") as outfile:
@@ -214,14 +213,15 @@ def _is_compliant_notebook(path):
                     outfile.write("#################\n")
                     for line in _build_pep8_output(result):
                         outfile.write("#  {}\n".format(line))
+                        errors.append(line)
             else:
                 os.remove(testname)
 
     except subprocess.CalledProcessError:
-        raise RuntimeError("Failed to perform flake8 checks on {}".
-                           format(path))
+        return ["Failed to perform flake8 checks on {} ({})".
+                format(path, testname)]
 
-    return len(result) <= 0
+    return errors
 
 
 def _read_notebook(path):
@@ -282,7 +282,7 @@ class TestJupyterNotebooks(type):
             def test_exec(self):
                 errors = _execute_notebook(filename)
                 # Indent output of each error (if any)
-                self.assertEqual(errors, [], "Execution errors detect in "
+                self.assertEqual(errors, [], "Execution errors detected in "
                                  "{}:\n  {}".format(filename, "\n  ".
                                                     join(errors)))
             return test_exec
@@ -294,9 +294,10 @@ class TestJupyterNotebooks(type):
             :param filename: fully qualifed notebook path
             """
             def test_style(self):
-                self.assertTrue(_is_compliant_notebook(filename), "Style "
-                                "errors detected in {}. Refer to associated "
-                                "test script for details.".format(filename))
+                errors = _check_notebook_style(filename)
+                # Indent output of each error (if any)
+                self.assertEqual(errors, [], "Style errors detected in {}:\n  "
+                                 "{}".format(filename, "\n  ".join(errors)))
             return test_style
 
         files = _find_notebooks()
