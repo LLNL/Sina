@@ -98,17 +98,17 @@ ln -sf $VENV_PATH $DEPLOY_DIR/$VENV_SYM_NAME
 
 # Deploy the examples
 source $VENV_PATH/bin/activate
-for db_build_script in `find $RUN_DIR/examples -name "build_db.sh"`; do
+for db_build_script in `find $RUN_DIR/../examples -name "build_db.sh"`; do
     DATASET_NAME=$(basename $(dirname "$db_build_script"))
     EXAMPLE_DEST=$EXAMPLE_DIR/$DATASET_NAME
-    cd $RUN_DIR/examples/$DATASET_NAME
+    cd $RUN_DIR/../examples/$DATASET_NAME
     bash "$db_build_script" 
     rm -rf $EXAMPLE_DEST && mkdir $EXAMPLE_DEST
     mv files $EXAMPLE_DEST/files
     mv data.sqlite $EXAMPLE_DEST
 done
 deactivate
-for notebook in `find $RUN_DIR/examples -name "*.ipynb"`; do
+for notebook in `find $RUN_DIR/../examples -name "*.ipynb"`; do
     NOTEBOOK_DATASET=$(basename $(dirname "$notebook"))
     NOTEBOOK_NAME=$(basename "$notebook")
     if [ "$NOTEBOOK_DATASET" == "examples" ]

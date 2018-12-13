@@ -9,13 +9,15 @@
 # Run this AFTER Bamboo test jobs or AFTER a manual run of `make tests` and `make docs`.
 
 # Converts any relative paths to absolute and ensures ending in /
-DEPLOY_DIR=`greadlink -f $1`/
-DOC_DIR=`greadlink -f $2`/
-EXAMPLE_DIR=`greadlink -f $3`/
+DEPLOY_DIR=`readlink -f $1`/
+DOC_DIR=`readlink -f $2`/
+EXAMPLE_DIR=`readlink -f $3`/
 CPP_DOCS=$DOC_DIR/sina/cpp
+PERM_GROUP=wciuser
 
 set -e
-if [ ! "$(ls -A cpp/build/docs)" ]; then
+
+if [ ! "$(ls -A cpp/build/docs/html)" ]; then
     echo "You must have run the C++ tests and built the docs"
     exit -1
 fi
@@ -25,8 +27,13 @@ cd python
 
 cd ../cpp
 CREATED_TAR=$(sh create_spack_package.sh)
+chown :$PERM_GROUP $CREATED_TAR
+chmod 640 $CREATED_TAR
 
 mv $CREATED_TAR $DEPLOY_DIR
 rm -rf $CPP_DOCS
 mkdir -p $CPP_DOCS
-mv build/docs $CPP_DOCS
+mv build/docs/html/* $CPP_DOCS
+chown -R :$PERM_GROUP $CPP_DOCS 
+find $CPP_DOCS -type f -exec chmod 640 {} \;
+find $CPP_DOCS -type d -exec chmod 750 {} \;

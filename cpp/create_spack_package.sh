@@ -6,7 +6,7 @@ find_version='__VERSION__ = "(.*?)"'
 
 # Find version assignment chunk
 file_contents=$(cat "$python_version_file")
-version_assignment=`egrep -o "$find_version" <<< $file_contents`
+version_assignment=`grep -oP "$find_version" <<< $file_contents`
 
 # Extract the version string
 version=${version_assignment:15}
