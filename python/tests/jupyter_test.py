@@ -16,6 +16,7 @@ from nbconvert.preprocessors import ExecutePreprocessor
 import nbformat
 import os
 import shutil
+from six import with_metaclass
 import subprocess
 import unittest
 
@@ -155,7 +156,8 @@ def _find_notebooks():
     """
     child = subprocess.Popen("find {} -name '*.ipynb' -print".
                              format(EXAMPLES_PATH), shell=True,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             universal_newlines=True)
     (_stdoutdata, _) = child.communicate()
 
     # Skip checkpoint notebooks in generated subdirectories
@@ -311,9 +313,8 @@ class TestJupyterNotebooks(type):
         return type.__new__(meta, name, bases, _dict)
 
 
-class TestNotebooks(unittest.TestCase):
+class TestNotebooks(with_metaclass(TestJupyterNotebooks, unittest.TestCase)):
     """Class for performing basic tests of example Jupyter Notebooks."""
-    __metaclass__ = TestJupyterNotebooks
 
     @classmethod
     def setUpClass(cls):
