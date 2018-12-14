@@ -8,6 +8,7 @@ import uuid
 import csv
 import time
 import datetime
+from numbers import Number
 
 from multiprocessing.pool import ThreadPool
 from collections import OrderedDict
@@ -181,6 +182,58 @@ def _export_csv(data, scalar_names, output_file):
                 writer.writerow([run] + [dataset[scalar]['value'] for scalar in scalar_names])
 
 
+def parse_data_string(data_string):
+    """
+    Parse a string into (name, DataRange) tuples for use with data_query().
+
+    Ex: "speed=(3,4], max_height=(3,4]" creates two DataRanges. They are both
+    min exclusive, max inclusive, and have a range of 3.0 to 4.0. They are then
+    paired up with their respective names and returned as:
+    [("speed", range_1), ("max_height", range_2)]
+
+    :params data_string: A string of space-separated range descriptions
+
+    :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
+
+    :returns: a list of tuples: (name, DataRange).
+
+    """
+    LOGGER.debug('Parsing string <{}> into DataRange objects.'
+                 .format(data_string))
+    raw_data = filter(None, data_string.split(" "))
+    clean_data = []
+
+    for entry in raw_data:
+        components = entry.split("=")
+        name = components[0]
+
+        # Make sure scalar's of the form <foo>=<bar>
+        if len(components) < 2 or len(components[1]) == 0:
+            raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
+        val_range = components[1].split(",")
+        data_range = DataRange()
+
+        if len(val_range) == 1:
+            val = val_range[0]
+            # If a user types 4, it arrives as "4", thus the cast
+            # If they give us '4', it arrives as "'4'", thus the strip
+            try:
+                val = float(val)
+            except ValueError:
+                val = val.strip("'").strip('"')
+            data_range.set_equal(val)
+            clean_data.append((name, data_range))
+        elif is_grouped_as_range(components[1]) and len(val_range) == 2:
+            data_range.set_min(val_range[0])
+            data_range.set_max(val_range[1])
+            clean_data.append((name, data_range))
+        else:
+            raise ValueError('Bad specifier in range for {}'
+                             .format(name))
+
+    return clean_data
+
+
 def parse_scalars(scalar_args):
     """
     Parse commandline input into ScalarRange object(s).
@@ -327,15 +380,17 @@ def get_example_path(relpath, suffix="-new",
     return filename
 
 
-class ScalarRange(object):
-    """Store scalar name and range, and provide parsing utility functions."""
+class DataRange(object):
+    """
+    Express a range some data must be within and provide parsing utility functions.
 
-    def __init__(self, name, min=None, min_inclusive=False,
-                 max=None, max_inclusive=False):
+    By default, a DataRange is left inclusive and right exclusive.
+    """
+
+    def __init__(self, min=None, max=None, min_inclusive=True, max_inclusive=False):
         """
-        Initialize ScalarRange with necessary info.
+        Initialize DataRange with necessary info.
 
-        :params name: name of the scalar value (ex: velocity, density)
         :params min: number that scalar is >= or >. None for negative
                           infinity
         :params min_inclusive: True if min inclusive (>=), False for
@@ -345,37 +400,38 @@ class ScalarRange(object):
         :params max_inclusive: True if max inclusive (<=), False for
                                  < only
         """
-        self.name = name
         self.min = min
         self.min_inclusive = min_inclusive
         self.max = max
         self.max_inclusive = max_inclusive
+        if self.min and self.max:
+            self.validate_and_standardize_range()
 
     def __repr__(self):
-        """Return a comprehensive (debug) representation of a ScalarRange."""
-        return ('ScalarRange <name={}, min={}, min_inclusive={}, max={}, '
-                'max_inclusive={}>'.format(self.name,
-                                           self.min,
+        """Return a comprehensive (debug) representation of a DataRange."""
+        return ('DataRange min={}, min_inclusive={}, max={}, '
+                'max_inclusive={}>'.format(self.min,
                                            self.min_inclusive,
                                            self.max,
                                            self.max_inclusive))
 
     def __str__(self):
-        """Return a ScalarRange in range format ({x, y} [x, y}, {,y], etc.)."""
-        return "{} = {}{}, {}{}".format(self.name,
-                                        ("[" if self.min_inclusive else "("),
-                                        (self.min if self.min
-                                         is not None else "-inf"),
-                                        (self.max if self.max
-                                         is not None else "inf"),
-                                        ("]" if self.max_inclusive else ")")
-                                        )
+        """Return a DataRange in range format ({x, y} [x, y}, {,y], etc.)."""
+        return "{}{}, {}{}".format(("[" if self.min_inclusive else "("),
+                                   (self.min if self.min is not None else "-inf"),
+                                   (self.max if self.max is not None else "inf"),
+                                   ("]" if self.max_inclusive else ")"))
+
+    def __eq__(self, other):
+        """Check whether two DataRanges are equivalent."""
+        return(isinstance(other, DataRange)
+               and self.__dict__ == other.__dict__)
 
     def set_min(self, left_range):
         """
         Parse the left (min) half of a range.
 
-        Sets the ScalarRange's left portion to be inclusive/not depending on
+        Sets the DataRange's left portion to be inclusive/not depending on
         the arg's left paren/bracket,  and its left number to be whatever's
         provided by the arg.
 
@@ -384,9 +440,22 @@ class ScalarRange(object):
                                numerical range
         """
         LOGGER.debug('Setting min of range: {}'.format(left_range))
+        if not left_range[0] in ['(', '[']:
+            raise ValueError("Bad inclusiveness specifier for range: {}",
+                             format(left_range[0]))
         if len(left_range) > 1:
             self.min_inclusive = left_range[0] is '['
-            self.min = left_range[1:]
+
+            # We can take strings, but here we're already taking a string.
+            # Thus we need to do a check: '"4"]' is passing us a string, but
+            # '4]', despite being a string itself, is passing us an int
+            min_arg = left_range[1:]
+            try:
+                self.min = float(min_arg)
+            except ValueError:
+                self.min = min_arg.strip("'").strip('"')
+            self.validate_and_standardize_range()
+
         else:
             # None represents negative infinity in range notation.
             self.min = None
@@ -397,7 +466,7 @@ class ScalarRange(object):
         """
         Parse the right (max) half of a range.
 
-        Sets the ScalarRange's right portion to be inclusive/not depending on
+        Sets the DataRange's right portion to be inclusive/not depending on
         the arg's right paren/bracket,  and its right number to be whatever's
         provided by the arg.
 
@@ -406,25 +475,36 @@ class ScalarRange(object):
                                 numerical range
         """
         LOGGER.debug('Setting max of range: {}'.format(right_range))
+        if not right_range[-1] in [')', ']']:
+            raise ValueError("Bad inclusiveness specifier for range: {}",
+                             format(right_range[0]))
         if len(right_range) > 1:
             self.max_inclusive = right_range[-1] is ']'
-            self.max = right_range[:-1]
+            # We can take strings, but here we're already taking a string.
+            # Thus we need to do a check: '"4"]' is passing us a string, but
+            # '4]', despite being a string itself, is passing us an int
+            max_arg = right_range[:-1]
+            try:
+                self.max = float(max_arg)
+            except ValueError:
+                self.max = max_arg.strip("'").strip('"')
+            self.validate_and_standardize_range()
         else:
             # None represents positive infinity in range notation.
             self.max = None
             # Positive infinity can't be inclusive
             self.max_inclusive = False
 
-    def set_equal(self, num):
+    def set_equal(self, val):
         """
-        Set a ScalarRange equal to a single number while preserving notation.
+        Set a DataRange equal to a single value while preserving notation.
 
         This is provided for the convenience case of testing exact equivalence
         (=5), allowing the user to just write =5 instead of =[5:5].
         """
-        LOGGER.debug('Setting range equal to: {}'.format(num))
-        self.min = num
-        self.max = num
+        LOGGER.debug('Setting range equal to: {}'.format(val))
+        self.min = val
+        self.max = val
         self.min_inclusive = True
         self.max_inclusive = True
 
@@ -436,27 +516,31 @@ class ScalarRange(object):
 
         :raises ValueError: if given an impossible range, ex: [3,2]
         :raises TypeError: if the range has a component of the wrong type,
-                           ex [2,"str"]
+                           ex [2,[-1,-2]], or mismatched types ex [4, "4"]
         """
         LOGGER.debug('Validating and standardizing range of: {}'.format(self))
         try:
-            self.min = float(
-                self.min) if self.min is not None else None
-            self.max = float(
-                self.max) if self.max is not None else None
-            self.min_inclusive = bool(self.min_inclusive)
-            self.max_inclusive = bool(self.max_inclusive)
+            # Case 1: min or max is number. Other must be number or None.
+            if isinstance(self.min, Number) or isinstance(self.max, Number):
+                self.min = float(self.min) if self.min is not None else None
+                self.max = float(self.max) if self.max is not None else None
+            # Case 2: neither min nor max is number. Both must be None or string
+            elif (not isinstance(self.min, (str, type(None))
+                  or not isinstance(self.max, (str, type(None))))):
+                raise ValueError
+            # Note that both being None is a special case, since then we don't
+            # know if what we're ultimately looking for is a number or string.
         except ValueError:
-            msg = ("Bad type for portion of  \'{}\' range".format(
-                   self.name))
+            msg = ("Bad type for portion of range: {}".format(self))
             LOGGER.error(msg)
-            raise TypeError(msg)  # TypeError as ValueError is a bit broad
+            raise TypeError(msg)  # TypeError, as ValueError is a bit broad
+
         if self.min is not None:
             min_gt_max = self.max is not None and self.min > self.max
             max_eq_min = self.max is not None and self.min == self.max
             impossible_range = max_eq_min and not (self.min_inclusive and self.max_inclusive)
             if min_gt_max or impossible_range:
-                msg = ("Bad range for scalar  \'{}\': min must be <= max"
-                       .format(self.name))
+                msg = ("Bad range for data, min must be <= max: {}"
+                       .format(self))
                 LOGGER.error(msg)
                 raise ValueError(msg)
