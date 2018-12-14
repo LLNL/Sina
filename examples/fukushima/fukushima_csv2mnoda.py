@@ -115,14 +115,14 @@ def process_data(dataset_fn, dest_dn):
                     Fukushima files and data are to be written
     """
     if not os.path.exists(dataset_fn):
-        raise ValueError('Expected the data set filename (%s) to exist' %
-                         dataset_fn)
+        raise ValueError('Expected the data set filename ({}) to exist'.
+                         format(dataset_fn))
     elif not os.path.isfile(dataset_fn):
-        raise ValueError('Expected the data set filename (%s) to be a file' %
-                         dataset_fn)
+        raise ValueError('Expected the data set filename ({}) to be a file'.
+                         format(dataset_fn))
     elif not dataset_fn.endswith(DATA_FN):
-        raise ValueError('Expected a CSV data set filename (%s) ending %s' %
-                         (dataset_fn, DATA_FN))
+        raise ValueError('Expected a CSV data set filename ({}) ending {}'.
+                         format(dataset_fn, DATA_FN))
 
     # Make sure the files subdirectory exists in the destination directory
     files_dn = os.path.realpath(os.path.join(dest_dn, 'files'))
@@ -181,14 +181,14 @@ def process_data(dataset_fn, dest_dn):
                 mdata.add_exp(last_exp_id)
 
         except csv.Error as cerr:
-            print("ERROR: %s: line %s: %s" % (dataset_fn, creader.line_num,
-                                              str(cerr)))
+            print("ERROR: {}: line {}: {}".
+                  format(dataset_fn, creader.line_num, str(cerr)))
             sys.exit(1)
 
         except Exception as exc:
-            print("ERROR: %s: line %s: %s: %s" % (dataset_fn, creader.line_num,
-                                                  exc.__class__.__name__,
-                                                  str(exc)))
+            print("ERROR: {}: line {}: {}: {}".
+                  format(dataset_fn, creader.line_num,
+                         exc.__class__.__name__, str(exc)))
             traceback.print_exc()
             sys.exit(1)
 
@@ -305,7 +305,7 @@ class FukushimaData(object):
 
         :param exp_id: experiment id string
         """
-        return os.path.join(self.files_dn, '%s-data.csv' % exp_id)
+        return os.path.join(self.files_dn, '{}-data.csv'.format(exp_id))
 
     def write(self):
         """
@@ -331,7 +331,7 @@ class FukushimaData(object):
         """
         with open(self.get_exp_fn(exp_id), 'w') as ofd:
             for row in obs:
-                ofd.write('%s\n' % ','.join(row))
+                ofd.write('{}\n'.format(','.join(row)))
 
 
 # ----------------------------------- MAIN -----------------------------------
@@ -347,7 +347,7 @@ def main():
 
     parser.add_argument('csv_pathname',
                         help='The pathname to the CSV file, which needs to '
-                             'end in %s.' % DATA_FN)
+                             'end in {}.'.format(DATA_FN))
 
     parser.add_argument('dest_dirname',
                         help='The pathname to the destination Fukushima data '

@@ -83,20 +83,20 @@ QC_DATA = [
 
 # Observation data file format
 DATA_FMT = """\
-obs_id      = %s
-depth       = %s
+obs_id      = {}
+depth       = {}
 depth_units = meters
-press       = %s
+press       = {}
 press_units = decibars
-ctd_temp    = %s
+ctd_temp    = {}
 temp_units  = C
-ctd_oxy     = %s
+ctd_oxy     = {}
 oxy_units   = micromol/kg
-o2          = %s
+o2          = {}
 o2_units    = micromol/kg
-o2_qc       = %s
-ph          = %s
-ph_qc       = %s
+o2_qc       = {}
+ph          = {}
+ph_qc       = {}
 """
 
 
@@ -109,14 +109,14 @@ def process_data(dataset_fn, dest_dn):
                     files and data are to be written
     """
     if not os.path.exists(dataset_fn):
-        raise ValueError('Expected the data set filename (%s) to exist' %
-                         dataset_fn)
+        raise ValueError('Expected the data set filename ({}) to exist'.
+                         format(dataset_fn))
     elif not os.path.isfile(dataset_fn):
-        raise ValueError('Expected the data set filename (%s) to be a file' %
-                         dataset_fn)
+        raise ValueError('Expected the data set filename ({}) to be a file'.
+                         format(dataset_fn))
     elif not dataset_fn.endswith(DATA_FN):
-        raise ValueError('Expected a CSV data set filename (%s) ending %s' %
-                         (dataset_fn, DATA_FN))
+        raise ValueError('Expected a CSV data set filename ({}) ending {}'.
+                         format(dataset_fn, DATA_FN))
 
     # Make sure the files subdirectory exists in the destination directory
     files_dn = os.path.realpath(os.path.join(dest_dn, 'files'))
@@ -162,14 +162,14 @@ def process_data(dataset_fn, dest_dn):
                 ph, ph_qc = row[30:32]
 
                 # Write the observation data to a file
-                obs_dir = os.path.join(files_dn, exp, 'obs%05d' % i)
+                obs_dir = os.path.join(files_dn, exp, 'obs{:05d}'.format(i))
                 if not os.path.isdir(obs_dir):
                     os.makedirs(obs_dir)
 
                 obs_fn = os.path.join(obs_dir, 'obs-data.txt')
                 with open(os.path.join(obs_fn), 'w') as ofd:
-                    ofd.write(DATA_FMT % (oid, depth, press, temp, oxy, o2,
-                                          o2_qc, ph, ph_qc))
+                    ofd.write(DATA_FMT.format(oid, depth, press, temp, oxy, o2,
+                                              o2_qc, ph, ph_qc))
 
                 # Add the observation data (and create the example file)
                 mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
@@ -178,15 +178,15 @@ def process_data(dataset_fn, dest_dn):
 
     except csv.Error as ce:
         ifd.close()
-        print("ERROR: %s: line %s: %s" % (dataset_fn, rdr.line_num,
-                                          str(ce)))
+        print("ERROR: {} line {}: {}".
+              format(dataset_fn, rdr.line_num, str(ce)))
         sys.exit(1)
 
     except Exception as exc:
         ifd.close()
-        print("ERROR: %s: line %s: %s: %s" % (dataset_fn, rdr.line_num,
-                                              exc.__class__.__name__,
-                                              str(exc)))
+        print("ERROR: {}: line {}: {}: {}".
+              format(dataset_fn, rdr.line_num, exc.__class__.__name__,
+                     str(exc)))
         traceback.print_exc()
         sys.exit(1)
 
