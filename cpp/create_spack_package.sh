@@ -1,12 +1,9 @@
 #!/bin/bash
 
+# Find version assignment chunk
 python_version_file="../python/sina/__init__.py"
 find_version='__VERSION__ = "(.*?)"'
-
-
-# Find version assignment chunk
-file_contents=$(cat "$python_version_file")
-version_assignment=`grep -oP "$find_version" <<< $file_contents`
+version_assignment=`grep -oP "$find_version" $python_version_file`
 
 # Extract the version string
 version=${version_assignment:15}
@@ -30,5 +27,5 @@ cd ..
 tar --exclude="${versioned_dir}/blt/.git" -czhf ${versioned_tar} ${versioned_dir}
 rm -fr ${versioned_dir}
 
-# Other script(s) rely on this echo to know the name of the created file
+# ../deploy.sh relies on this echo to know the name of the created file
 echo ${versioned_tar}

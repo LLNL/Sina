@@ -9,17 +9,25 @@
 # Run this AFTER Bamboo test jobs or AFTER a manual run of `make tests` and `make docs`.
 
 # Converts any relative paths to absolute and ensures ending in /
-DEPLOY_DIR=`readlink -f $1`/
-DOC_DIR=`readlink -f $2`/
-EXAMPLE_DIR=`readlink -f $3`/
 CPP_DOCS=$DOC_DIR/sina/cpp
 PERM_GROUP=wciuser
 
 set -e
 
-if [ ! "$(ls -A cpp/build/docs/html)" ]; then
+# Arg check
+if [ $# != 3 ]
+  then
+    echo "Script takes exactly three arguments: <wheel_deploy_dir> <doc_deploy_dir> <examples_deploy_dir>"
+    exit 1
+fi
+
+DEPLOY_DIR=`readlink -f $1`/
+DOC_DIR=`readlink -f $2`/
+EXAMPLE_DIR=`readlink -f $3`/
+
+if [ ! -d cpp/build/docs/html ]; then
     echo "You must have run the C++ tests and built the docs"
-    exit -1
+    exit 1
 fi
 
 cd python
@@ -34,6 +42,6 @@ mv $CREATED_TAR $DEPLOY_DIR
 rm -rf $CPP_DOCS
 mkdir -p $CPP_DOCS
 mv build/docs/html/* $CPP_DOCS
-chown -R :$PERM_GROUP $CPP_DOCS 
+chown -R :$PERM_GROUP $CPP_DOCS
 find $CPP_DOCS -type f -exec chmod 640 {} \;
 find $CPP_DOCS -type d -exec chmod 750 {} \;
