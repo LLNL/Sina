@@ -130,25 +130,27 @@ class TestSinaUtils(unittest.TestCase):
     def test_data_range_string_setters_with_scalars(self):
         """Test the functions that use strings to set up DataRanges with scalar vals."""
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
-        flipped_inclusivity.set_min("[0")
+        flipped_inclusivity.parse_min("[0")
         self.assertEqual(flipped_inclusivity.min, 0)
         self.assertTrue(flipped_inclusivity.min_inclusive)
-        flipped_inclusivity.set_max("4)")
+        flipped_inclusivity.parse_max("4)")
         self.assertEqual(flipped_inclusivity.max, 4)
         self.assertFalse(flipped_inclusivity.max_inclusive)
         # None should automatically set inclusivity to False
-        flipped_inclusivity.set_min("[")
+        flipped_inclusivity.parse_min("[")
         self.assertIsNone(flipped_inclusivity.min)
         self.assertFalse(flipped_inclusivity.min_inclusive)
 
     def test_data_range_string_setters_with_strings(self):
         """Test the functions that use strings to set up DataRanges with string vals."""
+        # Strings must follow python variable naming conventions, so we don't
+        # test strings like '4' or 'some=body'
         with_strings = DataRange("foo_a", "foo_c")
-        with_strings.set_min("('4'")  # Still a string
-        self.assertEqual(with_strings.min, '4')
+        with_strings.parse_min("(a_p3pp3r_mint")
+        self.assertEqual(with_strings.min, 'a_p3pp3r_mint')
         self.assertFalse(with_strings.min_inclusive)
-        with_strings.set_max('"sp am"]')
-        self.assertEqual(with_strings.max, 'sp am')
+        with_strings.parse_max('spam]')
+        self.assertEqual(with_strings.max, 'spam')
         self.assertTrue(with_strings.max_inclusive)
 
     def test_data_range_bad_string_setters_min(self):
@@ -156,10 +158,10 @@ class TestSinaUtils(unittest.TestCase):
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
         with_strings = DataRange("foo_a", "foo_c")
         with self.assertRaises(TypeError) as context:
-            flipped_inclusivity.set_min("('cat'")
+            flipped_inclusivity.parse_min("(cat")
         self.assertIn('Bad type for portion of range', str(context.exception))
         with self.assertRaises(ValueError) as context:
-            with_strings.set_min("'4'")
+            with_strings.parse_min("spam")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
 
     def test_data_range_bad_string_setters_max(self):
@@ -167,17 +169,17 @@ class TestSinaUtils(unittest.TestCase):
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
         with_strings = DataRange("foo_a", "foo_c")
         with self.assertRaises(TypeError) as context:
-            flipped_inclusivity.set_max("cat)")
+            flipped_inclusivity.parse_max("cat)")
         self.assertIn('Bad type for portion of range', str(context.exception))
         with self.assertRaises(ValueError) as context:
-            with_strings.set_max("4")
+            with_strings.parse_max("4")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
 
     def test_parse_data_string(self):
         """Test the function for parsing a string to names and DataRanges."""
         just_one = "speed=[1,2)"
         basic_case = DataRange(1, 2)
-        a_few = "speed=(1,2] quadrant='nw'"
+        a_few = "speed=(1,2] quadrant=nw"
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
         both_sides_equal = DataRange("nw", "nw", max_inclusive=True)
         none = ""

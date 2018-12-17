@@ -9,6 +9,7 @@ import csv
 import time
 import datetime
 from numbers import Number
+from six import string_types
 
 from multiprocessing.pool import ThreadPool
 from collections import OrderedDict
@@ -191,6 +192,12 @@ def parse_data_string(data_string):
     paired up with their respective names and returned as:
     [("speed", range_1), ("max_height", range_2)]
 
+    IMPORTANT CAVEATS: values passed in can't have quotes, equals signs, etc.
+    Same conventions as python variable naming: som3cat is fine, cat=sp'm isn't.
+    Should look something like "speed=[fast,faster] height=real_tall". In case
+    your string looks like a number (ex: version=1.2.8 got updated to 1.3),
+    **this will NOT work correctly** and it's time to revisit the function.
+
     :param data_string: A string of space-separated range descriptions
 
     :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
@@ -198,6 +205,10 @@ def parse_data_string(data_string):
     :returns: a list of tuples: (name, DataRange).
 
     """
+    # This code was lifted from parse_scalars() and only updated enough to avoid
+    # breaking things; further refinement should be tackled in another PR.
+    # Notable issues are outlined above as "IMPORTANT CAVEATS".
+
     LOGGER.debug('Parsing string <{}> into DataRange objects.'
                  .format(data_string))
     raw_data = filter(None, data_string.split(" "))
@@ -215,17 +226,15 @@ def parse_data_string(data_string):
 
         if len(val_range) == 1:
             val = val_range[0]
-            # If a user types 4, it arrives as "4", thus the cast
-            # If they give us '4', it arrives as "'4'", thus the strip
             try:
                 val = float(val)
             except ValueError:
-                val = val.strip("'").strip('"')
+                pass  # It's a non-numeric string, we just keep going
             data_range.set_equal(val)
             clean_data.append((name, data_range))
         elif is_grouped_as_range(components[1]) and len(val_range) == 2:
-            data_range.set_min(val_range[0])
-            data_range.set_max(val_range[1])
+            data_range.parse_min(val_range[0])
+            data_range.parse_max(val_range[1])
             clean_data.append((name, data_range))
         else:
             raise ValueError('Bad specifier in range for {}'
@@ -358,7 +367,7 @@ def get_example_path(relpath, suffix="-new",
     LOGGER.debug("Retrieving example data store path: {}, {}, {}".
                  format(relpath, suffix, example_dirs))
 
-    dirs = [example_dirs] if isinstance(example_dirs, str) else example_dirs
+    dirs = [example_dirs] if isinstance(example_dirs, string_types) else example_dirs
 
     paths = [relpath]
     if os.getenv("SINA_TEST_KERNEL") is not None:
@@ -404,7 +413,7 @@ class DataRange(object):
         self.min_inclusive = min_inclusive
         self.max = max
         self.max_inclusive = max_inclusive
-        if self.min and self.max:
+        if self.min is not None and self.max is not None:
             self.validate_and_standardize_range()
 
     def __repr__(self):
@@ -428,10 +437,9 @@ class DataRange(object):
 
         :param other: The object to compare against.
         """
-        return(isinstance(other, DataRange)
-               and self.__dict__ == other.__dict__)
+        return(isinstance(other, DataRange) and self.__dict__ == other.__dict__)
 
-    def set_min(self, min_range):
+    def parse_min(self, min_range):
         """
         Parse the minimum half of a range, ex: the "[4" in "[4,2]".
 
@@ -450,14 +458,11 @@ class DataRange(object):
         if len(min_range) > 1:
             self.min_inclusive = min_range[0] is '['
 
-            # We can take strings, but here we're already taking a string.
-            # Thus we need to do a check: '"4"]' is passing us a string, but
-            # '4]', despite being a string itself, is passing us an int
             min_arg = min_range[1:]
             try:
                 self.min = float(min_arg)
             except ValueError:
-                self.min = min_arg.strip("'").strip('"')
+                self.min = min_arg
             self.validate_and_standardize_range()
 
         else:
@@ -466,7 +471,7 @@ class DataRange(object):
             # Negative infinity can't be inclusive.
             self.min_inclusive = False
 
-    def set_max(self, max_range):
+    def parse_max(self, max_range):
         """
         Parse the maximum half of a range, ex: the "2]" in "[4,2]".
 
@@ -491,7 +496,7 @@ class DataRange(object):
             try:
                 self.max = float(max_arg)
             except ValueError:
-                self.max = max_arg.strip("'").strip('"')
+                self.max = max_arg
             self.validate_and_standardize_range()
         else:
             # None represents positive infinity in range notation.
@@ -532,8 +537,8 @@ class DataRange(object):
                 self.min = float(self.min) if self.min is not None else None
                 self.max = float(self.max) if self.max is not None else None
             # Case 2: neither min nor max is number. Both must be None or string
-            elif (not isinstance(self.min, (str, type(None))
-                  or not isinstance(self.max, (str, type(None))))):
+            elif (not isinstance(self.min, (string_types, type(None)) or
+                  not isinstance(self.max, (string_types, type(None))))):
                 raise ValueError
             # Note that both being None is a special case, since then we don't
             # know if what we're ultimately looking for is a number or string.
