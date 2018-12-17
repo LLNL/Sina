@@ -186,12 +186,12 @@ def parse_data_string(data_string):
     """
     Parse a string into (name, DataRange) tuples for use with data_query().
 
-    Ex: "speed=(3,4], max_height=(3,4]" creates two DataRanges. They are both
+    Ex: "speed=(3,4] max_height=(3,4]" creates two DataRanges. They are both
     min exclusive, max inclusive, and have a range of 3.0 to 4.0. They are then
     paired up with their respective names and returned as:
     [("speed", range_1), ("max_height", range_2)]
 
-    :params data_string: A string of space-separated range descriptions
+    :param data_string: A string of space-separated range descriptions
 
     :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
 
@@ -384,7 +384,7 @@ class DataRange(object):
     """
     Express a range some data must be within and provide parsing utility functions.
 
-    By default, a DataRange is left inclusive and right exclusive.
+    By default, a DataRange is min inclusive and max exclusive.
     """
 
     def __init__(self, min=None, max=None, min_inclusive=True, max_inclusive=False):
@@ -409,7 +409,7 @@ class DataRange(object):
 
     def __repr__(self):
         """Return a comprehensive (debug) representation of a DataRange."""
-        return ('DataRange min={}, min_inclusive={}, max={}, '
+        return ('DataRange <min={}, min_inclusive={}, max={}, '
                 'max_inclusive={}>'.format(self.min,
                                            self.min_inclusive,
                                            self.max,
@@ -423,33 +423,37 @@ class DataRange(object):
                                    ("]" if self.max_inclusive else ")"))
 
     def __eq__(self, other):
-        """Check whether two DataRanges are equivalent."""
+        """
+        Check whether two DataRanges are equivalent.
+
+        :param other: The object to compare against.
+        """
         return(isinstance(other, DataRange)
                and self.__dict__ == other.__dict__)
 
-    def set_min(self, left_range):
+    def set_min(self, min_range):
         """
-        Parse the left (min) half of a range.
+        Parse the minimum half of a range, ex: the "[4" in "[4,2]".
 
-        Sets the DataRange's left portion to be inclusive/not depending on
-        the arg's left paren/bracket,  and its left number to be whatever's
+        Sets the DataRange's minimum portion to be inclusive/not depending on
+        the arg's min paren/bracket,  and its min number to be whatever's
         provided by the arg.
 
-        :param str left_range: a string of the form '<range_end>[number]',
-                               ex: '[4', that represents the left side of a
-                               numerical range
+        :param str min_range: a string of the form '<range_end>[value]',
+                               ex: '[4' or '(', that represents the min side
+                               of a numerical range
         """
-        LOGGER.debug('Setting min of range: {}'.format(left_range))
-        if not left_range[0] in ['(', '[']:
+        LOGGER.debug('Setting min of range: {}'.format(min_range))
+        if not min_range[0] in ['(', '[']:
             raise ValueError("Bad inclusiveness specifier for range: {}",
-                             format(left_range[0]))
-        if len(left_range) > 1:
-            self.min_inclusive = left_range[0] is '['
+                             format(min_range[0]))
+        if len(min_range) > 1:
+            self.min_inclusive = min_range[0] is '['
 
             # We can take strings, but here we're already taking a string.
             # Thus we need to do a check: '"4"]' is passing us a string, but
             # '4]', despite being a string itself, is passing us an int
-            min_arg = left_range[1:]
+            min_arg = min_range[1:]
             try:
                 self.min = float(min_arg)
             except ValueError:
@@ -462,28 +466,28 @@ class DataRange(object):
             # Negative infinity can't be inclusive.
             self.min_inclusive = False
 
-    def set_max(self, right_range):
+    def set_max(self, max_range):
         """
-        Parse the right (max) half of a range.
+        Parse the maximum half of a range, ex: the "2]" in "[4,2]".
 
-        Sets the DataRange's right portion to be inclusive/not depending on
-        the arg's right paren/bracket,  and its right number to be whatever's
+        Sets the DataRange's maximum portion to be inclusive/not depending on
+        the arg's max paren/bracket,  and its max number to be whatever's
         provided by the arg.
 
-        :param str right_range: a string of the form '[number]<range_end>',
-                                ex: '}', that represents the right side of a
-                                numerical range
+        :param str max_range: a string of the form '[value]<range_end>',
+                                ex: '4)' or ']', that represents the max side
+                                of a numerical range
         """
-        LOGGER.debug('Setting max of range: {}'.format(right_range))
-        if not right_range[-1] in [')', ']']:
+        LOGGER.debug('Setting max of range: {}'.format(max_range))
+        if not max_range[-1] in [')', ']']:
             raise ValueError("Bad inclusiveness specifier for range: {}",
-                             format(right_range[0]))
-        if len(right_range) > 1:
-            self.max_inclusive = right_range[-1] is ']'
+                             format(max_range[-1]))
+        if len(max_range) > 1:
+            self.max_inclusive = max_range[-1] is ']'
             # We can take strings, but here we're already taking a string.
             # Thus we need to do a check: '"4"]' is passing us a string, but
             # '4]', despite being a string itself, is passing us an int
-            max_arg = right_range[:-1]
+            max_arg = max_range[:-1]
             try:
                 self.max = float(max_arg)
             except ValueError:
@@ -501,12 +505,15 @@ class DataRange(object):
 
         This is provided for the convenience case of testing exact equivalence
         (=5), allowing the user to just write =5 instead of =[5:5].
+
+        :param val: The value (string or number) to set the DataRange to.
         """
         LOGGER.debug('Setting range equal to: {}'.format(val))
         self.min = val
         self.max = val
         self.min_inclusive = True
         self.max_inclusive = True
+        self.validate_and_standardize_range()
 
     def validate_and_standardize_range(self):
         """
