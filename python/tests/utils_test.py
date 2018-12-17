@@ -78,69 +78,99 @@ class TestSinaUtils(unittest.TestCase):
                          "Expected {}, not {}".format(filename, result))
         os.remove(filename)
 
-    def test_data_range(self):
-        """Test the basic functionality of DataRanges."""
+    def test_basic_data_range_scalar(self):
+        """Test basic DataRange creation using scalars."""
         basic_case = DataRange(1, 2)
-        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        self.assertEqual(basic_case.min, 1)
+        self.assertEqual(basic_case.max, 2)
+        self.assertTrue(basic_case.min_inclusive)
+        self.assertFalse(basic_case.max_inclusive)
+
+    def test_basic_data_range_string(self):
+        """
+        Test basic DataRange creation using strings.
+
+        We test both to ensure no bad assumptions are being made, as previously
+        we only handled scalars in our ranges.
+        """
         with_strings = DataRange("foo_a", "foo_c")
+        self.assertEqual(with_strings.min, "foo_a")
+        self.assertEqual(with_strings.max, "foo_c")
+        self.assertTrue(with_strings.min_inclusive)
+        self.assertFalse(with_strings.max_inclusive)
+
+    def test_data_range_inclusivity_assignment(self):
+        """Test DataRange creation including inclusivity."""
+        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        self.assertFalse(flipped_inclusivity.min_inclusive)
+        self.assertTrue(flipped_inclusivity.max_inclusive)
+
+    def test_data_range_bad_assignment(self):
+        """Tests invalid assignments for DataRanges."""
         with self.assertRaises(TypeError) as context:
             DataRange(30, "fast")
         self.assertIn('Bad type for portion of range', str(context.exception))
         with self.assertRaises(TypeError) as context:
             DataRange(["foo", "bar"], ["spam", "eggs"])
         self.assertIn('Bad type for portion of range', str(context.exception))
+        with self.assertRaises(ValueError) as context:
+            DataRange(30, 1)
+        self.assertIn('min must be <= max', str(context.exception))
 
+    def test_data_range_equality(self):
+        """Test the DataRange equality operator."""
+        basic_case = DataRange(1, 2)
+        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        with_strings = DataRange("foo_a", "foo_c")
         basic_case_again = DataRange(1, 2)
         self.assertEqual(basic_case, basic_case_again)
         self.assertNotEqual(basic_case, flipped_inclusivity)
         self.assertNotEqual(basic_case, with_strings)
 
-    def test_data_range_string_setters(self):
-        """Test the functions that use strings to set up DataRanges."""
+    def test_data_range_string_setters_with_scalars(self):
+        """Test the functions that use strings to set up DataRanges with scalar vals."""
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
-        with_strings = DataRange("foo_a", "foo_c")
-
-        # Basic setting with min
         flipped_inclusivity.set_min("[0")
         self.assertEqual(flipped_inclusivity.min, 0)
         self.assertTrue(flipped_inclusivity.min_inclusive)
-        with_strings.set_min("('4'")  # Still a string
-        self.assertEqual(with_strings.min, '4')
-        self.assertFalse(with_strings.min_inclusive)
-
+        flipped_inclusivity.set_max("4)")
+        self.assertEqual(flipped_inclusivity.max, 4)
+        self.assertFalse(flipped_inclusivity.max_inclusive)
         # None should automatically set inclusivity to False
         flipped_inclusivity.set_min("[")
         self.assertIsNone(flipped_inclusivity.min)
         self.assertFalse(flipped_inclusivity.min_inclusive)
 
-        # Raise errors if setting with bad types
+    def test_data_range_string_setters_with_strings(self):
+        """Test the functions that use strings to set up DataRanges with string vals."""
+        with_strings = DataRange("foo_a", "foo_c")
+        with_strings.set_min("('4'")  # Still a string
+        self.assertEqual(with_strings.min, '4')
+        self.assertFalse(with_strings.min_inclusive)
+        with_strings.set_max('"sp am"]')
+        self.assertEqual(with_strings.max, 'sp am')
+        self.assertTrue(with_strings.max_inclusive)
+
+    def test_data_range_bad_string_setters_min(self):
+        """Test invalid string setters for DataRanges. For min only."""
+        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        with_strings = DataRange("foo_a", "foo_c")
         with self.assertRaises(TypeError) as context:
             flipped_inclusivity.set_min("('cat'")
         self.assertIn('Bad type for portion of range', str(context.exception))
         with self.assertRaises(ValueError) as context:
-            flipped_inclusivity.set_min("'4'")
+            with_strings.set_min("'4'")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
 
-        # The above, repeated for max. Reset values:
+    def test_data_range_bad_string_setters_max(self):
+        """Test invalid string setters for DataRanges. For max only."""
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
         with_strings = DataRange("foo_a", "foo_c")
-
-        flipped_inclusivity.set_max("100]")
-        self.assertEqual(flipped_inclusivity.max, 100)
-        self.assertTrue(flipped_inclusivity.max_inclusive)
-        with_strings.set_max("'foo_d')")  # Still a string
-        self.assertEqual(with_strings.max, 'foo_d')
-        self.assertFalse(with_strings.max_inclusive)
-
-        flipped_inclusivity.set_max("]")
-        self.assertIsNone(flipped_inclusivity.max)
-        self.assertFalse(flipped_inclusivity.max_inclusive)
-
         with self.assertRaises(TypeError) as context:
             flipped_inclusivity.set_max("cat)")
         self.assertIn('Bad type for portion of range', str(context.exception))
         with self.assertRaises(ValueError) as context:
-            flipped_inclusivity.set_max("4")
+            with_strings.set_max("4")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
 
     def test_parse_data_string(self):
