@@ -305,8 +305,8 @@ class TestJupyterNotebooks(type):
         files = _find_notebooks()
         if len(files) > 0:
             for filename in files:
-                test_name = "test_%s" % \
-                    os.path.splitext(os.path.basename(filename))[0]
+                test_name = "test_{}".format(os.path.splitext(
+                                             os.path.basename(filename))[0])
                 _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
                 _dict["{}_style".format(test_name)] = gen_test_style(filename)
 
