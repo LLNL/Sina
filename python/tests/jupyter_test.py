@@ -110,11 +110,11 @@ def _execute_notebook(path):
     try:
         exec_preprocessor = ExecutePreprocessor(timeout=-1,
                                                 kernel_name=SINA_KERNEL)
-        exec_preprocessor.preprocess(notebook, {'metadata': {'path': '.'}})
+        exec_preprocessor.preprocess(notebook, {'metadata': {'path': RUN_PATH}})
     except Exception as _exception:
-        errors.append('{}: {}: Running {}: {}'.
+        errors.append('{}: {}: Running {} in {}: {}'.
                       format(_exception.__class__.__name__, SINA_KERNEL, path,
-                             str(_exception)))
+                             RUN_PATH, str(_exception)))
     finally:
         _, basename = os.path.split(path)
         execname = os.path.join(RUN_PATH, "execute_{}".format(basename))
@@ -140,8 +140,8 @@ def _execute_notebook(path):
                                                      output.evalue))
             except Exception as _exception:
                 errors.append('{}: {}: Checking for errors in {}: {}'.
-                              format(_exception.__class__.__name__, SINA_KERNEL,
-                                     execname, str(_exception)))
+                              format(_exception.__class__.__name__,
+                                     SINA_KERNEL, execname, str(_exception)))
             if len(errors) <= 0:
                 os.remove(execname)
 
@@ -305,8 +305,8 @@ class TestJupyterNotebooks(type):
         files = _find_notebooks()
         if len(files) > 0:
             for filename in files:
-                test_name = "test_%s" % \
-                    os.path.splitext(os.path.basename(filename))[0]
+                test_name = "test_{}".format(os.path.splitext(
+                                             os.path.basename(filename))[0])
                 _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
                 _dict["{}_style".format(test_name)] = gen_test_style(filename)
 
