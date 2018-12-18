@@ -164,7 +164,7 @@ def process_data(dataset_fn, dest_dn):
                     ph, ph_qc = row[30:32]
 
                     # Write the observation data to a file
-                    obs_dir = os.path.join(files_dn, exp, 'obs%05d' % i)
+                    obs_dir = os.path.join(files_dn, exp, 'obs{:05d}'.format(i))
                     if not os.path.isdir(obs_dir):
                         os.makedirs(obs_dir)
 
