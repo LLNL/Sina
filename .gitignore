@@ -7,7 +7,7 @@
 *.coverage
 .tox/
 tests/run_tests
-python/tests/test_venv
+tests/test_venv
 cover/
 dist/
 examples/*/.ipynb_checkpoints/*
@@ -17,7 +17,7 @@ docs/source/generated_docs
 docs/build/
 
 */migrations/*
-python/venv/*
+venv/*
 
 nosetests*.xml*
 
