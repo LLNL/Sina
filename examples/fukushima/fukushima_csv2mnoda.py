@@ -140,14 +140,20 @@ def process_data(dataset_fn, dest_dn):
 
     # Now process the Fukushima data CSV file
     mdata = FukushimaData(files_dn)
-    with open(input_fn, "r") as ifd:
+
+    try:
+        ifd = open(input_fn, "r", newline='', encoding='ISO-8859-1')  # Py3
+    except Exception:
+        ifd = open(input_fn, "rb")  # Py2
+
+    with ifd as csv_file:
         last_exp_id = ''
         header = ''
         obs = []
 
-        creader = csv.reader(ifd, delimiter=',')
+        csv_reader = csv.reader(csv_file, delimiter=',')
         try:
-            for i, row in enumerate(creader):
+            for i, row in enumerate(csv_reader):
                 if i > 0 and len(row[0]) > 0:
                     obs_dt = datetime.datetime.strptime(row[0],
                                                         '%m/%d/%Y %I:%M:%S %p')
@@ -182,12 +188,12 @@ def process_data(dataset_fn, dest_dn):
 
         except csv.Error as cerr:
             print("ERROR: {}: line {}: {}".
-                  format(dataset_fn, creader.line_num, str(cerr)))
+                  format(dataset_fn, csv_reader.line_num, str(cerr)))
             sys.exit(1)
 
         except Exception as exc:
             print("ERROR: {}: line {}: {}: {}".
-                  format(dataset_fn, creader.line_num,
+                  format(dataset_fn, csv_reader.line_num,
                          exc.__class__.__name__, str(exc)))
             traceback.print_exc()
             sys.exit(1)
