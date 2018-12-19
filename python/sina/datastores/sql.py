@@ -86,6 +86,45 @@ class RecordDAO(dao.RecordDAO):
                                              mimetype=entry.get('mimetype'),
                                              tags=tags))
 
+    @abstractmethod
+    def data_query(self, **kwargs):
+        """
+        Return the ids of all Records whose data fulfill some criteria.
+
+        Criteria are expressed as keyword arguments. Each keyword
+        is the name of an entry in a Record's data field, and it's set
+        equal to a either a single value or a DataRange (see utils.DataRanges
+        for more info) that expresses the desired value/range of values.
+        All criteria must be satisfied for an ID to be returned:
+
+            # Return ids of all Records with a volume of 12, a quadrant of
+            # "NW", AND a max_height >=30 and <40.
+            data_query(volume=12, quadrant="NW", max_height=DataRange(30,40))
+
+        :param **kwargs: Pairs of the names of data and the criteria that data
+                         must fulfill.
+        :returns: A list of ids of Records who fulfill all criteria.
+        """
+        ids = []
+        scalar_query = self.session.query(schema.ScalarData.id)
+        string_requirements = self.session.query(schema.StringData.id)
+        for (data_name, criteria) in kwargs:
+
+        return ids
+
+        """
+                LOGGER.debug('Getting all records with scalars within the following '
+                             'ranges: {}'.format(scalar_range_list))
+                query = self.session.query(schema.ScalarData.id)
+                query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
+                if ids_only:
+                    for x in query.all():
+                        yield x[0]
+                else:
+                    filtered_ids = (x[0] for x in query.all())
+                    for record in self.get_many(filtered_ids):
+                        yield record"""
+
     def get(self, id):
         """
         Given a id, return match (if any) from SQL database.
@@ -159,82 +198,53 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
-    # TODO: While not part of the original implementation, we now have
-    # the ability to store non-scalar data as well, so we'll need a query
-    # to search on them, as well as a more user-facing query that can be
-    # given a list of data and call both this and the aforementioned method.
-    def get_given_scalars(self, scalar_range_list, ids_only=False):
+    # get_given_scalar(s) was removed because, given the removal of
+    # ScalarRanges, any code using it would have broken anyways.
+
+    def _apply_scalar_ranges_to_query(self, query, data, table):
         """
-        Return all records with scalars fulfilling some criteria.
+        Filter query object based on list of (name, criteria).
 
-        Note that this is a logical 'and'--the record must satisfy every
-        conditional provided (which is also why this can't simply call
-        get_given_scalar() as get_many() does with get()).
-
-        :param scalar_range_list: A list of 'sina.ScalarRange's describing the
-                                 different criteria.
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of Records fitting the criteriaor (if ids_only) a
-                  generator of their ids
-        """
-        LOGGER.debug('Getting all records with scalars within the following '
-                     'ranges: {}'.format(scalar_range_list))
-        query = self.session.query(schema.ScalarData.id)
-        query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
-        if ids_only:
-            for x in query.all():
-                yield x[0]
-        else:
-            filtered_ids = (x[0] for x in query.all())
-            for record in self.get_many(filtered_ids):
-                yield record
-
-    def get_given_scalar(self, scalar_range, ids_only=False):
-        """
-        Return all records with scalars fulfilling some criteria.
-
-        :param scalar_range: A sina.ScalarRange describing the criteria.
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of Records fitting the criteria or (if ids_only) a
-                  generator of their ids
-        """
-        return self.get_given_scalars([scalar_range], ids_only=ids_only)
-
-    def _apply_scalar_ranges_to_query(self, query, scalars):
-        """
-        Filter query object based on list of ScalarRanges.
+        Criteria can be either DataRanges or individual values ("cat", 4, etc).
+        This is only meant to be used in conjunction with data_query() and
+        related.
 
         Uses parameter substitution to get around limitations of SQLAlchemy OR
-        construct.
+        construct. Note that we still use AND logic; the "or" is used in
+        conjunction with a count statement because each data entry is its own
+        row, and we need to use AND across rows (and with respect to the record
+        id).
 
         :param query: A SQLAlchemy query object
-        :param scalars: A list of ScalarRanges to apply to the query object
+        :param scalars: A list of DataRanges to apply to the query object
+        :param table: The table to query against, either ScalarData or
+                      StringData
 
-        :returns: <query>, now filtering on <scalars>
+        :returns: <query>, now filtering on <data>
         """
-        LOGGER.debug('Filtering <query={}> with <scalars={}>.'.format(query, scalars))
+        LOGGER.debug('Filtering <query={}> with <data={}>.'.format(query, scalars))
         search_args = {}
-        for index, scalar in enumerate(scalars):
-            search_args["scalar_name{}".format(index)] = scalar.name
-            search_args["min{}".format(index)] = scalar.min
-            search_args["max{}".format(index)] = scalar.max
+        for index, data in enumerate(data):
+            name, criteria = data
+            search_args["value_name{}".format(index)] = name
+            if isinstance(criteria, DataRange):
+                search_args["min{}".format(index)] = criteria.min
+                search_args["max{}".format(index)] = criteria.max
+            else:
+                search_args["eq{}".format(index)] = criteria
 
         query = query.filter(sqlalchemy
-                             .or_(self._build_range_filter(scalar, index)
+                             .or_(self._build_range_filter(name, criteria, index)
                                   for index, scalar in enumerate(scalars)))
-        query = (query.group_by(schema.ScalarData.id)
+        query = (query.group_by(schema.table.id)
                       .having(sqlalchemy.text("{} = {}"
                               .format(sqlalchemy.func
-                                      .count(schema.ScalarData.id),
+                                      .count(schema.table.id),
                                       len(scalars)))))
         query = query.params(search_args)
         return query
 
-    def _build_range_filter(self, scalar, index=0):
+    def _build_range_filter(self, name, criteria, table, index=0):
         """
         Build a TextClause to filter a SQL query using range parameters.
 
@@ -245,40 +255,38 @@ class RecordDAO(dao.RecordDAO):
 
         WHERE ScalarData.name=:scalar_name0 AND ScalarData.value<right_num0
 
-        :param scalar: The scalar used to build the query.
+        :param name: The name of the value we apply the criteria to
+        :param criteria: The criteria used to build the query.
+        :param table: The table to query against, either ScalarData or
+                      StringData
         :param index: optional offset of this criteria if using multiple
                       criteria. Used for building var names for
                       parameterization.
 
         :returns: a TextClause object for use in a SQLAlchemy statement
         """
-        LOGGER.debug('Building TextClause filter from <scalar={}> and index={}.'
-                     .format(scalar, index))
-        conditions = ["(ScalarData.name IS :scalar_name{} AND ScalarData.value"
-                      .format(index)]
+        LOGGER.debug('Building TextClause filter for data "{}" with criteria'
+                     '<{}> and index={}.'
+                     .format(name, criteria, index))
+        conditions = ["({table}.name IS :value_name{index} AND {table}.value"
+                      .format(table=table, index=index)]
 
-        scalar.validate_and_standardize_range()
-
-        # Check if both sides of the range are the same number (not None)
-        # Used for a small simplification: '=[5,5]' == '=5'
-        if (scalar.min is not None) and (scalar.min == scalar.max):
-            conditions.append(" = :min{}".format(index))
-
-        # If both sides are None, we're only testing that a number exists
-        elif scalar.min is None and scalar.max is None:
-            conditions.append(" IS NOT NULL")
-
-        else:
-            if scalar.min is not None:
-                conditions.append(" >= " if scalar.min_inclusive else " > ")
+        # We previously used range objects whether it was a range or single
+        # value, but now we just check type.
+        if isinstance(criteria, DataRange):
+            if criteria.min is not None:
+                conditions.append(" >= " if criteria.min_inclusive else " > ")
                 conditions.append(":min{}".format(index))
-            if (scalar.min is not None) and (scalar.max is not None):
-                # If two-sided range, begin preparing new condition
-                conditions.append(" AND ScalarData.value ")
+            # If two-sided range, begin preparing new condition
+            if (criteria.min is not None) and (criteria.max is not None):
+                conditions.append(" AND {}.value ".format(table))
             if scalar.max is not None:
-                conditions.append(" <= " if scalar.max_inclusive else " < ")
+                conditions.append(" <= " if criteria.max_inclusive else " < ")
                 conditions.append(":max{}".format(index))
-
+        else:  # Single value
+            conditions.append(" = :eq{}".format(index))
+        # This helper method should NEVER see a (None, None) range due to the
+        # special way they need handled (figuring out what table they belong to)
         conditions.append(")")
         return sqlalchemy.text(''.join(conditions))
 
