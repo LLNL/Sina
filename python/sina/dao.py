@@ -95,6 +95,27 @@ class RecordDAO(object):
             self.insert(item)
 
     @abstractmethod
+    def data_query(self, **kwargs):
+        """
+        Return the ids of all Records whose data fulfill some criteria.
+
+        Criteria are expressed as keyword arguments. Each keyword
+        is the name of an entry in a Record's data field, and it's set
+        equal to a either a single value or a DataRange (see utils.DataRanges
+        for more info) that expresses the desired value/range of values.
+        All criteria must be satisfied for an ID to be returned:
+
+            # Return ids of all Records with a volume of 12, a quadrant of
+            # "NW", AND a max_height >=30 and <40.
+            data_query(volume=12, quadrant="NW", max_height=DataRange(30,40))
+
+        :param **kwargs: Pairs of the names of data and the criteria that data
+                         must fulfill.
+        :returns: A list of ids of Records who fulfill all criteria.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_all_of_type(self, type):
         """
         Given a type of Record, return all Records of that type.
