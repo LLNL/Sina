@@ -5,10 +5,13 @@ import logging
 import sqlalchemy
 import json
 from collections import defaultdict
+from numbers import Number
+from six import string_types
 
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.sql_schema as schema
+from sina.utils import DataRange
 
 LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +89,6 @@ class RecordDAO(dao.RecordDAO):
                                              mimetype=entry.get('mimetype'),
                                              tags=tags))
 
-    @abstractmethod
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
@@ -105,25 +107,50 @@ class RecordDAO(dao.RecordDAO):
                          must fulfill.
         :returns: A list of ids of Records who fulfill all criteria.
         """
-        ids = []
-        scalar_query = self.session.query(schema.ScalarData.id)
-        string_requirements = self.session.query(schema.StringData.id)
-        for (data_name, criteria) in kwargs:
-
-        return ids
-
-        """
-                LOGGER.debug('Getting all records with scalars within the following '
-                             'ranges: {}'.format(scalar_range_list))
-                query = self.session.query(schema.ScalarData.id)
-                query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
-                if ids_only:
-                    for x in query.all():
-                        yield x[0]
-                else:
-                    filtered_ids = (x[0] for x in query.all())
-                    for record in self.get_many(filtered_ids):
-                        yield record"""
+        scalar_criteria = []
+        string_criteria = []
+        for data_name, criteria in kwargs.items():
+            if (isinstance(criteria, Number) or
+                    (isinstance(criteria, DataRange) and
+                     criteria.is_numeric_range())):
+                scalar_criteria.append((data_name, criteria))
+            elif (isinstance(criteria, string_types) or
+                    (isinstance(criteria, DataRange) and
+                     criteria.is_lexographic_range())):
+                string_criteria.append((data_name, criteria))
+            else:
+                # A null range; we don't know what table to look in
+                # While we may support this in the future, we don't now.
+                raise ValueError("data_query() does not support null DataRanges")
+        if scalar_criteria:
+            scalar_query = self.session.query(schema.ScalarData.id)
+            scalar_query = self._apply_ranges_to_query(scalar_query,
+                                                       scalar_criteria,
+                                                       schema.ScalarData)
+        if string_criteria:
+            string_query = self.session.query(schema.StringData.id)
+            string_query = self._apply_ranges_to_query(string_query,
+                                                       string_criteria,
+                                                       schema.StringData)
+        #  If we have more than one set of data, we need to perform a union
+        if scalar_criteria and string_criteria:
+            viable_string_ids = set(x[0] for x in string_query.all())
+            for result in scalar_query.all():
+                scalar_id = result[0]
+                if scalar_id in viable_string_ids:
+                    yield scalar_id
+        # Otherwise, just find whoever has something to return
+        elif scalar_criteria:
+            for x in scalar_query.all():
+                yield x[0]
+        elif string_criteria:
+            for x in string_query.all():
+                yield x[0]
+        # Can't use return in a yield function, thus empty generator
+        else:
+            for i in []:
+                yield i
+            return
 
     def get(self, id):
         """
@@ -201,7 +228,7 @@ class RecordDAO(dao.RecordDAO):
     # get_given_scalar(s) was removed because, given the removal of
     # ScalarRanges, any code using it would have broken anyways.
 
-    def _apply_scalar_ranges_to_query(self, query, data, table):
+    def _apply_ranges_to_query(self, query, data, table):
         """
         Filter query object based on list of (name, criteria).
 
@@ -218,15 +245,17 @@ class RecordDAO(dao.RecordDAO):
         :param query: A SQLAlchemy query object
         :param scalars: A list of DataRanges to apply to the query object
         :param table: The table to query against, either ScalarData or
-                      StringData
+                      StringData.
 
         :returns: <query>, now filtering on <data>
         """
-        LOGGER.debug('Filtering <query={}> with <data={}>.'.format(query, scalars))
+        LOGGER.debug('Filtering <query={}> with <data={}>.'.format(query, data))
         search_args = {}
+        range_components = []
         for index, data in enumerate(data):
             name, criteria = data
-            search_args["value_name{}".format(index)] = name
+            range_components.append((name, criteria, index))
+            search_args["name{}".format(index)] = name
             if isinstance(criteria, DataRange):
                 search_args["min{}".format(index)] = criteria.min
                 search_args["max{}".format(index)] = criteria.max
@@ -234,13 +263,12 @@ class RecordDAO(dao.RecordDAO):
                 search_args["eq{}".format(index)] = criteria
 
         query = query.filter(sqlalchemy
-                             .or_(self._build_range_filter(name, criteria, index)
-                                  for index, scalar in enumerate(scalars)))
-        query = (query.group_by(schema.table.id)
+                             .or_(self._build_range_filter(name, criteria, table, index)
+                                  for (name, criteria, index) in range_components))
+        query = (query.group_by(table.id)
                       .having(sqlalchemy.text("{} = {}"
-                              .format(sqlalchemy.func
-                                      .count(schema.table.id),
-                                      len(scalars)))))
+                              .format(sqlalchemy.func.count(table.id),
+                                      len(range_components)))))
         query = query.params(search_args)
         return query
 
@@ -268,9 +296,17 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Building TextClause filter for data "{}" with criteria'
                      '<{}> and index={}.'
                      .format(name, criteria, index))
-        conditions = ["({table}.name IS :value_name{index} AND {table}.value"
-                      .format(table=table, index=index)]
+        # SQLAlchemy's methods for substituting in table names are convoluted.
+        # A much simpler, clearer method:
+        if table == schema.ScalarData:
+            tablename = "ScalarData"
+        elif table == schema.StringData:
+            tablename = "StringData"
+        else:
+            raise ValueError("Given a bad table for data query: {}".format(table))
 
+        conditions = ["({table}.name IS :name{index} AND {table}.value"
+                      .format(table=tablename, index=index)]
         # We previously used range objects whether it was a range or single
         # value, but now we just check type.
         if isinstance(criteria, DataRange):
@@ -279,8 +315,8 @@ class RecordDAO(dao.RecordDAO):
                 conditions.append(":min{}".format(index))
             # If two-sided range, begin preparing new condition
             if (criteria.min is not None) and (criteria.max is not None):
-                conditions.append(" AND {}.value ".format(table))
-            if scalar.max is not None:
+                conditions.append(" AND {}.value ".format(tablename))
+            if criteria.max is not None:
                 conditions.append(" <= " if criteria.max_inclusive else " < ")
                 conditions.append(":max{}".format(index))
         else:  # Single value

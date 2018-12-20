@@ -14,7 +14,7 @@ import types
 
 import sina.datastores.sql as sina_sql
 import sina.datastores.sql_schema as schema
-from sina.utils import ScalarRange, import_json, export, _export_csv
+from sina.utils import DataRange, import_json, export, _export_csv
 from sina.model import Run, Record
 
 LOGGER = logging.getLogger(__name__)
@@ -42,10 +42,20 @@ def _populate_database_with_data(session):
     session.add(schema.ScalarData(id="spam3",
                                   name="spam_scal_2",
                                   value=10.5))
-    session.add(schema.StringData(id="spam3",
+    session.add(schema.StringData(id="spam1",
                                   name="val_data",
                                   value="runny",
                                   tags='["edible"]'))
+    session.add(schema.StringData(id="spam1",
+                                  name="val_data_2",
+                                  value="double yolks"))
+    session.add(schema.StringData(id="spam3",
+                                  name="val_data",
+                                  value="chewy",
+                                  tags='["edible"]'))
+    session.add(schema.StringData(id="spam3",
+                                  name="val_data_2",
+                                  value="double yolks"))
     session.commit()
 
 
@@ -127,14 +137,15 @@ class TestSQL(unittest.TestCase):
         self.assertEquals(canonical['records'][1]['application'],
                           child.application)
         child_from_uri = list(run_factory.get_given_document_uri("foo.png"))
-        child_scalar = ScalarRange(name="scalar-1", min=387.6,
-                                   min_inclusive=True, max=387.6,
-                                   max_inclusive=True)
-        child_from_scalar = list(run_factory.get_given_scalar(child_scalar))
+        child_scalar = DataRange(min=387.6,
+                                 min_inclusive=True, max=387.6,
+                                 max_inclusive=True)
+        child_from_scalar_id = list(run_factory.data_query(scalar_1=child_scalar))
+        full_record = run_factory.get(child_from_scalar_id[0])
         self.assertEquals(canonical['records'][1]['application'],
-                          child.application)
+                          full_record.application)
         self.assertEquals(child.id, child_from_uri[0].id)
-        self.assertEquals(child.id, child_from_scalar[0].id)
+        self.assertEquals(child.id, full_record.id)
         self.assertEquals(canonical['relationships'][0]['predicate'],
                           relation[0].predicate)
 
@@ -312,12 +323,10 @@ class TestSQL(unittest.TestCase):
                                    {"uri": "ham.curve", "tags": ["hammy"]}],
                             user_defined={})
         record_dao.insert(vals_files)
-        scal = ScalarRange(name="foo", min=12, min_inclusive=True,
-                           max=12, max_inclusive=True)
-        returned_record = next(record_dao.get_given_scalar(scal))
-        self.assertEquals(returned_record.id, vals_files.id)
-        no_scal = ScalarRange(name="bar", min=1, min_inclusive=True)
-        self.assertFalse(list(record_dao.get_given_scalar(no_scal)))
+        returned_record_id = next(record_dao.data_query(foo=12))
+        self.assertEquals(returned_record_id, vals_files.id)
+        no_scal = DataRange(min=1, min_inclusive=False)
+        self.assertFalse(list(record_dao.data_query(bar=no_scal)))
         file_match = next(record_dao.get_given_document_uri(uri="ham.png"))
         self.assertEquals(file_match.id, vals_files.id)
 
@@ -351,69 +360,87 @@ class TestSQL(unittest.TestCase):
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam3", "spam4"])
 
-    @patch(__name__+'.sina_sql.RecordDAO.get')
-    def test_recorddao_scalar(self, mock_get):
-        """Test that RecordDAO is retrieving based on scalars correctly."""
-        mock_get.return_value = True
+    def test_recorddao_scalar_data_query(self):
+        """Test that RecordDAO is retrieving based one scalar correctly."""
         factory = sina_sql.DAOFactory()
         record_dao = factory.createRecordDAO()
         _populate_database_with_data(factory.session)
-        too_big_range = ScalarRange(name="spam_scal", max=9,
-                                    max_inclusive=True)
-        too_big = record_dao.get_given_scalar(too_big_range)
-        self.assertFalse(list(too_big))
-        too_small_range = ScalarRange(name="spam_scal", min=10.99999,
-                                      min_inclusive=False)
-        too_small = record_dao.get_given_scalar(too_small_range)
-        self.assertFalse(list(too_small))
-        just_right_range = ScalarRange(name="spam_scal", min=0,
-                                       min_inclusive=True, max=300,
-                                       max_inclusive=True)
-        just_right = record_dao.get_given_scalar(just_right_range)
-        self.assertEqual(len(list(just_right)), 3)
-        nonexistant_range = ScalarRange(name="not_here", min=0,
-                                        min_inclusive=True, max=300,
-                                        max_inclusive=True)
-        no_scalar = record_dao.get_given_scalar(nonexistant_range)
-        self.assertFalse(list(no_scalar))
-        multi_range = ScalarRange(name="spam_scal")
-        multi = record_dao.get_given_scalar(multi_range)
-        self.assertEqual(len(list(multi)), 3)
-        self.assertEqual(mock_get.call_count, 6)
-        ids_only = record_dao.get_given_scalar(multi_range, ids_only=True)
-        self.assertIsInstance(ids_only, types.GeneratorType,
+        too_big_range = DataRange(max=9, max_inclusive=True)
+        too_big = record_dao.data_query(spam_scal=too_big_range)
+        self.assertIsInstance(too_big, types.GeneratorType,
                               "Method must return generator.")
-        ids_only = list(ids_only)
-        self.assertEqual(len(ids_only), 3)
-        self.assertIsInstance(ids_only[0], six.string_types)
-        six.assertCountEqual(self, ids_only, ["spam", "spam2", "spam3"])
+        self.assertFalse(list(too_big))
+        too_small_range = DataRange(min=10.99999, min_inclusive=False)
+        too_small = record_dao.data_query(spam_scal=too_small_range)
+        self.assertFalse(list(too_small))
+        just_right_range = DataRange(min=0, max=300, max_inclusive=True)
+        just_right = record_dao.data_query(spam_scal=just_right_range)
+        self.assertEqual(len(list(just_right)), 3)
+        no_scalar = record_dao.data_query(nonexistant_scalar=just_right_range)
+        self.assertFalse(list(no_scalar))
+        multi_range = DataRange(min=-100, max=100)
+        multi = record_dao.data_query(spam_scal=multi_range)
+        multi_list = list(multi)
+        self.assertEqual(len(multi_list), 3)
+        six.assertCountEqual(self, multi_list, ["spam", "spam2", "spam3"])
 
-    @patch(__name__+'.sina_sql.RecordDAO.get')
-    def test_recorddao_many_scalar(self, mock_get):
+    def test_recorddao_many_scalar_data_query(self):
         """Test that RecordDAO's retrieving on multiple scalars correctly."""
-        mock_get.return_value = True
         factory = sina_sql.DAOFactory()
         record_dao = factory.createRecordDAO()
         _populate_database_with_data(factory.session)
-        spam_and_spam_3 = ScalarRange(name="spam_scal", min=10,
-                                      min_inclusive=True)
-        spam_3_only = ScalarRange(name="spam_scal_2", max=100)
-        one = record_dao.get_given_scalars([spam_and_spam_3,
-                                            spam_3_only])
-        self.assertEqual(len(list(one)), 1)
-        none_fulfill = ScalarRange(name="nonexistant", max=100)
-        none = record_dao.get_given_scalars([spam_and_spam_3,
-                                             spam_3_only,
-                                             none_fulfill])
-        self.assertFalse(list(none))
-        id_only = record_dao.get_given_scalars([spam_and_spam_3,
-                                               spam_3_only],
-                                               ids_only=True)
-        self.assertIsInstance(id_only, types.GeneratorType,
+        spam_and_spam_3 = DataRange(min=10)
+        one = record_dao.data_query(spam_scal=spam_and_spam_3,
+                                    spam_scal_2=10.5)  # Matches spam_3 only
+        self.assertIsInstance(one, types.GeneratorType,
                               "Method must return a generator.")
-        id_only = list(id_only)
-        self.assertEqual(len(id_only), 1)
-        self.assertEqual(id_only[0], "spam3")
+        self.assertEqual(len(list(one)), 1)
+        none = record_dao.data_query(spam_scal=spam_and_spam_3,
+                                     nonexistant=10101010)
+        self.assertFalse(list(none))
+
+    def test_recorddao_string_data_query(self):
+        """Test that RecordDAO is retrieving based on string(s) correctly."""
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+
+        # With one arg
+        too_big_range = DataRange(max="awesome", max_inclusive=True)
+        too_big = record_dao.data_query(val_data=too_big_range)
+        self.assertIsInstance(too_big, types.GeneratorType,
+                              "Method must return generator.")
+        self.assertFalse(list(too_big))
+
+        too_small_range = DataRange(min="xtra_crunchy", min_inclusive=False)
+        too_small = record_dao.data_query(val_data=too_small_range)
+        self.assertFalse(list(too_small))
+
+        just_right_range = DataRange(min="astounding", max="runny", max_inclusive=True)
+        just_right = record_dao.data_query(val_data=just_right_range)
+        just_right_list = list(just_right)
+        self.assertEqual(len(just_right_list), 2)
+        six.assertCountEqual(self, just_right_list, ["spam1", "spam3"])
+
+        no_scalar = record_dao.data_query(nonexistant_scalar=just_right_range)
+        self.assertFalse(list(no_scalar))
+
+        # With multiple args
+        one = record_dao.data_query(val_data=DataRange("runny"),  # Matches 1 only
+                                    val_data_2="double yolks")  # Matches 1 and 3
+        self.assertEqual(len(list(one)), 1)
+
+    def test_recorddao_data_query_strings_and_records(self):
+        """Test that the RecordDAO is retrieving on scalars correctly."""
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+
+        just_3 = record_dao.data_query(spam_scal=DataRange(10.1, 400),  # 2 and 3
+                                       val_data_2="double yolks")  # 1 and 3
+        just_3_list = list(just_3)
+        self.assertEqual(len(just_3_list), 1)
+        self.assertEqual(just_3_list[0], "spam3")
 
     def test_recorddao_type(self):
         """Test the RecordDAO is retrieving based on type correctly."""
@@ -495,7 +522,7 @@ class TestSQL(unittest.TestCase):
                                                               "val_data"])
         six.assertCountEqual(self, for_many["spam3"]["val_data"].keys(),
                                                     ["value", "tags"])
-        self.assertEqual(for_many["spam3"]["val_data"]["value"], "runny")
+        self.assertEqual(for_many["spam3"]["val_data"]["value"], "chewy")
         self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible"])
 
         for_none = record_dao.get_data_for_records(id_list=["nope", "nada"],
@@ -593,11 +620,10 @@ class TestSQL(unittest.TestCase):
                    version="0.4", user_defined={"eggs": "spam"})
         run_dao.record_DAO.insert(rec)
         run_dao.insert_many([run, run2])
-        multi_range = ScalarRange(name="spam_scal")
-        multi_scalar = list(run_dao.get_given_scalar(multi_range))
+        multi_scalar = list(run_dao.data_query(spam_scal=DataRange(-500, 500)))
         self.assertEqual(len(multi_scalar), 2)
         # They're returned in primary key order
-        spam_run = multi_scalar[0]
+        spam_run = run_dao.get(multi_scalar[0])
         self.assertEquals(spam_run.user, run.user)
         self.assertEquals(spam_run.raw, run.raw)
 
