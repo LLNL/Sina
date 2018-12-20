@@ -243,50 +243,6 @@ def parse_data_string(data_string):
     return clean_data
 
 
-def parse_scalars(scalar_args):
-    """
-    Parse commandline input into ScalarRange object(s).
-
-    Ex: "speed=[3,4), speed=[3,4)" returns two ScalarRanges, each  with the
-    name "speed." The resulting ScalarRange is min inclusive, max exclusive,
-    and has a range of 3.0 to 4.0.
-
-    :params scalar_args: The "scalar" argument provided by the user
-
-    :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
-
-    :returns: a list of ScalarRange objects.
-
-    """
-    LOGGER.debug('Parsing command line args <{}> into ScalarRange objects.'
-                 .format(scalar_args))
-    raw_scalars = filter(None, scalar_args.strip("\"").split(" "))
-    clean_scalars = []
-
-    for entry in raw_scalars:
-        components = entry.split("=")
-        name = components[0]
-
-        # Make sure scalar's of the form <foo>=<bar>
-        if len(components) < 2 or len(components[1]) == 0:
-            raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
-        val_range = components[1].split(",")
-        scalar = ScalarRange(name)
-
-        if len(val_range) == 1:
-            scalar.set_equal(val_range[0])
-            clean_scalars.append(scalar)
-        elif is_grouped_as_range(components[1]) and len(val_range) == 2:
-            scalar.set_min(val_range[0])
-            scalar.set_max(val_range[1])
-            clean_scalars.append(scalar)
-        else:
-            raise ValueError('Bad specifier in range for {}. See -h'
-                             .format(name))
-
-    return clean_scalars
-
-
 def is_grouped_as_range(range_string):
     """
     Return whether a string, ex: (2,3], begins & ends in valid range-grouping characters.
@@ -439,8 +395,8 @@ class DataRange(object):
         """
         return(isinstance(other, DataRange) and self.__dict__ == other.__dict__)
 
-    def is_numerical_range(self):
-        """Return whether the DataRange describes a numerical range."""
+    def is_numeric_range(self):
+        """Return whether the DataRange describes a numeric range."""
         return (isinstance(self.min, Number) or isinstance(self.max, Number))
 
     def is_lexographic_range(self):

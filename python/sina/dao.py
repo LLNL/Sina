@@ -115,6 +115,10 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def get_given_data(self, **kwargs):
+        """Alias of data_query() to fit historical naming convention."""
+        return self.data_query(**kwargs)
+
     @abstractmethod
     def get_all_of_type(self, type):
         """
@@ -135,36 +139,6 @@ class RecordDAO(object):
         :param uri: The uri to use as a search term, such as "foo.png"
 
         :returns: A generator of matching records
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_given_scalars(self, scalar_range_list):
-        """
-        Return all records with scalars fulfilling some criteria.
-
-        Note that this is a logical 'and'--the record must satisfy every
-        conditional provided (which is also why this can't simply call
-        get_given_scalar() as get_many() does with get()).
-
-        :param scalar_range_list: A list of 'sina.ScalarRange's describing the
-                                 different criteria.
-
-        :returns: A generator of Records fitting the criteria
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_given_scalar(self, scalar_range):
-        """
-        Return all records where some scalar fulfills some criteria.
-
-        Example criteria: height > 20.0, 2 < volume <= inf, etc. See
-        sina.utils.ScalarRange for further info (import as sina.ScalarRange).
-
-        :param scalar_range: A 'sina.ScalarRange' describing the criteria.
-
-        :returns: A generator of Records fitting the criteria
         """
         raise NotImplementedError
 
@@ -389,7 +363,7 @@ class RunDAO(object):
         for item in list_to_insert:
             self.insert(item)
 
-    def get_all(self):
+    def get_all(self, ids_only=False):
         """
         Return all Records with type 'run'.
 
@@ -397,27 +371,33 @@ class RunDAO(object):
         """
         # Collapsed TODO down, we can reindex on type
         # NYI in Cassandra
-        super(RunDAO, self).get_given_type(self, 'run')
+        return self.record_DAO.get_all_of_type('run', ids_only)
 
-    def get_given_scalar(self, scalar_range):
+    def data_query(self, **kwargs):
         """
-        Return runs where scalar_name's value is within some range.
-
-        Specifically, returns all Runs for which scalar_name
-        is between scalar_min and scalar_max (or, if both are None,
-        for which scalar_name exists)
-
-        Really just calls Record's implementation.
+        Call Record's implementation then filter on type.
 
         :param scalar_range: A sina.ScalarRange describing the criteria
 
-        :returns: A generator of Runs fitting the criteria
+        :returns: A generator of run ids fitting the criteria
         """
-        records = self.record_DAO.get_given_scalar(scalar_range)
+        run_gen = self.get_all(ids_only=True)
+        if run_gen is not None:
+            run_ids = set(run_gen)
+        else:
+            # Yield empty
+            for i in []:
+                yield i
+            return
+        records = self.record_DAO.data_query(**kwargs)
         if records:
             for record in records:
-                if record.type == "run":
-                    yield self._convert_record_to_run(record)
+                if record in run_ids:
+                    yield record
+
+    def get_given_data(self, **kwargs):
+        """Alias data_query()."""
+        return self.data_query(**kwargs)
 
     def get_given_document_uri(self, uri):
         """

@@ -132,11 +132,11 @@ class TestSinaUtils(unittest.TestCase):
         numerical = DataRange(min=1)
         lexographic = DataRange(max="foo_c")
         empty = DataRange()
-        self.assertTrue(numerical.is_numerical_range())
+        self.assertTrue(numerical.is_numeric_range())
         self.assertFalse(numerical.is_lexographic_range())
         self.assertTrue(lexographic.is_lexographic_range())
-        self.assertFalse(lexographic.is_numerical_range())
-        self.assertFalse(empty.is_numerical_range())
+        self.assertFalse(lexographic.is_numeric_range())
+        self.assertFalse(empty.is_numeric_range())
         self.assertFalse(empty.is_lexographic_range())
 
     def test_data_range_string_setters_with_scalars(self):
