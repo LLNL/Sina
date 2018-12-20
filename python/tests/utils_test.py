@@ -195,9 +195,8 @@ class TestSinaUtils(unittest.TestCase):
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
         both_sides_equal = DataRange("nw", "nw", max_inclusive=True)
         none = ""
-        self.assertEqual(("speed", basic_case),
-                         sina.utils.parse_data_string(just_one)[0])
-        few_list = sina.utils.parse_data_string(a_few)
-        self.assertEqual(("speed", flipped_inclusivity), few_list[0])
-        self.assertEqual(("quadrant", both_sides_equal), few_list[1])
+        self.assertEqual(basic_case, sina.utils.parse_data_string(just_one)["speed"])
+        few_dict = sina.utils.parse_data_string(a_few)
+        self.assertEqual(flipped_inclusivity, few_dict["speed"])
+        self.assertEqual(both_sides_equal, few_dict["quadrant"])
         self.assertFalse(sina.utils.parse_data_string(none))
