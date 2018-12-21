@@ -222,7 +222,8 @@ def parse_data_string(data_string):
         if len(components) < 2 or len(components[1]) == 0:
             raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
         val_range = components[1].split(",")
-        data_range = DataRange()
+        # Dummy DataRange as we can't have an empty range, will be set below.
+        data_range = DataRange(float("-inf"), float("inf"))
 
         if len(val_range) == 1:
             val = val_range[0]
@@ -369,8 +370,7 @@ class DataRange(object):
         self.min_inclusive = min_inclusive
         self.max = max
         self.max_inclusive = max_inclusive
-        if self.min is not None and self.max is not None:
-            self.validate_and_standardize_range()
+        self.validate_and_standardize_range()
 
     def __repr__(self):
         """Return a comprehensive (debug) representation of a DataRange."""
@@ -386,6 +386,22 @@ class DataRange(object):
                                    (self.min if self.min is not None else "-inf"),
                                    (self.max if self.max is not None else "inf"),
                                    ("]" if self.max_inclusive else ")"))
+
+    def __contains__(self, value):
+        """
+        Check whether a value falls within a DataRange.
+
+        :param other: The value to check.
+        """
+        if self.min is not None:
+            greater_than_min = value >= self.min if self.min_inclusive else value > self.min
+        else:
+            greater_than_min = True
+        if self.max is not None:
+            less_than_max = value <= self.max if self.max_inclusive else value < self.max
+        else:
+            less_than_max = True
+        return less_than_max and greater_than_min
 
     def __eq__(self, other):
         """
@@ -495,6 +511,8 @@ class DataRange(object):
                            ex [2,[-1,-2]], or mismatched types ex [4, "4"]
         """
         LOGGER.debug('Validating and standardizing range of: {}'.format(self))
+        if self.min is None and self.max is None:
+            raise ValueError("Null DataRange; min or max must be defined")
         try:
             # Case 1: min or max is number. Other must be number or None.
             if isinstance(self.min, Number) or isinstance(self.max, Number):

@@ -225,9 +225,6 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
-    # get_given_scalar(s) was removed because, given the removal of
-    # ScalarRanges, any code using it would have broken anyways.
-
     def _apply_ranges_to_query(self, query, data, table):
         """
         Filter query object based on list of (name, criteria).
