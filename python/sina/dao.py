@@ -101,7 +101,7 @@ class RecordDAO(object):
 
         Criteria are expressed as keyword arguments. Each keyword
         is the name of an entry in a Record's data field, and it's set
-        equal to a either a single value or a DataRange (see utils.DataRanges
+        equal to either a single value or a DataRange (see utils.DataRanges
         for more info) that expresses the desired value/range of values.
         All criteria must be satisfied for an ID to be returned:
 
@@ -367,7 +367,9 @@ class RunDAO(object):
         """
         Return all Records with type 'run'.
 
-        :returns: A list of all Records which are runs
+        :param ids_only: whether to return only the ids of matching Runs
+                         (used for further filtering)
+        :returns: A list of all Records which are Runs
         """
         # Collapsed TODO down, we can reindex on type
         # NYI in Cassandra
@@ -382,18 +384,13 @@ class RunDAO(object):
         :returns: A generator of run ids fitting the criteria
         """
         run_gen = self.get_all(ids_only=True)
-        if run_gen is not None:
-            run_ids = set(run_gen)
-        else:
-            # Yield empty
-            for i in []:
-                yield i
+        if run_gen is None:
             return
-        records = self.record_DAO.data_query(**kwargs)
-        if records:
-            for record in records:
-                if record in run_ids:
-                    yield record
+        matched_records = set(self.record_DAO.data_query(**kwargs))
+        if matched_records:
+            for run in run_gen:
+                if run in matched_records:
+                    yield run
 
     def get_given_data(self, **kwargs):
         """Alias data_query()."""

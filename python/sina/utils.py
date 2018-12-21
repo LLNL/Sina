@@ -412,11 +412,25 @@ class DataRange(object):
         return(isinstance(other, DataRange) and self.__dict__ == other.__dict__)
 
     def is_numeric_range(self):
-        """Return whether the DataRange describes a numeric range."""
+        """
+        Return whether the DataRange describes a numeric range.
+
+        We know that if one is a Number, the other must be a Number or None,
+        because we perform validation when they're changed. If the other is
+        None, it's still a numeric range, albeit open on one side
+        (x<4 vs 3<x<4).
+        """
         return (isinstance(self.min, Number) or isinstance(self.max, Number))
 
     def is_lexographic_range(self):
-        """Return whether the DataRange describes a lexographic range."""
+        """
+        Return whether the DataRange describes a lexographic range.
+
+        We know that if one is a string, the other must be a string or None,
+        because we perform validation when they're changed. If the other is
+        None, it's still a lexographic range, albeit open on one side
+        (x<"dog" vs "cat"<x<"dog").
+        """
         return (isinstance(self.min, string_types) or isinstance(self.max, string_types))
 
     def parse_min(self, min_range):

@@ -95,7 +95,7 @@ class RecordDAO(dao.RecordDAO):
 
         Criteria are expressed as keyword arguments. Each keyword
         is the name of an entry in a Record's data field, and it's set
-        equal to a either a single value or a DataRange (see utils.DataRanges
+        equal to either a single value or a DataRange (see utils.DataRanges
         for more info) that expresses the desired value/range of values.
         All criteria must be satisfied for an ID to be returned:
 
@@ -134,11 +134,9 @@ class RecordDAO(dao.RecordDAO):
                                                        schema.StringData)
         #  If we have more than one set of data, we need to perform a union
         if scalar_criteria and string_criteria:
-            viable_string_ids = set(x[0] for x in string_query.all())
-            for result in scalar_query.all():
-                scalar_id = result[0]
-                if scalar_id in viable_string_ids:
-                    yield scalar_id
+            and_query = scalar_query.intersect(string_query)
+            for x in and_query.all():
+                yield x[0]
         # Otherwise, just find whoever has something to return
         elif scalar_criteria:
             for x in scalar_query.all():
@@ -146,11 +144,9 @@ class RecordDAO(dao.RecordDAO):
         elif string_criteria:
             for x in string_query.all():
                 yield x[0]
-        # Can't use return in a yield function, thus empty generator
+        # No kwargs is bad usage
         else:
-            for i in []:
-                yield i
-            return
+            raise ValueError("You must supply at least one criteria.")
 
     def get(self, id):
         """
@@ -240,7 +236,7 @@ class RecordDAO(dao.RecordDAO):
         id).
 
         :param query: A SQLAlchemy query object
-        :param scalars: A list of DataRanges to apply to the query object
+        :param data: A list of (name, DataRange) pairs to apply to the query object
         :param table: The table to query against, either ScalarData or
                       StringData.
 
@@ -249,15 +245,22 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Filtering <query={}> with <data={}>.'.format(query, data))
         search_args = {}
         range_components = []
+        # Performing an intersection on two SQLAlchemy queries, as in data_query(),
+        # causes their parameters to merge and overwrite any shared names.
+        # Here, we guarantee our params will have unique names per table.
+        if table == schema.ScalarData:
+            offset = ""
+        elif table == schema.StringData:
+            offset = "_1"
         for index, data in enumerate(data):
             name, criteria = data
             range_components.append((name, criteria, index))
-            search_args["name{}".format(index)] = name
+            search_args["name{}{}".format(index, offset)] = name
             if isinstance(criteria, DataRange):
-                search_args["min{}".format(index)] = criteria.min
-                search_args["max{}".format(index)] = criteria.max
+                search_args["min{}{}".format(index, offset)] = criteria.min
+                search_args["max{}{}".format(index, offset)] = criteria.max
             else:
-                search_args["eq{}".format(index)] = criteria
+                search_args["eq{}{}".format(index, offset)] = criteria
 
         query = query.filter(sqlalchemy
                              .or_(self._build_range_filter(name, criteria, table, index)
@@ -289,6 +292,8 @@ class RecordDAO(dao.RecordDAO):
                       parameterization.
 
         :returns: a TextClause object for use in a SQLAlchemy statement
+
+        :raises ValueError: if given a bad table to query against.
         """
         LOGGER.debug('Building TextClause filter for data "{}" with criteria'
                      '<{}> and index={}.'
@@ -297,27 +302,29 @@ class RecordDAO(dao.RecordDAO):
         # A much simpler, clearer method:
         if table == schema.ScalarData:
             tablename = "ScalarData"
+            offset = ""
         elif table == schema.StringData:
             tablename = "StringData"
+            offset = "_1"
         else:
             raise ValueError("Given a bad table for data query: {}".format(table))
 
-        conditions = ["({table}.name IS :name{index} AND {table}.value"
-                      .format(table=tablename, index=index)]
+        conditions = ["({table}.name IS :name{index}{offset} AND {table}.value"
+                      .format(table=tablename, index=index, offset=offset)]
         # We previously used range objects whether it was a range or single
         # value, but now we just check type.
         if isinstance(criteria, DataRange):
             if criteria.min is not None:
                 conditions.append(" >= " if criteria.min_inclusive else " > ")
-                conditions.append(":min{}".format(index))
+                conditions.append(":min{}{}".format(index, offset))
             # If two-sided range, begin preparing new condition
             if (criteria.min is not None) and (criteria.max is not None):
                 conditions.append(" AND {}.value ".format(tablename))
             if criteria.max is not None:
                 conditions.append(" <= " if criteria.max_inclusive else " < ")
-                conditions.append(":max{}".format(index))
+                conditions.append(":max{}{}".format(index, offset))
         else:  # Single value
-            conditions.append(" = :eq{}".format(index))
+            conditions.append(" = :eq{}{}".format(index, offset))
         # This helper method should NEVER see a (None, None) range due to the
         # special way they need handled (figuring out what table they belong to)
         conditions.append(")")

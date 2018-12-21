@@ -56,6 +56,9 @@ def _populate_database_with_data(session):
     session.add(schema.StringData(id="spam3",
                                   name="val_data_2",
                                   value="double yolks"))
+    session.add(schema.StringData(id="spam4",
+                                  name="val_data_2",
+                                  value="double yolks"))
     session.commit()
 
 
@@ -431,13 +434,13 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(list(one)), 1)
 
     def test_recorddao_data_query_strings_and_records(self):
-        """Test that the RecordDAO is retrieving on scalars correctly."""
+        """Test that the RecordDAO is retrieving on scalars and strings correctly."""
         factory = sina_sql.DAOFactory()
         record_dao = factory.createRecordDAO()
         _populate_database_with_data(factory.session)
 
         just_3 = record_dao.data_query(spam_scal=DataRange(10.1, 400),  # 2 and 3
-                                       val_data_2="double yolks")  # 1 and 3
+                                       val_data_2="double yolks")  # 1, 3, and 4
         just_3_list = list(just_3)
         self.assertEqual(len(just_3_list), 1)
         self.assertEqual(just_3_list[0], "spam3")
