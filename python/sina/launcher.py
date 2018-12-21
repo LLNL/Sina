@@ -20,6 +20,7 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 from cassandra.cluster import Cluster
 from sqlite3 import connect
 
+from sina import model
 from sina import utils
 from sina.utils import import_many_jsons, import_json, parse_scalars, create_file
 import sina.datastores.cass as cass
@@ -242,8 +243,30 @@ def add_query_subparser(subparsers):
 def add_compare_subparser(subparsers):
     """Add subparser for performing queries on backends."""
     parser_compare = subparsers.add_parser(
-        'query', help='perform a comparison against two records. '
-                      'See "sina compare -h" for more information.')
+        'compare', help='perform a comparison against two records. '
+                        'See "sina compare -h" for more information.')
+    required = parser_compare.add_argument_group("required arguments")
+    required.add_argument(COMMON_SHORT_OPTION_DATABASE,
+                          COMMON_OPTION_DATABASE, type=str,
+                          dest='database', required=True,
+                          help='URI of database to query.\n'
+                          'For Cassandra: <IP>[:port], use {}'
+                          ' to specify keyspace. '
+                          'For SQLite: <filepath>'
+                          .format(COMMON_OPTION_CASSANDRA_DEST))
+    parser_compare.add_argument(COMMON_OPTION_CASSANDRA_DEST, type=str,
+                                dest='cass_keyspace',
+                                help='If using a Cassandra database, the '
+                                'keyspace to use. Ignored by other database '
+                                'types.')
+    parser_compare.add_argument(COMMON_OPTION_DATABASE_TYPE, type=str,
+                                dest='database_type',
+                                help='Type of database to query. Sina '
+                                'will try to infer this from {} if '
+                                'that is provided, but {} is not.'
+                                .format(COMMON_OPTION_DATABASE,
+                                        COMMON_OPTION_DATABASE_TYPE),
+                                choices=['cass', 'sql'])
     parser_compare.add_argument('id_one', type=str,
                                 help='The first id of the record to compare.')
     parser_compare.add_argument('id_two', type=str,
@@ -478,8 +501,43 @@ def compare_records(args):
     """
     Run logic for comparing records.
 
+    :params args: (ArgumentParser, req) Command line args that tell us what
+        pattern and database to use.
+
+    :raises ValueError: if there's an issue with flags (bad filetype, etc)
     """
-    raise NotImplementedError()
+    LOGGER.info('Comparing {} to {}.'.format(args.id_one, args.id_two))
+    error_message = []
+    if not args.database_type:
+        args.database_type = _get_guessed_database_type(args.database)
+        if not args.database_type:
+            error_message.append("{flag} not provided and unable "
+                                 "to guess type from source. Please "
+                                 "specify {flag}. Currently, "
+                                 "only cass and sql are supported for "
+                                 "querying."
+                                 .format(flag=COMMON_OPTION_DATABASE_TYPE))
+        elif args.database_type not in ('cass', 'sql'):
+            error_message.append("Currently, comparing is only supported when "
+                                 "querying sql files or Cassandra.")
+    if args.database_type == 'cass' and (not args.cass_keyspace):
+        error_message.append("{} not provided. In "
+                             "the future, it will be possible to "
+                             "set a default. For now, please "
+                             "specify it to continue!"
+                             .format(COMMON_OPTION_CASSANDRA_DEST))
+    if error_message:
+        msg = "\n".join(error_message)
+        LOGGER.error(msg)
+        raise ValueError(msg)
+    record_dao = _make_factory(args=args).createRecordDAO()
+    try:
+        ddiff = record_dao.compare_records_ids(args.id_one, args.id_two)
+        model.pprint_deep_diff(deep_diff=ddiff,
+                               id_one=args.id_one,
+                               id_two=args.id_two)
+    except ValueError as e:
+        print(e)
 
 
 def version():
@@ -570,6 +628,8 @@ def main():
             export(args)
         elif args.subparser_name == 'query':
             query(args)
+        elif args.subparser_name == 'compare':
+            compare_records(args)
         else:
             msg = 'No supported args given: {}'.format(args)
             LOGGER.error(msg)

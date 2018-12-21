@@ -64,5 +64,5 @@ class TestRecordDAO(unittest.TestCase):
         self.assertEqual(kwargs3['report_repetition'], False)
         self.assertEqual(kwargs3['significant_digits'], None)
         self.assertEqual(kwargs3['verbose_level'], 2)
-        self.assertEqual(kwargs3['view'], 'text')
+        self.assertEqual(kwargs3['view'], 'tree')
         self.assertEqual(mock_compare.call_count, 1)

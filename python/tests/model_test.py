@@ -2,11 +2,14 @@
 
 import unittest
 import json
+import sys
+from six.moves import cStringIO as StringIO
 from mock import patch, MagicMock
 
 from sina.model import Record
 import sina.model as model
 
+from pprint import pprint
 
 class TestModel(unittest.TestCase):
     """Unit tests for the model utility methods."""
@@ -21,7 +24,8 @@ class TestModel(unittest.TestCase):
                                        "bar": {"value": "1",
                                                "tags": ["in"]}},
                                  files=[{"uri": "ham.png", "mimetype": "png"},
-                                        {"uri": "ham.curve", "tags": ["hammy"]}],
+                                        {"uri": "ham.curve", "tags":
+                                        ["hammy"]}],
                                  user_defined={})
         self.record_two = Record(id="spam",
                                  type="new_eggs",
@@ -29,16 +33,28 @@ class TestModel(unittest.TestCase):
                                        "bar": {"value": "1",
                                                "tags": ["in"]}},
                                  files=[{"uri": "ham.png", "mimetype": "png"},
-                                        {"uri": "ham.curve", "tags": ["hammy"]}],
+                                        {"uri": "ham.curve", "tags":
+                                        ["hammy"]}],
                                  user_defined={})
         self.record_three = Record(id="spam2",
                                    type="super_eggs",
                                    data={"foo": {"value": 13},
                                          "bar": {"value": "1",
                                                  "tags": ["in"]}},
-                                   files=[{"uri": "ham.png", "mimetype": "png"},
-                                          {"uri": "ham.curve", "tags": ["hammy"]}],
+                                   files=[{"uri": "ham.png", "mimetype":
+                                           "png"},
+                                          {"uri": "ham.curve", "tags":
+                                          ["hammy"]}],
                                    user_defined={})
+        self.record_four = Record(id="spam4",
+                                  type="new_eggs",
+                                  data={"foo": {"value": 12},
+                                        "bar": {"value": "1",
+                                                "tags": ["in"]}},
+                                  files=[{"uri": "ham.png", "mimetype": "png"},
+                                         {"uri": "ham.curve", "tags":
+                                         ["hammy"]}],
+                                  user_defined={})
 
     # Record
     def test_is_valid(self):
@@ -69,7 +85,8 @@ class TestModel(unittest.TestCase):
         spam.files = [{"uri": "spam.log", "tags": "output"}]
         self.assertFalse(spam.is_valid()[0])
 
-        spam.files = [{"uri": "spam.log", "mimetype": "text/plain", "tags": ["output"]}]
+        spam.files = [{"uri": "spam.log", "mimetype": "text/plain", "tags":
+                      ["output"]}]
 
         spam.type = "recipe"
 
@@ -227,7 +244,8 @@ class TestModel(unittest.TestCase):
                      }
         with self.assertRaises(ValueError) as context:
             model.generate_run_from_json(json_input=json_input)
-        self.assertIn("Missing required key <'application'>.", str(context.exception))
+        self.assertIn("Missing required key <'application'>.",
+                      str(context.exception))
 
     def test_compare_records_equal(self):
         """
@@ -240,12 +258,56 @@ class TestModel(unittest.TestCase):
         """
         Check records that are not equivalent return DeepDiff detailing diff.
         """
-        ddiff = model.compare_records(self.record_one, self.record_three)
+        ddiff = model.compare_records(self.record_one, self.record_three,
+                                      view='text')
         self.assertTrue(ddiff)
+        pprint(ddiff)
         self.assertEqual(ddiff,  {'values_changed':
                                   {"root['id']":
                                    {'new_value': 'spam2', 'old_value': 'spam'},
                                    "root['data']['foo']['value']":
                                    {'new_value': 13, 'old_value': 12},
                                    "root['type']":
-                                   {'new_value': 'super_eggs', 'old_value': 'new_eggs'}}})
+                                   {'new_value': 'super_eggs', 'old_value':
+                                    'new_eggs'}}})
+
+    def test_pprint_deep_diff_equal(self):
+        """
+        Check we print an empty text table when comparing an empty ddiff.
+        """
+        ddiff = model.compare_records(self.record_one, self.record_one)
+        try:
+            # Grab stdout and send to string io
+            sys.stdout = StringIO()
+            model.pprint_deep_diff(deep_diff=ddiff,
+                                   id_one='spam',
+                                   id_two='spam')
+            std_output = sys.stdout.getvalue()
+            self.assertEqual(std_output, '+-----+------+------+\n'
+                                         '| key | spam | spam |\n'
+                                         '+=====+======+======+\n'
+                                         '+-----+------+------+\n\n')
+        finally:
+            # Reset stdout
+            sys.stdout = sys.__stdout__
+
+    def test_pprint_deep_diff_not_equal(self):
+        """
+        Check we print the correct text table when comparing a nonempty ddiff.
+        """
+        ddiff = model.compare_records(self.record_one, self.record_four)
+        try:
+            # Grab stdout and send to string io
+            sys.stdout = StringIO()
+            model.pprint_deep_diff(deep_diff=ddiff,
+                                   id_one='spam',
+                                   id_two='spam4')
+            std_output = sys.stdout.getvalue()
+            self.assertEqual(std_output, '+--------+------+-------+\n'
+                                         '|  key   | spam | spam4 |\n'
+                                         '+========+======+=======+\n'
+                                         '| [\'id\'] | spam | spam4 |\n'
+                                         '+--------+------+-------+\n\n')
+        finally:
+            # Reset stdout
+            sys.stdout = sys.__stdout__

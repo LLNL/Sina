@@ -7,6 +7,7 @@ and Relationships, it will not differ between backends, ex: Cassandra and sql.
 """
 from abc import ABCMeta, abstractmethod
 import logging
+from sqlalchemy.orm.exc import NoResultFound
 
 from sina import model
 
@@ -217,7 +218,7 @@ class RecordDAO(object):
                             verbose_level=2,
                             exclude_paths=[],
                             exclude_types=[],
-                            view='text'):
+                            view='tree'):
         """
         Given two record ids, get the records and compare them.
 
@@ -231,7 +232,7 @@ class RecordDAO(object):
 
         :param id_one: string. The id of the first record to compare.
         :param id_two: string. The id of the second record to compare.
-        :param ignore_order: boolean, default False. Ignores orders for
+        :param ignore_order: boolean, default True. Ignores orders for
                              iterables.
         :paramreport_repetition:  boolean, default False. Reports repetitions
                                   when set True.
@@ -246,14 +247,27 @@ class RecordDAO(object):
                               exclude from the report.
         :param exclude_types: list, default empty list. List of object types to
                                exclude from the report.
-        :param view: string, default 'text'. Support 'text' or 'tree'. Text is
+        :param view: string, default 'tree'. Support 'text' or 'tree'. Text is
                      the regular output. Tree allows you to traverse through
                      the tree of the changed items.
+        :raises ValueError: If given an id that we can't find.
         :returns: A DeepDiff object.
         """
         LOGGER.debug('Comparing id={} vs id={}'.format(id_one, id_two))
-        record_one = self.get(id=id_one)
-        record_two = self.get(id=id_two)
+        try:
+            record_one = self.get(id=id_one)
+        except NoResultFound:
+            msg = 'Could not find record with id <{}>. Check id and '\
+                  'database.'.format(id_one)
+            LOGGER.error(msg)
+            raise ValueError(msg)
+        try:
+            record_two = self.get(id=id_two)
+        except NoResultFound:
+            msg = 'Could not find record with id <{}>. Check id and '\
+                  'database.'.format(id_two)
+            LOGGER.error(msg)
+            raise ValueError(msg)
         return model.compare_records(record_one=record_one,
                                      record_two=record_two,
                                      ignore_order=ignore_order,
