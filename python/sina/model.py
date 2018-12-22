@@ -4,10 +4,8 @@ import json
 import logging
 import collections
 import six
-import os
 
 import deepdiff
-from pprint import pprint
 from texttable import Texttable
 
 logging.basicConfig()
