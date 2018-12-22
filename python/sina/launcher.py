@@ -501,10 +501,10 @@ def compare_records(args):
     """
     Run logic for comparing records.
 
-    :params args: (ArgumentParser, req) Command line args that tell us what
-        pattern and database to use.
+    :params args: (ArgumentParser, req) Command line args that tell us
+        what pattern and database to use.
 
-    :raises ValueError: if there's an issue with flags (bad filetype, etc)
+    :raises ValueError: if there's an issue with flags (bad record id)
     """
     LOGGER.info('Comparing {} to {}.'.format(args.id_one, args.id_two))
     error_message = []

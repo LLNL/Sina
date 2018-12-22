@@ -234,15 +234,15 @@ class RecordDAO(object):
         :param id_two: string. The id of the second record to compare.
         :param ignore_order: boolean, default True. Ignores orders for
                              iterables.
-        :paramreport_repetition:  boolean, default False. Reports repetitions
-                                  when set True.
+        :paramreport_repetition: boolean, default False. Reports repetitions
+                                 when set True.
         :param significant_digits: int >= 0, default None. Digits after the
                                    decimal point.
         :param verbose_level: int >=0. Default 2.
                               0: Won't report values when type changed.
                               1: DeepDiff default.
                               2: Will report values when custom objects or
-                                 dictionaries have items added or removed.
+                              dictionaries have items added or removed.
         :param exclude_paths: list, default empty list. List of paths to
                               exclude from the report.
         :param exclude_types: list, default empty list. List of object types to

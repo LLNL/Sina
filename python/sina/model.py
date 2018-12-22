@@ -382,7 +382,7 @@ def compare_records(record_one,
     :param record_two: The second record object to compare.
     :param ignore_order: boolean, default True. Ignores orders for
                          iterables.
-    :param report_repetition:  boolean, default False. Reports repetitions
+    :param report_repetition: boolean, default False. Reports repetitions
                               when set True.
     :param significant_digits: int >= 0, default None. Digits after the
                                decimal point.
@@ -390,7 +390,7 @@ def compare_records(record_one,
                           0: Won't report values when type changed.
                           1: DeepDiff default.
                           2: Will report values when custom objects or
-                             dictionaries have items added or removed.
+                          dictionaries have items added or removed.
     :param exclude_paths: list, default empty list. List of paths to
                           exclude from the report.
     :param exclude_types: list, default empty list. List of object types to

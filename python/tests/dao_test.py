@@ -44,6 +44,7 @@ class TestRecordDAO(unittest.TestCase):
         """
         Check that we get the records of the ids and call compare_records().
         """
+        RecordDAO.__abstractmethods__ = set()
         record_dao = RecordDAO()
         record_dao.compare_records_ids(self.record_one.id,
                                        self.record_three.id)

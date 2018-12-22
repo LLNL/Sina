@@ -4,12 +4,10 @@ import unittest
 import json
 import sys
 from six.moves import cStringIO as StringIO
-from mock import patch, MagicMock
 
 from sina.model import Record
 import sina.model as model
 
-from pprint import pprint
 
 class TestModel(unittest.TestCase):
     """Unit tests for the model utility methods."""
@@ -261,7 +259,6 @@ class TestModel(unittest.TestCase):
         ddiff = model.compare_records(self.record_one, self.record_three,
                                       view='text')
         self.assertTrue(ddiff)
-        pprint(ddiff)
         self.assertEqual(ddiff,  {'values_changed':
                                   {"root['id']":
                                    {'new_value': 'spam2', 'old_value': 'spam'},
