@@ -239,7 +239,7 @@ class RecordDAO(object):
         :param significant_digits: int >= 0, default None. Digits after the
                                    decimal point.
         :param verbose_level: int >=0. Default 2.
-                              0: Won’t report values when type changed.
+                              0: Won't report values when type changed.
                               1: DeepDiff default.
                               2: Will report values when custom objects or
                                  dictionaries have items added or removed.
