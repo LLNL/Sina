@@ -18,6 +18,11 @@ LOGGER = logging.getLogger(__name__)
 # String used to identify a sqlite database for SQLALchemy
 SQLITE = "sqlite:///"
 
+# Parameter offsets used when combining queries across tables
+# see _apply_ranges_to_query() for usage
+param_offsets = {schema.ScalarData: "",
+                 schema.StringData: "_1"}
+
 
 class RecordDAO(dao.RecordDAO):
     """The DAO specifically responsible for handling Records in SQL."""
@@ -248,12 +253,8 @@ class RecordDAO(dao.RecordDAO):
         # Performing an intersection on two SQLAlchemy queries, as in data_query(),
         # causes their parameters to merge and overwrite any shared names.
         # Here, we guarantee our params will have unique names per table.
-        if table == schema.ScalarData:
-            offset = ""
-        elif table == schema.StringData:
-            offset = "_1"
-        for index, data in enumerate(data):
-            name, criteria = data
+        offset = param_offsets[table]
+        for index, (name, criteria) in enumerate(data):
             range_components.append((name, criteria, index))
             search_args["name{}{}".format(index, offset)] = name
             if isinstance(criteria, DataRange):
@@ -298,14 +299,13 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Building TextClause filter for data "{}" with criteria'
                      '<{}> and index={}.'
                      .format(name, criteria, index))
+        offset = param_offsets[table]
         # SQLAlchemy's methods for substituting in table names are convoluted.
         # A much simpler, clearer method:
         if table == schema.ScalarData:
             tablename = "ScalarData"
-            offset = ""
         elif table == schema.StringData:
             tablename = "StringData"
-            offset = "_1"
         else:
             raise ValueError("Given a bad table for data query: {}".format(table))
 
