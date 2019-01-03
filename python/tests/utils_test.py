@@ -141,7 +141,7 @@ class TestSinaUtils(unittest.TestCase):
 
     def test_data_range_string_setters_with_scalars(self):
         """Test the functions that use strings to set up DataRanges with scalar vals."""
-        flipped_inclusivity = DataRange(1, 2e0, min_inclusive=False, max_inclusive=True)
+        flipped_inclusivity = DataRange(1, 2e100, min_inclusive=False, max_inclusive=True)
         flipped_inclusivity.parse_min("[0")
         self.assertEqual(flipped_inclusivity.min, 0)
         self.assertTrue(flipped_inclusivity.min_inclusive)
