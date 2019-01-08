@@ -96,7 +96,7 @@ MORE_FILES = [
 MNODA_FN = 'AMS_C12_SeaData.json'
 
 # Status interval
-STATUS_INTERVAL = 1000
+STATUS_INTERVAL = 100
 
 # The units and description for each value
 UNITS = [
@@ -187,6 +187,11 @@ def process_data(dataset_fn, dest_dn, display_status=False):
                 elif i == 0:
                     header = row
 
+                    # Let the user know the purpose of the dots
+                    if display_status:
+                        print('Processing (. = {} rows): '.
+                               format(STATUS_INTERVAL), end='')
+
                 # Provide status feedback during processing
                 if display_status and (i % STATUS_INTERVAL) == 0:
                     print('.', end='')
@@ -195,6 +200,10 @@ def process_data(dataset_fn, dest_dn, display_status=False):
             if last_exp_id != '' and len(obs) > 0:
                 mdata.write_exp(last_exp_id, obs)
                 mdata.add_exp(last_exp_id)
+
+            # Generate a newline to ensure a clean status display
+            if display_status:
+                print('')
 
         except csv.Error as csv_err:
             print("ERROR: {}: line {}: {}".

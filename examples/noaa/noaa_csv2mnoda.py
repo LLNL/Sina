@@ -184,9 +184,19 @@ def process_data(dataset_fn, dest_dn, display_status=False):
                     mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
                                   o2_qc, ph, ph_qc)
 
+                elif i == 0:
+                    # Let the user know the purpose of the dots
+                    if display_status:
+                        print('Processing (. = {} rows): '.
+                              format(STATUS_INTERVAL), end='')
+
                 # Provide status feedback during processing
-                if display_status and (i % 10) == 0:
+                if display_status and (i % STATUS_INTERVAL) == 0:
                     print('.', end='')
+
+            # Generate a newline to ensure a clean status display
+            if display_status:
+                print('')
 
         except csv.Error as csv_err:
             print("ERROR: {}: line {}: {}".
