@@ -120,16 +120,28 @@ class TestSinaUtils(unittest.TestCase):
     def test_data_range_equality(self):
         """Test the DataRange equality operator."""
         basic_case = DataRange(1, 2)
-        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        flipped_inclusivity = DataRange(1, 2e0, min_inclusive=False, max_inclusive=True)
         with_strings = DataRange("foo_a", "foo_c")
         basic_case_again = DataRange(1, 2)
         self.assertEqual(basic_case, basic_case_again)
         self.assertNotEqual(basic_case, flipped_inclusivity)
         self.assertNotEqual(basic_case, with_strings)
 
+    def test_data_range_identity(self):
+        """Test functions that return what kind of range the DataRange is."""
+        numerical = DataRange(min=1)
+        lexographic = DataRange(max="foo_c")
+        empty = DataRange()
+        self.assertTrue(numerical.is_numeric_range())
+        self.assertFalse(numerical.is_lexographic_range())
+        self.assertTrue(lexographic.is_lexographic_range())
+        self.assertFalse(lexographic.is_numeric_range())
+        self.assertFalse(empty.is_numeric_range())
+        self.assertFalse(empty.is_lexographic_range())
+
     def test_data_range_string_setters_with_scalars(self):
         """Test the functions that use strings to set up DataRanges with scalar vals."""
-        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        flipped_inclusivity = DataRange(1, 2e100, min_inclusive=False, max_inclusive=True)
         flipped_inclusivity.parse_min("[0")
         self.assertEqual(flipped_inclusivity.min, 0)
         self.assertTrue(flipped_inclusivity.min_inclusive)
