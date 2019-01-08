@@ -45,6 +45,7 @@ Data Source: https://catalog.data.gov/dataset/\
  with direct download link:
     https://www.nodc.noaa.gov/cgi-bin/OAS/prd/accession/download/123467
 """
+from __future__ import print_function
 
 import argparse
 import csv
@@ -99,14 +100,19 @@ ph          = {}
 ph_qc       = {}
 """
 
+# Status interval
+STATUS_INTERVAL = 100
 
-def process_data(dataset_fn, dest_dn):
+
+def process_data(dataset_fn, dest_dn, show_status=False):
     """
     Process the NOAA data.
 
     :param dataset_fn: qualified name of the NOAA CSV file
     :param dest_dn: destination data directory (i.e., path to where the NOAA
                     files and data are to be written
+    :param show_status: True if status markers are to be displayed; False
+                           otherwise
     """
     if not os.path.exists(dataset_fn):
         raise ValueError('Expected the data set filename ({}) to exist'.
@@ -178,15 +184,29 @@ def process_data(dataset_fn, dest_dn):
                     mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
                                   o2_qc, ph, ph_qc)
 
-        except csv.Error as ce:
+                elif i == 0:
+                    # Let the user know the purpose of the dots
+                    if show_status:
+                        print('Processing (. = {} rows): '.
+                              format(STATUS_INTERVAL), end='')
+
+                # Provide status feedback during processing
+                if show_status and (i % STATUS_INTERVAL) == 0:
+                    print('.', end='')
+
+            # Generate a newline to ensure a clean status display
+            if show_status:
+                print('')
+
+        except csv.Error as csv_err:
             print("ERROR: {}: line {}: {}".
-                  format(dataset_fn, csv_reader.line_num, str(ce)))
+                  format(dataset_fn, csv_reader.line_num, str(csv_err)))
             sys.exit(1)
 
-        except Exception as exc:
+        except Exception as err:
             print("ERROR: {}: line {}: {}: {}".
                   format(dataset_fn, csv_reader.line_num,
-                         exc.__class__.__name__, str(exc)))
+                         err.__class__.__name__, str(err)))
             traceback.print_exc()
             sys.exit(1)
 
@@ -223,19 +243,14 @@ class NoaaData(object):
         """
         lfiles = []
         lfiles.append({"uri": os.path.join(self.files_dn, DATA_FN),
-                       "mimetype": "text/csv",
-                       "tags": ["data"]})
+                       "mimetype": "text/csv", "tags": ["data"]})
 
         for extra_fn, tag, mtype in MORE_FILES:
             lfiles.append({"uri": os.path.join(self.files_dn,
                                                os.path.basename(extra_fn)),
                            "mimetype": mtype, "tags": [tag]})
 
-        self.recs.append({
-            "type": "exp",
-            "id": exp,
-            "files": lfiles
-            })
+        self.recs.append({"type": "exp", "id": exp, "files": lfiles})
 
     def add_exp2obs(self, exp, obs):
         """
@@ -313,6 +328,10 @@ def main():
                     'file to facilitate subsequent access from Jupyter '
                     'notebooks.')
 
+    parser.add_argument('-s', '--show-status', action='store_true',
+                        help='Display a dot for every {} lines processed'.
+                             format(STATUS_INTERVAL))
+
     parser.add_argument('csv_pathname',
                         help='The pathname to the CSV file, which needs to '
                              'end in WCOA11-01-06-2015_data.csv.')
@@ -326,7 +345,7 @@ def main():
     args = parser.parse_args()
 
     # Process the NOAA data.
-    process_data(args.csv_pathname, args.dest_dirname)
+    process_data(args.csv_pathname, args.dest_dirname, args.show_status)
 
 
 if __name__ == "__main__":
