@@ -298,9 +298,9 @@ class FukushimaData(object):
                        "mimetype": "text/csv", "tags": ["data"]})
 
         for extra_fn, tag, mtype in MORE_FILES:
-            path = os.path.join(os.path.dirname(self.files_dn), extra_fn)
-            if os.path.isfile(path):
-                lfiles.append({"uri": path, "mimetype": mtype, "tags": [tag]})
+            lfiles.append({"uri": os.path.join(os.path.dirname(self.files_dn),
+                                               extra_fn),
+                           "mimetype": mtype, "tags": [tag]})
 
         self.recs.append({"type": "source", "id": "AMS-C12", "files": lfiles})
 
