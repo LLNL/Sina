@@ -104,14 +104,14 @@ ph_qc       = {}
 STATUS_INTERVAL = 100
 
 
-def process_data(dataset_fn, dest_dn, display_status=False):
+def process_data(dataset_fn, dest_dn, show_status=False):
     """
     Process the NOAA data.
 
     :param dataset_fn: qualified name of the NOAA CSV file
     :param dest_dn: destination data directory (i.e., path to where the NOAA
                     files and data are to be written
-    :param display_status: True if status markers are to be displayed; False
+    :param show_status: True if status markers are to be displayed; False
                            otherwise
     """
     if not os.path.exists(dataset_fn):
@@ -186,16 +186,16 @@ def process_data(dataset_fn, dest_dn, display_status=False):
 
                 elif i == 0:
                     # Let the user know the purpose of the dots
-                    if display_status:
+                    if show_status:
                         print('Processing (. = {} rows): '.
                               format(STATUS_INTERVAL), end='')
 
                 # Provide status feedback during processing
-                if display_status and (i % STATUS_INTERVAL) == 0:
+                if show_status and (i % STATUS_INTERVAL) == 0:
                     print('.', end='')
 
             # Generate a newline to ensure a clean status display
-            if display_status:
+            if show_status:
                 print('')
 
         except csv.Error as csv_err:
@@ -328,7 +328,7 @@ def main():
                     'file to facilitate subsequent access from Jupyter '
                     'notebooks.')
 
-    parser.add_argument('-d', '--display-status', action='store_true',
+    parser.add_argument('-s', '--show-status', action='store_true',
                         help='Display a dot for every {} lines processed'.
                              format(STATUS_INTERVAL))
 
@@ -345,7 +345,7 @@ def main():
     args = parser.parse_args()
 
     # Process the NOAA data.
-    process_data(args.csv_pathname, args.dest_dirname, args.display_status)
+    process_data(args.csv_pathname, args.dest_dirname, args.show_status)
 
 
 if __name__ == "__main__":
