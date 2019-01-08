@@ -116,6 +116,9 @@ class TestSinaUtils(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             DataRange(30, 1)
         self.assertIn('min must be <= max', str(context.exception))
+        with self.assertRaises(ValueError) as context:
+            DataRange()
+        self.assertIn('Null DataRange', str(context.exception))
 
     def test_data_range_equality(self):
         """Test the DataRange equality operator."""
@@ -127,17 +130,26 @@ class TestSinaUtils(unittest.TestCase):
         self.assertNotEqual(basic_case, flipped_inclusivity)
         self.assertNotEqual(basic_case, with_strings)
 
+    def test_data_range_contains(self):
+        """Test the DataRange contains operator."""
+        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        inf_max = DataRange(max=100)
+        with_strings = DataRange(min="foo_a", min_inclusive=False)
+        self.assertTrue(2 in flipped_inclusivity)
+        self.assertFalse(1 in flipped_inclusivity)
+        self.assertTrue(-999 in inf_max)
+        self.assertFalse(100 in inf_max)
+        self.assertTrue("foo_c" in with_strings)
+        self.assertFalse("foo_a" in with_strings)
+
     def test_data_range_identity(self):
         """Test functions that return what kind of range the DataRange is."""
         numerical = DataRange(min=1)
         lexographic = DataRange(max="foo_c")
-        empty = DataRange()
         self.assertTrue(numerical.is_numeric_range())
         self.assertFalse(numerical.is_lexographic_range())
         self.assertTrue(lexographic.is_lexographic_range())
         self.assertFalse(lexographic.is_numeric_range())
-        self.assertFalse(empty.is_numeric_range())
-        self.assertFalse(empty.is_lexographic_range())
 
     def test_data_range_string_setters_with_scalars(self):
         """Test the functions that use strings to set up DataRanges with scalar vals."""
@@ -195,9 +207,8 @@ class TestSinaUtils(unittest.TestCase):
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
         both_sides_equal = DataRange("nw", "nw", max_inclusive=True)
         none = ""
-        self.assertEqual(("speed", basic_case),
-                         sina.utils.parse_data_string(just_one)[0])
-        few_list = sina.utils.parse_data_string(a_few)
-        self.assertEqual(("speed", flipped_inclusivity), few_list[0])
-        self.assertEqual(("quadrant", both_sides_equal), few_list[1])
+        self.assertEqual(basic_case, sina.utils.parse_data_string(just_one)["speed"])
+        few_dict = sina.utils.parse_data_string(a_few)
+        self.assertEqual(flipped_inclusivity, few_dict["speed"])
+        self.assertEqual(both_sides_equal, few_dict["quadrant"])
         self.assertFalse(sina.utils.parse_data_string(none))

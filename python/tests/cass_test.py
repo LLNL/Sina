@@ -13,7 +13,7 @@ from nose.plugins.attrib import attr
 
 import sina.datastores.cass as sina_cass
 import sina.datastores.cass_schema as schema
-from sina.utils import ScalarRange, import_json
+from sina.utils import DataRange, import_json
 
 from sina.model import Run, Record
 
@@ -134,9 +134,9 @@ class TestSearch(unittest.TestCase):
                           child.application)
 
         child_from_uri = list(run_factory.get_given_document_uri("foo.png"))
-        child_scalar = ScalarRange(name="scalar-1", min=387.6,
-                                   min_inclusive=True, max=387.6,
-                                   max_inclusive=True)
+        child_scalar = DataRange(name="scalar-1", min=387.6,
+                                 min_inclusive=True, max=387.6,
+                                 max_inclusive=True)
         child_from_scalar = list(run_factory.get_given_scalar(child_scalar))
 
         self.assertEquals(child.id, child_from_uri[0].id)
@@ -203,11 +203,11 @@ class TestSearch(unittest.TestCase):
                             {"uri": "ham.curve",
                              "contents": "eggs"}])
         record_dao.insert(rec)
-        scal = ScalarRange(name="foo", min=12, min_inclusive=True,
-                           max=12, max_inclusive=True)
+        scal = DataRange(name="foo", min=12, min_inclusive=True,
+                         max=12, max_inclusive=True)
         returned_record = list(record_dao.get_given_scalar(scal))[0]
         self.assertEquals(returned_record.id, rec.id)
-        no_scal = ScalarRange(name="bar", min=1, min_inclusive=True)
+        no_scal = DataRange(name="bar", min=1, min_inclusive=True)
         self.assertFalse(list(record_dao.get_given_scalar(no_scal)))
         file_match = list(record_dao.get_given_document_uri(uri="ham.png"))[0]
         self.assertEquals(file_match.id, rec.id)
@@ -249,25 +249,25 @@ class TestSearch(unittest.TestCase):
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
         _populate_database_with_data()
-        too_big_range = ScalarRange(name="spam_scal", max=9,
-                                    max_inclusive=True)
+        too_big_range = DataRange(name="spam_scal", max=9,
+                                  max_inclusive=True)
         too_big = record_dao.get_given_scalar(too_big_range)
         self.assertFalse(list(too_big))
-        too_small_range = ScalarRange(name="spam_scal", min=10.99999,
-                                      min_inclusive=False)
+        too_small_range = DataRange(name="spam_scal", min=10.99999,
+                                    min_inclusive=False)
         too_small = record_dao.get_given_scalar(too_small_range)
         self.assertFalse(list(too_small))
-        just_right_range = ScalarRange(name="spam_scal", min=0,
-                                       min_inclusive=True, max=300,
-                                       max_inclusive=True)
+        just_right_range = DataRange(name="spam_scal", min=0,
+                                     min_inclusive=True, max=300,
+                                     max_inclusive=True)
         just_right = record_dao.get_given_scalar(just_right_range)
         self.assertEqual(len(list(just_right)), 3)
-        nonexistant_range = ScalarRange(name="not_here", min=0,
-                                        min_inclusive=True, max=300,
-                                        max_inclusive=True)
+        nonexistant_range = DataRange(name="not_here", min=0,
+                                      min_inclusive=True, max=300,
+                                      max_inclusive=True)
         no_scalar = record_dao.get_given_scalar(nonexistant_range)
         self.assertFalse(list(no_scalar))
-        multi_range = ScalarRange(name="spam_scal")
+        multi_range = DataRange(name="spam_scal")
         multi = list(record_dao.get_given_scalar(multi_range))
         self.assertEqual(len(multi), 3)
         self.assertEqual(mock_get.call_count, 6)
@@ -286,13 +286,13 @@ class TestSearch(unittest.TestCase):
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
         _populate_database_with_data()
-        spam_and_spam_3 = ScalarRange(name="spam_scal", min=10,
-                                      min_inclusive=True)
-        spam_3_only = ScalarRange(name="spam_scal_2", max=100)
+        spam_and_spam_3 = DataRange(name="spam_scal", min=10,
+                                    min_inclusive=True)
+        spam_3_only = DataRange(name="spam_scal_2", max=100)
         one = record_dao.get_given_scalars([spam_and_spam_3,
                                             spam_3_only])
         self.assertEqual(len(list(one)), 1)
-        none_fulfill = ScalarRange(name="nonexistant", max=100)
+        none_fulfill = DataRange(name="nonexistant", max=100)
         none = list(record_dao.get_given_scalars([spam_and_spam_3,
                                                  spam_3_only,
                                                  none_fulfill]))
@@ -487,7 +487,7 @@ class TestSearch(unittest.TestCase):
                    version="0.4", user_defined={"eggs": "spam"})
         run_dao.record_DAO.insert(rec)
         run_dao.insert_many([run, run2])
-        multi_range = ScalarRange(name="spam_scal")
+        multi_range = DataRange(name="spam_scal")
         multi_scalar = list(run_dao.get_given_scalar(multi_range))
         self.assertEqual(len(multi_scalar), 2)
         # They're returned in primary key order
