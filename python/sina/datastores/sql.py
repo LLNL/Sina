@@ -112,6 +112,8 @@ class RecordDAO(dao.RecordDAO):
                          must fulfill.
         :returns: A list of ids of Records who fulfill all criteria.
         """
+        LOGGER.debug('Finding all records fulfilling criteria: {}'
+                     .format(kwargs.items()))
         scalar_criteria = []
         string_criteria = []
         for data_name, criteria in kwargs.items():
@@ -151,7 +153,7 @@ class RecordDAO(dao.RecordDAO):
                 yield x[0]
         # No kwargs is bad usage
         else:
-            raise ValueError("You must supply at least one criteria.")
+            raise ValueError("You must supply at least one valid criteria.")
 
     def get(self, id):
         """
@@ -241,7 +243,7 @@ class RecordDAO(dao.RecordDAO):
         id).
 
         :param query: A SQLAlchemy query object
-        :param data: A list of (name, DataRange) pairs to apply to the query object
+        :param data: A list of (name, criteria) pairs to apply to the query object
         :param table: The table to query against, either ScalarData or
                       StringData.
 
