@@ -6,6 +6,7 @@ import json
 from mock import patch, MagicMock
 from nose.plugins.attrib import attr
 from six.moves import cStringIO as StringIO
+from sqlalchemy.orm.exc import NoResultFound
 
 from sina import launcher
 from sina.datastores import sql as sina_sql
@@ -200,36 +201,29 @@ class TestCLI(unittest.TestCase):
                       str(context.exception))
         mock_cass_query.assert_not_called()
 
-    @patch('sina.launcher.sql.RecordDAO.compare_records_ids')
-    @patch('sina.launcher.model.pprint_deep_diff')
-    def test_compare_records_good(self, mock_model_pprint,
-                                  mock_sql_compare):
+    @patch('sina.launcher.sql.RecordDAO.get')
+    @patch('sina.launcher.model.print_diff_records')
+    def test_compare_records_good(self, mock_model_print, mock_get):
         """Verify compare subcommand prints the correct output."""
         self.args.database = "fake.sqlite"
         self.args.id_one = "some_id"
         self.args.id_two = "another_id"
         launcher.compare_records(self.args)
-        mock_sql_compare.assert_called_once()
-        mock_sql_args = mock_sql_compare.call_args[0]
-        self.assertEqual(mock_sql_args, (self.args.id_one, self.args.id_two))
 
-        mock_model_pprint.assert_called_once()
-        mock_model_pprint_args = mock_model_pprint.call_args[1]
-        self.assertEqual(mock_model_pprint_args['id_one'], self.args.id_one)
-        self.assertEqual(mock_model_pprint_args['id_two'], self.args.id_two)
-        self.assertNotEqual(mock_model_pprint_args['deep_diff'], None)
+        self.assertEqual(mock_get.call_count, 2)
 
-    @patch('sina.launcher.sql.RecordDAO.compare_records_ids')
-    @patch('sina.launcher.model.pprint_deep_diff')
-    def test_compare_records_bad(self, mock_model_pprint,
-                                 mock_sql_compare):
+        mock_model_print.assert_called_once()
+
+    @patch('sina.launcher.sql.RecordDAO.get')
+    @patch('sina.launcher.model.print_diff_records')
+    def test_compare_records_bad(self, mock_model_print, mock_get):
         """Verify compare subcommand prints useful error if given a bad id."""
         self.args.database = "fake.sqlite"
         self.args.id_one = "bad_id"
         self.args.id_two = "another_id"
         error_msg = 'Could not find record with id <{}>. Check id and '\
                     'database.'.format(self.args.id_one)
-        mock_sql_compare.side_effect = ValueError(error_msg)
+        mock_get.side_effect = NoResultFound(error_msg)
 
         try:
             # Grab stdout and send to string io
@@ -240,9 +234,5 @@ class TestCLI(unittest.TestCase):
         finally:
             # Reset stdout
             sys.stdout = sys.__stdout__
-
-        mock_sql_compare.assert_called_once()
-        mock_sql_args = mock_sql_compare.call_args[0]
-        self.assertEqual(mock_sql_args, (self.args.id_one, self.args.id_two))
-        self.assertEqual(mock_model_pprint.call_count, 0)
+        self.assertEqual(mock_model_print.call_count, 0)
         self.assertEqual(std_output, error_msg)

@@ -19,6 +19,7 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 
 from cassandra.cluster import Cluster
 from sqlite3 import connect
+from sqlalchemy.orm.exc import NoResultFound
 
 from sina import model
 from sina import utils
@@ -533,11 +534,16 @@ def compare_records(args):
     record_dao = _make_factory(args=args).createRecordDAO()
     try:
         record_one = record_dao.get(args.id_one)
-        record_two = record_dao.get(args.id_two)
-        model.print_diff_records(record_one=record_one,
-                                 record_two=record_two)
-    except ValueError as e:
-        print(e)
+        try:
+            record_two = record_dao.get(args.id_two)
+            model.print_diff_records(record_one=record_one,
+                                     record_two=record_two)
+        except NoResultFound:
+            print('Could not find record with id <{}>. Check id and '
+                  'database.'.format(args.id_two))
+    except NoResultFound:
+        print('Could not find record with id <{}>. Check id and '
+              'database.'.format(args.id_one))
 
 
 def version():
