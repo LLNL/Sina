@@ -245,40 +245,13 @@ class TestModel(unittest.TestCase):
         self.assertIn("Missing required key <'application'>.",
                       str(context.exception))
 
-    def test_compare_records_equal(self):
-        """
-        Check records that are equivalent return an empty DeepDiff object.
-        """
-        ddiff = model.compare_records(self.record_one, self.record_two)
-        self.assertFalse(ddiff)
-
-    def test_compare_records_not_equal(self):
-        """
-        Check records that are not equivalent return DeepDiff detailing diff.
-        """
-        ddiff = model.compare_records(self.record_one, self.record_three,
-                                      view='text')
-        self.assertTrue(ddiff)
-        self.assertEqual(ddiff,  {'values_changed':
-                                  {"root['id']":
-                                   {'new_value': 'spam2', 'old_value': 'spam'},
-                                   "root['data']['foo']['value']":
-                                   {'new_value': 13, 'old_value': 12},
-                                   "root['type']":
-                                   {'new_value': 'super_eggs', 'old_value':
-                                    'new_eggs'}}})
-
     def test_pprint_deep_diff_equal(self):
-        """
-        Check we print an empty text table when comparing an empty ddiff.
-        """
-        ddiff = model.compare_records(self.record_one, self.record_one)
+        """Check we print an empty texttable when comparing an empty ddiff."""
         try:
             # Grab stdout and send to string io
             sys.stdout = StringIO()
-            model.pprint_deep_diff(deep_diff=ddiff,
-                                   id_one='spam',
-                                   id_two='spam')
+            model.print_diff_records(record_one=self.record_one,
+                                     record_two=self.record_one)
             std_output = sys.stdout.getvalue()
             self.assertEqual(std_output, '+-----+------+------+\n'
                                          '| key | spam | spam |\n'
@@ -289,22 +262,22 @@ class TestModel(unittest.TestCase):
             sys.stdout = sys.__stdout__
 
     def test_pprint_deep_diff_not_equal(self):
-        """
-        Check we print the correct text table when comparing a nonempty ddiff.
-        """
-        ddiff = model.compare_records(self.record_one, self.record_four)
+        """Check we print a correct texttable when comparing nonempty ddiff."""
         try:
             # Grab stdout and send to string io
             sys.stdout = StringIO()
-            model.pprint_deep_diff(deep_diff=ddiff,
-                                   id_one='spam',
-                                   id_two='spam4')
+            model.print_diff_records(record_one=self.record_one,
+                                     record_two=self.record_three)
             std_output = sys.stdout.getvalue()
-            self.assertEqual(std_output, '+--------+------+-------+\n'
-                                         '|  key   | spam | spam4 |\n'
-                                         '+========+======+=======+\n'
-                                         '| [\'id\'] | spam | spam4 |\n'
-                                         '+--------+------+-------+\n\n')
+            self.assertEqual(
+                std_output,
+                "+--------------------------+----------+------------+\n"
+                "|           key            |   spam   |   spam2    |\n"
+                "+==========================+==========+============+\n"
+                "| ['data']['foo']['value'] |    12    |     13     |\n"
+                "+--------------------------+----------+------------+\n"
+                "|         ['type']         | new_eggs | super_eggs |\n"
+                "+--------------------------+----------+------------+\n\n")
         finally:
             # Reset stdout
             sys.stdout = sys.__stdout__

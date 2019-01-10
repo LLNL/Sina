@@ -362,85 +362,37 @@ def generate_run_from_json(json_input):
     return run
 
 
-def compare_records(record_one,
-                    record_two,
-                    ignore_order=True,
-                    report_repetition=False,
-                    significant_digits=None,
-                    verbose_level=2,
-                    exclude_paths=[],
-                    exclude_types=[],
-                    view='tree'):
+def print_diff_records(record_one, record_two, significant_digits=None):
     """
-    Given two records, compare them.
+    Print a table showing the difference between two Records.
 
-    A comparison of two records consists of the following: Reporting any
-    differences between their keys and reporting any differences between
-    the values of the keys that are in both records.
-
-    :param record_one: The first record object to compare.
-    :param record_two: The second record object to compare.
-    :param ignore_order: boolean, default True. Ignores orders for
-                         iterables.
-    :param report_repetition: boolean, default False. Reports repetitions
-                              when set True.
+    :param record_one: The first record to compare.
+    :param record_two: The second record to compare.
     :param significant_digits: int >= 0, default None. Digits after the
                                decimal point.
-    :param verbose_level: int >=0. Default 2.
-                          0: Won't report values when type changed.
-                          1: DeepDiff default.
-                          2: Will report values when custom objects or
-                          dictionaries have items added or removed.
-    :param exclude_paths: list, default empty list. List of paths to
-                          exclude from the report.
-    :param exclude_types: list, default empty list. List of object types to
-                           exclude from the report.
-    :param view: string, default 'text'. Support 'text' or 'tree'. Text is
-                 the regular output. Tree allows you to traverse through
-                 the tree of the changed items.
-    :returns: A DeepDiff object.
     """
-    LOGGER.debug('Diffing records: {} and {}.'.format(record_one, record_two))
-    return deepdiff.DeepDiff(record_one.raw,
-                             record_two.raw,
-                             ignore_order=ignore_order,
-                             report_repetition=report_repetition,
-                             significant_digits=significant_digits,
-                             verbose_level=verbose_level,
-                             exclude_paths=exclude_paths,
-                             exclude_types=exclude_types,
-                             view=view)
+    deep_diff = deepdiff.DeepDiff(record_one.raw,
+                                  record_two.raw,
+                                  significant_digits=significant_digits,
+                                  verbose_level=2,
+                                  view='tree')
 
+    def get_diff_attribute(name):
+        return (list(zip(deep_diff[name]))
+                if name in deep_diff else [])
 
-def pprint_deep_diff(deep_diff, id_one, id_two):
-    """
-    Pretty print a DeepDiff object that represents a Record.
-
-    :param deep_diff: The DeepDiff object to pretty print.
-    """
-    titles = ['key', id_one, id_two]
-    values_changed = (list(zip(deep_diff['values_changed']))
-                      if 'values_changed' in deep_diff else [])
-    type_changes = (list(zip(deep_diff['type_changes']))
-                    if 'type_changes' in deep_diff else [])
-    iterable_item_removed = (list(zip(deep_diff['iterable_item_removed']))
-                             if 'iterable_item_removed' in deep_diff else [])
-    iterable_item_added = (list(zip(deep_diff['iterable_item_added']))
-                           if 'iterable_item_added' in deep_diff else [])
-    dict_item_removed = (list(zip(deep_diff['dictionary_item_removed']))
-                         if 'dictionary_item_removed' in deep_diff else [])
-    dict_item_added = (list(zip(deep_diff['dictionary_item_added']))
-                       if 'dictionary_item_added' in deep_diff else [])
-    set_item_added = (list(zip(deep_diff['set_item_added']))
-                      if 'set_item_added' in deep_diff else [])
-    set_item_removed = (list(zip(deep_diff['set_item_removed']))
-                        if 'set_item_removed' in deep_diff else [])
-    attribute_added = (list(zip(deep_diff['attribute_added']))
-                       if 'attribute_added' in deep_diff else [])
-    attribute_removed = (list(zip(deep_diff['attribute_removed']))
-                         if 'attribute_removed' in deep_diff else [])
-    repitition_change = (list(zip(deep_diff['repetition_change']))
-                         if 'repetition_change' in deep_diff else [])
+    titles = ['key', record_one.id, record_two.id]
+    values_changed = get_diff_attribute('values_changed')
+    type_changes = get_diff_attribute('type_changes')
+    iterable_item_removed = get_diff_attribute('iterable_item_removed')
+    iterable_item_added = get_diff_attribute('iterable_item_added')
+    dict_item_removed = get_diff_attribute('dictionary_item_removed')
+    dict_item_added = get_diff_attribute('dictinoary_item_added')
+    set_item_added = get_diff_attribute('set_item_added')
+    set_item_removed = get_diff_attribute('set_item_removed')
+    attribute_added = get_diff_attribute('attribute_added')
+    attribute_removed = get_diff_attribute('attribute_removed')
+    repitition_change = get_diff_attribute('repitition_change')
     data = (values_changed +
             type_changes +
             iterable_item_removed +
@@ -452,12 +404,16 @@ def pprint_deep_diff(deep_diff, id_one, id_two):
             attribute_added +
             attribute_removed +
             repitition_change)
-    data_list = [titles]
+    data_list = []
     for d in data:
         key = d[0].path().strip('root')
+        if key == "['id']":
+            continue
         id_one_output = d[0].t1
         id_two_output = d[0].t2
         data_list.append([key, id_one_output, id_two_output])
+    data_list.sort()
+    data_list = [titles] + data_list
     table = Texttable()
     table.set_cols_align(['c', 'c', 'c'])
     table.set_cols_valign(['m', 'm', 'm'])

@@ -241,7 +241,7 @@ def add_query_subparser(subparsers):
 
 
 def add_compare_subparser(subparsers):
-    """Add subparser for performing queries on backends."""
+    """Add subparser for performing record comparisons."""
     parser_compare = subparsers.add_parser(
         'compare', help='perform a comparison against two records. '
                         'See "sina compare -h" for more information.')
@@ -515,7 +515,7 @@ def compare_records(args):
                                  "to guess type from source. Please "
                                  "specify {flag}. Currently, "
                                  "only cass and sql are supported for "
-                                 "querying."
+                                 "comparing."
                                  .format(flag=COMMON_OPTION_DATABASE_TYPE))
         elif args.database_type not in ('cass', 'sql'):
             error_message.append("Currently, comparing is only supported when "
@@ -532,10 +532,10 @@ def compare_records(args):
         raise ValueError(msg)
     record_dao = _make_factory(args=args).createRecordDAO()
     try:
-        ddiff = record_dao.compare_records_ids(args.id_one, args.id_two)
-        model.pprint_deep_diff(deep_diff=ddiff,
-                               id_one=args.id_one,
-                               id_two=args.id_two)
+        record_one = record_dao.get(args.id_one)
+        record_two = record_dao.get(args.id_two)
+        model.print_diff_records(record_one=record_one,
+                                 record_two=record_two)
     except ValueError as e:
         print(e)
 
