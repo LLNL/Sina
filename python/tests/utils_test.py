@@ -9,6 +9,8 @@ written such that this should not be a testing issue.
 import os
 import shutil
 import unittest
+from six import assertCountEqual
+
 import sina.utils
 from sina.utils import DataRange
 
@@ -142,6 +144,15 @@ class TestSinaUtils(unittest.TestCase):
         self.assertTrue("foo_c" in with_strings)
         self.assertFalse("foo_a" in with_strings)
 
+    def test_data_range_is_single(self):
+        """Test the DataRange is_single_value method."""
+        is_single = DataRange(2, 2, max_inclusive=True)
+        is_also_single = DataRange("cat", "cat", max_inclusive=True)
+        is_not_single = DataRange(2, 10, max_inclusive=True)
+        self.assertTrue(is_single.is_single_value())
+        self.assertTrue(is_also_single.is_single_value())
+        self.assertFalse(is_not_single.is_single_value())
+
     def test_data_range_identity(self):
         """Test functions that return what kind of range the DataRange is."""
         numerical = DataRange(min=1)
@@ -198,6 +209,31 @@ class TestSinaUtils(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             with_strings.parse_max("4")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
+
+    def test_sort_and_standardizing(self):
+        """Test the function for processing query criteria."""
+        criteria = {"numra": DataRange(1, 2),
+                    "lexra": DataRange("bar", "foo"),
+                    "num": 12,
+                    "num2": 2,
+                    "lex": "cat"}
+        scalar_crit, string_crit = sina.utils.sort_and_standardize_criteria(criteria)
+        num_equiv = DataRange(12, 12, max_inclusive=True)
+        num2_equiv = DataRange(2, 2, max_inclusive=True)
+        lex_equiv = DataRange("cat", "cat", max_inclusive=True)
+        # assertCountEqual WOULD make sense, except it seems to test on object
+        # identity and not using the == operator. Instead, we sort
+        scalar_crit.sort()
+        string_crit.sort()
+        self.assertEqual(scalar_crit, [("num", num_equiv),
+                                       ("num2", num2_equiv),
+                                       ("numra", criteria["numra"])])
+        self.assertEqual(string_crit, [("lex", lex_equiv),
+                                       ("lexra", criteria["lexra"])])
+
+        with self.assertRaises(ValueError) as context:
+            sina.utils.sort_and_standardize_criteria({"bork": ["meow"]})
+        self.assertIn('criteria must be a number, string', str(context.exception))
 
     def test_parse_data_string(self):
         """Test the function for parsing a string to names and DataRanges."""

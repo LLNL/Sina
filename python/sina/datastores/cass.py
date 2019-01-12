@@ -6,14 +6,13 @@ import fnmatch
 import six
 from collections import defaultdict
 import json
-from numbers import Number
 
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery
 
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.cass_schema as schema
-from sina.utils import DataRange
+from sina.utils import DataRange, sort_and_standardize_criteria
 
 LOGGER = logging.getLogger(__name__)
 
@@ -227,25 +226,17 @@ class RecordDAO(dao.RecordDAO):
 
         :param **kwargs: Pairs of the names of data and the criteria that data
                          must fulfill.
-        :returns: A list of ids of Records who fulfill all criteria.
+        :returns: A generator of Records that fulfill all criteria.
+
+        :raises ValueError: if not supplied at least one criterion.
         """
         LOGGER.debug('Finding all records fulfilling criteria: {}'
                      .format(kwargs.items()))
-        scalar_criteria = []
-        string_criteria = []
-        for data_name, criteria in kwargs.items():
-            if (isinstance(criteria, Number) or
-                    (isinstance(criteria, DataRange) and
-                     criteria.is_numeric_range())):
-                scalar_criteria.append((data_name, criteria))
-            elif (isinstance(criteria, six.string_types) or
-                    (isinstance(criteria, DataRange) and
-                     criteria.is_lexographic_range())):
-                string_criteria.append((data_name, criteria))
-            else:
-                # A null range; we don't know what table to look in
-                # While we may support this in the future, we don't now.
-                raise ValueError("data_query() does not support null DataRanges")
+        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
+        if not kwargs.items():
+            raise ValueError("You must supply at least one criterion.")
+        scalar_criteria, string_criteria = sort_and_standardize_criteria(kwargs)
+
         if scalar_criteria:
             scalar_ids = self._apply_ranges_to_query(scalar_criteria,
                                                      "scalar")
@@ -263,24 +254,20 @@ class RecordDAO(dao.RecordDAO):
             for id in scalar_ids:
                 if id in string_ids:
                     yield id
-        # Otherwise, just find whoever has something to return
+        # Otherwise, just find which one has something to return
         elif scalar_criteria:
             for id in scalar_ids:
                 yield id
-        elif string_criteria:
+        else:
             for id in string_ids:
                 yield id
-        # No kwargs is bad usage
-        else:
-            raise ValueError("You must supply at least one valid criteria.")
 
     def _apply_ranges_to_query(self, data, table):
         """
         Return the ids of all Records whose data fulfill table-specific criteria.
 
-        Criteria can be either DataRanges or individual values ("cat", 4, etc).
-        This is only meant to be used in conjunction with data_query() and
-        related. Unlike data_query, it's done per-table.
+        Done per table, unlike data_query. This is only meant to be used in
+        conjunction with data_query() and related. Criteria must be DataRanges.
 
         Because each piece of data is its own row and we need to compare between
         rows, we can't use a simple AND. In SQL, we get around this with
@@ -307,19 +294,18 @@ class RecordDAO(dao.RecordDAO):
                             .values_list('id', flat=True))
 
         # Only do the next part if there's more scalars and at least one id
-        if len(data) > 1:
-            for counter, (name, criteria) in enumerate(data[1:]):
-                if filtered_ids:
-                    query = (data_table.objects.filter(id__in=filtered_ids))
-                    query = self._configure_query_for_criteria(query, name, criteria)
-                    if counter < (len(data[1:]) - 1):
-                        # Cassandra requires a list for the id__in attribute
-                        filtered_ids = list(query.values_list('id', flat=True).all())
-                    else:
-                        # We are on the last iteration, no need for a list, use a generator
-                        filtered_ids = query.values_list('id', flat=True)
+        for counter, (name, criteria) in enumerate(data[1:]):
+            if filtered_ids:
+                query = (data_table.objects.filter(id__in=filtered_ids))
+                query = self._configure_query_for_criteria(query, name, criteria)
+                if counter < (len(data[1:]) - 1):
+                    # Cassandra requires a list for the id__in attribute
+                    filtered_ids = list(query.values_list('id', flat=True).all())
                 else:
-                    break
+                    # We are on the last iteration, no need for a list, use a generator
+                    filtered_ids = query.values_list('id', flat=True)
+            else:
+                break
 
         for id in filtered_ids:
             yield id
@@ -439,7 +425,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param query: The query object to consider
         :param name: The name of the data being queries
-        :param datarange: The criteria we're filtering the query on.
+        :param criteria: The criteria we're filtering the query on.
 
         :returns: The query object with criteria-appropriate filters
                   applied.
@@ -447,8 +433,8 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Configuring <query={}> with <criteria={}>.'
                      .format(query, criteria))
         query = query.filter(name=name)
-        if not isinstance(criteria, DataRange):
-            query = query.filter(value=criteria)
+        if criteria.is_single_value():
+            query = query.filter(value=criteria.min)
         else:
             if criteria.min is not None:
                 if criteria.min_inclusive:
