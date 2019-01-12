@@ -185,7 +185,7 @@ def _export_csv(data, scalar_names, output_file):
 
 def parse_data_string(data_string):
     """
-    Parse a string into (name, DataRange) tuples for use with data_query().
+    Parse a string into a {name: DataRange} dict for use with data_query().
 
     Ex: "speed=(3,4] max_height=(3,4]" creates two DataRanges. They are both
     min exclusive, max inclusive, and have a range of 3.0 to 4.0. They are then
@@ -202,7 +202,7 @@ def parse_data_string(data_string):
 
     :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
 
-    :returns: a list of tuples: (name, DataRange).
+    :returns: a dict of {name: DataRange}.
 
     """
     # This code was lifted from parse_scalars() and only updated enough to avoid
@@ -212,7 +212,7 @@ def parse_data_string(data_string):
     LOGGER.debug('Parsing string <{}> into DataRange objects.'
                  .format(data_string))
     raw_data = filter(None, data_string.split(" "))
-    clean_data = []
+    clean_data = {}
 
     for entry in raw_data:
         components = entry.split("=")
@@ -222,7 +222,8 @@ def parse_data_string(data_string):
         if len(components) < 2 or len(components[1]) == 0:
             raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
         val_range = components[1].split(",")
-        data_range = DataRange()
+        # Dummy DataRange as we can't have an empty range, will be set below.
+        data_range = DataRange(float("-inf"), float("inf"))
 
         if len(val_range) == 1:
             val = val_range[0]
@@ -231,11 +232,11 @@ def parse_data_string(data_string):
             except ValueError:
                 pass  # It's a non-numeric string, we just keep going
             data_range.set_equal(val)
-            clean_data.append((name, data_range))
+            clean_data[name] = data_range
         elif is_grouped_as_range(components[1]) and len(val_range) == 2:
             data_range.parse_min(val_range[0])
             data_range.parse_max(val_range[1])
-            clean_data.append((name, data_range))
+            clean_data[name] = data_range
         else:
             raise ValueError('Bad specifier in range for {}'
                              .format(name))
@@ -369,8 +370,7 @@ class DataRange(object):
         self.min_inclusive = min_inclusive
         self.max = max
         self.max_inclusive = max_inclusive
-        if self.min is not None and self.max is not None:
-            self.validate_and_standardize_range()
+        self.validate_and_standardize_range()
 
     def __repr__(self):
         """Return a comprehensive (debug) representation of a DataRange."""
@@ -386,6 +386,22 @@ class DataRange(object):
                                    (self.min if self.min is not None else "-inf"),
                                    (self.max if self.max is not None else "inf"),
                                    ("]" if self.max_inclusive else ")"))
+
+    def __contains__(self, value):
+        """
+        Check whether a value falls within a DataRange.
+
+        :param other: The value to check.
+        """
+        if self.min is not None:
+            greater_than_min = value >= self.min if self.min_inclusive else value > self.min
+        else:
+            greater_than_min = True
+        if self.max is not None:
+            less_than_max = value <= self.max if self.max_inclusive else value < self.max
+        else:
+            less_than_max = True
+        return less_than_max and greater_than_min
 
     def __eq__(self, other):
         """
@@ -509,6 +525,8 @@ class DataRange(object):
                            ex [2,[-1,-2]], or mismatched types ex [4, "4"]
         """
         LOGGER.debug('Validating and standardizing range of: {}'.format(self))
+        if self.min is None and self.max is None:
+            raise ValueError("Null DataRange; min or max must be defined")
         try:
             # Case 1: min or max is number. Other must be number or None.
             if isinstance(self.min, Number) or isinstance(self.max, Number):

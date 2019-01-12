@@ -108,7 +108,7 @@ class RecordDAO(dao.RecordDAO):
             # "NW", AND a max_height >=30 and <40.
             data_query(volume=12, quadrant="NW", max_height=DataRange(30,40))
 
-        :param **kwargs: Pairs of the names of data and the criteria that data
+        :param kwargs: Pairs of the names of data and the criteria that data
                          must fulfill.
         :returns: A list of ids of Records who fulfill all criteria.
         """

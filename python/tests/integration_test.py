@@ -49,7 +49,7 @@ class TestSQLIntegration(unittest.TestCase):
         self.args.database = self.created_db
         launcher.ingest(self.args)
         self.args.subparser_name = 'query'
-        self.args.scalar = 'scalar-1=387.6'
+        self.args.scalar = 'scalar_1=387.6'
         self.args.uri = 'foo.png'
         self.args.raw = ''
         self.args.id = False
@@ -59,7 +59,7 @@ class TestSQLIntegration(unittest.TestCase):
             sys.stdout = StringIO()
             launcher.query(self.args)
             std_output = sys.stdout.getvalue()
-            matches = ast.literal_eval(std_output)
+            matches = list(ast.literal_eval(std_output))
             self.assertEqual(len(matches), 2)
             id_list = [matches[0]['id'], matches[1]['id']]
             self.assertIn("child_1", id_list)
@@ -116,7 +116,7 @@ class TestCassIntegration(unittest.TestCase):
         self.args.cass_keyspace = TEMP_KEYSPACE_NAME
         launcher.ingest(self.args)
         self.args.subparser_name = 'query'
-        self.args.scalar = 'scalar-1=387.6'
+        self.args.scalar = 'scalar_1=387.6'
         self.args.uri = 'foo.png'
         self.args.raw = ''
         self.args.id = False
