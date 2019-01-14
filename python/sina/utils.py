@@ -264,6 +264,44 @@ def is_grouped_as_range(range_string):
     return True
 
 
+def sort_and_standardize_criteria(criteria_dict):
+    """
+    Given a dict of name: criteria, sort into lists by criteria type.
+
+    If any simple equivalence criteria are found (x=5), convert them to DataRanges.
+
+    :param criteria_dict: A dictionary of the form {name_1: criterion_1}
+    :returns: A tuple of lists of the form (scalar_criteria, string_criteria)
+              Each entry in each list is (name, datarange_criterion)
+    :raises ValueError: if passed any criterion that isn't a number, string,
+                        numerical DataRange, or lexographic DataRange
+    """
+    LOGGER.debug('Sorting and standardizing criteria: {}'.format(criteria_dict))
+    scalar_criteria = []
+    string_criteria = []
+    for data_name, criterion in criteria_dict.items():
+        if isinstance(criterion, Number):
+            scalar_criteria.append((data_name, DataRange(min=criterion,
+                                                         max=criterion,
+                                                         max_inclusive=True)))
+        elif isinstance(criterion, DataRange) and criterion.is_numeric_range():
+            scalar_criteria.append((data_name, criterion))
+        elif isinstance(criterion, string_types):
+            string_criteria.append((data_name, DataRange(min=criterion,
+                                                         max=criterion,
+                                                         max_inclusive=True)))
+        elif isinstance(criterion, DataRange) and criterion.is_lexographic_range():
+            string_criteria.append((data_name, criterion))
+        else:
+            # Probably a null range; we don't know what table to look in
+            # While we may support this in the future, we don't now.
+            # Might also be a dict or something else strange.
+            raise ValueError("criteria must be a number, string, numerical"
+                             "DataRange, or lexographic DataRange. Given {}:{}"
+                             .format(data_name, criterion))
+    return (scalar_criteria, string_criteria)
+
+
 def create_file(path):
     """
     Check if a file exists.
@@ -422,6 +460,12 @@ class DataRange(object):
         """
         return (isinstance(self.min, Number) or isinstance(self.max, Number))
 
+    def is_single_value(self):
+        """Return whether the DataRange represents simple equivalence (foo=5)."""
+        # This method is as simple as it is due to the validation; min
+        # and max can't both be None, and they can't be equal but not inclusive.
+        return self.min == self.max
+
     def is_lexographic_range(self):
         """
         Return whether the DataRange describes a lexographic range.
@@ -524,6 +568,8 @@ class DataRange(object):
         :raises TypeError: if the range has a component of the wrong type,
                            ex [2,[-1,-2]], or mismatched types ex [4, "4"]
         """
+        # This method defines the assumptions we make about DataRanges. If you
+        # change this logic, methods like is_single_value() need changed as well
         LOGGER.debug('Validating and standardizing range of: {}'.format(self))
         if self.min is None and self.max is None:
             raise ValueError("Null DataRange; min or max must be defined")

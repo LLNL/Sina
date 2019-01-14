@@ -6,14 +6,22 @@ import fnmatch
 import six
 from collections import defaultdict
 import json
-from cassandra.cqlengine.query import DoesNotExist, BatchQuery
 
+from cassandra.cqlengine.query import DoesNotExist, BatchQuery
 
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.cass_schema as schema
+from sina.utils import DataRange, sort_and_standardize_criteria
 
 LOGGER = logging.getLogger(__name__)
+
+table_lookup = {
+                "scalar": {"record_table": schema.RecordFromScalarData,
+                           "data_table": schema.ScalarDataFromRecord},
+                "string": {"record_table": schema.RecordFromStringData,
+                           "data_table": schema.StringDataFromRecord}
+}
 
 
 class RecordDAO(dao.RecordDAO):
@@ -202,6 +210,106 @@ class RecordDAO(dao.RecordDAO):
                    mimetype=entry.get('mimetype'),
                    tags=entry.get('tags'))
 
+    def data_query(self, **kwargs):
+        """
+        Return the ids of all Records whose data fulfill some criteria.
+
+        Criteria are expressed as keyword arguments. Each keyword
+        is the name of an entry in a Record's data field, and it's set
+        equal to either a single value or a DataRange (see utils.DataRanges
+        for more info) that expresses the desired value/range of values.
+        All criteria must be satisfied for an ID to be returned:
+
+            # Return ids of all Records with a volume of 12, a quadrant of
+            # "NW", AND a max_height >=30 and <40.
+            data_query(volume=12, quadrant="NW", max_height=DataRange(30,40))
+
+        :param **kwargs: Pairs of the names of data and the criteria that data
+                         must fulfill.
+        :returns: A generator of Records that fulfill all criteria.
+
+        :raises ValueError: if not supplied at least one criterion.
+        """
+        LOGGER.debug('Finding all records fulfilling criteria: {}'
+                     .format(kwargs.items()))
+        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
+        if not kwargs.items():
+            raise ValueError("You must supply at least one criterion.")
+        scalar_criteria, string_criteria = sort_and_standardize_criteria(kwargs)
+
+        if scalar_criteria:
+            scalar_ids = self._apply_ranges_to_query(scalar_criteria,
+                                                     "scalar")
+        if string_criteria:
+            string_ids = self._apply_ranges_to_query(string_criteria,
+                                                     "string")
+
+        # If we have more than one set of data, we need to perform a union.
+        # Cassandra doesn't support join-like operations, though, so we
+        # handle it. Note that we'll be storing a full list of ids in memory,
+        # but because Cassandra already required that to perform the query,
+        # we're not in danger of running out of memory if we've reached here.
+        if scalar_criteria and string_criteria:
+            string_ids = set(string_ids)
+            for id in scalar_ids:
+                if id in string_ids:
+                    yield id
+        # Otherwise, just find which one has something to return
+        elif scalar_criteria:
+            for id in scalar_ids:
+                yield id
+        else:
+            for id in string_ids:
+                yield id
+
+    def _apply_ranges_to_query(self, data, table):
+        """
+        Return the ids of all Records whose data fulfill table-specific criteria.
+
+        Done per table, unlike data_query. This is only meant to be used in
+        conjunction with data_query() and related. Criteria must be DataRanges.
+
+        Because each piece of data is its own row and we need to compare between
+        rows, we can't use a simple AND. In SQL, we get around this with
+        GROUP BY, in order to avoid reading the entire table multiple times.
+        Cassandra is organized differently; thanks to its partitioning, it is
+        *in theory* efficient to start by narrowing it down to a set of partitions
+        (by finding which Records fit the first criteria) and then applying each
+        successive criteria as a filter on that set, ultimately doing len(data)
+        queries (but handling less data overall). If this acts slow, it's
+        probably network/query overhead.
+
+        :param data: A list of (name, criteria) pairs to apply to the query object
+        :param table: The name of the table, to look up in table_lookup (module-level var)
+
+        :returns: a generator of ids fitting the criteria
+        """
+        rec_table = table_lookup[table]["record_table"]
+        data_table = table_lookup[table]["data_table"]
+        query = rec_table.objects
+        # Cassandra requires a list for the in-predicate
+        filtered_ids = list(self._configure_query_for_criteria(query,
+                                                               name=data[0][0],
+                                                               criteria=data[0][1])
+                            .values_list('id', flat=True))
+
+        # Only do the next part if there's more scalars and at least one id
+        for counter, (name, criteria) in enumerate(data[1:]):
+            if filtered_ids:
+                query = (data_table.objects.filter(id__in=filtered_ids))
+                query = self._configure_query_for_criteria(query, name, criteria)
+                if counter < (len(data[1:]) - 1):
+                    # Cassandra requires a list for the id__in attribute
+                    filtered_ids = list(query.values_list('id', flat=True).all())
+                else:
+                    # We are on the last iteration, no need for a list, use a generator
+                    filtered_ids = query.values_list('id', flat=True)
+            else:
+                break
+
+        for id in filtered_ids:
+            yield id
+
     def get(self, id):
         """
         Given a id, return match (if any) from Cassandra database.
@@ -308,100 +416,36 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(match_ids):
                 yield record
 
-    def get_given_scalars(self, scalar_range_list, ids_only=False):
+    def _configure_query_for_criteria(self, query, name, criteria):
         """
-        Return all records with scalars fulfilling some criteria.
-
-        Note that this is a logical 'and'--the record must satisfy every
-        conditional provided (which is also why this can't simply call
-        get_given_scalar() as get_many() does with get()).
-
-        :param scalar_range_list: A list of 'sina.ScalarRange's describing the
-                                  different criteria.
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of Records fitting the criteria or (if ids_only) a
-                  generator of their ids
-        """
-        LOGGER.debug('Getting all records with scalars within the following '
-                     'ranges: {}'.format(scalar_range_list))
-        query = schema.RecordFromScalarData.objects
-        # Because query results are AND-ed, and queries are more efficient
-        # when the partition key is specified, we use the first criteria to
-        # narrow down the rest to partitions
-        filtered_ids = list(self.get_given_scalar(scalar_range_list[0], ids_only=True))
-        # Only do the next part if there's more scalars and at least one id
-        if len(scalar_range_list) > 1:
-            for counter, scalar_range in enumerate(scalar_range_list[1:]):
-                if filtered_ids:
-                    query = (schema.ScalarDataFromRecord.objects
-                             .filter(id__in=filtered_ids))
-                    query = self._configure_query_for_scalar_range(query,
-                                                                   scalar_range)
-                    if counter < (len(scalar_range_list[1:]) - 1):
-                        # Cassandra requires a list for the id__in attribute
-                        filtered_ids = list(query.values_list('id', flat=True).all())
-                    else:
-                        # We are on the last iteration, no need for a list, use a generator
-                        filtered_ids = query.values_list('id', flat=True)
-        if ids_only:
-            for id in filtered_ids:
-                yield id
-        else:
-            for record in self.get_many(filtered_ids):
-                yield record
-
-    def get_given_scalar(self, scalar_range, ids_only=False):
-        """
-        Return all records with scalars fulfilling some criterion.
-
-        :param scalar_range: A 'sina.ScalarRange's describing the
-                             criterion.
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of Records fitting the criterion or (if ids_only) a
-                  generator of their ids
-        """
-        LOGGER.debug('Getting all records with scalars within the range: {}'
-                     .format(scalar_range))
-        query = schema.RecordFromScalarData.objects
-        filtered_ids = (self._configure_query_for_scalar_range(query, scalar_range)
-                        .values_list('id', flat=True))
-        if ids_only:
-            for id in filtered_ids:
-                yield id
-        else:
-            for record in self.get_many(filtered_ids):
-                yield record
-
-    def _configure_query_for_scalar_range(self, query, scalar_range):
-        """
-        Use a ScalarRange to build a query.
+        Use criteria to build a query.
 
         Note that this returns a query object, not a completed query. It's
-        used by the scalar query methods to build the queries they execute.
+        used by the data query methods to build the queries they execute.
 
         :param query: The query object to consider
-        :param scalar_range: The ScalarRange we're building the query from.
+        :param name: The name of the data being queries
+        :param criteria: The criteria we're filtering the query on.
 
-        :returns: The query object with scalar_range appropriate filters
+        :returns: The query object with criteria-appropriate filters
                   applied.
         """
-        LOGGER.debug('Configuring <query={}> with <scalar_range={}>.'
-                     .format(query, scalar_range))
-        query = query.filter(name=scalar_range.name)
-        if scalar_range.min is not None:
-            if scalar_range.min_inclusive:
-                query = query.filter(value__gte=scalar_range.min)
-            else:
-                query = query.filter(value__gt=scalar_range.min)
-        if scalar_range.max is not None:
-            if scalar_range.max_inclusive:
-                query = query.filter(value__lte=scalar_range.max)
-            else:
-                query = query.filter(value__lt=scalar_range.max)
+        LOGGER.debug('Configuring <query={}> with <criteria={}>.'
+                     .format(query, criteria))
+        query = query.filter(name=name)
+        if criteria.is_single_value():
+            query = query.filter(value=criteria.min)
+        else:
+            if criteria.min is not None:
+                if criteria.min_inclusive:
+                    query = query.filter(value__gte=criteria.min)
+                else:
+                    query = query.filter(value__gt=criteria.min)
+            if criteria.max is not None:
+                if criteria.max_inclusive:
+                    query = query.filter(value__lte=criteria.max)
+                else:
+                    query = query.filter(value__lt=criteria.max)
         return query
 
     def get_data_for_records(self, id_list, data_list, omit_tags=False):

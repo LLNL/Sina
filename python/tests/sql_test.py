@@ -317,21 +317,21 @@ class TestSQL(unittest.TestCase):
         Doesn't do much testing of functionality, see later tests for that.
         """
         record_dao = sina_sql.DAOFactory().createRecordDAO()
-        vals_files = Record(id="spam",
-                            type="new_eggs",
-                            data={"foo": {"value": 12},
-                                  "bar": {"value": "1",
-                                          "tags": ["in"]}},
-                            files=[{"uri": "ham.png", "mimetype": "png"},
-                                   {"uri": "ham.curve", "tags": ["hammy"]}],
-                            user_defined={})
-        record_dao.insert(vals_files)
+        rec = Record(id="spam",
+                     type="new_eggs",
+                     data={"foo": {"value": 12},
+                           "bar": {"value": "1",
+                                   "tags": ["in"]}},
+                     files=[{"uri": "ham.png", "mimetype": "png"},
+                            {"uri": "ham.curve", "tags": ["hammy"]}],
+                     user_defined={})
+        record_dao.insert(rec)
         returned_record_id = next(record_dao.data_query(foo=12))
-        self.assertEquals(returned_record_id, vals_files.id)
+        self.assertEquals(returned_record_id, rec.id)
         no_scal = DataRange(min=1, min_inclusive=False)
         self.assertFalse(list(record_dao.data_query(bar=no_scal)))
         file_match = next(record_dao.get_given_document_uri(uri="ham.png"))
-        self.assertEquals(file_match.id, vals_files.id)
+        self.assertEquals(file_match.id, rec.id)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
     def test_recorddao_uri(self, mock_get):
@@ -602,7 +602,7 @@ class TestSQL(unittest.TestCase):
         self.assertEquals(returned_run.user_defined, run.user_defined)
         self.assertEquals(returned_run.version, run.version)
 
-    def test_rundao_get_scalars(self):
+    def test_rundao_get_by_scalars(self):
         """
         Test ability to find Runs by scalars.
 
@@ -610,8 +610,6 @@ class TestSQL(unittest.TestCase):
         extra processing, and most of that in _convert_record_to_run. We're
         really just making sure nothing gets lost between those two.
         """
-        # TODO: Test raises question of whether type should be tracked in
-        # the scalars table.
         factory = sina_sql.DAOFactory()
         _populate_database_with_data(factory.session)
         run_dao = factory.createRunDAO()
@@ -625,7 +623,7 @@ class TestSQL(unittest.TestCase):
         run_dao.insert_many([run, run2])
         multi_scalar = list(run_dao.data_query(spam_scal=DataRange(-500, 500)))
         self.assertEqual(len(multi_scalar), 2)
-        # They're returned in primary key order
+        # No guaranteed order per docs, but we get primary key order here
         spam_run = run_dao.get(multi_scalar[0])
         self.assertEquals(spam_run.user, run.user)
         self.assertEquals(spam_run.raw, run.raw)
