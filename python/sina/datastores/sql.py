@@ -108,7 +108,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param kwargs: Pairs of the names of data and the criteria that data
                          must fulfill.
-        :returns: :returns: A generator of Records that fulfill all criteria.
+        :returns: A generator of Records that fulfill all criteria.
         """
         LOGGER.debug('Finding all records fulfilling criteria: {}'
                      .format(kwargs.items()))
