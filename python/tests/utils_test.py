@@ -9,7 +9,6 @@ written such that this should not be a testing issue.
 import os
 import shutil
 import unittest
-from six import assertCountEqual
 
 import sina.utils
 from sina.utils import DataRange

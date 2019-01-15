@@ -9,7 +9,7 @@ from collections import defaultdict
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.sql_schema as schema
-from sina.utils import DataRange, sort_and_standardize_criteria
+from sina.utils import sort_and_standardize_criteria
 
 LOGGER = logging.getLogger(__name__)
 
