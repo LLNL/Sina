@@ -194,7 +194,7 @@ class Record(object):
                                      "Record {} is not a dictionary or list. "
                                      "Value: {}".format(self.id, entry)))
                     break
-                # Check if data enty is a dict, it must have a "value".
+                # Check if data entry is a dict, it must have a "value".
                 if isinstance(self.data[entry], dict):
                     if "value" not in self.data[entry]:
                         (warnings.append("At least one data entry belonging "

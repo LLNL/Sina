@@ -173,7 +173,7 @@ class RecordDAO(dao.RecordDAO):
         for datum_name, datum in data.items():
             if isinstance(datum, list):
                 LOGGER.warning('We do not currently support indexing lists of '
-                               'data.')
+                               'data. Lists stored in raw only.')
             else:
                 tags = ([str(x) for x in datum['tags']] if 'tags' in datum
                         else None)
