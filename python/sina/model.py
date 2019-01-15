@@ -187,22 +187,29 @@ class Record(object):
                              .format(self.id)))
         else:
             for entry in self.data:
-                if not isinstance(self.data[entry], dict):
-                    (warnings.append("At least one value entry belonging to "
-                                     "Record {} is not a dictionary. Value: {}"
-                                     .format(self.id, entry)))
+                # Check data entry is a dictionary or list
+                if (not isinstance(self.data[entry], dict)
+                        and not isinstance(self.data[entry], list)):
+                    (warnings.append("At least one data entry belonging to "
+                                     "Record {} is not a dictionary or list. "
+                                     "Value: {}".format(self.id, entry)))
                     break
-                if "value" not in self.data[entry]:
-                    (warnings.append("At least one value entry belonging to "
-                                     "Record {} is missing a value. Value: {}"
-                                     .format(self.id, entry)))
-                    break
-                if (self.data[entry].get("tags") and
-                    (isinstance(self.data[entry].get("tags"), six.string_types) or
-                     not isinstance(self.data[entry].get("tags"), collections.Sequence))):
-                    (warnings.append("At least one value entry belonging to "
-                                     "Record {} has a malformed tag list. Value: {}"
-                                     .format(self.id, entry)))
+                # Check if data enty is a dict, it must have a "value".
+                if isinstance(self.data[entry], dict):
+                    if "value" not in self.data[entry]:
+                        (warnings.append("At least one data entry belonging "
+                                         "to Record {} is missing a value. "
+                                         "Value: {}".format(self.id, entry)))
+                        break
+                    if (self.data[entry].get("tags") and
+                        (isinstance(self.data[entry].get("tags"),
+                         six.string_types) or
+                         not isinstance(self.data[entry].get("tags"),
+                                        collections.Sequence))):
+                        (warnings.append("At least one value entry belonging "
+                                         "to Record {} has a malformed tag "
+                                         "list. Value: {}"
+                                         .format(self.id, entry)))
         try:
             json.dumps(self.raw)
         except ValueError:

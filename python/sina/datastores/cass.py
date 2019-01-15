@@ -171,17 +171,22 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
                      .format(len(data), id, force_overwrite))
         for datum_name, datum in data.items():
-            tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
-            # Check if it's a scalar
-            insert_data = (schema.cross_populate_scalar_and_record
-                           if isinstance(datum['value'], numbers.Real)
-                           else schema.cross_populate_string_and_record)
-            insert_data(id=id,
-                        name=datum_name,
-                        value=datum['value'],
-                        units=datum.get('units'),
-                        tags=tags,
-                        force_overwrite=True)
+            if isinstance(datum, list):
+                LOGGER.warning('We do not currently support indexing lists of '
+                               'data.')
+            else:
+                tags = ([str(x) for x in datum['tags']] if 'tags' in datum
+                        else None)
+                # Check if it's a scalar
+                insert_data = (schema.cross_populate_scalar_and_record
+                               if isinstance(datum['value'], numbers.Real)
+                               else schema.cross_populate_string_and_record)
+                insert_data(id=id,
+                            name=datum_name,
+                            value=datum['value'],
+                            units=datum.get('units'),
+                            tags=tags,
+                            force_overwrite=True)
 
     def _insert_files(self, id, files, force_overwrite=False):
         """

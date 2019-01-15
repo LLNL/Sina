@@ -158,7 +158,9 @@ class TestSearch(unittest.TestCase):
 
         rec = Record(id="spam", type="eggs",
                      user_defined={},
-                     data={"eggs": {"value": 12,
+                     data={"scalar-strings": ["red", "green", "blue"],
+                           "scalar-numbers": [1, 2, 3],
+                           "eggs": {"value": 12,
                                     "units": None,
                                     "tags": ["runny"]}},
                      files=[{"uri": "eggs.brek",
@@ -171,6 +173,10 @@ class TestSearch(unittest.TestCase):
         self.assertEquals(returned_record.user_defined, rec.user_defined)
         self.assertEquals(returned_record.raw, rec.raw)
         returned_scalars = record_dao.get_scalars("spam", ["eggs"])
+        # Check against data without lists. We will eventually support indexing
+        # on lists, but for now we only store in raw.
+        del rec.data["scalar-strings"]
+        del rec.data["scalar-numbers"]
         self.assertEquals(returned_scalars, rec.data)
         returned_files = record_dao.get_files("spam")
         self.assertEquals(returned_files, rec.files)
