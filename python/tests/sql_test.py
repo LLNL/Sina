@@ -563,8 +563,11 @@ class TestSQL(unittest.TestCase):
         run = Run(id="spam", version="1.2.3",
                   application="bar", user="bep",
                   user_defined={"boop": "bep"},
-                  data={"scalar-strings": ["red", "green", "blue"],
-                        "scalar-numbers": [1, 2, 3],
+                  data={"scalar-strings": {"value":
+                                           ["red", "green", "blue"],
+                                           "units": None},
+                        "scalar-numbers": {"value": [1, 2, 3],
+                                           "units": "m"},
                         "foo": {"value": 12,
                                 "units": None,
                                 "tags": ["in", "on"]},

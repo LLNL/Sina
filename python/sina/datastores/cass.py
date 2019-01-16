@@ -4,6 +4,7 @@ import logging
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
 import six
+from numbers import Number
 from collections import defaultdict
 import json
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery
@@ -171,10 +172,10 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
                      .format(len(data), id, force_overwrite))
         for datum_name, datum in data.items():
-            if isinstance(datum, list):
-                LOGGER.warning('We do not currently support indexing lists of '
-                               'data. Lists stored in raw only.')
-            else:
+            # Currently only support putting strings/numbers into value table, lists
+            # put into raw
+            if (isinstance(datum['value'], six.string_types) or
+               isinstance(datum['value'], Number)):
                 tags = ([str(x) for x in datum['tags']] if 'tags' in datum
                         else None)
                 # Check if it's a scalar

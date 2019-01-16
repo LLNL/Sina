@@ -158,8 +158,11 @@ class TestSearch(unittest.TestCase):
 
         rec = Record(id="spam", type="eggs",
                      user_defined={},
-                     data={"scalar-strings": ["red", "green", "blue"],
-                           "scalar-numbers": [1, 2, 3],
+                     data={"scalar-strings": {"value":
+                                              ["red", "green", "blue"],
+                                              "units": None},
+                           "scalar-numbers": {"value": [1, 2, 3],
+                                              "units": "m"},
                            "eggs": {"value": 12,
                                     "units": None,
                                     "tags": ["runny"]}},
