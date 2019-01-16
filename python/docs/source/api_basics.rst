@@ -81,7 +81,7 @@ interested in data within a range::
 
 Now we've found the ids of all Records that have a :code:`final_volume` >= 200
 and < 310, a :code:`final_acceleration` > 12 and <= 20, a :code:`schema`
-that comes before "bb_12" alphabetically, and a :code:`quadrant`="NW". For an
+that comes before "bb_12" alphabetically, and a :code:`quadrant` = "NW". For an
 interactive demo, see examples/fukushima/fukushima_subsecting_data.ipynb.
 
 NOTE: when providing multiple criteria, only entries fulfilling all criteria
