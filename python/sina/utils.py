@@ -8,6 +8,8 @@ import uuid
 import csv
 import time
 import datetime
+from numbers import Number
+from six import string_types
 
 from multiprocessing.pool import ThreadPool
 from collections import OrderedDict
@@ -181,6 +183,66 @@ def _export_csv(data, scalar_names, output_file):
                 writer.writerow([run] + [dataset[scalar]['value'] for scalar in scalar_names])
 
 
+def parse_data_string(data_string):
+    """
+    Parse a string into (name, DataRange) tuples for use with data_query().
+
+    Ex: "speed=(3,4] max_height=(3,4]" creates two DataRanges. They are both
+    min exclusive, max inclusive, and have a range of 3.0 to 4.0. They are then
+    paired up with their respective names and returned as:
+    [("speed", range_1), ("max_height", range_2)]
+
+    IMPORTANT CAVEATS: values passed in can't have quotes, equals signs, etc.
+    Same conventions as python variable naming: som3cat is fine, cat=sp'm isn't.
+    Should look something like "speed=[fast,faster] height=real_tall". In case
+    your string looks like a number (ex: version=1.2.8 got updated to 1.3),
+    **this will NOT work correctly** and it's time to revisit the function.
+
+    :param data_string: A string of space-separated range descriptions
+
+    :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
+
+    :returns: a list of tuples: (name, DataRange).
+
+    """
+    # This code was lifted from parse_scalars() and only updated enough to avoid
+    # breaking things; further refinement should be tackled in another PR.
+    # Notable issues are outlined above as "IMPORTANT CAVEATS".
+
+    LOGGER.debug('Parsing string <{}> into DataRange objects.'
+                 .format(data_string))
+    raw_data = filter(None, data_string.split(" "))
+    clean_data = []
+
+    for entry in raw_data:
+        components = entry.split("=")
+        name = components[0]
+
+        # Make sure scalar's of the form <foo>=<bar>
+        if len(components) < 2 or len(components[1]) == 0:
+            raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
+        val_range = components[1].split(",")
+        data_range = DataRange()
+
+        if len(val_range) == 1:
+            val = val_range[0]
+            try:
+                val = float(val)
+            except ValueError:
+                pass  # It's a non-numeric string, we just keep going
+            data_range.set_equal(val)
+            clean_data.append((name, data_range))
+        elif is_grouped_as_range(components[1]) and len(val_range) == 2:
+            data_range.parse_min(val_range[0])
+            data_range.parse_max(val_range[1])
+            clean_data.append((name, data_range))
+        else:
+            raise ValueError('Bad specifier in range for {}'
+                             .format(name))
+
+    return clean_data
+
+
 def parse_scalars(scalar_args):
     """
     Parse commandline input into ScalarRange object(s).
@@ -278,51 +340,222 @@ def create_file(path):
 
 
 def get_example_path(relpath, suffix="-new",
-                     example_dirs=["/collab/usr/gapps/wf/examples/data"]):
+                     example_dirs=["/collab/usr/gapps/wf/examples/",
+                                   os.path.realpath(os.path.join(os.path.dirname(__file__),
+                                                    "../../examples/"))]):
     """
-    Return the fully qualified path name for the appropriate example data store.
+    Return the fully qualified path name for the appropriate example data store and
+    raises an exception if none is found.
 
-    The results starts with the test data store if SINA_TEST_KERNEL is set and
-    the file with the suffix exists.  Otherwise, it will return the path to
-    the current example data store if it exists.  If neither exist, then
-    an exception is raised.
+    This function checks the paths listed in <example_dirs> for the file specified
+    with <relpath>.
+
+    If $SINA_TEST_KERNEL is set, it will initially append <suffix> to relpath's
+    filename, ex foo/bar.txt becomes foo/bar<suffix>.txt. If it doesn't find
+    anything, it reverts (so it looks for relpath both with and without the suffix).
+
+    The order of example_dirs is important; as soon as something that matches is
+    found, the function returns.
 
     :param relpath: The path, relative to the example_dirs, of the data store
     :param suffix: The test filename suffix
     :param example_dirs: A list of fully qualified paths to root directories
         containing example data
     :returns: The path to the appropriate example data store
-    :raises ValueError: if an example data store file does not exists
+    :raises ValueError: if an example data store file does not exist
     """
     LOGGER.debug("Retrieving example data store path: {}, {}, {}".
                  format(relpath, suffix, example_dirs))
 
-    LOGGER.debug("TLD: example_dirs={}".format(example_dirs))
-    dirs = [example_dirs] if isinstance(example_dirs, str) else example_dirs
+    dirs = [example_dirs] if isinstance(example_dirs, string_types) else example_dirs
 
     paths = [relpath]
     if os.getenv("SINA_TEST_KERNEL") is not None:
         base, ext = os.path.splitext(relpath)
         paths.insert(0, "{}{}{}".format(base, suffix, ext))
 
-    LOGGER.debug("TLD: paths={}".format(paths))
-
     filename = None
     for db_path in paths:
         for root in dirs:
             datastore = os.path.join(root, db_path)
-            LOGGER.debug("TLD: checking {}".format(datastore))
             if os.path.isfile(datastore):
                 filename = datastore
                 break
-        if filename is not None:
-            break
 
-    LOGGER.debug("TLD: filename={}".format(filename))
     if filename is None:
-        raise ValueError("No example data store exists for {}".format(relpath))
+        raise ValueError("No example data store found for {} in example dirs {}"
+                         .format(relpath, example_dirs))
 
     return filename
+
+
+class DataRange(object):
+    """
+    Express a range some data must be within and provide parsing utility functions.
+
+    By default, a DataRange is min inclusive and max exclusive.
+    """
+
+    def __init__(self, min=None, max=None, min_inclusive=True, max_inclusive=False):
+        """
+        Initialize DataRange with necessary info.
+
+        :params min: number that scalar is >= or >. None for negative
+                          infinity
+        :params min_inclusive: True if min inclusive (>=), False for
+                                > only
+        :params max: number that scalar is < or <=. None for positive
+                infinity
+        :params max_inclusive: True if max inclusive (<=), False for
+                                 < only
+        """
+        self.min = min
+        self.min_inclusive = min_inclusive
+        self.max = max
+        self.max_inclusive = max_inclusive
+        if self.min is not None and self.max is not None:
+            self.validate_and_standardize_range()
+
+    def __repr__(self):
+        """Return a comprehensive (debug) representation of a DataRange."""
+        return ('DataRange <min={}, min_inclusive={}, max={}, '
+                'max_inclusive={}>'.format(self.min,
+                                           self.min_inclusive,
+                                           self.max,
+                                           self.max_inclusive))
+
+    def __str__(self):
+        """Return a DataRange in range format ({x, y} [x, y}, {,y], etc.)."""
+        return "{}{}, {}{}".format(("[" if self.min_inclusive else "("),
+                                   (self.min if self.min is not None else "-inf"),
+                                   (self.max if self.max is not None else "inf"),
+                                   ("]" if self.max_inclusive else ")"))
+
+    def __eq__(self, other):
+        """
+        Check whether two DataRanges are equivalent.
+
+        :param other: The object to compare against.
+        """
+        return(isinstance(other, DataRange) and self.__dict__ == other.__dict__)
+
+    def parse_min(self, min_range):
+        """
+        Parse the minimum half of a range, ex: the "[4" in "[4,2]".
+
+        Sets the DataRange's minimum portion to be inclusive/not depending on
+        the arg's min paren/bracket,  and its min number to be whatever's
+        provided by the arg.
+
+        :param str min_range: a string of the form '<range_end>[value]',
+                               ex: '[4' or '(', that represents the min side
+                               of a numerical range
+        """
+        LOGGER.debug('Setting min of range: {}'.format(min_range))
+        if not min_range[0] in ['(', '[']:
+            raise ValueError("Bad inclusiveness specifier for range: {}",
+                             format(min_range[0]))
+        if len(min_range) > 1:
+            self.min_inclusive = min_range[0] is '['
+
+            min_arg = min_range[1:]
+            try:
+                self.min = float(min_arg)
+            except ValueError:
+                self.min = min_arg
+            self.validate_and_standardize_range()
+
+        else:
+            # None represents negative infinity in range notation.
+            self.min = None
+            # Negative infinity can't be inclusive.
+            self.min_inclusive = False
+
+    def parse_max(self, max_range):
+        """
+        Parse the maximum half of a range, ex: the "2]" in "[4,2]".
+
+        Sets the DataRange's maximum portion to be inclusive/not depending on
+        the arg's max paren/bracket,  and its max number to be whatever's
+        provided by the arg.
+
+        :param str max_range: a string of the form '[value]<range_end>',
+                                ex: '4)' or ']', that represents the max side
+                                of a numerical range
+        """
+        LOGGER.debug('Setting max of range: {}'.format(max_range))
+        if not max_range[-1] in [')', ']']:
+            raise ValueError("Bad inclusiveness specifier for range: {}",
+                             format(max_range[-1]))
+        if len(max_range) > 1:
+            self.max_inclusive = max_range[-1] is ']'
+            # We can take strings, but here we're already taking a string.
+            # Thus we need to do a check: '"4"]' is passing us a string, but
+            # '4]', despite being a string itself, is passing us an int
+            max_arg = max_range[:-1]
+            try:
+                self.max = float(max_arg)
+            except ValueError:
+                self.max = max_arg
+            self.validate_and_standardize_range()
+        else:
+            # None represents positive infinity in range notation.
+            self.max = None
+            # Positive infinity can't be inclusive
+            self.max_inclusive = False
+
+    def set_equal(self, val):
+        """
+        Set a DataRange equal to a single value while preserving notation.
+
+        This is provided for the convenience case of testing exact equivalence
+        (=5), allowing the user to just write =5 instead of =[5:5].
+
+        :param val: The value (string or number) to set the DataRange to.
+        """
+        LOGGER.debug('Setting range equal to: {}'.format(val))
+        self.min = val
+        self.max = val
+        self.min_inclusive = True
+        self.max_inclusive = True
+        self.validate_and_standardize_range()
+
+    def validate_and_standardize_range(self):
+        """
+        Ensure that members of a range are set to correct types.
+
+        Raise exceptions if not.
+
+        :raises ValueError: if given an impossible range, ex: [3,2]
+        :raises TypeError: if the range has a component of the wrong type,
+                           ex [2,[-1,-2]], or mismatched types ex [4, "4"]
+        """
+        LOGGER.debug('Validating and standardizing range of: {}'.format(self))
+        try:
+            # Case 1: min or max is number. Other must be number or None.
+            if isinstance(self.min, Number) or isinstance(self.max, Number):
+                self.min = float(self.min) if self.min is not None else None
+                self.max = float(self.max) if self.max is not None else None
+            # Case 2: neither min nor max is number. Both must be None or string
+            elif (not isinstance(self.min, (string_types, type(None)) or
+                  not isinstance(self.max, (string_types, type(None))))):
+                raise ValueError
+            # Note that both being None is a special case, since then we don't
+            # know if what we're ultimately looking for is a number or string.
+        except ValueError:
+            msg = ("Bad type for portion of range: {}".format(self))
+            LOGGER.error(msg)
+            raise TypeError(msg)  # TypeError, as ValueError is a bit broad
+
+        if self.min is not None:
+            min_gt_max = self.max is not None and self.min > self.max
+            max_eq_min = self.max is not None and self.min == self.max
+            impossible_range = max_eq_min and not (self.min_inclusive and self.max_inclusive)
+            if min_gt_max or impossible_range:
+                msg = ("Bad range for data, min must be <= max: {}"
+                       .format(self))
+                LOGGER.error(msg)
+                raise ValueError(msg)
 
 
 class ScalarRange(object):

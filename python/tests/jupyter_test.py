@@ -7,9 +7,7 @@ Sources:
 1) Parameterized unit test generation follows the post by Guy at:
     https://stackoverflow.com/questions/32899/\
         how-do-you-generate-dynamic-parametrized-unit-tests-in-python
-2) Execution tests are a variant of the function found at:
-    https://blog.thedataincubator.com/2016/06/testing-jupyter-notebooks
-3) Execution tests via the API at:
+2) Execution tests via the API at:
     https://nbconvert.readthedocs.io/en/latest/execute_api.html
 """
 import collections
@@ -18,6 +16,7 @@ from nbconvert.preprocessors import ExecutePreprocessor
 import nbformat
 import os
 import shutil
+from six import with_metaclass
 import subprocess
 import unittest
 
@@ -32,7 +31,7 @@ RUN_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "tests",
                                         "run_tests", "notebooks"))
 
 # Path to the examples directory containing Jupyter notebooks to be tested.
-EXAMPLES_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "examples"))
+EXAMPLES_PATH = os.path.abspath(os.path.join(DIR_ROOT, "..", "..", "examples"))
 
 # Python magics template filename
 MAGICS_TEMPLATE = os.path.abspath(os.path.join(RUN_PATH, "pythonmagics.tpl"))
@@ -111,11 +110,11 @@ def _execute_notebook(path):
     try:
         exec_preprocessor = ExecutePreprocessor(timeout=-1,
                                                 kernel_name=SINA_KERNEL)
-        exec_preprocessor.preprocess(notebook, {'metadata': {'path': '.'}})
+        exec_preprocessor.preprocess(notebook, {'metadata': {'path': RUN_PATH}})
     except Exception as _exception:
-        errors.append('{}: {}: Running {}: {}'.
+        errors.append('{}: {}: Running {} in {}: {}'.
                       format(_exception.__class__.__name__, SINA_KERNEL, path,
-                             str(_exception)))
+                             RUN_PATH, str(_exception)))
     finally:
         _, basename = os.path.split(path)
         execname = os.path.join(RUN_PATH, "execute_{}".format(basename))
@@ -141,8 +140,8 @@ def _execute_notebook(path):
                                                      output.evalue))
             except Exception as _exception:
                 errors.append('{}: {}: Checking for errors in {}: {}'.
-                              format(_exception.__class__.__name__, SINA_KERNEL,
-                                     execname, str(_exception)))
+                              format(_exception.__class__.__name__,
+                                     SINA_KERNEL, execname, str(_exception)))
             if len(errors) <= 0:
                 os.remove(execname)
 
@@ -157,7 +156,8 @@ def _find_notebooks():
     """
     child = subprocess.Popen("find {} -name '*.ipynb' -print".
                              format(EXAMPLES_PATH), shell=True,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             universal_newlines=True)
     (_stdoutdata, _) = child.communicate()
 
     # Skip checkpoint notebooks in generated subdirectories
@@ -165,12 +165,12 @@ def _find_notebooks():
                   if filename.find(".ipynb_checkpoints") < 0])
 
 
-def _is_compliant_notebook(path):
+def _check_notebook_style(path):
     """
     Check the notebook style against PEP8 requirements.
 
     :param path: fully qualified path to the notebook
-    :returns: True if the notebook is compliant, False otherwise
+    :returns: list of error message(s)
     """
     _, basename = os.path.split(path)
 
@@ -192,7 +192,7 @@ def _is_compliant_notebook(path):
     except subprocess.CalledProcessError:
         if os.path.isfile(testname):
             os.remove(testname)
-        raise RuntimeError("Failed to create {}".format(testname))
+        return ["Failed to create {}".format(testname)]
 
     try:
         #
@@ -206,6 +206,7 @@ def _is_compliant_notebook(path):
         result = subprocess.check_output(" ".join(args), shell=True,
                                          stderr=subprocess.STDOUT)
 
+        errors = []
         if os.path.isfile(testname):
             if result:
                 with open(testname, "a") as outfile:
@@ -214,14 +215,15 @@ def _is_compliant_notebook(path):
                     outfile.write("#################\n")
                     for line in _build_pep8_output(result):
                         outfile.write("#  {}\n".format(line))
+                        errors.append(line)
             else:
                 os.remove(testname)
 
     except subprocess.CalledProcessError:
-        raise RuntimeError("Failed to perform flake8 checks on {}".
-                           format(path))
+        return ["Failed to perform flake8 checks on {} ({})".
+                format(path, testname)]
 
-    return len(result) <= 0
+    return errors
 
 
 def _read_notebook(path):
@@ -282,7 +284,7 @@ class TestJupyterNotebooks(type):
             def test_exec(self):
                 errors = _execute_notebook(filename)
                 # Indent output of each error (if any)
-                self.assertEqual(errors, [], "Execution errors detect in "
+                self.assertEqual(errors, [], "Execution errors detected in "
                                  "{}:\n  {}".format(filename, "\n  ".
                                                     join(errors)))
             return test_exec
@@ -294,25 +296,25 @@ class TestJupyterNotebooks(type):
             :param filename: fully qualifed notebook path
             """
             def test_style(self):
-                self.assertTrue(_is_compliant_notebook(filename), "Style "
-                                "errors detected in {}. Refer to associated "
-                                "test script for details.".format(filename))
+                errors = _check_notebook_style(filename)
+                # Indent output of each error (if any)
+                self.assertEqual(errors, [], "Style errors detected in {}:\n  "
+                                 "{}".format(filename, "\n  ".join(errors)))
             return test_style
 
         files = _find_notebooks()
         if len(files) > 0:
             for filename in files:
-                test_name = "test_%s" % \
-                    os.path.splitext(os.path.basename(filename))[0]
+                test_name = "test_{}".format(os.path.splitext(
+                                             os.path.basename(filename))[0])
                 _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
                 _dict["{}_style".format(test_name)] = gen_test_style(filename)
 
         return type.__new__(meta, name, bases, _dict)
 
 
-class TestNotebooks(unittest.TestCase):
+class TestNotebooks(with_metaclass(TestJupyterNotebooks, unittest.TestCase)):
     """Class for performing basic tests of example Jupyter Notebooks."""
-    __metaclass__ = TestJupyterNotebooks
 
     @classmethod
     def setUpClass(cls):

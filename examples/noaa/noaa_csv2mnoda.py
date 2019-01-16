@@ -45,6 +45,7 @@ Data Source: https://catalog.data.gov/dataset/\
  with direct download link:
     https://www.nodc.noaa.gov/cgi-bin/OAS/prd/accession/download/123467
 """
+from __future__ import print_function
 
 import argparse
 import csv
@@ -83,40 +84,45 @@ QC_DATA = [
 
 # Observation data file format
 DATA_FMT = """\
-obs_id      = %s
-depth       = %s
+obs_id      = {}
+depth       = {}
 depth_units = meters
-press       = %s
+press       = {}
 press_units = decibars
-ctd_temp    = %s
+ctd_temp    = {}
 temp_units  = C
-ctd_oxy     = %s
+ctd_oxy     = {}
 oxy_units   = micromol/kg
-o2          = %s
+o2          = {}
 o2_units    = micromol/kg
-o2_qc       = %s
-ph          = %s
-ph_qc       = %s
+o2_qc       = {}
+ph          = {}
+ph_qc       = {}
 """
 
+# Status interval
+STATUS_INTERVAL = 100
 
-def process_data(dataset_fn, dest_dn):
+
+def process_data(dataset_fn, dest_dn, show_status=False):
     """
     Process the NOAA data.
 
     :param dataset_fn: qualified name of the NOAA CSV file
     :param dest_dn: destination data directory (i.e., path to where the NOAA
                     files and data are to be written
+    :param show_status: True if status markers are to be displayed; False
+                           otherwise
     """
     if not os.path.exists(dataset_fn):
-        raise ValueError('Expected the data set filename (%s) to exist' %
-                         dataset_fn)
+        raise ValueError('Expected the data set filename ({}) to exist'.
+                         format(dataset_fn))
     elif not os.path.isfile(dataset_fn):
-        raise ValueError('Expected the data set filename (%s) to be a file' %
-                         dataset_fn)
+        raise ValueError('Expected the data set filename ({}) to be a file'.
+                         format(dataset_fn))
     elif not dataset_fn.endswith(DATA_FN):
-        raise ValueError('Expected a CSV data set filename (%s) ending %s' %
-                         (dataset_fn, DATA_FN))
+        raise ValueError('Expected a CSV data set filename ({}) ending {}'.
+                         format(dataset_fn, DATA_FN))
 
     # Make sure the files subdirectory exists in the destination directory
     files_dn = os.path.realpath(os.path.join(dest_dn, 'files'))
@@ -133,62 +139,76 @@ def process_data(dataset_fn, dest_dn):
 
     # Now process the NOAA data CSV file
     mdata = NoaaData(files_dn)
-    # Need to open differently to handle encoding on both Python 2/3
-    if sys.version_info[0] < 3:
-        ifd = open(input_fn, "r")
-    else:
-        ifd = open(input_fn, "r", encoding="ISO-8859-1")
-    last_exp = ''
-    rdr = csv.reader(ifd, delimiter=',')
+
     try:
-        for i, row in enumerate(rdr):
-            if i > 0 and len(row[0]) > 0:
-                exp = row[0]
-                if exp != last_exp:
-                    exp_dn = os.path.join(files_dn, exp)
-                    if not os.path.isdir(exp_dn):
-                        os.makedirs(exp_dn)
-                    last_exp = row[0]
-                    mdata.add_exp(exp)
+        ifd = open(input_fn, "r", newline='', encoding='ISO-8859-1')  # Py3
+    except Exception:
+        ifd = open(input_fn, "rb")  # Py2
 
-                oid = '-'.join(row[1:6])
+    with ifd as csv_file:
+        last_exp = ''
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        try:
+            for i, row in enumerate(csv_reader):
+                if i > 0 and len(row[0]) > 0:
+                    exp = row[0]
+                    if exp != last_exp:
+                        exp_dn = os.path.join(files_dn, exp)
+                        if not os.path.isdir(exp_dn):
+                            os.makedirs(exp_dn)
+                        last_exp = row[0]
+                        mdata.add_exp(exp)
 
-                # Add the relation between the experiment and observation
-                mdata.add_exp2obs(exp, oid)
+                    oid = '-'.join(row[1:6])
 
-                # Extract the observation data
-                depth, press, temp = row[11:14]
-                oxy, o2, o2_qc = row[18:21]
-                ph, ph_qc = row[30:32]
+                    # Add the relation between the experiment and observation
+                    mdata.add_exp2obs(exp, oid)
 
-                # Write the observation data to a file
-                obs_dir = os.path.join(files_dn, exp, 'obs%05d' % i)
-                if not os.path.isdir(obs_dir):
-                    os.makedirs(obs_dir)
+                    # Extract the observation data
+                    depth, press, temp = row[11:14]
+                    oxy, o2, o2_qc = row[18:21]
+                    ph, ph_qc = row[30:32]
 
-                obs_fn = os.path.join(obs_dir, 'obs-data.txt')
-                with open(os.path.join(obs_fn), 'w') as ofd:
-                    ofd.write(DATA_FMT % (oid, depth, press, temp, oxy, o2,
-                                          o2_qc, ph, ph_qc))
+                    # Write the observation data to a file
+                    obs_dir = os.path.join(files_dn, exp, 'obs{:05d}'.format(i))
+                    if not os.path.isdir(obs_dir):
+                        os.makedirs(obs_dir)
 
-                # Add the observation data (and create the example file)
-                mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
-                              o2_qc, ph, ph_qc)
-        ifd.close()
+                    obs_fn = os.path.join(obs_dir, 'obs-data.txt')
+                    with open(os.path.join(obs_fn), 'w') as ofd:
+                        ofd.write(DATA_FMT.
+                                  format(oid, depth, press, temp, oxy, o2,
+                                         o2_qc, ph, ph_qc))
 
-    except csv.Error as ce:
-        ifd.close()
-        print("ERROR: %s: line %s: %s" % (dataset_fn, rdr.line_num,
-                                          str(ce)))
-        sys.exit(1)
+                    # Add the observation data (and create the example file)
+                    mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
+                                  o2_qc, ph, ph_qc)
 
-    except Exception as exc:
-        ifd.close()
-        print("ERROR: %s: line %s: %s: %s" % (dataset_fn, rdr.line_num,
-                                              exc.__class__.__name__,
-                                              str(exc)))
-        traceback.print_exc()
-        sys.exit(1)
+                elif i == 0:
+                    # Let the user know the purpose of the dots
+                    if show_status:
+                        print('Processing (. = {} rows): '.
+                              format(STATUS_INTERVAL), end='')
+
+                # Provide status feedback during processing
+                if show_status and (i % STATUS_INTERVAL) == 0:
+                    print('.', end='')
+
+            # Generate a newline to ensure a clean status display
+            if show_status:
+                print('')
+
+        except csv.Error as csv_err:
+            print("ERROR: {}: line {}: {}".
+                  format(dataset_fn, csv_reader.line_num, str(csv_err)))
+            sys.exit(1)
+
+        except Exception as err:
+            print("ERROR: {}: line {}: {}: {}".
+                  format(dataset_fn, csv_reader.line_num,
+                         err.__class__.__name__, str(err)))
+            traceback.print_exc()
+            sys.exit(1)
 
     mdata.write()
 
@@ -223,19 +243,14 @@ class NoaaData(object):
         """
         lfiles = []
         lfiles.append({"uri": os.path.join(self.files_dn, DATA_FN),
-                       "mimetype": "text/csv",
-                       "tags": ["data"]})
+                       "mimetype": "text/csv", "tags": ["data"]})
 
         for extra_fn, tag, mtype in MORE_FILES:
             lfiles.append({"uri": os.path.join(self.files_dn,
                                                os.path.basename(extra_fn)),
                            "mimetype": mtype, "tags": [tag]})
 
-        self.recs.append({
-            "type": "exp",
-            "id": exp,
-            "files": lfiles
-            })
+        self.recs.append({"type": "exp", "id": exp, "files": lfiles})
 
     def add_exp2obs(self, exp, obs):
         """
@@ -313,6 +328,10 @@ def main():
                     'file to facilitate subsequent access from Jupyter '
                     'notebooks.')
 
+    parser.add_argument('-s', '--show-status', action='store_true',
+                        help='Display a dot for every {} lines processed'.
+                             format(STATUS_INTERVAL))
+
     parser.add_argument('csv_pathname',
                         help='The pathname to the CSV file, which needs to '
                              'end in WCOA11-01-06-2015_data.csv.')
@@ -326,7 +345,7 @@ def main():
     args = parser.parse_args()
 
     # Process the NOAA data.
-    process_data(args.csv_pathname, args.dest_dirname)
+    process_data(args.csv_pathname, args.dest_dirname, args.show_status)
 
 
 if __name__ == "__main__":

@@ -48,6 +48,7 @@ The following is a list of the relevant column number-value pairings:
 Data Source: https://catalog.data.gov/dataset/\
         us-doe-nnsa-response-to-2011-fukushima-incident-at-sea-aerial-data
 """
+from __future__ import print_function
 
 import argparse
 import csv
@@ -94,6 +95,9 @@ MORE_FILES = [
 # Name of the Mnoda file we will generate
 MNODA_FN = 'AMS_C12_SeaData.json'
 
+# Status interval
+STATUS_INTERVAL = 100
+
 # The units and description for each value
 UNITS = [
         (KEY_LATITUDE, "degrees", "GPS location latitude"),
@@ -106,23 +110,25 @@ UNITS = [
 
 
 # -------------------------------- Process Data -------------------------------
-def process_data(dataset_fn, dest_dn):
+def process_data(dataset_fn, dest_dn, show_status=False):
     """
     Process the Fukushima data.
 
     :param dataset_fn: qualified name of the Fukushima CSV file
     :param dest_dn: destination data directory (i.e., path to where the
                     Fukushima files and data are to be written
+    :param show_status: True if status markers are to be displayed; False
+                           otherwise
     """
     if not os.path.exists(dataset_fn):
-        raise ValueError('Expected the data set filename (%s) to exist' %
-                         dataset_fn)
+        raise ValueError('Expected the data set filename ({}) to exist'.
+                         format(dataset_fn))
     elif not os.path.isfile(dataset_fn):
-        raise ValueError('Expected the data set filename (%s) to be a file' %
-                         dataset_fn)
+        raise ValueError('Expected the data set filename ({}) to be a file'.
+                         format(dataset_fn))
     elif not dataset_fn.endswith(DATA_FN):
-        raise ValueError('Expected a CSV data set filename (%s) ending %s' %
-                         (dataset_fn, DATA_FN))
+        raise ValueError('Expected a CSV data set filename ({}) ending {}'.
+                         format(dataset_fn, DATA_FN))
 
     # Make sure the files subdirectory exists in the destination directory
     files_dn = os.path.realpath(os.path.join(dest_dn, 'files'))
@@ -140,14 +146,20 @@ def process_data(dataset_fn, dest_dn):
 
     # Now process the Fukushima data CSV file
     mdata = FukushimaData(files_dn)
-    with open(input_fn, "r") as ifd:
+
+    try:
+        ifd = open(input_fn, "r", newline='', encoding='ISO-8859-1')  # Py3
+    except Exception:
+        ifd = open(input_fn, "rb")  # Py2
+
+    with ifd as csv_file:
         last_exp_id = ''
         header = ''
         obs = []
 
-        creader = csv.reader(ifd, delimiter=',')
+        csv_reader = csv.reader(csv_file, delimiter=',')
         try:
-            for i, row in enumerate(creader):
+            for i, row in enumerate(csv_reader):
                 if i > 0 and len(row[0]) > 0:
                     obs_dt = datetime.datetime.strptime(row[0],
                                                         '%m/%d/%Y %I:%M:%S %p')
@@ -175,20 +187,33 @@ def process_data(dataset_fn, dest_dn):
                 elif i == 0:
                     header = row
 
+                    # Let the user know the purpose of the dots
+                    if show_status:
+                        print('Processing (. = {} rows): '.
+                               format(STATUS_INTERVAL), end='')
+
+                # Provide status feedback during processing
+                if show_status and (i % STATUS_INTERVAL) == 0:
+                    print('.', end='')
+
             # Add last experiment and its associated observations
             if last_exp_id != '' and len(obs) > 0:
                 mdata.write_exp(last_exp_id, obs)
                 mdata.add_exp(last_exp_id)
 
-        except csv.Error as cerr:
-            print("ERROR: %s: line %s: %s" % (dataset_fn, creader.line_num,
-                                              str(cerr)))
+            # Generate a newline to ensure a clean status display
+            if show_status:
+                print('')
+
+        except csv.Error as csv_err:
+            print("ERROR: {}: line {}: {}".
+                  format(dataset_fn, csv_reader.line_num, str(csv_err)))
             sys.exit(1)
 
-        except Exception as exc:
-            print("ERROR: %s: line %s: %s: %s" % (dataset_fn, creader.line_num,
-                                                  exc.__class__.__name__,
-                                                  str(exc)))
+        except Exception as err:
+            print("ERROR: {}: line {}: {}: {}".
+                  format(dataset_fn, csv_reader.line_num,
+                         err.__class__.__name__, str(err)))
             traceback.print_exc()
             sys.exit(1)
 
@@ -270,19 +295,14 @@ class FukushimaData(object):
         """
         lfiles = []
         lfiles.append({"uri": os.path.join(self.files_dn, DATA_FN),
-                       "mimetype": "text/csv",
-                       "tags": ["data"]})
+                       "mimetype": "text/csv", "tags": ["data"]})
 
         for extra_fn, tag, mtype in MORE_FILES:
-            path = os.path.join(os.path.dirname(self.files_dn), extra_fn)
-            if os.path.isfile(path):
-                lfiles.append({"uri": path, "mimetype": mtype, "tags": [tag]})
+            lfiles.append({"uri": os.path.join(os.path.dirname(self.files_dn),
+                                               extra_fn),
+                           "mimetype": mtype, "tags": [tag]})
 
-        self.recs.append({
-            "type": "source",
-            "id": "AMS-C12",
-            "files": lfiles
-            })
+        self.recs.append({"type": "source", "id": "AMS-C12", "files": lfiles})
 
     def add_units(self):
         """
@@ -305,7 +325,7 @@ class FukushimaData(object):
 
         :param exp_id: experiment id string
         """
-        return os.path.join(self.files_dn, '%s-data.csv' % exp_id)
+        return os.path.join(self.files_dn, '{}-data.csv'.format(exp_id))
 
     def write(self):
         """
@@ -331,7 +351,7 @@ class FukushimaData(object):
         """
         with open(self.get_exp_fn(exp_id), 'w') as ofd:
             for row in obs:
-                ofd.write('%s\n' % ','.join(row))
+                ofd.write('{}\n'.format(','.join(row)))
 
 
 # ----------------------------------- MAIN -----------------------------------
@@ -345,9 +365,13 @@ def main():
                     'paths will be written to the file to facilitate '
                     'subsequent access from Jupyter notebooks.')
 
+    parser.add_argument('-s', '--show-status', action='store_true',
+                        help='Display a dot for every {} lines processed'.
+                             format(STATUS_INTERVAL))
+
     parser.add_argument('csv_pathname',
                         help='The pathname to the CSV file, which needs to '
-                             'end in %s.' % DATA_FN)
+                             'end in {}.'.format(DATA_FN))
 
     parser.add_argument('dest_dirname',
                         help='The pathname to the destination Fukushima data '
@@ -358,7 +382,7 @@ def main():
     args = parser.parse_args()
 
     # Process the Fukushima data.
-    process_data(args.csv_pathname, args.dest_dirname)
+    process_data(args.csv_pathname, args.dest_dirname, args.show_status)
 
 
 if __name__ == "__main__":

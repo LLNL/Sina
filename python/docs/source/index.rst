@@ -13,6 +13,7 @@ Sina documentation index
    mnoda
    cli_basics
    api_basics
+   cpp
    examples
    faq
    changelog

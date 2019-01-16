@@ -1,10 +1,6 @@
 #!/bin/bash
 
-set -e
-
-SCRIPT_DIR=`dirname ${BASH_SOURCE[0]}`
-
-## Register spack package and install it
+# Register spack package and install it
 SPACK=`which spack`
 
 if [ -z "${SPACK}" ]; then
@@ -12,6 +8,8 @@ if [ -z "${SPACK}" ]; then
     exit 1
 fi
 
+set -e
+SCRIPT_DIR=`dirname ${BASH_SOURCE[0]}`
 branch=$(git rev-parse --abbrev-ref HEAD)
 repo_namespace=mnoda-${branch}
 
