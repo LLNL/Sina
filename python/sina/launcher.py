@@ -21,7 +21,7 @@ from cassandra.cluster import Cluster
 from sqlite3 import connect
 
 from sina import utils
-from sina.utils import import_many_jsons, import_json, parse_scalars, create_file
+from sina.utils import import_many_jsons, import_json, parse_data_string, create_file
 import sina.datastores.cass as cass
 import sina.datastores.sql as sql
 
@@ -445,11 +445,10 @@ def query(args):
     record_dao = _make_factory(args=args).createRecordDAO()
     matches = []
     if args.scalar:
-        scalar_range_list = parse_scalars(args.scalar)
-        matches = record_dao.get_given_scalars(
-                             scalar_range_list=scalar_range_list)
+        data_args = parse_data_string(args.scalar)
+        matches = list(record_dao.get_given_data(**data_args))
     if args.uri:
-        accepted_ids_list = [x.id for x in matches] if args.scalar else None
+        accepted_ids_list = matches if args.scalar else None
         matches = record_dao.get_given_document_uri(
                              uri=args.uri, accepted_ids_list=accepted_ids_list)
     # TODO: Not ideal, if we only need the ids we're doing an unnecessary query

@@ -8,7 +8,7 @@ from nose.plugins.attrib import attr
 from sina import launcher
 from sina.datastores import sql as sina_sql
 from sina.datastores import cass as sina_cass
-from sina.utils import ScalarRange, import_json, _process_relationship_entry
+from sina.utils import DataRange, import_json, _process_relationship_entry
 
 TEMP_DB_NAME = "temp_sqlite_testfile.sqlite"
 
@@ -119,9 +119,9 @@ class TestCLI(unittest.TestCase):
 
     @patch('sina.launcher.sql.RecordDAO.get_given_document_uri',
            return_value=[MagicMock(raw='hello')])
-    @patch('sina.launcher.sql.RecordDAO.get_given_scalars',
+    @patch('sina.launcher.sql.RecordDAO.get_given_data',
            return_value=[MagicMock(raw='hello', id='general')])
-    def test_query_sql(self, mock_scalars, mock_uri):
+    def test_query_sql(self, mock_get_given_data, mock_uri):
         """Verify CLI fetches and feeds query info to the DAO (sql)."""
         self.args.database_type = 'sql'
         self.args.raw = ""
@@ -131,25 +131,25 @@ class TestCLI(unittest.TestCase):
         self.args.scalar = 'somescalar=[1,2]'
         launcher.query(self.args)
         # As long as this is called, we know we correctly used sql
-        mock_scalars.assert_called_once()
-        mock_args = mock_scalars.call_args[1]  # Named args
-        self.assertIsInstance(mock_args['scalar_range_list'][0], ScalarRange)
-        self.assertEqual(len(mock_args['scalar_range_list']), 1)
+        mock_get_given_data.assert_called_once()
+        mock_args = mock_get_given_data.call_args[1]  # Named args
+        self.assertIsInstance(mock_args['somescalar'], DataRange)
+        self.assertEqual(len(mock_args), 1)
         self.args.uri = 'somedoc.png'
         launcher.query(self.args)
         mock_uri.assert_called_once()
         mock_uri_args = mock_uri.call_args[1]  # Named args
         self.assertEqual(mock_uri_args['uri'], self.args.uri)
         self.assertEqual(mock_uri_args['accepted_ids_list'][0],
-                         mock_scalars.return_value[0].id)
+                         mock_get_given_data.return_value[0])
 
     @attr('cassandra')
     @patch('sina.launcher.cass.RecordDAO.get_given_document_uri',
            return_value=[MagicMock(raw='hello')])
-    @patch('sina.launcher.cass.RecordDAO.get_given_scalars',
+    @patch('sina.launcher.cass.RecordDAO.get_given_data',
            return_value=[MagicMock(raw='hello', id='general')])
     @patch('sina.datastores.cass.schema.form_connection', return_value=True)
-    def test_query_cass(self, mock_connect, mock_scalars, mock_uri):
+    def test_query_cass(self, mock_connect, mock_data, mock_uri):
         """Verify CLI fetches and feeds query info to the DAO (cass)."""
         self.args.database_type = 'cass'
         self.args.raw = ""
@@ -161,17 +161,17 @@ class TestCLI(unittest.TestCase):
         launcher.query(self.args)
         # As long as these are called, we know we correctly used cass
         mock_connect.assert_called_once()
-        mock_scalars.assert_called_once()
-        mock_args = mock_scalars.call_args[1]  # Named args
-        self.assertIsInstance(mock_args['scalar_range_list'][0], ScalarRange)
-        self.assertEqual(len(mock_args['scalar_range_list']), 1)
+        mock_data.assert_called_once()
+        mock_args = mock_data.call_args[1]  # Named args
+        self.assertIsInstance(mock_args['somescalar'], DataRange)
+        self.assertEqual(len(mock_args.keys()), 1)
         self.args.uri = 'somedoc.png'
         launcher.query(self.args)
         mock_uri.assert_called_once()
         mock_uri_args = mock_uri.call_args[1]  # Named args
         self.assertEqual(mock_uri_args['uri'], self.args.uri)
         self.assertEqual(mock_uri_args['accepted_ids_list'][0],
-                         mock_scalars.return_value[0].id)
+                         mock_data.return_value[0])
 
     @patch('sina.launcher.cass.RecordDAO.get_given_document_uri')
     @patch('sina.launcher.sql.RecordDAO.get_given_document_uri')

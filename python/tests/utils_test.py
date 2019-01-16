@@ -9,6 +9,7 @@ written such that this should not be a testing issue.
 import os
 import shutil
 import unittest
+
 import sina.utils
 from sina.utils import DataRange
 
@@ -116,20 +117,53 @@ class TestSinaUtils(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             DataRange(30, 1)
         self.assertIn('min must be <= max', str(context.exception))
+        with self.assertRaises(ValueError) as context:
+            DataRange()
+        self.assertIn('Null DataRange', str(context.exception))
 
     def test_data_range_equality(self):
         """Test the DataRange equality operator."""
         basic_case = DataRange(1, 2)
-        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        flipped_inclusivity = DataRange(1, 2e0, min_inclusive=False, max_inclusive=True)
         with_strings = DataRange("foo_a", "foo_c")
         basic_case_again = DataRange(1, 2)
         self.assertEqual(basic_case, basic_case_again)
         self.assertNotEqual(basic_case, flipped_inclusivity)
         self.assertNotEqual(basic_case, with_strings)
 
+    def test_data_range_contains(self):
+        """Test the DataRange contains operator."""
+        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        inf_max = DataRange(max=100)
+        with_strings = DataRange(min="foo_a", min_inclusive=False)
+        self.assertTrue(2 in flipped_inclusivity)
+        self.assertFalse(1 in flipped_inclusivity)
+        self.assertTrue(-999 in inf_max)
+        self.assertFalse(100 in inf_max)
+        self.assertTrue("foo_c" in with_strings)
+        self.assertFalse("foo_a" in with_strings)
+
+    def test_data_range_is_single(self):
+        """Test the DataRange is_single_value method."""
+        is_single = DataRange(2, 2, max_inclusive=True)
+        is_also_single = DataRange("cat", "cat", max_inclusive=True)
+        is_not_single = DataRange(2, 10, max_inclusive=True)
+        self.assertTrue(is_single.is_single_value())
+        self.assertTrue(is_also_single.is_single_value())
+        self.assertFalse(is_not_single.is_single_value())
+
+    def test_data_range_identity(self):
+        """Test functions that return what kind of range the DataRange is."""
+        numerical = DataRange(min=1)
+        lexographic = DataRange(max="foo_c")
+        self.assertTrue(numerical.is_numeric_range())
+        self.assertFalse(numerical.is_lexographic_range())
+        self.assertTrue(lexographic.is_lexographic_range())
+        self.assertFalse(lexographic.is_numeric_range())
+
     def test_data_range_string_setters_with_scalars(self):
         """Test the functions that use strings to set up DataRanges with scalar vals."""
-        flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
+        flipped_inclusivity = DataRange(1, 2e100, min_inclusive=False, max_inclusive=True)
         flipped_inclusivity.parse_min("[0")
         self.assertEqual(flipped_inclusivity.min, 0)
         self.assertTrue(flipped_inclusivity.min_inclusive)
@@ -175,6 +209,31 @@ class TestSinaUtils(unittest.TestCase):
             with_strings.parse_max("4")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
 
+    def test_sort_and_standardizing(self):
+        """Test the function for processing query criteria."""
+        criteria = {"numra": DataRange(1, 2),
+                    "lexra": DataRange("bar", "foo"),
+                    "num": 12,
+                    "num2": 2,
+                    "lex": "cat"}
+        scalar_crit, string_crit = sina.utils.sort_and_standardize_criteria(criteria)
+        num_equiv = DataRange(12, 12, max_inclusive=True)
+        num2_equiv = DataRange(2, 2, max_inclusive=True)
+        lex_equiv = DataRange("cat", "cat", max_inclusive=True)
+        # assertCountEqual WOULD make sense, except it seems to test on object
+        # identity and not using the == operator. Instead, we sort
+        scalar_crit.sort()
+        string_crit.sort()
+        self.assertEqual(scalar_crit, [("num", num_equiv),
+                                       ("num2", num2_equiv),
+                                       ("numra", criteria["numra"])])
+        self.assertEqual(string_crit, [("lex", lex_equiv),
+                                       ("lexra", criteria["lexra"])])
+
+        with self.assertRaises(ValueError) as context:
+            sina.utils.sort_and_standardize_criteria({"bork": ["meow"]})
+        self.assertIn('criteria must be a number, string', str(context.exception))
+
     def test_parse_data_string(self):
         """Test the function for parsing a string to names and DataRanges."""
         just_one = "speed=[1,2)"
@@ -183,9 +242,8 @@ class TestSinaUtils(unittest.TestCase):
         flipped_inclusivity = DataRange(1, 2, min_inclusive=False, max_inclusive=True)
         both_sides_equal = DataRange("nw", "nw", max_inclusive=True)
         none = ""
-        self.assertEqual(("speed", basic_case),
-                         sina.utils.parse_data_string(just_one)[0])
-        few_list = sina.utils.parse_data_string(a_few)
-        self.assertEqual(("speed", flipped_inclusivity), few_list[0])
-        self.assertEqual(("quadrant", both_sides_equal), few_list[1])
+        self.assertEqual(basic_case, sina.utils.parse_data_string(just_one)["speed"])
+        few_dict = sina.utils.parse_data_string(a_few)
+        self.assertEqual(flipped_inclusivity, few_dict["speed"])
+        self.assertEqual(both_sides_equal, few_dict["quadrant"])
         self.assertFalse(sina.utils.parse_data_string(none))
