@@ -43,13 +43,13 @@ enum class ValueType {
  * //prints 0, corresponding to String
  * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myOtherDatum.getType()) << std::endl;
  * //prints 3, corresponding to ScalarArray
- * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myThirdDatum.getType()) << std::endl;
+ * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myArrayDatum.getType()) << std::endl;
  * myRecord->add(myDatum);
  * myOtherDatum.setUnits("km/s");
  * myRecord->add(myOtherDatum);
  * std::vector<std:string> tags = {"input", "core"};
- * MyThirdDatum.setTags(tags);
- * myRecord->add(myThirdDatum);
+ * myArrayDatum.setTags(tags);
+ * myRecord->add(myArrayDatum);
  * \endcode
  */
 class Datum {

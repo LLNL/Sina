@@ -37,7 +37,7 @@ Datum::Datum(std::vector<std::string> value_) :
 
 Datum::Datum(std::vector<double> value_) :
         scalarArrayValue{std::move(value_)}{
-    //Set type to ScalarArray, as we know it uses an array of strings
+    //Set type to ScalarArray, as we know it uses an array of doubles
     type = ValueType::ScalarArray;
 }
 
@@ -138,7 +138,7 @@ nlohmann::json Datum::toJson() const {
         default:
             std::ostringstream message;
             message << "The field '" << VALUE_FIELD
-                    << "' must be a string or double.";
+                    << "' must be a string, double, list of strings, or list of doubles.";
             throw std::invalid_argument(message.str());
 
     }
