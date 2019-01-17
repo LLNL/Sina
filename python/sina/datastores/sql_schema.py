@@ -69,7 +69,7 @@ class ScalarData(Base):
     The scalar table relates record ids to contained data if (and only if)
     those data entries have numerical values. For example,
     "density":200.14 would be represented here, but "strategy":"best-fit" would
-    not be. Instead, "strategy":"best-fit" would go in the Value table.
+    not be. Instead, "strategy":"best-fit" would go in the StringData table.
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.
@@ -105,16 +105,73 @@ class ScalarData(Base):
                         self.units))
 
 
+class ListScalarData(Base):
+    """
+    Implementation of a table to store lists of scalar-type data.
+
+    The list scalar table relates record ids to contained lists of data if (and
+    only if) those data entries have lists of numerical values. For example,
+    "density":{"value":[200.14, 12]} would be represented here, but
+    "strategy":{"value":["best-fit", "some-string"]} would
+    not be. Instead, it would go in the ListStringData table.
+
+    These tables are not exposed to the user. It's decided based on type
+    which table should be accessed.
+    """
+
+    __tablename__ = 'ListScalarData'
+    id = Column(String(255),
+                ForeignKey(Record.id),
+                nullable=False,
+                primary_key=True)
+    name = Column(String(255), nullable=False, primary_key=True)
+    index = Column(Integer(), nullable=False, primary_key=True)
+    value = Column(Float(), nullable=False)
+    tags = Column(Text(), nullable=True)
+    units = Column(String(255), nullable=True)
+    Index('record_scalar_list_idx', id, name, index)
+
+    def __init__(self, id, name, value, index, tags=None, units=None):
+        """
+        Create a ListScalarData entry with the given args.
+
+        :param id: The record id associated with this value.
+        :param name: The name of the datum associated with this value.
+        :param index: The location in the scalar list of the value.
+        :param value: The value to store.
+        :param tags: A list of tags to store.
+        :param units: The associated units of the value.
+        """
+        self.id = id
+        self.name = name
+        self.index = index
+        self.value = value
+        self.tags = tags
+        self.units = units
+
+    def __repr__(self):
+        """Return a string repr. of a sql schema ListScalarData entry."""
+        return ('SQL Schema ListScalarData: <id={}, name={}, index={}, '
+                'value={}, tags={}, units={}>'
+                .format(self.id,
+                        self.name,
+                        self.index,
+                        self.value,
+                        self.tags,
+                        self.units))
+
+
 class StringData(Base):
     """
     Implementation of a table to store string-type data.
 
     The string table relates record ids to contained data if (and only if)
     those data entries have non-numerical values. For example,
-    "density":"200.14" would be represented here, but "density":200.14 would
-    not be, and would instead go in the scalar table. This is done so we can
-    store non-scalar values while still giving users the benefit of numerical
-    comparison lookups (being faster than string comparisons).
+    "strategy":{"value":["best-fit", "some-string"]} would be represented here,
+    but "density":200.14 would not be, and would instead go in the scalar
+    table. This is done so we can store non-scalar values while still giving
+    users the benefit of numerical comparison lookups (being faster than string
+    comparisons).
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.
@@ -147,6 +204,66 @@ class StringData(Base):
                 'units={}>'
                 .format(self.id,
                         self.name,
+                        self.value,
+                        self.tags,
+                        self.units))
+
+
+class ListStringData(Base):
+    """
+    Implementation of a table to store lists of string-type data.
+
+    The list string table relates record ids to contained lists of data if (and
+    only if) those data entries have lists of non-numerical values. For
+    example, "strategy":{"value":["best-fit", "some-string"]} would be
+    represented here, but "density":{"value":[200.14, 12]} would not be, and
+    would instead go in the list scalar table. This is done so we can
+    store non-scalar values while still giving users the benefit of numerical
+    comparison lookups (being faster than string comparisons).
+
+    These tables are not exposed to the user. It's decided based on type
+    which table should be accessed.
+    """
+
+    __tablename__ = 'ListStringData'
+    id = Column(String(255),
+                ForeignKey(Record.id),
+                nullable=False,
+                primary_key=True)
+    name = Column(String(255), nullable=False, primary_key=True)
+    index = Column(Integer(), nullable=False, primary_key=True)
+    value = Column(String(255), nullable=False)
+    tags = Column(Text(), nullable=True)
+    units = Column(String(255), nullable=True)
+
+    def __init__(self, id, name, index, value, tags=None, units=None):
+        """
+        Create a ListStringData entry with the given args.
+
+        :param id: The record id associated with this value.
+        :param name: The name of the datum associated with this value.
+        :param index: The location in the scalar list of the value.
+        :param value: The value to store.
+        :param tags: A list of tags to store.
+        :param units: The associated units of the value.
+        """
+        self.id = id
+        self.name = name
+        self.index = index
+        self.value = value
+        # Arguably, string-based values don't need units. But because the
+        # value vs. scalar implementation is hidden from the user, we need
+        # to guarantee their availability in any "value"
+        self.units = units
+        self.tags = tags
+
+    def __repr__(self):
+        """Return a string repr. of a sql schema ListStringData entry."""
+        return ('SQL Schema ListStringData: <id={}, name={}, index={}, '
+                'value={}, tags={}, units={}>'
+                .format(self.id,
+                        self.name,
+                        self.index,
                         self.value,
                         self.tags,
                         self.units))
