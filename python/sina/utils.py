@@ -185,7 +185,7 @@ def _export_csv(data, scalar_names, output_file):
 
 def parse_data_string(data_string):
     """
-    Parse a string into (name, DataRange) tuples for use with data_query().
+    Parse a string into a {name: DataRange} dict for use with data_query().
 
     Ex: "speed=(3,4] max_height=(3,4]" creates two DataRanges. They are both
     min exclusive, max inclusive, and have a range of 3.0 to 4.0. They are then
@@ -202,7 +202,7 @@ def parse_data_string(data_string):
 
     :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
 
-    :returns: a list of tuples: (name, DataRange).
+    :returns: a dict of {name: DataRange}.
 
     """
     # This code was lifted from parse_scalars() and only updated enough to avoid
@@ -212,7 +212,7 @@ def parse_data_string(data_string):
     LOGGER.debug('Parsing string <{}> into DataRange objects.'
                  .format(data_string))
     raw_data = filter(None, data_string.split(" "))
-    clean_data = []
+    clean_data = {}
 
     for entry in raw_data:
         components = entry.split("=")
@@ -222,7 +222,8 @@ def parse_data_string(data_string):
         if len(components) < 2 or len(components[1]) == 0:
             raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
         val_range = components[1].split(",")
-        data_range = DataRange()
+        # Dummy DataRange as we can't have an empty range, will be set below.
+        data_range = DataRange(float("-inf"), float("inf"))
 
         if len(val_range) == 1:
             val = val_range[0]
@@ -231,60 +232,16 @@ def parse_data_string(data_string):
             except ValueError:
                 pass  # It's a non-numeric string, we just keep going
             data_range.set_equal(val)
-            clean_data.append((name, data_range))
+            clean_data[name] = data_range
         elif is_grouped_as_range(components[1]) and len(val_range) == 2:
             data_range.parse_min(val_range[0])
             data_range.parse_max(val_range[1])
-            clean_data.append((name, data_range))
+            clean_data[name] = data_range
         else:
             raise ValueError('Bad specifier in range for {}'
                              .format(name))
 
     return clean_data
-
-
-def parse_scalars(scalar_args):
-    """
-    Parse commandline input into ScalarRange object(s).
-
-    Ex: "speed=[3,4), speed=[3,4)" returns two ScalarRanges, each  with the
-    name "speed." The resulting ScalarRange is min inclusive, max exclusive,
-    and has a range of 3.0 to 4.0.
-
-    :params scalar_args: The "scalar" argument provided by the user
-
-    :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
-
-    :returns: a list of ScalarRange objects.
-
-    """
-    LOGGER.debug('Parsing command line args <{}> into ScalarRange objects.'
-                 .format(scalar_args))
-    raw_scalars = filter(None, scalar_args.strip("\"").split(" "))
-    clean_scalars = []
-
-    for entry in raw_scalars:
-        components = entry.split("=")
-        name = components[0]
-
-        # Make sure scalar's of the form <foo>=<bar>
-        if len(components) < 2 or len(components[1]) == 0:
-            raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
-        val_range = components[1].split(",")
-        scalar = ScalarRange(name)
-
-        if len(val_range) == 1:
-            scalar.set_equal(val_range[0])
-            clean_scalars.append(scalar)
-        elif is_grouped_as_range(components[1]) and len(val_range) == 2:
-            scalar.set_min(val_range[0])
-            scalar.set_max(val_range[1])
-            clean_scalars.append(scalar)
-        else:
-            raise ValueError('Bad specifier in range for {}. See -h'
-                             .format(name))
-
-    return clean_scalars
 
 
 def is_grouped_as_range(range_string):
@@ -305,6 +262,44 @@ def is_grouped_as_range(range_string):
     if range_string[0] not in open_identifier or range_string[-1] not in close_identifier:
         return False
     return True
+
+
+def sort_and_standardize_criteria(criteria_dict):
+    """
+    Given a dict of name: criteria, sort into lists by criteria type.
+
+    If any simple equivalence criteria are found (x=5), convert them to DataRanges.
+
+    :param criteria_dict: A dictionary of the form {name_1: criterion_1}
+    :returns: A tuple of lists of the form (scalar_criteria, string_criteria)
+              Each entry in each list is (name, datarange_criterion)
+    :raises ValueError: if passed any criterion that isn't a number, string,
+                        numerical DataRange, or lexographic DataRange
+    """
+    LOGGER.debug('Sorting and standardizing criteria: {}'.format(criteria_dict))
+    scalar_criteria = []
+    string_criteria = []
+    for data_name, criterion in criteria_dict.items():
+        if isinstance(criterion, Number):
+            scalar_criteria.append((data_name, DataRange(min=criterion,
+                                                         max=criterion,
+                                                         max_inclusive=True)))
+        elif isinstance(criterion, DataRange) and criterion.is_numeric_range():
+            scalar_criteria.append((data_name, criterion))
+        elif isinstance(criterion, string_types):
+            string_criteria.append((data_name, DataRange(min=criterion,
+                                                         max=criterion,
+                                                         max_inclusive=True)))
+        elif isinstance(criterion, DataRange) and criterion.is_lexographic_range():
+            string_criteria.append((data_name, criterion))
+        else:
+            # Probably a null range; we don't know what table to look in
+            # While we may support this in the future, we don't now.
+            # Might also be a dict or something else strange.
+            raise ValueError("criteria must be a number, string, numerical"
+                             "DataRange, or lexographic DataRange. Given {}:{}"
+                             .format(data_name, criterion))
+    return (scalar_criteria, string_criteria)
 
 
 def create_file(path):
@@ -413,8 +408,7 @@ class DataRange(object):
         self.min_inclusive = min_inclusive
         self.max = max
         self.max_inclusive = max_inclusive
-        if self.min is not None and self.max is not None:
-            self.validate_and_standardize_range()
+        self.validate_and_standardize_range()
 
     def __repr__(self):
         """Return a comprehensive (debug) representation of a DataRange."""
@@ -431,6 +425,22 @@ class DataRange(object):
                                    (self.max if self.max is not None else "inf"),
                                    ("]" if self.max_inclusive else ")"))
 
+    def __contains__(self, value):
+        """
+        Check whether a value falls within a DataRange.
+
+        :param other: The value to check.
+        """
+        if self.min is not None:
+            greater_than_min = value >= self.min if self.min_inclusive else value > self.min
+        else:
+            greater_than_min = True
+        if self.max is not None:
+            less_than_max = value <= self.max if self.max_inclusive else value < self.max
+        else:
+            less_than_max = True
+        return less_than_max and greater_than_min
+
     def __eq__(self, other):
         """
         Check whether two DataRanges are equivalent.
@@ -438,6 +448,34 @@ class DataRange(object):
         :param other: The object to compare against.
         """
         return(isinstance(other, DataRange) and self.__dict__ == other.__dict__)
+
+    def is_numeric_range(self):
+        """
+        Return whether the DataRange describes a numeric range.
+
+        We know that if one is a Number, the other must be a Number or None,
+        because we perform validation when they're changed. If the other is
+        None, it's still a numeric range, albeit open on one side
+        (x<4 vs 3<x<4).
+        """
+        return (isinstance(self.min, Number) or isinstance(self.max, Number))
+
+    def is_single_value(self):
+        """Return whether the DataRange represents simple equivalence (foo=5)."""
+        # This method is as simple as it is due to the validation; min
+        # and max can't both be None, and they can't be equal but not inclusive.
+        return self.min == self.max
+
+    def is_lexographic_range(self):
+        """
+        Return whether the DataRange describes a lexographic range.
+
+        We know that if one is a string, the other must be a string or None,
+        because we perform validation when they're changed. If the other is
+        None, it's still a lexographic range, albeit open on one side
+        (x<"dog" vs "cat"<x<"dog").
+        """
+        return (isinstance(self.min, string_types) or isinstance(self.max, string_types))
 
     def parse_min(self, min_range):
         """
@@ -530,7 +568,11 @@ class DataRange(object):
         :raises TypeError: if the range has a component of the wrong type,
                            ex [2,[-1,-2]], or mismatched types ex [4, "4"]
         """
+        # This method defines the assumptions we make about DataRanges. If you
+        # change this logic, methods like is_single_value() need changed as well
         LOGGER.debug('Validating and standardizing range of: {}'.format(self))
+        if self.min is None and self.max is None:
+            raise ValueError("Null DataRange; min or max must be defined")
         try:
             # Case 1: min or max is number. Other must be number or None.
             if isinstance(self.min, Number) or isinstance(self.max, Number):
@@ -554,140 +596,5 @@ class DataRange(object):
             if min_gt_max or impossible_range:
                 msg = ("Bad range for data, min must be <= max: {}"
                        .format(self))
-                LOGGER.error(msg)
-                raise ValueError(msg)
-
-
-class ScalarRange(object):
-    """Store scalar name and range, and provide parsing utility functions."""
-
-    def __init__(self, name, min=None, min_inclusive=False,
-                 max=None, max_inclusive=False):
-        """
-        Initialize ScalarRange with necessary info.
-
-        :params name: name of the scalar value (ex: velocity, density)
-        :params min: number that scalar is >= or >. None for negative
-                          infinity
-        :params min_inclusive: True if min inclusive (>=), False for
-                                > only
-        :params max: number that scalar is < or <=. None for positive
-                infinity
-        :params max_inclusive: True if max inclusive (<=), False for
-                                 < only
-        """
-        self.name = name
-        self.min = min
-        self.min_inclusive = min_inclusive
-        self.max = max
-        self.max_inclusive = max_inclusive
-
-    def __repr__(self):
-        """Return a comprehensive (debug) representation of a ScalarRange."""
-        return ('ScalarRange <name={}, min={}, min_inclusive={}, max={}, '
-                'max_inclusive={}>'.format(self.name,
-                                           self.min,
-                                           self.min_inclusive,
-                                           self.max,
-                                           self.max_inclusive))
-
-    def __str__(self):
-        """Return a ScalarRange in range format ({x, y} [x, y}, {,y], etc.)."""
-        return "{} = {}{}, {}{}".format(self.name,
-                                        ("[" if self.min_inclusive else "("),
-                                        (self.min if self.min
-                                         is not None else "-inf"),
-                                        (self.max if self.max
-                                         is not None else "inf"),
-                                        ("]" if self.max_inclusive else ")")
-                                        )
-
-    def set_min(self, left_range):
-        """
-        Parse the left (min) half of a range.
-
-        Sets the ScalarRange's left portion to be inclusive/not depending on
-        the arg's left paren/bracket,  and its left number to be whatever's
-        provided by the arg.
-
-        :param str left_range: a string of the form '<range_end>[number]',
-                               ex: '[4', that represents the left side of a
-                               numerical range
-        """
-        LOGGER.debug('Setting min of range: {}'.format(left_range))
-        if len(left_range) > 1:
-            self.min_inclusive = left_range[0] is '['
-            self.min = left_range[1:]
-        else:
-            # None represents negative infinity in range notation.
-            self.min = None
-            # Negative infinity can't be inclusive.
-            self.min_inclusive = False
-
-    def set_max(self, right_range):
-        """
-        Parse the right (max) half of a range.
-
-        Sets the ScalarRange's right portion to be inclusive/not depending on
-        the arg's right paren/bracket,  and its right number to be whatever's
-        provided by the arg.
-
-        :param str right_range: a string of the form '[number]<range_end>',
-                                ex: '}', that represents the right side of a
-                                numerical range
-        """
-        LOGGER.debug('Setting max of range: {}'.format(right_range))
-        if len(right_range) > 1:
-            self.max_inclusive = right_range[-1] is ']'
-            self.max = right_range[:-1]
-        else:
-            # None represents positive infinity in range notation.
-            self.max = None
-            # Positive infinity can't be inclusive
-            self.max_inclusive = False
-
-    def set_equal(self, num):
-        """
-        Set a ScalarRange equal to a single number while preserving notation.
-
-        This is provided for the convenience case of testing exact equivalence
-        (=5), allowing the user to just write =5 instead of =[5:5].
-        """
-        LOGGER.debug('Setting range equal to: {}'.format(num))
-        self.min = num
-        self.max = num
-        self.min_inclusive = True
-        self.max_inclusive = True
-
-    def validate_and_standardize_range(self):
-        """
-        Ensure that members of a range are set to correct types.
-
-        Raise exceptions if not.
-
-        :raises ValueError: if given an impossible range, ex: [3,2]
-        :raises TypeError: if the range has a component of the wrong type,
-                           ex [2,"str"]
-        """
-        LOGGER.debug('Validating and standardizing range of: {}'.format(self))
-        try:
-            self.min = float(
-                self.min) if self.min is not None else None
-            self.max = float(
-                self.max) if self.max is not None else None
-            self.min_inclusive = bool(self.min_inclusive)
-            self.max_inclusive = bool(self.max_inclusive)
-        except ValueError:
-            msg = ("Bad type for portion of  \'{}\' range".format(
-                   self.name))
-            LOGGER.error(msg)
-            raise TypeError(msg)  # TypeError as ValueError is a bit broad
-        if self.min is not None:
-            min_gt_max = self.max is not None and self.min > self.max
-            max_eq_min = self.max is not None and self.min == self.max
-            impossible_range = max_eq_min and not (self.min_inclusive and self.max_inclusive)
-            if min_gt_max or impossible_range:
-                msg = ("Bad range for scalar  \'{}\': min must be <= max"
-                       .format(self.name))
                 LOGGER.error(msg)
                 raise ValueError(msg)
