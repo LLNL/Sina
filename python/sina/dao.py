@@ -6,6 +6,9 @@ each DAO. While function availabiliy may differ between objects, ex: Records
 and Relationships, it will not differ between backends, ex: Cassandra and sql.
 """
 from abc import ABCMeta, abstractmethod
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DAOFactory(object):
@@ -69,6 +72,7 @@ class RecordDAO(object):
 
         :returns: A generator of found records
         """
+        LOGGER.debug('Getting many records with iter: {}'.format(iter_of_ids))
         for id in iter_of_ids:
             record = self.get(id)
             yield record
@@ -91,6 +95,7 @@ class RecordDAO(object):
 
         :param list_to_insert: A list of Records to insert
         """
+        LOGGER.debug('Inserting {} records.'.format(len(list_to_insert)))
         for item in list_to_insert:
             self.insert(item)
 

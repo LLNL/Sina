@@ -1,9 +1,12 @@
 """Tests for the CLI."""
 import unittest
 import os
+import sys
 import json
 from mock import patch, MagicMock
 from nose.plugins.attrib import attr
+from six.moves import cStringIO as StringIO
+from sqlalchemy.orm.exc import NoResultFound
 
 from sina import launcher
 from sina.datastores import sql as sina_sql
@@ -197,3 +200,39 @@ class TestCLI(unittest.TestCase):
         self.assertIn("Raw queries don't support additional query",
                       str(context.exception))
         mock_cass_query.assert_not_called()
+
+    @patch('sina.launcher.sql.RecordDAO.get')
+    @patch('sina.launcher.model.print_diff_records')
+    def test_compare_records_good(self, mock_model_print, mock_get):
+        """Verify compare subcommand prints the correct output."""
+        self.args.database = "fake.sqlite"
+        self.args.id_one = "some_id"
+        self.args.id_two = "another_id"
+        launcher.compare_records(self.args)
+
+        self.assertEqual(mock_get.call_count, 2)
+
+        mock_model_print.assert_called_once()
+
+    @patch('sina.launcher.sql.RecordDAO.get')
+    @patch('sina.launcher.model.print_diff_records')
+    def test_compare_records_bad(self, mock_model_print, mock_get):
+        """Verify compare subcommand prints useful error if given a bad id."""
+        self.args.database = "fake.sqlite"
+        self.args.id_one = "bad_id"
+        self.args.id_two = "another_id"
+        error_msg = 'Could not find record with id <{}>. Check id and '\
+                    'database.'.format(self.args.id_one)
+        mock_get.side_effect = NoResultFound(error_msg)
+
+        try:
+            # Grab stdout and send to string io
+            sys.stdout = StringIO()
+            launcher.compare_records(self.args)
+            std_output = sys.stdout.getvalue().strip()
+
+        finally:
+            # Reset stdout
+            sys.stdout = sys.__stdout__
+        self.assertEqual(mock_model_print.call_count, 0)
+        self.assertEqual(std_output, error_msg)
