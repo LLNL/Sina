@@ -6,7 +6,7 @@ set +u
 # Wheelhouse used with venv --extra-search-dir to find pip/setuptools
 WHEELHOUSE=/usr/gapps/python/wheelhouse
 # Comma-separated directories to ignore when doing style checks
-IGNORE_STYLE=venv,docs,tests/test_venv,tests/run_tests,web,demos,.tox
+IGNORE_STYLE=venv,docs,tests/test_venv,tests/run_tests,.tox
 # Make sure python 3 is available on LC
 export PATH=/usr/apps/python-3.6.0/bin/:$PATH
 
