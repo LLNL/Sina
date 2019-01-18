@@ -7,11 +7,10 @@ Overview
 --------
 
 The Mnoda schema is a generalized JSON format for representing experimental data.
-It consists of two major components: Records, which are JSON objects representing
-the components in an experiment (such as runs, msubs, and jobs) and Relationships,
-which are JSON objects representing the relationships between Records. Each Mnoda
-document consists of a single JSON object with Records and Relationships as
-attributes, each being an array:
+It consists of two types of JSON objects: Records, which represent the components in
+an experiment (such as runs, msubs, and jobs) and Relationships, which represent
+the relationships between Records. Each Mnoda document consists of a single JSON
+object with arrays for Records and Relationships:
 
 .. code-block:: javascript
 
@@ -24,8 +23,8 @@ attributes, each being an array:
 Records
 -------
 
-Every Record has, at minimum, an :code:`id` (or a :code:`local_id`) and a
-:code:`type` (run, msub, etc). Records can also have :code:`data`, :code:`files`,
+Every Record has, at minimum, an :code:`id` and a :code:`type` (run, msub,
+etc). Records can also have :code:`data`, :code:`files`,
 application metadata, arbitrary user-defined information, and more.
 A minimal example of a Record:
 
@@ -47,7 +46,8 @@ A more fleshed-out example, with field descriptions:
     {
       // Category of the Record. Some types (ex: run) have additional support within Sina
       "type": "some_type",
-      // Local ID of the Record. Must be unique within JSON document. Will be replaced by global id (or simply 'id') in db.
+      // Local ID of the Record. Must be unique within JSON document. Will be
+      // replaced by global id (or simply 'id') in db.
       "local_id": "obj1",
       // A list of files associated with the Record
       "files": [
@@ -59,16 +59,20 @@ A more fleshed-out example, with field descriptions:
       // A dictionary of data associated with the Record
       "data": {
           // Entries must have a value. Optionally, they can have tags and/or units.
-          // We recommend standard SI units with / for division and ^ for exponentiation. This format may have future support in Sina.
+          "initial_angle":: {"value": 30},
+          // For units, we recommend SI with / for division and ^ for exponentiation.
+          // This format may have future support in Sina.
           "max_density": { "value": 3, "units": "kg/m^3" },
           "total_energy": { "value": 12.2, "units": "MJ", "tags": ["output"]},
-          "revision": { "value": "12-4-11"},
-          "solver": { "value": "GMRES", "tags": ["input", "left_quad"]}
+          // Data can be strings, scalars, lists of strings, or lists of scalars
+          "revision": { "value": "12-4-11", "tags": ["pedigree"]},
+          "presets": { "value": ["quickstart", "glass"]}
       },
       "user_defined": {
           // Information that does not make sense as a data or file entry should be placed here.
           // None of this will be interpreted by Sina. Instead, it will simply
           // be saved as part of the Record.
+          "display_string": "0x477265617420636174636821"
       }
     }
 
@@ -88,20 +92,20 @@ the :code:`subject`, "knows" is the :code:`predicate`, and "Bob" is the :code:`o
 
 To avoid confusion, try to use the grammatical active voice when assigning predicates.
 A "passive voice" :code:`predicate` like "contained by", "corrected by", or
-"launched by" may cause confusion, as it would reverse the normal direction of
-relations. In the Mnoda schema, a Relationship always consists of exactly a :code:`subject`,
+"launched by" reverses the normal direction of relations. In the Mnoda schema,
+a Relationship always consists of exactly a :code:`subject`,
 :code:`predicate`, and :code:`object`, where the :code:`subject` and :code:`object`
-are each the :code:`id` of a Mnoda Record:
+are each the :code:`id` of a Record:
 
 .. code-block:: javascript
 
     {
-      "subject": "myRecordName",
+      "subject": "myTaskId",
       "predicate": "contains",
-      "object": "myRunName"
+      "object": "myRunId"
     }
 
-:code:`Subject` and :code:`object` can be switched to :code:`local_subject`
+:code:`subject` and :code:`object` can be switched to :code:`local_subject`
 and :code:`local_object`, respectively, which indicates that the :code:`id` for that field:
 
   * Must correspond to a Record named using a :code:`local_id` elsewhere in the document
@@ -110,12 +114,12 @@ and :code:`local_object`, respectively, which indicates that the :code:`id` for 
 .. code-block:: javascript
 
     "records": [
-      {"type": "some_type", "id": "myRecordName"},
+      {"type": "some_type", "id": "myRecordId"},
       {"type": "run", "local_id": "run1"}
     ],
 
     "relationships": [
-      {"subject": "myRecordName", "predicate": "summarizes", "local_object": "run1"}
+      {"subject": "myRecordId", "predicate": "summarizes", "local_object": "run1"}
     ]
 
 When ingested by Sina, the :code:`local_id` "run1" and :code:`local_object` "run1" will both be renamed
@@ -126,13 +130,11 @@ Special Record Types
 --------------------
 
 Certain types of Records are expected to recur in data ingested by Sina.
-These types have special field support in datastores created by Sina, and
-may also support additional queries. What follows is a list of the
-special Record types supported by Sina, and the fields that can be added
-to a Mnoda Record to take advantage of that additional support. Note that **all
+These types support additional fields in datastores created by Sina, and
+may also support additional queries. What follows is a list of Sina's
+special Record types and the fields they support. Note that **all
 fields supported by generic Mnoda Records are supported by the special types**,
-such as :code:`local_id`, :code:`data`, etc. Additionally, **all fields
-supported by special types that aren't included in the generic Record are optional.**
+such as :code:`local_id`, :code:`data`, etc.
 
 Run
 ~~~
@@ -161,9 +163,9 @@ a user and version:
 Complete, Empty Document
 ------------------------
 
-For convenience, below is a roughly empty Mnoda document with all Relationship and generic
-Record fields represented except that "name" must be replaced by the actual name, or key, of a
-data value.
+For convenience, below is an empty Mnoda document with all Relationship and generic
+Record fields represented. Note that :code:`datum_name` should be replaced by the
+actual name of the datum (such as "density" or "max_volume").
 
 .. code-block:: javascript
 
@@ -176,7 +178,7 @@ data value.
               {"uri": "", "mimetype": "", "tags": []}
           ],
           "data": {
-              "name": {"value": "", "units": "", "tags": []}
+              "datum_name": {"value": "", "units": "", "tags": []}
           },
           "user_defined": {}
         },
@@ -187,7 +189,7 @@ data value.
               {"uri": "", "mimetype": "", "tags": []}
           ],
           "data": {
-              "name": {"value": "", "units": "", "tags": []}
+              "datum_name": {"value": [], "units": "", "tags": []}
           },
           "user_defined": {}
         }
