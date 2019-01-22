@@ -54,6 +54,30 @@ class ScalarDataFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
+class RecordFromScalarListData(Model):
+    """Query table for finding records given scalar criteria."""
+
+    name = columns.Text(primary_key=True)
+    # CQLEngine support for frozen collections isn't part of their API.
+    # Currently, _freeze_db_type() *is* the least hacky option.
+    value = columns.List(columns.Double(), primary_key=True)
+    value._freeze_db_type()
+    id = columns.Text(primary_key=True)
+    units = columns.Text()
+    tags = columns.Set(columns.Text())
+
+
+class ScalarListDataFromRecord(Model):
+    """Query table for finding a scalar-valued Record.data entry given record ID."""
+
+    id = columns.Text(primary_key=True)
+    name = columns.Text(primary_key=True)
+    value = columns.List(columns.Double(), primary_key=True)
+    value._freeze_db_type()
+    units = columns.Text()
+    tags = columns.Set(columns.Text())
+
+
 class RecordFromStringData(Model):
     """
     Query table for finding records given string criteria (ex, "version"="1.2.3").
@@ -75,6 +99,28 @@ class StringDataFromRecord(Model):
     id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
     value = columns.Text(primary_key=True)
+    units = columns.Text()
+    tags = columns.Set(columns.Text())
+
+
+class RecordFromStringListData(Model):
+    """Query table for finding records given scalar criteria."""
+
+    name = columns.Text(primary_key=True)
+    value = columns.List(columns.Text(), primary_key=True)
+    value._freeze_db_type()
+    id = columns.Text(primary_key=True)
+    units = columns.Text()
+    tags = columns.Set(columns.Text())
+
+
+class StringListDataFromRecord(Model):
+    """Query table for finding a scalar-valued Record.data entry given record ID."""
+
+    id = columns.Text(primary_key=True)
+    name = columns.Text(primary_key=True)
+    value = columns.List(columns.Text(), primary_key=True)
+    value._freeze_db_type()
     units = columns.Text()
     tags = columns.Set(columns.Text())
 
@@ -138,98 +184,107 @@ def cross_populate_object_and_subject(subject_id,
                              )
 
 
-def cross_populate_scalar_and_record(name,
-                                     value,
-                                     id,
-                                     tags=None,
-                                     units=None,
-                                     force_overwrite=False):
+def cross_populate_data_tables(first_table,
+                               second_table,
+                               name,
+                               value,
+                               id,
+                               tags=None,
+                               units=None,
+                               force_overwrite=False):
     """
-    Add scalar-value data entries to ScalarData_from_Record and Record_from_ScalarData tables.
+    Simultaneously add data entries to a pair of tables.
 
-    These tables have the same data but are organized differently to allow
-    for various queries.
+    The schema includes 4 pairs of tables for each of the 4 types of data
+    accepted: scalars, strings, scalar lists, and string lists. Each partner in
+    a pair holds the same data in a different arrangement to support
+    different types of queries.
 
     Each call handles one entry from one Record's "data" attribute. For mass
     (batch) insertion, see RecordDAO.insert_many().
 
+    :param first_table: The first table in the pair. Order doesn't matter
+    :param second_table: The second table in the pair
     :param name: The name of the entry
-    :param value: The entry's value (must be a scalar)
+    :param value: The entry's value (must be the type of value the pair handles)
     :param id: The id of the record containing the entry
     :param tags: Tags to be applied to this entry
     :param units: Units of the entry.
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
-    LOGGER.debug('Cross populating scalar data and record tables with: name={}, value={}, '
-                 'id={}, tags={}, units={}, and force_overwrite={}.'
-                 .format(name, value, id, tags, units, force_overwrite))
-    scalar_from_record_create = (ScalarDataFromRecord.create if force_overwrite
-                                 else ScalarDataFromRecord.if_not_exists()
-                                 .create)
-    record_from_scalar_create = (RecordFromScalarData.create if force_overwrite
-                                 else RecordFromScalarData.if_not_exists()
-                                 .create)
-
-    scalar_from_record_create(id=id,
-                              name=name,
-                              value=value,
-                              tags=tags,
-                              units=units,
-                              )
-    record_from_scalar_create(id=id,
-                              name=name,
-                              value=value,
-                              tags=tags,
-                              units=units,
-                              )
+    first_table_create = (first_table.create if force_overwrite
+                          else first_table.if_not_exists().create)
+    second_table_create = (second_table.create if force_overwrite
+                           else second_table.if_not_exists().create)
+    first_table_create(id=id,
+                       name=name,
+                       value=value,
+                       tags=tags,
+                       units=units)
+    second_table_create(id=id,
+                        name=name,
+                        value=value,
+                        tags=tags,
+                        units=units)
 
 
-def cross_populate_string_and_record(name,
-                                     value,
-                                     id,
-                                     tags=None,
-                                     units=None,
+def cross_populate_scalar_and_record(name, value, id, tags=None, units=None,
                                      force_overwrite=False):
     """
-    Add string-value data entries to StringData_from_Record and Record_from_StringData tables.
+    Insert data into the scalar query tables.
 
-    These tables have the same data but are organized differently to allow
-    for various queries.
-
-    Each call handles one entry from one Record's "data" attribute. For mass
-    (batch) insertion, see RecordDAO.insert_many().
-
-    :param name: The name of the entry
-    :param value: The entry's value (must be a string)
-    :param id: The id of the record containing the entry
-    :param tags: Tags to be applied to this entry
-    :param units: Units of the entry.
-    :param force_overwrite: Whether to forcibly overwrite an extant entry in
-                            the same "slot" in the database
+    Calls cross_populate_data_tables on the scalar tables. Value must be
+    a scalar.
     """
-    LOGGER.debug('Cross populating string data and record tables with: name={}, value={}, '
-                 'id={}, tags={}, units={}, and force_overwrite={}.'
-                 .format(name, value, id, tags, units, force_overwrite))
-    value_from_record_create = (StringDataFromRecord.create if force_overwrite
-                                else StringDataFromRecord.if_not_exists()
-                                .create)
-    record_from_value_create = (RecordFromStringData.create if force_overwrite
-                                else RecordFromStringData.if_not_exists()
-                                .create)
+    cross_populate_data_tables(first_table=ScalarDataFromRecord,
+                               second_table=RecordFromScalarData,
+                               id=id, name=name, value=value, units=units,
+                               tags=tags, force_overwrite=force_overwrite)
 
-    value_from_record_create(id=id,
-                             name=name,
-                             value=value,
-                             tags=tags,
-                             units=units,
-                             )
-    record_from_value_create(id=id,
-                             name=name,
-                             value=value,
-                             tags=tags,
-                             units=units,
-                             )
+
+def cross_populate_string_and_record(name, value, id, tags=None, units=None,
+                                     force_overwrite=False):
+    """
+    Insert data into the string query tables.
+
+    Calls cross_populate_data_tables on the string tables. Value must be
+    a string.
+    """
+    cross_populate_data_tables(first_table=StringDataFromRecord,
+                               second_table=RecordFromStringData,
+                               id=id, name=name, value=value, units=units,
+                               tags=tags, force_overwrite=force_overwrite)
+
+
+def cross_populate_scalar_list_and_record(name, value, id, tags=None, units=None,
+                                          force_overwrite=False):
+    """
+    Insert data into the scalar list query tables.
+
+    Calls cross_populate_data_tables on the scalar list tables. Value must be
+    a list of scalars.
+    """
+    cross_populate_data_tables(first_table=ScalarListDataFromRecord,
+                               second_table=RecordFromScalarListData,
+                               id=id, name=name, value=value, units=units,
+                               tags=tags, force_overwrite=force_overwrite)
+
+
+def cross_populate_string_list_and_record(name, value, id, tags=None, units=None,
+                                          force_overwrite=False):
+    """
+    Insert data into the string list query tables.
+
+    Calls cross_populate_data_tables on the string list tables. Value must be
+    a list of strings.
+    """
+    # CQLEngine's current undocumented support of frozen collections seems to
+    # require a stringified list. Hopefully this changes.
+    cross_populate_data_tables(first_table=StringListDataFromRecord,
+                               second_table=RecordFromStringListData,
+                               id=id, name=name, value=value, units=units,
+                               tags=tags, force_overwrite=force_overwrite)
 
 
 def form_connection(keyspace, node_ip_list=None):
@@ -258,3 +313,7 @@ def form_connection(keyspace, node_ip_list=None):
     sync_table(ScalarDataFromRecord)
     sync_table(StringDataFromRecord)
     sync_table(RecordFromStringData)
+    sync_table(RecordFromScalarListData)
+    sync_table(RecordFromStringListData)
+    sync_table(ScalarListDataFromRecord)
+    sync_table(StringListDataFromRecord)

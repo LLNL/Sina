@@ -175,7 +175,9 @@ class TestSearch(unittest.TestCase):
                      user_defined={},
                      data={"eggs": {"value": 12,
                                     "units": None,
-                                    "tags": ["runny"]}},
+                                    "tags": ["runny"]},
+                           "spam": {"value": [12, 24]},
+                           "flavors": {"value": ["original", "bbq"]}},
                      files=[{"uri": "eggs.brek",
                              "mimetype": "egg",
                              "tags": ["fried"]}])
@@ -185,8 +187,13 @@ class TestSearch(unittest.TestCase):
         self.assertEquals(returned_record.type, rec.type)
         self.assertEquals(returned_record.user_defined, rec.user_defined)
         self.assertEquals(returned_record.raw, rec.raw)
-        returned_scalars = record_dao.get_scalars("spam", ["eggs"])
-        self.assertEquals(returned_scalars, rec.data)
+
+        # TODO: Replace when queries are supported on these tables
+        scal_list = (schema.ScalarListDataFromRecord.objects.filter(id=rec.id))
+        self.assertEquals(scal_list.get()['value'], rec['data']['spam']['value'])
+        str_list = (schema.StringListDataFromRecord.objects.filter(id=rec.id))
+        self.assertEquals(str_list.get()['value'], rec['data']['flavors']['value'])
+
         returned_files = record_dao.get_files("spam")
         self.assertEquals(returned_files, rec.files)
         overwrite = Record(id="spam",
