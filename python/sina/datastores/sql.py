@@ -10,11 +10,17 @@ import six
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.sql_schema as schema
+from sina.utils import sort_and_standardize_criteria
 
 LOGGER = logging.getLogger(__name__)
 
 # String used to identify a sqlite database for SQLALchemy
 SQLITE = "sqlite:///"
+
+# Parameter offsets used when combining queries across tables
+# see _apply_ranges_to_query() for usage
+param_offsets = {schema.ScalarData: "",
+                 schema.StringData: "_1"}
 
 
 class RecordDAO(dao.RecordDAO):
@@ -91,6 +97,55 @@ class RecordDAO(dao.RecordDAO):
                                              mimetype=entry.get('mimetype'),
                                              tags=tags))
 
+    def data_query(self, **kwargs):
+        """
+        Return the ids of all Records whose data fulfill some criteria.
+
+        Criteria are expressed as keyword arguments. Each keyword
+        is the name of an entry in a Record's data field, and it's set
+        equal to either a single value or a DataRange (see utils.DataRanges
+        for more info) that expresses the desired value/range of values.
+        All criteria must be satisfied for an ID to be returned:
+
+            # Return ids of all Records with a volume of 12, a quadrant of
+            # "NW", AND a max_height >=30 and <40.
+            data_query(volume=12, quadrant="NW", max_height=DataRange(30,40))
+
+        :param kwargs: Pairs of the names of data and the criteria that data
+                         must fulfill.
+        :returns: A generator of Records that fulfill all criteria.
+        """
+        LOGGER.debug('Finding all records fulfilling criteria: {}'
+                     .format(kwargs.items()))
+        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
+        if not kwargs.items():
+            raise ValueError("You must supply at least one criterion.")
+        scalar_criteria, string_criteria = sort_and_standardize_criteria(kwargs)
+
+        if scalar_criteria:
+            scalar_query = self.session.query(schema.ScalarData.id)
+            scalar_query = self._apply_ranges_to_query(scalar_query,
+                                                       scalar_criteria,
+                                                       schema.ScalarData)
+        if string_criteria:
+            string_query = self.session.query(schema.StringData.id)
+            string_query = self._apply_ranges_to_query(string_query,
+                                                       string_criteria,
+                                                       schema.StringData)
+
+        #  If we have more than one set of data, we need to perform a union
+        if scalar_criteria and string_criteria:
+            and_query = scalar_query.intersect(string_query)
+            for x in and_query.all():
+                yield x[0]
+        # Otherwise, just find which one has something to return
+        elif scalar_criteria:
+            for x in scalar_query.all():
+                yield x[0]
+        else:
+            for x in string_query.all():
+                yield x[0]
+
     def get(self, id):
         """
         Given a id, return match (if any) from SQL database.
@@ -164,82 +219,53 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
-    # TODO: While not part of the original implementation, we now have
-    # the ability to store non-scalar data as well, so we'll need a query
-    # to search on them, as well as a more user-facing query that can be
-    # given a list of data and call both this and the aforementioned method.
-    def get_given_scalars(self, scalar_range_list, ids_only=False):
+    def _apply_ranges_to_query(self, query, data, table):
         """
-        Return all records with scalars fulfilling some criteria.
+        Filter query object based on list of (name, criteria).
 
-        Note that this is a logical 'and'--the record must satisfy every
-        conditional provided (which is also why this can't simply call
-        get_given_scalar() as get_many() does with get()).
-
-        :param scalar_range_list: A list of 'sina.ScalarRange's describing the
-                                 different criteria.
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of Records fitting the criteriaor (if ids_only) a
-                  generator of their ids
-        """
-        LOGGER.debug('Getting all records with scalars within the following '
-                     'ranges: {}'.format(scalar_range_list))
-        query = self.session.query(schema.ScalarData.id)
-        query = self._apply_scalar_ranges_to_query(query, scalar_range_list)
-        if ids_only:
-            for x in query.all():
-                yield x[0]
-        else:
-            filtered_ids = (x[0] for x in query.all())
-            for record in self.get_many(filtered_ids):
-                yield record
-
-    def get_given_scalar(self, scalar_range, ids_only=False):
-        """
-        Return all records with scalars fulfilling some criteria.
-
-        :param scalar_range: A sina.ScalarRange describing the criteria.
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of Records fitting the criteria or (if ids_only) a
-                  generator of their ids
-        """
-        return self.get_given_scalars([scalar_range], ids_only=ids_only)
-
-    def _apply_scalar_ranges_to_query(self, query, scalars):
-        """
-        Filter query object based on list of ScalarRanges.
+        This is only meant to be used in conjunction with data_query() and
+        related. Criteria must be DataRanges.
 
         Uses parameter substitution to get around limitations of SQLAlchemy OR
-        construct.
+        construct. Note that we still use AND logic; the "or" is used in
+        conjunction with a count statement because each data entry is its own
+        row, and we need to use AND across rows (and with respect to the record
+        id).
 
         :param query: A SQLAlchemy query object
-        :param scalars: A list of ScalarRanges to apply to the query object
+        :param data: A list of (name, criteria) pairs to apply to the query object
+        :param table: The table to query against, either ScalarData or
+                      StringData.
 
-        :returns: <query>, now filtering on <scalars>
+        :returns: <query>, now filtering on <data>
         """
-        LOGGER.debug('Filtering <query={}> with <scalars={}>.'.format(query, scalars))
+        LOGGER.debug('Filtering <query={}> with <data={}>.'.format(query, data))
         search_args = {}
-        for index, scalar in enumerate(scalars):
-            search_args["scalar_name{}".format(index)] = scalar.name
-            search_args["min{}".format(index)] = scalar.min
-            search_args["max{}".format(index)] = scalar.max
+        range_components = []
+        # Performing an intersection on two SQLAlchemy queries, as in data_query(),
+        # causes their parameters to merge and overwrite any shared names.
+        # Here, we guarantee our params will have unique names per table.
+        offset = param_offsets[table]
+        for index, (name, criteria) in enumerate(data):
+            range_components.append((name, criteria, index))
+            search_args["name{}{}".format(index, offset)] = name
+            if criteria.is_single_value():
+                search_args["eq{}{}".format(index, offset)] = criteria.min
+            else:
+                search_args["min{}{}".format(index, offset)] = criteria.min
+                search_args["max{}{}".format(index, offset)] = criteria.max
 
         query = query.filter(sqlalchemy
-                             .or_(self._build_range_filter(scalar, index)
-                                  for index, scalar in enumerate(scalars)))
-        query = (query.group_by(schema.ScalarData.id)
+                             .or_(self._build_range_filter(name, criteria, table, index)
+                                  for (name, criteria, index) in range_components))
+        query = (query.group_by(table.id)
                       .having(sqlalchemy.text("{} = {}"
-                              .format(sqlalchemy.func
-                                      .count(schema.ScalarData.id),
-                                      len(scalars)))))
+                              .format(sqlalchemy.func.count(table.id),
+                                      len(range_components)))))
         query = query.params(search_args)
         return query
 
-    def _build_range_filter(self, scalar, index=0):
+    def _build_range_filter(self, name, criteria, table, index=0):
         """
         Build a TextClause to filter a SQL query using range parameters.
 
@@ -250,40 +276,47 @@ class RecordDAO(dao.RecordDAO):
 
         WHERE ScalarData.name=:scalar_name0 AND ScalarData.value<right_num0
 
-        :param scalar: The scalar used to build the query.
+        :param name: The name of the value we apply the criteria to
+        :param criteria: The criteria used to build the query.
+        :param table: The table to query against, either ScalarData or
+                      StringData
         :param index: optional offset of this criteria if using multiple
                       criteria. Used for building var names for
                       parameterization.
 
         :returns: a TextClause object for use in a SQLAlchemy statement
+
+        :raises ValueError: if given a bad table to query against.
         """
-        LOGGER.debug('Building TextClause filter from <scalar={}> and index={}.'
-                     .format(scalar, index))
-        conditions = ["(ScalarData.name IS :scalar_name{} AND ScalarData.value"
-                      .format(index)]
-
-        scalar.validate_and_standardize_range()
-
-        # Check if both sides of the range are the same number (not None)
-        # Used for a small simplification: '=[5,5]' == '=5'
-        if (scalar.min is not None) and (scalar.min == scalar.max):
-            conditions.append(" = :min{}".format(index))
-
-        # If both sides are None, we're only testing that a number exists
-        elif scalar.min is None and scalar.max is None:
-            conditions.append(" IS NOT NULL")
-
+        LOGGER.debug('Building TextClause filter for data "{}" with criteria'
+                     '<{}> and index={}.'
+                     .format(name, criteria, index))
+        offset = param_offsets[table]
+        # SQLAlchemy's methods for substituting in table names are convoluted.
+        # A much simpler, clearer method:
+        if table == schema.ScalarData:
+            tablename = "ScalarData"
+        elif table == schema.StringData:
+            tablename = "StringData"
         else:
-            if scalar.min is not None:
-                conditions.append(" >= " if scalar.min_inclusive else " > ")
-                conditions.append(":min{}".format(index))
-            if (scalar.min is not None) and (scalar.max is not None):
-                # If two-sided range, begin preparing new condition
-                conditions.append(" AND ScalarData.value ")
-            if scalar.max is not None:
-                conditions.append(" <= " if scalar.max_inclusive else " < ")
-                conditions.append(":max{}".format(index))
+            raise ValueError("Given a bad table for data query: {}".format(table))
 
+        conditions = ["({table}.name IS :name{index}{offset} AND {table}.value"
+                      .format(table=tablename, index=index, offset=offset)]
+        if criteria.is_single_value():
+            conditions.append(" = :eq{}{}".format(index, offset))
+        else:
+            if criteria.min is not None:
+                conditions.append(" >= " if criteria.min_inclusive else " > ")
+                conditions.append(":min{}{}".format(index, offset))
+            # If two-sided range, begin preparing new condition
+            if (criteria.min is not None) and (criteria.max is not None):
+                conditions.append(" AND {}.value ".format(tablename))
+            if criteria.max is not None:
+                conditions.append(" <= " if criteria.max_inclusive else " < ")
+                conditions.append(":max{}{}".format(index, offset))
+        # This helper method should NEVER see a (None, None) range due to the
+        # special way they need handled (figuring out what table they belong to)
         conditions.append(")")
         return sqlalchemy.text(''.join(conditions))
 

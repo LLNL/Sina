@@ -39,8 +39,9 @@ between supported backends::
   record_dao = factory.createRecordDAO()
   record_dao.insert_many(all_sruns)
 
-This would result in a keyspace :code:`sruns_only` that contains all the :code:`"type": "srun"`
-records from :code:`somefile.sqlite` (assuming that :code:`sruns_only` was previously
+This would result in a keyspace (essentially a Cassandra database)
+:code:`sruns_only` that contains all the :code:`"type": "srun"` records found
+in :code:`somefile.sqlite` (assuming that :code:`sruns_only` was previously
 empty). Of course, this can also be used for passing between backends of
 the same type, such as creating a new sqlite file containing a subset of a
 larger one, ex: all the records with :code:`"type": "run"` with a scalar "volume" greater
@@ -52,52 +53,46 @@ documentation of all the methods available to each DAO, please see the
 `DAO documentation <generated_docs/sina.dao.html>`__.
 
 
-Filtering Records Based on Scalar Criteria
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Filtering Records Based on Their Data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Records can also be selected based on the scalars they contain. A Record "contains"
-a scalar if the scalar is both named in its data dictionary and assigned a numerical value.
-For example, :code:`"data": {"volume":{"value": 1.2}}` describes a scalar.
-:code:`"data": {"version":{"value":"1.2"}}` does not. Scalar criteria can be
-described
-using either strings (see the `CLI query examples <cli_examples.html#query>`__)
-or ScalarRanges, which are provided/documented in
-`sina.utils <generated_docs/sina.utils.html>`__. In short, a ScalarRange represents
-an interval, such as (0,1] or (,3), with two endpoints and
-inclusive/exclusive designators for each. Infinite endpoints are indicated by
-leaving the endpoint unspecified, or equivalently specifying it as None.::
+Records have a :code:`data` field that holds the experimental data they're
+associated with. This can be inputs, outputs, start times, etc. This data
+is queryable, and can be used to find Records fitting criteria. For example, let's
+say we're interested in all Records with a :code:`final_volume` of 310 and with
+a :code:`quadrant` of "NW"::
 
-  from sina.utils import ScalarRange
+  records = record_dao.get_given_data(final_volume=310, quadrant="NW")
 
-  # (,3), or x < 3
-  # endpoints are exclusive by default
-  less_than_three = ScalarRange(name='volume',
-                                right_num=3)
+This will find all the records record_dao knows about (so those in
+:code:`somefile.sqlite`) that fit our specifications. Of course, sometimes we're
+interested in data within a range::
 
-  # (0,1], or x > 0 and x <= 1
-  gt_0_lte_1 = ScalarRange(name='density',
-                           left_num=0,
-                           right_num=1,
-                           right_inclusive=True)
+  from sina.utils import DataRange
 
-  print(str(less_than_three) + ', ' + str(gt_0_lte_1))
+  # data_query is aliased to get_given_data, they're interchangeable
+  records = record_dao.data_query(final_volume=DataRange(200,310),
+                                  final_acceleration=DataRange(max=20,
+                                                               min=12,
+                                                               min_inclusive=False,
+                                                               max_inclusive=True),
+                                  schema=DataRange(max="bb_12"),
+                                  quadrant="NW")
 
-ScalarRanges (or, again, properly-formatted strings) can be fed to Record DAOs
-and related (Runs, etc) in order to filter based on the represented criteria.
-When providing multiple criteria, only entries fulfilling all criteria will be
-returned (boolean AND). If OR-like functionality is desired, see the next
-section. Filtering on the ScalarRanges above::
+Now we've found the ids of all Records that have a :code:`final_volume` >= 200
+and < 310, a :code:`final_acceleration` > 12 and <= 20, a :code:`schema`
+that comes before "bb_12" alphabetically, and a :code:`quadrant` = "NW". For an
+interactive demo, see examples/fukushima/fukushima_subsecting_data.ipynb.
 
-  ...
-
-  matched_records = record_dao.get_given_scalars((less_than_three,
-                                                  gt_0_lte_1))
+NOTE: when providing multiple criteria, only entries fulfilling all criteria
+will be returned (boolean AND). If OR-like functionality is desired, see the next
+section.
 
 
 Combining Filters using "IDs Only" Logic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Filtering methods (such as get_all_of_type, get_given_scalar, etc) take an
+Filtering methods (such as get_all_of_type and get_given_document_uri) take an
 optional argument, :code:`ids_only`. If passed as :code:`True`, they'll return
 only the ids of Records that fulfill their criteria, rather than the entire
 Record. This is faster than assembling the entire Record object(s), and is also
@@ -105,14 +100,12 @@ the recommended way of combining queries or implementing more complex logic::
 
   ...
 
-  ids_volume_filter = record_dao.get_given_scalar(less_than_three,
-                                                  ids_only=True)
-  ids_density_filter = record_dao.get_given_scalars(gt_0_lte_1,
-                                                    ids_only=True)
+  type_filter = record_dao.get_all_of_type("msubs", ids_only=True)
+  file_filter = record_dao.get_given_document_uri("mock_msub_out.txt", ids_only=True)
 
-  # This will print ids of all records whose volume is less than three or
-  # whose density is in the range (0, 1], *but not both* (XOR)
-  xor_recs = set(ids_volume_filter).symmetric_difference(ids_density_filter)
+  # This will print ids of all records which are msubs or are associated with
+  # a file "mock_msub_out.txt", **but not both** (exclusive OR)
+  xor_recs = set(type_filter).symmetric_difference(file_filter)
   print(xor_recs)
 
 
@@ -137,24 +130,22 @@ get_data_for_records() to find specific data entries across a list of Records::
                       data[id]["final_speed"]["value"],
                       data[id]["shape"]["value"]))
 
-
-Math-Based Queries
-~~~~~~~~~~~~~~~~~~
-
-Because of the potential complexity of queries based on equation criteria
-(ex: (math.pi * r**2 * h)/3 >= 100), there is no one single DAO
-method covering them. However, they're fairly straightforward to implement
-using some additional Python logic. Example scripts have been provided in the
-demo/apis folder (cass_equation.py and sql_equation.py) that will print a
-list of all record ids found in some database that fulfill some equation-based
-criterion.
+NOTE: Some machines enforce a limit on the number of variables per SQL
+statement, generally around 999. If you run into issues selecting data for
+large numbers of Records, consider using the Cassandra backend, or simply split
+your get_data_for_records call to use smaller chunks of Records.
 
 
 Working with Records, Runs, Etc. as Objects
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The methods detailed above return Records; full descriptions are available in
-the `model documentation <generated_docs/sina.model.html>`__, but
+Given the id of a Record, you can get the entire Record as a Python object using::
+
+   record = record_dao.get("my_record_id")
+   records_list = record_dao.get_many(["my_first_record", "my_second_record"])
+
+Full descriptions are available in
+`model documentation <generated_docs/sina.model.html>`__, but
 as a quick overview, Records and their subtypes (Runs, etc.) all
 have, at minimum, an :code:`id` and :code:`type`. These and
 additional optional fields (such as the Record's data and files) can be
