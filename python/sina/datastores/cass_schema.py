@@ -3,7 +3,7 @@ Cqlengine implementation of the minimal schema used in Cassandra imports.
 
 Based on Mnoda
 """
-
+import numbers
 import logging
 
 from cassandra.cqlengine.models import Model
@@ -55,7 +55,7 @@ class ScalarDataFromRecord(Model):
 
 
 class RecordFromScalarListData(Model):
-    """Query table for finding records given scalar criteria."""
+    """Query table for finding records given scalar list criteria."""
 
     name = columns.Text(primary_key=True)
     # CQLEngine support for frozen collections isn't part of their API.
@@ -68,7 +68,7 @@ class RecordFromScalarListData(Model):
 
 
 class ScalarListDataFromRecord(Model):
-    """Query table for finding a scalar-valued Record.data entry given record ID."""
+    """Query table for finding a scalar list-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
@@ -104,7 +104,7 @@ class StringDataFromRecord(Model):
 
 
 class RecordFromStringListData(Model):
-    """Query table for finding records given scalar criteria."""
+    """Query table for finding records given scalar list criteria."""
 
     name = columns.Text(primary_key=True)
     value = columns.List(columns.Text(), primary_key=True)
@@ -115,7 +115,7 @@ class RecordFromStringListData(Model):
 
 
 class StringListDataFromRecord(Model):
-    """Query table for finding a scalar-valued Record.data entry given record ID."""
+    """Query table for finding a scalar list-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
@@ -184,9 +184,7 @@ def cross_populate_object_and_subject(subject_id,
                              )
 
 
-def cross_populate_data_tables(first_table,
-                               second_table,
-                               name,
+def cross_populate_data_tables(name,
                                value,
                                id,
                                tags=None,
@@ -198,13 +196,12 @@ def cross_populate_data_tables(first_table,
     The schema includes 4 pairs of tables for each of the 4 types of data
     accepted: scalars, strings, scalar lists, and string lists. Each partner in
     a pair holds the same data in a different arrangement to support
-    different types of queries.
+    different types of queries. The pair to insert into is determined based
+    on the value arg's type.
 
     Each call handles one entry from one Record's "data" attribute. For mass
     (batch) insertion, see RecordDAO.insert_many().
 
-    :param first_table: The first table in the pair. Order doesn't matter
-    :param second_table: The second table in the pair
     :param name: The name of the entry
     :param value: The entry's value (must be the type of value the pair handles)
     :param id: The id of the record containing the entry
@@ -213,10 +210,24 @@ def cross_populate_data_tables(first_table,
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
-    first_table_create = (first_table.create if force_overwrite
-                          else first_table.if_not_exists().create)
-    second_table_create = (second_table.create if force_overwrite
-                           else second_table.if_not_exists().create)
+    # Check if it's a list
+    if isinstance(value, list):
+        # Check if it's a scalar or empty
+        table_1, table_2 = ((ScalarListDataFromRecord, RecordFromScalarListData)
+                            if not value or isinstance(value[0], numbers.Real)
+                            else (StringListDataFromRecord, RecordFromStringListData))
+    else:
+        table_1, table_2 = ((ScalarDataFromRecord, RecordFromScalarData)
+                            if isinstance(value, numbers.Real)
+                            else (StringDataFromRecord, RecordFromStringData))
+
+    # Now that we know which tables to use, determine how to insert
+    first_table_create = (table_1.create if force_overwrite
+                          else table_1.if_not_exists().create)
+    second_table_create = (table_2.create if force_overwrite
+                           else table_2.if_not_exists().create)
+
+    # Perform the insertion
     first_table_create(id=id,
                        name=name,
                        value=value,
@@ -227,64 +238,6 @@ def cross_populate_data_tables(first_table,
                         value=value,
                         tags=tags,
                         units=units)
-
-
-def cross_populate_scalar_and_record(name, value, id, tags=None, units=None,
-                                     force_overwrite=False):
-    """
-    Insert data into the scalar query tables.
-
-    Calls cross_populate_data_tables on the scalar tables. Value must be
-    a scalar.
-    """
-    cross_populate_data_tables(first_table=ScalarDataFromRecord,
-                               second_table=RecordFromScalarData,
-                               id=id, name=name, value=value, units=units,
-                               tags=tags, force_overwrite=force_overwrite)
-
-
-def cross_populate_string_and_record(name, value, id, tags=None, units=None,
-                                     force_overwrite=False):
-    """
-    Insert data into the string query tables.
-
-    Calls cross_populate_data_tables on the string tables. Value must be
-    a string.
-    """
-    cross_populate_data_tables(first_table=StringDataFromRecord,
-                               second_table=RecordFromStringData,
-                               id=id, name=name, value=value, units=units,
-                               tags=tags, force_overwrite=force_overwrite)
-
-
-def cross_populate_scalar_list_and_record(name, value, id, tags=None, units=None,
-                                          force_overwrite=False):
-    """
-    Insert data into the scalar list query tables.
-
-    Calls cross_populate_data_tables on the scalar list tables. Value must be
-    a list of scalars.
-    """
-    cross_populate_data_tables(first_table=ScalarListDataFromRecord,
-                               second_table=RecordFromScalarListData,
-                               id=id, name=name, value=value, units=units,
-                               tags=tags, force_overwrite=force_overwrite)
-
-
-def cross_populate_string_list_and_record(name, value, id, tags=None, units=None,
-                                          force_overwrite=False):
-    """
-    Insert data into the string list query tables.
-
-    Calls cross_populate_data_tables on the string list tables. Value must be
-    a list of strings.
-    """
-    # CQLEngine's current undocumented support of frozen collections seems to
-    # require a stringified list. Hopefully this changes.
-    cross_populate_data_tables(first_table=StringListDataFromRecord,
-                               second_table=RecordFromStringListData,
-                               id=id, name=name, value=value, units=units,
-                               tags=tags, force_overwrite=force_overwrite)
 
 
 def form_connection(keyspace, node_ip_list=None):
