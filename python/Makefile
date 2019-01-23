@@ -38,7 +38,7 @@ clean:
 
 clean-files:  clean-tests
 	@echo "Cleaning build files.."; \
-	rm -rf build docs/build docs/source/generated_docs; \
+	rm -rf build; \
 	rm -rf sina.egg-info $(VENV); \
 	find . -name "*.pyc" -exec rm -f {} \; >& /dev/null; \
 	find . -name __pycache__ -exec rm -rf {} \; >& /dev/null; \
@@ -48,7 +48,7 @@ clean-files:  clean-tests
 # to remove outputs from notebooks.
 clean-notebooks:
 	@echo "Removing any outputs from notebooks.."; \
-	NOTEBOOKS=`find examples -name "*.ipynb" -print`; \
+	NOTEBOOKS=`find ../examples -name "*.ipynb" -print`; \
 	JUPYTER_EXE=`which jupyter 2> /dev/null`; \
 	NBCONVERT="--ClearOutputPreprocessor.enabled=True --log-level WARN --inplace"; \
 	if test -f $(VENV)/bin/jupyter; then \
@@ -62,5 +62,6 @@ clean-notebooks:
 clean-tests:
 	@echo "Cleaning test files.."; \
 	rm -rf .tox fake.sqlite nosetests*.xml*; \
+	rm -rf docs/build docs/source/generated_docs; \
 	rm -rf tests/test_venv; \
 	rm -rf tests/run_tests
