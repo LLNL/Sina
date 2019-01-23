@@ -5,6 +5,7 @@ import logging
 import sqlalchemy
 import json
 from collections import defaultdict
+import six
 
 import sina.dao as dao
 import sina.model as model
@@ -60,19 +61,23 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {}.'
                      .format(len(data), id))
         for datum_name, datum in data.items():
-            # Note: SQL doesn't support maps, so we have to convert the
-            # tags to a string (if they exist).
-            # Using json.dumps() instead of str() (or join()) gives valid JSON
-            tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
-            # Check if it's a scalar
-            kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
-                    else schema.StringData)
-            self.session.add(kind(id=id,
-                                  name=datum_name,
-                                  value=datum['value'],
-                                  # units might be None, always use get()
-                                  units=datum.get('units'),
-                                  tags=tags))
+            if (isinstance(datum['value'], six.string_types) or
+               isinstance(datum['value'], numbers.Number)):
+                # Note: SQL doesn't support maps, so we have to convert the
+                # tags to a string (if they exist).
+                # Using json.dumps() instead of str() (or join()) gives valid
+                # JSON
+                tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
+                # Check if it's a scalar
+                kind = (schema.ScalarData if isinstance(datum['value'],
+                                                        numbers.Real)
+                        else schema.StringData)
+                self.session.add(kind(id=id,
+                                      name=datum_name,
+                                      value=datum['value'],
+                                      # units might be None, always use get()
+                                      units=datum.get('units'),
+                                      tags=tags))
 
     def _insert_files(self, id, files):
         """

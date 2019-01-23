@@ -194,6 +194,11 @@ class TestSearch(unittest.TestCase):
         str_list = (schema.StringListDataFromRecord.objects.filter(id=rec.id))
         self.assertEquals(str_list.get()['value'], rec['data']['flavors']['value'])
 
+        returned_scalars = record_dao.get_scalars("spam", ["eggs"])
+        del rec.data["spam"]
+        del rec.data["flavors"]
+        self.assertEquals(returned_scalars, rec.data)
+
         returned_files = record_dao.get_files("spam")
         self.assertEquals(returned_files, rec.files)
         overwrite = Record(id="spam",

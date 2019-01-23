@@ -4,6 +4,7 @@ import logging
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
 import six
+from numbers import Number
 from collections import defaultdict
 import json
 
