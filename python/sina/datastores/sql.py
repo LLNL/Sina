@@ -5,7 +5,6 @@ import logging
 import sqlalchemy
 import json
 from collections import defaultdict
-import six
 
 import sina.dao as dao
 import sina.model as model
