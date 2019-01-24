@@ -17,10 +17,10 @@ class Relationship(Base):
     __tablename__ = 'Relationship'
     id = Column(Integer, primary_key=True)
     subject_id = Column(String(255),
-                        ForeignKey('Record.id'),
+                        ForeignKey('Record.id', ondelete='CASCADE'),
                         nullable=False)
     object_id = Column(String(255),
-                       ForeignKey('Record.id'),
+                       ForeignKey('Record.id', ondelete='CASCADE'),
                        nullable=False)
     predicate = Column(String(255), nullable=False)
 
@@ -77,7 +77,7 @@ class ScalarData(Base):
 
     __tablename__ = 'ScalarData'
     id = Column(String(255),
-                ForeignKey(Record.id),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
@@ -122,7 +122,7 @@ class StringData(Base):
 
     __tablename__ = 'StringData'
     id = Column(String(255),
-                ForeignKey(Record.id),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
@@ -163,7 +163,7 @@ class Document(Base):
 
     __tablename__ = 'Document'
     id = Column(String(255),
-                ForeignKey(Record.id),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 nullable=False,
                 primary_key=True)
     uri = Column(String(255), nullable=False, primary_key=True)
@@ -196,7 +196,7 @@ class Run(Base):
 
     __tablename__ = 'Run'
     id = Column(String(255),
-                ForeignKey(Record.id),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 primary_key=True)
     application = Column(String(255), nullable=False)
     user = Column(String(255), nullable=True)

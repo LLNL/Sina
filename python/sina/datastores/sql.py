@@ -42,6 +42,8 @@ class RecordDAO(dao.RecordDAO):
         self.session.add(schema.Record(id=record.id,
                                        type=record.type,
                                        raw=json.dumps(record.raw)))
+        # Make sure the Record's in first to satisfy foreign key constraints
+        self.session.commit()
         if record.data:
             self._insert_data(record.id, record.data)
         if record.files:
@@ -629,6 +631,12 @@ class DAOFactory(dao.DAOFactory):
         else:
             engine = sqlalchemy.create_engine('sqlite:///')
             schema.Base.metadata.create_all(engine)
+
+        def configure_on_connect(connection, _):
+            """Activate foreign key support on connection creation."""
+            connection.execute('pragma foreign_keys=ON')
+
+        sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
         session = sqlalchemy.orm.sessionmaker(bind=engine)
         self.session = session()
 
