@@ -31,12 +31,8 @@ back to your default environment or end your session.
 Software Dependencies
 =====================
 
-Requirements files are provided to help set up your initial virtual environment
-whether you are using the standard or manual installation processes.  The files
-are::
-
-- Basic requirements:  [requirements.txt](requirements.txt)
-- Web requirements:  [web_requirements.txt](web_requirements.txt)
+We have a single requirements file for setting up the initial development 
+virtual environment.  The file is called [requirements.txt](requirements.txt).
 
 
 LC Setup
@@ -75,10 +71,6 @@ Test are run by entering::
 
     $ make tests
 
-Finally, Web dependencies can be installed using::
-
-    $ make web_deps
-
 Alternatively, you can install, build, and run all of the above by entering
 the following::
 
@@ -110,21 +102,6 @@ Installing Software Dependencies
 Enter the following command to install basic Sina dependencies::
 
     $(venv) pip install -r requirements.txt
-
-Access to a locally-hosted version of Sina's web content is provided
-with the following command::
-
-    $(venv) pip install -r web-requirements.txt
-
-Should installation problems arise for dependency packages (e.g., django) you
-will want to comment out the `--no-index` option in the corresponding
-requirements file and try again. Excluding this option tells pip to look for
-the associated dependencies in the Python Package Index.
-
-Note that multiple requirements files can be provided on a single line, for
-example::
-
-    $(venv) pip install -r requirements.txt -r web-requirements.txt
 
 
 Completing the Installation

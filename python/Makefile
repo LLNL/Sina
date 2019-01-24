@@ -4,7 +4,7 @@ VENV=venv
 VACT=$(VENV)/bin/activate
 PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual env"
 
-.PHONY: all clean clean-files clean-notebooks clean-tests docs install tests web_deps
+.PHONY: all clean clean-files clean-notebooks clean-tests docs install tests
 
 install:
 	@if test ! -d $(VENV); then \
@@ -19,18 +19,13 @@ install:
 	$(VENV)/bin/pip install -e .[jupyter]; \
 	echo $(PR_ACT)
 
-all: clean docs tests web_deps
+all: clean docs tests
 
 docs: install
 	@$(VENV)/bin/tox -e docs
 
 tests:
 	@tests/run_all_tests.sh
-
-web_deps: install
-	@($(VENV)/bin/pip install -r web-requirements.txt && \
-	  echo "Web dependencies installed" && echo $(PR_ACT)) || \
-	  echo "Unable to install web dependencies. Refer to README.md."
 
 clean:
 	@make --no-print-directory clean-notebooks; \
