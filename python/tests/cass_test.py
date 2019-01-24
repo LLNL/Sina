@@ -27,43 +27,43 @@ LOGGER = logging.getLogger(__name__)
 
 def _populate_database_with_data():
     """Build a database to test against."""
-    schema.cross_populate_scalar_and_record(id="spam",
-                                            name="spam_scal",
-                                            value=10,
-                                            units="pigs",
-                                            tags=["hammy"])
-    schema.cross_populate_scalar_and_record(id="eggs",
-                                            name="eggs_scal",
-                                            value=0)
-    schema.cross_populate_scalar_and_record(id="spam",
-                                            name="spam_scal_2",
-                                            value=200)
-    schema.cross_populate_scalar_and_record(id="spam2",
-                                            name="spam_scal",
-                                            value=10.99999)
-    schema.cross_populate_scalar_and_record(id="spam3",
-                                            name="spam_scal",
-                                            value=10.5)
-    schema.cross_populate_scalar_and_record(id="spam3",
-                                            name="spam_scal_2",
-                                            value=10.5)
-    schema.cross_populate_string_and_record(id="spam1",
-                                            name="val_data",
-                                            value="runny",
-                                            tags=["edible"])
-    schema.cross_populate_string_and_record(id="spam1",
-                                            name="val_data_2",
-                                            value="double yolks")
-    schema.cross_populate_string_and_record(id="spam3",
-                                            name="val_data",
-                                            value="chewy",
-                                            tags=["edible"])
-    schema.cross_populate_string_and_record(id="spam3",
-                                            name="val_data_2",
-                                            value="double yolks")
-    schema.cross_populate_string_and_record(id="spam4",
-                                            name="val_data_2",
-                                            value="double yolks")
+    schema.cross_populate_data_tables(id="spam",
+                                      name="spam_scal",
+                                      value=10,
+                                      units="pigs",
+                                      tags=["hammy"])
+    schema.cross_populate_data_tables(id="eggs",
+                                      name="eggs_scal",
+                                      value=0)
+    schema.cross_populate_data_tables(id="spam",
+                                      name="spam_scal_2",
+                                      value=200)
+    schema.cross_populate_data_tables(id="spam2",
+                                      name="spam_scal",
+                                      value=10.99999)
+    schema.cross_populate_data_tables(id="spam3",
+                                      name="spam_scal",
+                                      value=10.5)
+    schema.cross_populate_data_tables(id="spam3",
+                                      name="spam_scal_2",
+                                      value=10.5)
+    schema.cross_populate_data_tables(id="spam1",
+                                      name="val_data",
+                                      value="runny",
+                                      tags=["edible"])
+    schema.cross_populate_data_tables(id="spam1",
+                                      name="val_data_2",
+                                      value="double yolks")
+    schema.cross_populate_data_tables(id="spam3",
+                                      name="val_data",
+                                      value="chewy",
+                                      tags=["edible"])
+    schema.cross_populate_data_tables(id="spam3",
+                                      name="val_data_2",
+                                      value="double yolks")
+    schema.cross_populate_data_tables(id="spam4",
+                                      name="val_data_2",
+                                      value="double yolks")
 
 
 def _populate_database_with_files():
@@ -173,14 +173,11 @@ class TestSearch(unittest.TestCase):
 
         rec = Record(id="spam", type="eggs",
                      user_defined={},
-                     data={"scalar-strings": {"value":
-                                              ["red", "green", "blue"],
-                                              "units": None},
-                           "scalar-numbers": {"value": [1, 2, 3],
-                                              "units": "m"},
-                           "eggs": {"value": 12,
+                     data={"eggs": {"value": 12,
                                     "units": None,
-                                    "tags": ["runny"]}},
+                                    "tags": ["runny"]},
+                           "spam": {"value": [12, 24]},
+                           "flavors": {"value": ["original", "bbq"]}},
                      files=[{"uri": "eggs.brek",
                              "mimetype": "egg",
                              "tags": ["fried"]}])
@@ -190,12 +187,18 @@ class TestSearch(unittest.TestCase):
         self.assertEquals(returned_record.type, rec.type)
         self.assertEquals(returned_record.user_defined, rec.user_defined)
         self.assertEquals(returned_record.raw, rec.raw)
+
+        # TODO: Replace when queries are supported on these tables
+        scal_list = (schema.ScalarListDataFromRecord.objects.filter(id=rec.id))
+        self.assertEquals(scal_list.get()['value'], rec['data']['spam']['value'])
+        str_list = (schema.StringListDataFromRecord.objects.filter(id=rec.id))
+        self.assertEquals(str_list.get()['value'], rec['data']['flavors']['value'])
+
         returned_scalars = record_dao.get_scalars("spam", ["eggs"])
-        # Check against data without lists. We will eventually support indexing
-        # on lists, but for now we only store in raw.
-        del rec.data["scalar-strings"]
-        del rec.data["scalar-numbers"]
+        del rec.data["spam"]
+        del rec.data["flavors"]
         self.assertEquals(returned_scalars, rec.data)
+
         returned_files = record_dao.get_files("spam")
         self.assertEquals(returned_files, rec.files)
         overwrite = Record(id="spam",

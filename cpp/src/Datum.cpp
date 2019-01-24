@@ -29,8 +29,21 @@ Datum::Datum(double value_) :
     type = ValueType::Scalar;
 }
 
+Datum::Datum(std::vector<std::string> value_) :
+        stringArrayValue{std::move(value_)}{
+    //Set type to StringArray, as we know it uses an array of strings
+    type = ValueType::StringArray;
+}
+
+Datum::Datum(std::vector<double> value_) :
+        scalarArrayValue{std::move(value_)}{
+    //Set type to ScalarArray, as we know it uses an array of doubles
+    type = ValueType::ScalarArray;
+}
+
 Datum::Datum(nlohmann::json const &asJson) {
-    //Need to determine what type of Datum we have: Scalar (double) or String.
+    //Need to determine what type of Datum we have: Scalar (double), String,
+    //or list of one of those two.
     nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, DATA_PARENT_TYPE);
     if(valueField.is_string()){
         stringValue = valueField.get<std::string>();
@@ -38,10 +51,44 @@ Datum::Datum(nlohmann::json const &asJson) {
     else if(valueField.is_number()){
         scalarValue = valueField.get<double>();
     }
+    else if(valueField.is_array()){
+        //An empty list is assumed to be an empty list of doubles.
+        //This only works because this field is immutable!
+        //If this ever changes, or if Datum's type is used directly to make
+        //decisions (ex: Sina deciding where to store data), this logic
+        //should be revisited.
+        if(valueField.size() == 0 || valueField.at(0).is_number()){
+            type = ValueType::ScalarArray;
+        }
+        else if(valueField.at(0).is_string()){
+            type = ValueType::StringArray;
+        }
+        else {
+            std::ostringstream message;
+            message << "The only valid types for an array '" << VALUE_FIELD
+                    << "' are strings and numbers.";
+            throw std::invalid_argument(message.str());
+        }
+
+        for(auto &entry : valueField){
+            if(entry.is_string() && type == ValueType::StringArray){
+                stringArrayValue.emplace_back(entry.get<std::string>());
+            }
+            else if(entry.is_number() && type == ValueType::ScalarArray){
+                scalarArrayValue.emplace_back(entry.get<double>());
+            }
+            else {
+                std::ostringstream message;
+                message << "If the required field '" << VALUE_FIELD
+                        << "' is an array, it must consist of only strings or only numbers.";
+                throw std::invalid_argument(message.str());
+            }
+        }
+    }
     else {
         std::ostringstream message;
         message << "The required field '" << VALUE_FIELD
-                << "' must be a string or a double";
+                << "' must be a string, double, list of strings, or list of doubles.";
         throw std::invalid_argument(message.str());
     }
 
@@ -82,10 +129,16 @@ nlohmann::json Datum::toJson() const {
         case ValueType::String:
             asJson[VALUE_FIELD] = stringValue;
             break;
+        case ValueType::ScalarArray:
+            asJson[VALUE_FIELD] = scalarArrayValue;
+            break;
+        case ValueType::StringArray:
+            asJson[VALUE_FIELD] = stringArrayValue;
+            break;
         default:
             std::ostringstream message;
             message << "The field '" << VALUE_FIELD
-                    << "' must be a string or double.";
+                    << "' must be a string, double, list of strings, or list of doubles.";
             throw std::invalid_argument(message.str());
 
     }
