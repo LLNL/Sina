@@ -61,13 +61,29 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {}.'
                      .format(len(data), id))
         for datum_name, datum in data.items():
-            if (isinstance(datum['value'], six.string_types) or
-               isinstance(datum['value'], numbers.Number)):
-                # Note: SQL doesn't support maps, so we have to convert the
-                # tags to a string (if they exist).
-                # Using json.dumps() instead of str() (or join()) gives valid
-                # JSON
-                tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
+            if isinstance(datum['value'], list):
+                for index, entry in enumerate(datum['value']):
+                    # Note: SQL doesn't support maps, so we have to convert the
+                    # tags to a string (if they exist).
+                    # Using json.dumps() instead of str() (or join()) gives
+                    # valid JSON
+                    tags = (json.dumps(datum['tags']) if 'tags' in datum
+                                                         else None)
+                    # Check if it's a scalar
+                    kind = (schema.ListScalarData if isinstance(entry,
+                                                                numbers.Real)
+                            else schema.ListStringData)
+                    self.session.add(kind(id=id,
+                                          name=datum_name,
+                                          index=index,
+                                          value=entry,
+                                          # units might be None, always use
+                                          # get()
+                                          units=datum.get('units'),
+                                          tags=tags))
+            else:
+                tags = (json.dumps(datum['tags']) if 'tags' in datum
+                                                     else None)
                 # Check if it's a scalar
                 kind = (schema.ScalarData if isinstance(datum['value'],
                                                         numbers.Real)
