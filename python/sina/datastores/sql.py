@@ -560,15 +560,12 @@ class RunDAO(dao.RunDAO):
         :param run: A Run to import
         """
         LOGGER.debug('Inserting {} into SQL.'.format(run))
+        self.record_DAO.insert(run)
         self.session.add(schema.Run(id=run.id,
                                     application=run.application,
                                     user=run.user,
                                     version=run.version))
-        self.record_DAO.insert(run)
         self.session.commit()
-        # TODO: Previous question carried forward:
-        # When inserting to Run, should we also insert to Record?
-        # Or should the "all Runs are Records" be expressed elsewhere?
 
     def get(self, id):
         """
