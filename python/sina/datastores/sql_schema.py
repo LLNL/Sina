@@ -1,42 +1,10 @@
 """SQLAlchemy implementations of Mnoda objects."""
 
-from sqlalchemy import (Column, ForeignKey, String, Text, Float, Integer)
+from sqlalchemy import (Column, ForeignKey, String, Text, Float)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import Index
 
 Base = declarative_base()
-
-
-class Relationship(Base):
-    """
-    Implementation of Relationship table.
-
-    Stores subject/object/predicate triple relationships.
-    """
-
-    __tablename__ = 'Relationship'
-    id = Column(Integer, primary_key=True)
-    subject_id = Column(String(255),
-                        ForeignKey('Record.id', ondelete='CASCADE',
-                                   deferrable=True, initially='DEFERRED'),
-                        nullable=False)
-    object_id = Column(String(255),
-                       ForeignKey('Record.id', ondelete='CASCADE'),
-                       nullable=False)
-    predicate = Column(String(255), nullable=False)
-
-    def __init__(self, subject_id=None, object_id=None, predicate=None):
-        """Create entry from Relationship info."""
-        self.subject_id = subject_id
-        self.object_id = object_id
-        self.predicate = predicate
-
-    def __repr__(self):
-        """Return a string representation of a sql schema Relationship."""
-        return ('SQL Schema Relationship <subject_id={}, object_id={},'
-                'predicate={}>'.format(self.subject_id,
-                                       self.object_id,
-                                       self.predicate))
 
 
 class Record(Base):
@@ -61,6 +29,38 @@ class Record(Base):
         """Return a string representation of a sql schema Record."""
         return ('SQL Schema Record <id={}, type={}>'
                 .format(self.id, self.type))
+
+
+class Relationship(Base):
+    """
+    Implementation of Relationship table.
+
+    Stores subject/object/predicate triple relationships.
+    """
+
+    __tablename__ = 'Relationship'
+    subject_id = Column(String(255),
+                        ForeignKey(Record.id, ondelete='CASCADE',
+                                   deferrable=True, initially='DEFERRED'),
+                        primary_key=True)
+    object_id = Column(String(255),
+                       ForeignKey(Record.id, ondelete='CASCADE',
+                                  deferrable=True, initially='DEFERRED'),
+                       primary_key=True)
+    predicate = Column(String(255), primary_key=True)
+
+    def __init__(self, subject_id=None, object_id=None, predicate=None):
+        """Create entry from Relationship info."""
+        self.subject_id = subject_id
+        self.object_id = object_id
+        self.predicate = predicate
+
+    def __repr__(self):
+        """Return a string representation of a sql schema Relationship."""
+        return ('SQL Schema Relationship <subject_id={}, object_id={},'
+                'predicate={}>'.format(self.subject_id,
+                                       self.object_id,
+                                       self.predicate))
 
 
 class ScalarData(Base):
