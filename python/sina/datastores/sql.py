@@ -29,11 +29,14 @@ class RecordDAO(dao.RecordDAO):
         """Initialize RecordDAO with session for its SQL database."""
         self.session = session
 
-    def insert(self, record):
+    def insert(self, record, called_from_child=False):
         """
         Given a Record, insert it into the current SQL database.
 
         :param record: A Record to insert
+        :param called_from_child: Whether a child of Record (such as Run) is
+                                  calling this. Used to skip committing in
+                                  order to preserve atomicity.
         """
         LOGGER.debug('Inserting {} into SQL.'.format(record))
         is_valid, warnings = record.is_valid()
@@ -46,7 +49,10 @@ class RecordDAO(dao.RecordDAO):
             self._insert_data(record.id, record.data)
         if record.files:
             self._insert_files(record.id, record.files)
-        self.session.commit()
+
+        # If called from child, child is responsible for committing.
+        if not called_from_child:
+            self.session.commit()
 
     def _insert_data(self, id, data):
         """
@@ -558,15 +564,12 @@ class RunDAO(dao.RunDAO):
         :param run: A Run to import
         """
         LOGGER.debug('Inserting {} into SQL.'.format(run))
+        self.record_DAO.insert(run, called_from_child=True)
         self.session.add(schema.Run(id=run.id,
                                     application=run.application,
                                     user=run.user,
                                     version=run.version))
-        self.record_DAO.insert(run)
         self.session.commit()
-        # TODO: Previous question carried forward:
-        # When inserting to Run, should we also insert to Record?
-        # Or should the "all Runs are Records" be expressed elsewhere?
 
     def get(self, id):
         """
@@ -629,6 +632,12 @@ class DAOFactory(dao.DAOFactory):
         else:
             engine = sqlalchemy.create_engine('sqlite:///')
             schema.Base.metadata.create_all(engine)
+
+        def configure_on_connect(connection, _):
+            """Activate foreign key support on connection creation."""
+            connection.execute('pragma foreign_keys=ON')
+
+        sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
         session = sqlalchemy.orm.sessionmaker(bind=engine)
         self.session = session()
 
