@@ -1,9 +1,11 @@
 # For use on LLNL Network. Remove these flags if outside LC.
  --no-index
  --find-links /usr/gapps/python/wheelhouse/
-# Uncomment the following if you are not on an LC machine.
-# --trusted-host www-lc.llnl.gov
-# --find-links http://www-lc.llnl.gov/python/wheelhouse/
+
+# Comment out the following if causing problems on an LC machine, e.g. SCF.
+ --trusted-host www-lc.llnl.gov
+ --find-links http://www-lc.llnl.gov/python/wheelhouse/
+
 # Used for wheels not yet in the LC wheelhouse.
  --find-links /usr/gapps/wf/packages/third-party
 
@@ -12,7 +14,7 @@ flake8
 mock
 jsonschema
 
-# Note: nose installed independently of tox to ensure xunit functionality is available
+# Install nose independently of tox to ensure xunit functionality is available
 nose
 sphinx==1.4.4
 sphinx_rtd_theme
