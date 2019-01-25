@@ -85,8 +85,12 @@ class TestSQL(unittest.TestCase):
             mode='w+b')
 
     def tearDown(self):
-        """Remove temp files left over from test."""
-        os.remove(self.test_file_path.name)
+        """Remove any temp files created during test."""
+        try:
+            os.remove(self.test_file_path.name)
+            os.remove(self.test_db_path)
+        except OSError:
+            pass
 
     # DAOFactory
     def test_factory_instantiate(self):
@@ -100,7 +104,6 @@ class TestSQL(unittest.TestCase):
         self.assertFalse(os.path.isfile(self.test_db_path))
         sina_sql.DAOFactory(self.test_db_path)
         self.assertTrue(os.path.isfile(self.test_db_path))
-        os.remove(self.test_db_path)
 
     def test_factory_production(self):
         """
@@ -332,6 +335,50 @@ class TestSQL(unittest.TestCase):
         self.assertFalse(list(record_dao.data_query(bar=no_scal)))
         file_match = next(record_dao.get_given_document_uri(uri="ham.png"))
         self.assertEquals(file_match.id, rec.id)
+
+    def test_recorddao_delete(self):
+        """Test that RecordDAO is deleting correctly."""
+        # Cascading on an in-memory db always fails. Found no documentation on it.
+        factory = sina_sql.DAOFactory(self.test_db_path)
+        record_dao = factory.createRecordDAO()
+        relationship_dao = factory.createRelationshipDAO()
+        data = {"eggs": {"value": 12, "tags": ["breakfast"]},
+                "flavor": {"value": "tasty"}}
+        files = [{"uri": "justheretoexist.png"}]
+
+        record_1 = Record(id="rec_1", type="sample", data=data, files=files)
+        record_2 = Record(id="rec_2", type="sample", data=data, files=files)
+        record_3 = Record(id="rec_3", type="sample", data=data, files=files)
+        record_4 = Record(id="rec_4", type="sample", data=data, files=files)
+        all_ids = ["rec_1", "rec_2", "rec_3", "rec_4"]
+        record_dao.insert_many([record_1, record_2, record_3, record_4])
+        relationship_dao.insert(subject_id="rec_1", object_id="rec_2", predicate="dupes")
+        relationship_dao.insert(subject_id="rec_2", object_id="rec_2", predicate="is")
+        relationship_dao.insert(subject_id="rec_3", object_id="rec_4", predicate="dupes")
+        relationship_dao.insert(subject_id="rec_4", object_id="rec_4", predicate="is")
+
+        # Delete one
+        record_dao.delete("rec_1")
+        remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
+        self.assertEquals(remaining_records, ["rec_2", "rec_3", "rec_4"])
+
+        # Delete several
+        record_dao.delete_many(["rec_2", "rec_3"])
+        remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
+        self.assertEquals(remaining_records, ["rec_4"])
+
+        # Make sure the data, raw, files, and relationships were deleted as well
+        for_all = record_dao.get_data_for_records(id_list=all_ids,
+                                                  data_list=["eggs", "flavor"])
+        for_one = record_dao.get_data_for_records(id_list=["rec_4"],
+                                                  data_list=["eggs", "flavor"])
+        self.assertEquals(for_all, for_one)
+        have_files = list(record_dao.get_given_document_uri("justheretoexist.png",
+                                                            ids_only=True))
+        self.assertEquals(have_files, ["rec_4"])
+        self.assertFalse(relationship_dao.get(subject_id="rec_1"))
+        self.assertFalse(relationship_dao.get(subject_id="rec_2"))
+        self.assertEquals(len(relationship_dao.get(object_id="rec_4")), 1)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
     def test_recorddao_uri(self, mock_get):
@@ -601,6 +648,20 @@ class TestSQL(unittest.TestCase):
         self.assertEquals(returned_run.user, run.user)
         self.assertEquals(returned_run.user_defined, run.user_defined)
         self.assertEquals(returned_run.version, run.version)
+
+    def test_rundao_delete(self):
+        """Test that RunDAO is deleting correctly."""
+        factory = sina_sql.DAOFactory(self.test_db_path)
+        run_dao = factory.createRunDAO()
+
+        run_1 = Run(id="run_1", application="eggs")
+        run_2 = Run(id="run_2", application="spam")
+
+        run_dao.insert_many([run_1, run_2])
+        # Delete one
+        run_dao.delete("run_1")
+        remaining_runs = list(run_dao.get_all(ids_only=True))
+        self.assertEquals(len(remaining_runs), 1)
 
     def test_rundao_get_by_scalars(self):
         """
