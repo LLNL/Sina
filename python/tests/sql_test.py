@@ -362,6 +362,9 @@ class TestSQL(unittest.TestCase):
         remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
         self.assertEquals(remaining_records, ["rec_2", "rec_3", "rec_4"])
 
+        # Make sure the relationship was deleted
+        self.assertFalse(relationship_dao.get(subject_id="rec_1"))
+
         # Delete several
         record_dao.delete_many(["rec_2", "rec_3"])
         remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
@@ -376,8 +379,8 @@ class TestSQL(unittest.TestCase):
         have_files = list(record_dao.get_given_document_uri("justheretoexist.png",
                                                             ids_only=True))
         self.assertEquals(have_files, ["rec_4"])
-        self.assertFalse(relationship_dao.get(subject_id="rec_1"))
-        self.assertFalse(relationship_dao.get(subject_id="rec_2"))
+        self.assertFalse(relationship_dao.get(object_id="rec_2"))
+        self.assertFalse(relationship_dao.get(subject_id="rec_3"))
         self.assertEquals(len(relationship_dao.get(object_id="rec_4")), 1)
 
     @patch(__name__+'.sina_sql.RecordDAO.get')
@@ -653,15 +656,33 @@ class TestSQL(unittest.TestCase):
         """Test that RunDAO is deleting correctly."""
         factory = sina_sql.DAOFactory(self.test_db_path)
         run_dao = factory.createRunDAO()
+        relationship_dao = factory.createRelationshipDAO()
 
-        run_1 = Run(id="run_1", application="eggs")
-        run_2 = Run(id="run_2", application="spam")
-
+        data = {"eggs": {"value": 12, "tags": ["breakfast"]}}
+        files = [{"uri": "justheretoexist.png"}]
+        run_1 = Run(id="run_1", application="eggs", data=data, files=files)
+        run_2 = Run(id="run_2", application="spam", data=data, files=files)
         run_dao.insert_many([run_1, run_2])
+        relationship_dao.insert(subject_id="run_1", object_id="run_2", predicate="dupes")
+
+        # Ensure there's two entries in the Run table
+        self.assertEquals(run_dao.session.query(schema.Run).count(), 2)
         # Delete one
         run_dao.delete("run_1")
+        # Now there should only be one Run left
+        self.assertEquals(run_dao.session.query(schema.Run).count(), 1)
         remaining_runs = list(run_dao.get_all(ids_only=True))
         self.assertEquals(len(remaining_runs), 1)
+
+        # Double check that relationship, data, and files got deleted as well
+        self.assertFalse(relationship_dao.get(subject_id="run_1"))
+        for_all = run_dao.record_DAO.get_data_for_records(id_list=["run_1", "run_2"],
+                                                          data_list=["eggs"])
+        for_one = run_dao.record_DAO.get_data_for_records(id_list=["run_2"],
+                                                          data_list=["eggs"])
+        self.assertEquals(for_all, for_one)
+        have_files = list(x.id for x in run_dao.get_given_document_uri("justheretoexist.png"))
+        self.assertEquals(have_files, ['run_2'])
 
     def test_rundao_get_by_scalars(self):
         """
