@@ -363,7 +363,7 @@ class RunDAO(object):
         If a given DAO's backend can bulk insert more cleverly (bulk inserts),
         this should be reimplemented there.
 
-        :param list_to_insert: A list of Records to insert
+        :param list_to_insert: A list of Runs to insert
         """
         for item in list_to_insert:
             self.insert(item)
