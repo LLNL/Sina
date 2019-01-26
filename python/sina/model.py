@@ -244,8 +244,6 @@ class Record(object):
         return True, warnings
 
 
-
-
 class Relationship(object):
     """
     A Relationship is a triple describing the relationship between two objects.
