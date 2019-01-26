@@ -136,7 +136,7 @@ class Run(Model):
 
 class ObjectFromSubject(Model):
     """
-    Query table for finding object given subject (and/or predicate).
+    Query table for finding object given subject (plus optionally predicate).
 
     Subject/Object is triples terminology. Example:
     <subject> <predicate> <object>
@@ -152,11 +152,11 @@ class ObjectFromSubject(Model):
 
 
 class SubjectFromObject(Model):
-    """Query table for finding subject given object (and/or predicate)."""
+    """Query table for finding subject given object (plus optionally predicate)."""
 
-    subject_id = columns.Text(primary_key=True)
     object_id = columns.Text(primary_key=True)
     predicate = columns.Text(primary_key=True)
+    subject_id = columns.Text(primary_key=True)
 
 
 def cross_populate_object_and_subject(subject_id,
@@ -184,6 +184,27 @@ def cross_populate_object_and_subject(subject_id,
                              )
 
 
+def _discover_tables_from_value(value):
+    """
+    Given a value, tell what pair of query tables it's associated with based on type.
+
+    :param value: The value to evaluate
+
+    :returns: A tuple containing the two query tables.
+    """
+    # Check if it's a list
+    if isinstance(value, list):
+        # Check if it's a scalar or empty
+        table_1, table_2 = ((ScalarListDataFromRecord, RecordFromScalarListData)
+                            if not value or isinstance(value[0], numbers.Real)
+                            else (StringListDataFromRecord, RecordFromStringListData))
+    else:
+        table_1, table_2 = ((ScalarDataFromRecord, RecordFromScalarData)
+                            if isinstance(value, numbers.Real)
+                            else (StringDataFromRecord, RecordFromStringData))
+    return (table_1, table_2)
+
+
 def cross_populate_data_tables(name,
                                value,
                                id,
@@ -203,23 +224,14 @@ def cross_populate_data_tables(name,
     (batch) insertion, see RecordDAO.insert_many().
 
     :param name: The name of the entry
-    :param value: The entry's value (must be the type of value the pair handles)
+    :param value: The entry's value
     :param id: The id of the record containing the entry
     :param tags: Tags to be applied to this entry
     :param units: Units of the entry.
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
-    # Check if it's a list
-    if isinstance(value, list):
-        # Check if it's a scalar or empty
-        table_1, table_2 = ((ScalarListDataFromRecord, RecordFromScalarListData)
-                            if not value or isinstance(value[0], numbers.Real)
-                            else (StringListDataFromRecord, RecordFromStringListData))
-    else:
-        table_1, table_2 = ((ScalarDataFromRecord, RecordFromScalarData)
-                            if isinstance(value, numbers.Real)
-                            else (StringDataFromRecord, RecordFromStringData))
+    table_1, table_2 = _discover_tables_from_value(value)
 
     # Now that we know which tables to use, determine how to insert
     first_table_create = (table_1.create if force_overwrite
@@ -238,6 +250,28 @@ def cross_populate_data_tables(name,
                         value=value,
                         tags=tags,
                         units=units)
+
+
+def cross_batch_delete_data_tables(name,
+                                   value,
+                                   id,
+                                   batch):
+    """
+    Simultaneously create batch deletion statements for a pair of tables.
+
+    Each call handles one entry from one Record's "data" attribute and adds
+    the deletion statements to the provided batch. Tables are decided based
+    on the type of the value arg.
+
+    :param name: The name of the entry
+    :parm value: The entry's value
+    :param id: The id of the record containing the entry
+    :param batch: The batch object to add the statements to.
+    """
+    table_1, table_2 = _discover_tables_from_value(value)
+
+    table_1.objects(id=id, name=name, value=value).batch(batch).delete()
+    table_2.objects(id=id, name=name, value=value).batch(batch).delete()
 
 
 def form_connection(keyspace, node_ip_list=None):
