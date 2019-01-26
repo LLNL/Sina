@@ -5,6 +5,7 @@ import logging
 import sqlalchemy
 import json
 from collections import defaultdict
+import six
 
 import sina.dao as dao
 import sina.model as model
@@ -80,7 +81,8 @@ class RecordDAO(dao.RecordDAO):
                                           # get()
                                           units=datum.get('units'),
                                           tags=tags))
-            else:
+            elif (isinstance(datum['value'], six.string_types) or
+                  isinstance(datum['value'], numbers.Number)):
                 tags = (json.dumps(datum['tags']) if 'tags' in datum
                                                      else None)
                 # Check if it's a scalar

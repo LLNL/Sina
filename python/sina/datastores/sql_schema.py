@@ -113,7 +113,8 @@ class ListScalarData(Base):
     only if) those data entries have lists of numerical values. For example,
     "density":{"value":[200.14, 12]} would be represented here, but
     "strategy":{"value":["best-fit", "some-string"]} would
-    not be. Instead, it would go in the ListStringData table.
+    not be. Instead, it would go in the ListStringData table. Scalar and
+    string data cannot be mixed in the same list.
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.
@@ -167,7 +168,7 @@ class StringData(Base):
 
     The string table relates record ids to contained data if (and only if)
     those data entries have non-numerical values. For example,
-    "strategy":{"value":["best-fit", "some-string"]} would be represented here,
+    "strategy":{"value": "best-fit"} would be represented here,
     but "density":200.14 would not be, and would instead go in the scalar
     table. This is done so we can store non-scalar values while still giving
     users the benefit of numerical comparison lookups (being faster than string
@@ -219,7 +220,8 @@ class ListStringData(Base):
     represented here, but "density":{"value":[200.14, 12]} would not be, and
     would instead go in the list scalar table. This is done so we can
     store non-scalar values while still giving users the benefit of numerical
-    comparison lookups (being faster than string comparisons).
+    comparison lookups (being faster than string comparisons). Scalar and
+    string data cannot be mixed in the same list.
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.

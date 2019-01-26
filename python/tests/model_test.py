@@ -53,6 +53,28 @@ class TestModel(unittest.TestCase):
                                          {"uri": "ham.curve", "tags":
                                          ["hammy"]}],
                                   user_defined={})
+        self.record_five = Record(id="spam5",
+                                  type="new_eggs",
+                                  data={"list_scalars": {"value": [1, 2, 3]},
+                                        "list_strings": {"value": ['apple',
+                                                                   'orange']},
+                                        "bar": {"value": "1",
+                                                "tags": ["in"]}},
+                                  files=[{"uri": "ham.png", "mimetype": "png"},
+                                         {"uri": "ham.curve", "tags":
+                                         ["hammy"]}],
+                                  user_defined={})
+        self.record_six = Record(id="spam6",
+                                 type="new_eggs",
+                                 data={"bad_list": {"value": ['bad', 3]},
+                                       "bad_list_2": {"value":
+                                                      [1, 2, {'not': 'allowed'}]},
+                                       "bar": {"value": "1",
+                                               "tags": ["in"]}},
+                                 files=[{"uri": "ham.png", "mimetype": "png"},
+                                        {"uri": "ham.curve", "tags":
+                                        ["hammy"]}],
+                                 user_defined={})
 
     # Record
     def test_is_valid(self):
@@ -92,6 +114,40 @@ class TestModel(unittest.TestCase):
 
         # all previous errors fixed: "maximal" valid run
         self.assertTrue(spam.is_valid()[0])
+
+    def test__is_valid_list_good(self):
+        """Test we report a list as valid when it is."""
+        self.assertTrue(model._is_valid_list(
+            self.record_five.data['list_scalars']['value']))
+        self.assertTrue(model._is_valid_list(
+            self.record_five.data['list_strings']['value']))
+
+    def test__is_valid_list_unsupported(self):
+        """
+        Test we raise a ValueError if given an unsupported entry type.
+
+        If the list contains an entry other than a string or scalar, raise a
+        ValueError.
+        """
+        with self.assertRaises(ValueError) as context:
+            model._is_valid_list(self.record_six.data['bad_list_2']['value'])
+        self.assertIn("List of data contains entry that isn't a "
+                      "string or scalar.", str(context.exception))
+
+    def test__is_valid_list_bad_mix(self):
+        """
+        Test we return False if given a mixture of string/scalars in a list.
+
+        If the list contains some mixture of strings and scalars, we should
+        return False with the corresponding bad indices.
+        """
+        (validated,
+            scalar_index,
+            string_index) = model._is_valid_list(
+            self.record_six.data['bad_list']['value'])
+        self.assertFalse(validated)
+        self.assertEqual(scalar_index, 1)
+        self.assertEqual(string_index, 0)
 
     def test_record_access(self):
         """Ensure accessing record attribs using rec["spam"]."""

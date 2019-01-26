@@ -4,6 +4,7 @@ import json
 import logging
 import collections
 import six
+import numbers
 
 import deepdiff
 from texttable import Texttable
@@ -201,6 +202,21 @@ class Record(object):
                                      "to Record {} is missing a value. "
                                      "Value: {}".format(self.id, entry)))
                     break
+                if isinstance(self.data[entry]['value'], list):
+                    try:
+                        (validated_list,
+                            scalar_index,
+                            string_index) = _is_valid_list(
+                                list_of_data=self.data[entry]["value"])
+                    except ValueError as e:
+                        warnings.append(str(e))
+                        break
+                    if not validated_list:
+                        (warnings.append(
+                            "A data entry may not have a list of different types. "
+                            "They must all be scalars or all strings. Check "
+                            "indicies: {}, {}".format(scalar_index, string_index)))
+                        break
                 if (self.data[entry].get("tags") and
                     (isinstance(self.data[entry].get("tags"),
                      six.string_types) or
@@ -226,6 +242,8 @@ class Record(object):
             LOGGER.warning(warnstring)
             return False, warnings
         return True, warnings
+
+
 
 
 class Relationship(object):
@@ -309,6 +327,44 @@ class Run(Record):
                        self.application,
                        self.user,
                        self.version))
+
+
+def _is_valid_list(list_of_data):
+    """
+    Checks if a list of data is valid.
+
+    Validty means that all entries in the list are either strings or all
+    are scalars.
+
+    :param list of data: The list of data to check is valid.
+    :returns: A Tuple consisting of a Boolean and two Integers. The Boolean
+    is True if the list is valid, False otherwise. If False, the two
+    Integers are two indexes of differing types of values (the first being
+    an index of a scalar and the second being a index of a string). If True
+    they are None.
+    """
+    LOGGER.debug('Checking if list of length {} is valid.'
+                 .format(len(list_of_data)))
+    is_scalar = False
+    is_string = False
+    latest_scalar = None
+    latest_string = None
+    for index, list_entry in enumerate(list_of_data):
+        if isinstance(list_entry, numbers.Real):
+            latest_scalar = index
+            is_scalar = True
+        elif isinstance(list_entry, six.string_types):
+            latest_string = index
+            is_string = True
+        else:
+            raise ValueError("List of data contains entry that isn't a "
+                             "string or scalar. value: {}, type: {}, index:"
+                             " {}.".format(list_entry, type(list_entry),
+                                           index))
+        if is_scalar and is_string:
+            LOGGER.debug('Found invalid list.')
+            return (False, latest_scalar, latest_string)
+    return (True, latest_scalar, latest_string)
 
 
 def generate_record_from_json(json_input):
