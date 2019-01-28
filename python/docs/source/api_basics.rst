@@ -218,3 +218,26 @@ Inserting objects is otherwise straightforward::
 Note that the (sub)type of Record is important--use the right constructor and
 DAO or, if you won't know the type in advance, consider using the CLI
 importer.
+
+
+Deleting Records
+~~~~~~~~~~~~~~~~
+
+To delete a Record entirely from one of Sina's backends::
+
+  ...
+  my_record_to_delete = Record("fodder", "fodder_type")
+  record_dao.insert(my_record_to_delete)
+
+  # This would print 1
+  print(len(list(record_dao.get_all_of_type("fodder_type"))))
+
+  record_dao.delete("fodder")
+
+  # This would print 0
+  print(len(list(record_dao.get_all_of_type("fodder_type"))))
+
+Be careful, as the deletion will include every Relationship the Record is
+mentioned in, all the scalar data associated with that Record, etc. There is
+also a mass deletion method that takes a list of ids to delete,
+:code:`delete_many()`.

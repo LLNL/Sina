@@ -226,6 +226,82 @@ class RecordDAO(dao.RecordDAO):
                    mimetype=entry.get('mimetype'),
                    tags=entry.get('tags'))
 
+    def delete(self, id):
+        """
+        Delete a single Record from the Cassandra backend.
+
+        Removes everything: its data, any relationships its in, files. Relies on
+        Cassandra batching, one batch per Record.
+
+        :param id: The id of the Record to delete
+        """
+        with BatchQuery() as batch:
+            self._setup_batch_delete(batch, id)
+
+    def delete_many(self, ids_to_delete):
+        """
+        Delete a list of Records from the Cassandra backend.
+
+        Removes everything: their data, relationships, files. Relies on
+        Cassandra's batching, one batch encompassing all Records. If you want
+        to do one batch per Record, use delete() in a loop.
+
+        :param ids_to_delete: A list of ids of Records to delete
+        """
+        with BatchQuery() as batch:
+            for id in ids_to_delete:
+                self._setup_batch_delete(batch, id)
+
+    def _setup_batch_delete(self, batch, record_id):
+        """
+        Given a batchquery, add the deletion commands for a given record.
+
+        Cassandra has no notion of foreign keys, so we manually define what
+        it means to delete a record, including removing all the data entries,
+        all the files, etc. We add those deletions to a batchquery for later
+        execution.
+
+        :param batch: the batch to add the deletions to
+        :param record_id: the id of the record we're deleting
+        """
+        LOGGER.debug("Generating batch deletion commands for {}".format(record_id))
+        record = self.get(record_id)
+        # Delete from the record table itself
+        schema.Record.objects(id=record_id).batch(batch).delete()
+        # Delete every file
+        schema.DocumentFromRecord.objects(id=record_id).batch(batch).delete()
+        # Delete every piece of data
+        # Done a bit differently because record_id isn't always the partition key
+        for name, datum in record['data'].iteritems():
+            schema.cross_batch_delete_data_tables(id=record_id,
+                                                  name=name,
+                                                  value=datum['value'],
+                                                  batch=batch)
+
+        # Because Relationships are created separately from Records, we have to
+        # manually discover all relationships. Because they are mirrored, we
+        # can do this efficiently and without allow_filtering.
+        obj_when_rec_is_subj = (schema.ObjectFromSubject.objects(subject_id=record_id)
+                                                        .values_list('object_id',
+                                                                     'predicate'))
+        for obj, pred in obj_when_rec_is_subj:
+            (schema.SubjectFromObject.objects(object_id=obj,
+                                              predicate=pred,
+                                              subject_id=record_id)
+             .batch(batch).delete())
+        schema.ObjectFromSubject.objects(subject_id=record_id).batch(batch).delete()
+
+        # Now again with the other table.
+        subj_when_rec_is_obj = (schema.SubjectFromObject.objects(object_id=record_id)
+                                                        .values_list('subject_id',
+                                                                     'predicate'))
+        for subj, pred in subj_when_rec_is_obj:
+            (schema.ObjectFromSubject.objects(subject_id=subj,
+                                              predicate=pred,
+                                              object_id=record_id)
+             .batch(batch).delete())
+        schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
+
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
@@ -808,6 +884,34 @@ class RunDAO(dao.RunDAO):
                                     _type_managed=True)
         for item in list_to_insert:
             self._insert_sans_rec(item, force_overwrite)
+
+    def delete(self, id):
+        """
+        Delete a single Run from the Cassandra backend.
+
+        Removes everything: its data, any relationships its in, files. Relies on
+        Cassandra batching, one batch per Run.
+
+        :param id: The id of the Run to delete
+        """
+        with BatchQuery() as batch:
+            schema.Run.objects(id=id).batch(batch).delete()
+            self.record_DAO._setup_batch_delete(batch, id)
+
+    def delete_many(self, ids_to_delete):
+        """
+        Delete a list of Runs from the Cassandra backend.
+
+        Removes everything: their data, relationships, files. Relies on
+        Cassandra's batching, one batch encompassing all Runs. If you want
+        to do one batch per Run, use delete() in a loop.
+
+        :param ids_to_delete: A list of ids of Runs to delete
+        """
+        with BatchQuery() as batch:
+            for id in ids_to_delete:
+                schema.Run.objects(id=id).batch(batch).delete()
+                self.record_DAO._setup_batch_delete(batch, id)
 
     def get(self, id):
         """
