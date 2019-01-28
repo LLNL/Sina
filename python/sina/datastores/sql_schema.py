@@ -105,22 +105,68 @@ class ScalarData(Base):
                         self.units))
 
 
-class ListScalarData(Base):
+class ListScalarDataMaster(Base):
     """
-    Implementation of a table to store lists of scalar-type data.
+    Implementation of a table to store info about lists of scalar-type data.
 
-    The list scalar table relates record ids to contained lists of data if (and
-    only if) those data entries have lists of numerical values. For example,
+    Info that applies to all values in the list are stored here. The list
+    scalar tables relates record ids to contained lists of data if (and only
+    if) those data entries have lists of numerical values. For example,
     "density":{"value":[200.14, 12]} would be represented here, but
-    "strategy":{"value":["best-fit", "some-string"]} would
-    not be. Instead, it would go in the ListStringData table. Scalar and
-    string data cannot be mixed in the same list.
+    "strategy":{"value":["best-fit", "some-string"]} would not be. Instead,
+    it would go in the ListStringDataMaster table. Scalar and
+    string data cannot be mixed in the same list. The actual storage of the
+    list entries is stored in the ListScalarDataEntry table.
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.
     """
 
-    __tablename__ = 'ListScalarData'
+    __tablename__ = 'ListScalarDataMaster'
+    id = Column(String(255),
+                ForeignKey(Record.id),
+                nullable=False,
+                primary_key=True)
+    name = Column(String(255), nullable=False, primary_key=True)
+    tags = Column(Text(), nullable=True)
+    units = Column(String(255), nullable=True)
+
+    def __init__(self, id, name, tags=None, units=None):
+        """
+        Create a ListScalarDataMaster entry with the given args.
+
+        :param id: The record id associated with this value.
+        :param name: The name of the datum associated with this value.
+        :param tags: A list of tags to store.
+        :param units: The associated units of the value.
+        """
+        self.id = id
+        self.name = name
+        self.tags = tags
+        self.units = units
+
+    def __repr__(self):
+        """Return a string repr. of a sql schema ListScalarDataMaster entry."""
+        return ('SQL Schema ListScalarDataMaster: <id={}, name={}, tags={}, '
+                'units={}>'
+                .format(self.id,
+                        self.name,
+                        self.tags,
+                        self.units))
+
+
+class ListScalarDataEntry(Base):
+    """
+    Implementation of a table to store list entries of scalar-type data.
+
+    This table contains scalar-data list entries related to a list from the
+    ListScalarDataMaster table.
+
+    These tables are not exposed to the user. It's decided based on type
+    which table should be accessed.
+    """
+
+    __tablename__ = 'ListScalarDataEntry'
     id = Column(String(255),
                 ForeignKey(Record.id),
                 nullable=False,
@@ -128,38 +174,30 @@ class ListScalarData(Base):
     name = Column(String(255), nullable=False, primary_key=True)
     index = Column(Integer(), nullable=False, primary_key=True)
     value = Column(Float(), nullable=False)
-    tags = Column(Text(), nullable=True)
-    units = Column(String(255), nullable=True)
     Index('record_scalar_list_idx', id, name, index)
 
-    def __init__(self, id, name, value, index, tags=None, units=None):
+    def __init__(self, id, name, value, index):
         """
-        Create a ListScalarData entry with the given args.
+        Create a ListScalarDataEntry entry with the given args.
 
         :param id: The record id associated with this value.
         :param name: The name of the datum associated with this value.
         :param index: The location in the scalar list of the value.
         :param value: The value to store.
-        :param tags: A list of tags to store.
-        :param units: The associated units of the value.
         """
         self.id = id
         self.name = name
         self.index = index
         self.value = value
-        self.tags = tags
-        self.units = units
 
     def __repr__(self):
-        """Return a string repr. of a sql schema ListScalarData entry."""
-        return ('SQL Schema ListScalarData: <id={}, name={}, index={}, '
-                'value={}, tags={}, units={}>'
+        """Return a string repr. of a sql schema ListScalarDataEntry entry."""
+        return ('SQL Schema ListScalarDataEntry: <id={}, name={}, index={}, '
+                'value={}>'
                 .format(self.id,
                         self.name,
                         self.index,
-                        self.value,
-                        self.tags,
-                        self.units))
+                        self.value))
 
 
 class StringData(Base):
@@ -210,49 +248,45 @@ class StringData(Base):
                         self.units))
 
 
-class ListStringData(Base):
+class ListStringDataMaster(Base):
     """
-    Implementation of a table to store lists of string-type data.
+    Implementation of a table to store info about lists of string-type data.
 
-    The list string table relates record ids to contained lists of data if (and
+    Info that applies to all values in the list are stored here. The list
+    string table relates record ids to contained lists of data if (and
     only if) those data entries have lists of non-numerical values. For
     example, "strategy":{"value":["best-fit", "some-string"]} would be
     represented here, but "density":{"value":[200.14, 12]} would not be, and
-    would instead go in the list scalar table. This is done so we can
+    would instead go in the ListScalarDataMaster table. This is done so we can
     store non-scalar values while still giving users the benefit of numerical
     comparison lookups (being faster than string comparisons). Scalar and
-    string data cannot be mixed in the same list.
+    string data cannot be mixed in the same list. The actual storage of the
+    list entries is stored in the ListStringDataEntry table.
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.
     """
 
-    __tablename__ = 'ListStringData'
+    __tablename__ = 'ListStringDataMaster'
     id = Column(String(255),
                 ForeignKey(Record.id),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
-    index = Column(Integer(), nullable=False, primary_key=True)
-    value = Column(String(255), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
 
-    def __init__(self, id, name, index, value, tags=None, units=None):
+    def __init__(self, id, name, tags=None, units=None):
         """
-        Create a ListStringData entry with the given args.
+        Create a ListStringDataMaster entry with the given args.
 
         :param id: The record id associated with this value.
         :param name: The name of the datum associated with this value.
-        :param index: The location in the scalar list of the value.
-        :param value: The value to store.
         :param tags: A list of tags to store.
         :param units: The associated units of the value.
         """
         self.id = id
         self.name = name
-        self.index = index
-        self.value = value
         # Arguably, string-based values don't need units. But because the
         # value vs. scalar implementation is hidden from the user, we need
         # to guarantee their availability in any "value"
@@ -260,15 +294,57 @@ class ListStringData(Base):
         self.tags = tags
 
     def __repr__(self):
-        """Return a string repr. of a sql schema ListStringData entry."""
-        return ('SQL Schema ListStringData: <id={}, name={}, index={}, '
-                'value={}, tags={}, units={}>'
+        """Return a string repr. of a sql schema ListStringDataMaster entry."""
+        return ('SQL Schema ListStringDataMaster: <id={}, name={}, tags={}, '
+                'units={}>'
+                .format(self.id,
+                        self.name,
+                        self.tags,
+                        self.units))
+
+
+class ListStringDataEntry(Base):
+    """
+    Implementation of a table to store list entries of string-type data.
+
+    This table contains string-data list entries related to a list from the
+    ListStringDataMaster table.
+
+    These tables are not exposed to the user. It's decided based on type
+    which table should be accessed.
+    """
+
+    __tablename__ = 'ListStringDataEntry'
+    id = Column(String(255),
+                ForeignKey(Record.id),
+                nullable=False,
+                primary_key=True)
+    name = Column(String(255), nullable=False, primary_key=True)
+    index = Column(Integer(), nullable=False, primary_key=True)
+    value = Column(String(255), nullable=False)
+
+    def __init__(self, id, name, index, value):
+        """
+        Create a ListStringDataEntry entry with the given args.
+
+        :param id: The record id associated with this value.
+        :param name: The name of the datum associated with this value.
+        :param index: The location in the scalar list of the value.
+        :param value: The value to store.
+        """
+        self.id = id
+        self.name = name
+        self.index = index
+        self.value = value
+
+    def __repr__(self):
+        """Return a string repr. of a sql schema ListStringDataEntry entry."""
+        return ('SQL Schema ListStringDataEntry: <id={}, name={}, index={}, '
+                'value={}>'
                 .format(self.id,
                         self.name,
                         self.index,
-                        self.value,
-                        self.tags,
-                        self.units))
+                        self.value))
 
 
 class Document(Base):
