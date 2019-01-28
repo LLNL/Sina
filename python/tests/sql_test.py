@@ -642,7 +642,18 @@ class TestSQL(unittest.TestCase):
         run_dao = sina_sql.DAOFactory().createRunDAO()
         run = Run(id="spam", version="1.2.3",
                   application="bar", user="bep",
-                  user_defined={"boop": "bep"})
+                  user_defined={"boop": "bep"},
+                  data={"scalar-strings": {"value":
+                                           ["red", "green", "blue"],
+                                           "units": None},
+                        "scalar-numbers": {"value": [1, 2, 3],
+                                           "units": "m"},
+                        "foo": {"value": 12,
+                                "units": None,
+                                "tags": ["in", "on"]},
+                        "bar": {"value": "1",
+                                "units": None}},)
+
         run_dao.insert(run)
         returned_run = run_dao.get("spam")
         self.assertEquals(returned_run.id, run.id)
@@ -651,6 +662,7 @@ class TestSQL(unittest.TestCase):
         self.assertEquals(returned_run.user, run.user)
         self.assertEquals(returned_run.user_defined, run.user_defined)
         self.assertEquals(returned_run.version, run.version)
+        self.assertEquals(returned_run.data, run.data)
 
     def test_rundao_delete(self):
         """Test that RunDAO is deleting correctly."""

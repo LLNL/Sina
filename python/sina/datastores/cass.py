@@ -20,7 +20,11 @@ table_lookup = {
                 "scalar": {"record_table": schema.RecordFromScalarData,
                            "data_table": schema.ScalarDataFromRecord},
                 "string": {"record_table": schema.RecordFromStringData,
-                           "data_table": schema.StringDataFromRecord}
+                           "data_table": schema.StringDataFromRecord},
+                "stringlist": {"record_table": schema.RecordFromStringListData,
+                               "data_table": schema.StringListDataFromRecord},
+                "scalarlist": {"record_table": schema.RecordFromScalarListData,
+                               "data_table": schema.ScalarListDataFromRecord}
 }
 
 
@@ -66,8 +70,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param list_to_insert: A list of Records to insert
         :param force_overwrite: Whether to forcibly overwrite a preexisting run
-                                that shares this run's id. Currently only used
-                                by Cassandra DAOs.
+                                that shares this run's id.
         :param _type_managed: Whether all records inserted are the same type
                               AND insert_many is called from a method that has
                               special handling for this type. See Run's
@@ -82,6 +85,8 @@ class RecordDAO(dao.RecordDAO):
         # tables whose full per-partition info isn't supplied by one Record
         from_scalar_batch = defaultdict(list)
         from_string_batch = defaultdict(list)
+        from_scalar_list_batch = defaultdict(list)
+        from_string_list_batch = defaultdict(list)
 
         for record in list_to_insert:
             # Insert the Record itself
@@ -96,30 +101,44 @@ class RecordDAO(dao.RecordDAO):
             if record.data:
                 string_from_rec_batch = []
                 scalar_from_rec_batch = []
+                string_list_from_rec_batch = []
+                scalar_list_from_rec_batch = []
+                tags, units, value, datum_name, id = [None]*5
+
+                def _cross_populate_batch(batch_dict, batch_list):
+                    """Insert data into a batch dict and list."""
+                    batch_dict[datum_name].append((value, id, units, tags))
+                    batch_list.append((datum_name, value, units, tags))
+
                 for datum_name, datum in record.data.items():
                     tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
-                    if isinstance(datum['value'], numbers.Real):
-                        from_scalar_batch[datum_name].append((datum['value'],
-                                                              record.id,
-                                                              datum.get('units'),
-                                                              tags))
-                        scalar_from_rec_batch.append((datum_name,
-                                                      datum['value'],
-                                                      datum.get('units'),
-                                                      tags))
+                    units = datum.get('units')
+                    value = datum['value']
+                    id = record.id
+                    if isinstance(value, numbers.Real):
+                        _cross_populate_batch(from_scalar_batch, scalar_from_rec_batch)
+
+                    elif isinstance(value, list):
+                        # Empty lists are stored as though they contain scalars
+                        # This is safe as long as future functionality involving
+                        # modifying already-ingested data checks type on re-ingestion
+                        if not value or isinstance(value[0], numbers.Real):
+                            _cross_populate_batch(from_scalar_list_batch,
+                                                  scalar_list_from_rec_batch)
+                        else:
+                            _cross_populate_batch(from_string_list_batch,
+                                                  string_list_from_rec_batch)
                     else:
-                        from_string_batch[datum_name].append((datum['value'],
-                                                              record.id,
-                                                              datum.get('units'),
-                                                              tags))
-                        string_from_rec_batch.append((datum_name,
-                                                      datum['value'],
-                                                      datum.get('units'),
-                                                      tags))
+                        # It's a string (or it's something else and Cassandra will yell)
+                        _cross_populate_batch(from_string_batch, string_from_rec_batch)
 
                 # We've finished this record's data--do the batch inserts
                 for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
-                                         (schema.StringDataFromRecord, string_from_rec_batch)):
+                                         (schema.StringDataFromRecord, string_from_rec_batch),
+                                         (schema.ScalarListDataFromRecord,
+                                          scalar_list_from_rec_batch),
+                                         (schema.StringListDataFromRecord,
+                                          string_list_from_rec_batch)):
                     with BatchQuery() as b:
                         create = (table.batch(b).create if force_overwrite
                                   else table.batch(b).if_not_exists().create)
@@ -152,7 +171,9 @@ class RecordDAO(dao.RecordDAO):
         # We've gone through every record we were given. The from_scalar_batch
         # and from_string_batch dictionaries are ready for batch inserting.
         for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
-                                      (schema.RecordFromStringData, from_string_batch)):
+                                      (schema.RecordFromStringData, from_string_batch),
+                                      (schema.RecordFromScalarListData, from_scalar_list_batch),
+                                      (schema.RecordFromStringListData, from_string_list_batch)):
             for partition, data_list in six.iteritems(partition_data):
                 with BatchQuery() as b:
                     create = (table.batch(b).create if force_overwrite
@@ -179,17 +200,12 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
                      .format(len(data), id, force_overwrite))
         for datum_name, datum in data.items():
-            tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
-            # Check if it's a scalar
-            insert_data = (schema.cross_populate_scalar_and_record
-                           if isinstance(datum['value'], numbers.Real)
-                           else schema.cross_populate_string_and_record)
-            insert_data(id=id,
-                        name=datum_name,
-                        value=datum['value'],
-                        units=datum.get('units'),
-                        tags=tags,
-                        force_overwrite=True)
+            schema.cross_populate_data_tables(id=id,
+                                              name=datum_name,
+                                              value=datum['value'],
+                                              units=datum.get('units'),
+                                              tags=datum.get('tags'),
+                                              force_overwrite=force_overwrite)
 
     def _insert_files(self, id, files, force_overwrite=False):
         """
