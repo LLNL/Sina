@@ -98,6 +98,32 @@ class RecordDAO(dao.RecordDAO):
                                              mimetype=entry.get('mimetype'),
                                              tags=tags))
 
+    def delete(self, id):
+        """
+        Given the id of a Record, delete all mention of it from the SQL database.
+
+        This includes removing all its data, its raw, any relationships
+        involving it, etc. Because the id is a foreign key in every table
+        (besides Record itself but including Run, etc), we can rely on
+        cascading to propogate the deletion.
+
+        :param id: The id of the Record to delete.
+        """
+        LOGGER.debug('Deleting record with id: {}'.format(id))
+        self.session.query(schema.Record).filter(schema.Record.id == id).delete()
+        self.session.commit()
+
+    def delete_many(self, ids_to_delete):
+        """
+        Given a list of Record ids, delete all mentions of them from the SQL database.
+
+        :param ids_to_delete: A list of the ids of Records to delete.
+        """
+        LOGGER.debug('Deleting records with ids in: {}'.format(ids_to_delete))
+        (self.session.query(schema.Record).filter(schema.Record.id.in_(ids_to_delete))
+                                          .delete(synchronize_session='fetch'))
+        self.session.commit()
+
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
@@ -563,7 +589,6 @@ class RunDAO(dao.RunDAO):
 
         :param run: A Run to import
         """
-        LOGGER.debug('Inserting {} into SQL.'.format(run))
         self.record_DAO.insert(run, called_from_child=True)
         self.session.add(schema.Run(id=run.id,
                                     application=run.application,
@@ -573,7 +598,7 @@ class RunDAO(dao.RunDAO):
 
     def get(self, id):
         """
-        Given a run's id, return match (if any) from SQL database.
+        Given a run's id, return match (if any) from the SQL database.
 
         :param id: The id of some run
 
@@ -583,6 +608,25 @@ class RunDAO(dao.RunDAO):
         record = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one())
         return model.generate_run_from_json(json.loads(record.raw))
+
+    def delete(self, id):
+        """
+        Given the id of a Run, delete all mention of it from the SQL database.
+
+        This includes removing all its data, its raw, any relationships
+        involving it, etc.
+
+        :param id: The id of the Run to delete.
+        """
+        self.record_DAO.delete(id)
+
+    def delete_many(self, ids_to_delete):
+        """
+        Given a list of Run ids, delete all mentions of them from the SQL database.
+
+        :param ids_to_delete: A list of the ids of Runs to delete.
+        """
+        self.record_DAO.delete_many(ids_to_delete)
 
     def _convert_record_to_run(self, record):
         """
