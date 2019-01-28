@@ -79,7 +79,6 @@ class RecordDAO(dao.RecordDAO):
                 else:
                     # Default to Scalar table
                     kind_master = schema.ListScalarDataMaster
-                print(datum.get('units'))
                 self.session.add(kind_master(id=id,
                                              name=datum_name,
                                              # units might be None, always use

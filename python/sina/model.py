@@ -329,12 +329,12 @@ class Run(Record):
 
 def _is_valid_list(list_of_data):
     """
-    Checks if a list of data is valid.
+    Check if a list of data is valid.
 
-    Validty means that all entries in the list are either strings or all
+    Validity means that all entries in the list are either strings or all
     are scalars.
 
-    :param list of data: The list of data to check is valid.
+    :param list_of_data: The list of data to check is valid.
     :returns: A Tuple consisting of a Boolean and two Integers. The Boolean
     is True if the list is valid, False otherwise. If False, the two
     Integers are two indexes of differing types of values (the first being
@@ -362,7 +362,7 @@ def _is_valid_list(list_of_data):
         if is_scalar and is_string:
             LOGGER.debug('Found invalid list.')
             return (False, latest_scalar, latest_string)
-    return (True, latest_scalar, latest_string)
+    return (True, None, None)
 
 
 def generate_record_from_json(json_input):

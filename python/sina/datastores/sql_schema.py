@@ -115,8 +115,8 @@ class ListScalarDataMaster(Base):
     "density":{"value":[200.14, 12]} would be represented here, but
     "strategy":{"value":["best-fit", "some-string"]} would not be. Instead,
     it would go in the ListStringDataMaster table. Scalar and
-    string data cannot be mixed in the same list. The actual storage of the
-    list entries is stored in the ListScalarDataEntry table.
+    string data cannot be mixed in the same list. The list entries themselves
+    are stored in the ListScalarDataEntry table.
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.
@@ -124,7 +124,8 @@ class ListScalarDataMaster(Base):
 
     __tablename__ = 'ListScalarDataMaster'
     id = Column(String(255),
-                ForeignKey(Record.id),
+                ForeignKey(Record.id, ondelete='CASCADE',
+                           deferrable=True, initially='DEFERRED'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
@@ -168,7 +169,8 @@ class ListScalarDataEntry(Base):
 
     __tablename__ = 'ListScalarDataEntry'
     id = Column(String(255),
-                ForeignKey(Record.id),
+                ForeignKey(Record.id, ondelete='CASCADE',
+                           deferrable=True, initially='DEFERRED'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
@@ -260,8 +262,8 @@ class ListStringDataMaster(Base):
     would instead go in the ListScalarDataMaster table. This is done so we can
     store non-scalar values while still giving users the benefit of numerical
     comparison lookups (being faster than string comparisons). Scalar and
-    string data cannot be mixed in the same list. The actual storage of the
-    list entries is stored in the ListStringDataEntry table.
+    string data cannot be mixed in the same list. The list entries themselves
+    are stored in the ListStringDataEntry table.
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.
@@ -269,7 +271,8 @@ class ListStringDataMaster(Base):
 
     __tablename__ = 'ListStringDataMaster'
     id = Column(String(255),
-                ForeignKey(Record.id),
+                ForeignKey(Record.id, ondelete='CASCADE',
+                           deferrable=True, initially='DEFERRED'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
@@ -316,7 +319,8 @@ class ListStringDataEntry(Base):
 
     __tablename__ = 'ListStringDataEntry'
     id = Column(String(255),
-                ForeignKey(Record.id),
+                ForeignKey(Record.id, ondelete='CASCADE',
+                           deferrable=True, initially='DEFERRED'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
