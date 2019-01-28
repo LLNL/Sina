@@ -38,7 +38,7 @@ source $EXEC_HOME/tests/test_venv/bin/activate
 BIN=$EXEC_HOME/tests/test_venv/bin
 
 # Nose installed separately to make sure xunit's available
-# Pip settings supplied by requirements.txt, etc.
+# Pip settings supplied by setup.py (implicit) and requirements.txt.
 python $BIN/pip install -r requirements.txt
 
 set -e

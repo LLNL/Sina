@@ -14,7 +14,7 @@ setup(name='sina',
         'console_scripts': [
             'sina = sina.launcher:main'
         ]
-                    },
+      },
       extras_require={
         'jupyter': [
             'plotly',
