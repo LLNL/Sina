@@ -4,6 +4,7 @@ import logging
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
 import six
+from numbers import Number
 from collections import defaultdict
 import json
 
@@ -179,17 +180,22 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
                      .format(len(data), id, force_overwrite))
         for datum_name, datum in data.items():
-            tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
-            # Check if it's a scalar
-            insert_data = (schema.cross_populate_scalar_and_record
-                           if isinstance(datum['value'], numbers.Real)
-                           else schema.cross_populate_string_and_record)
-            insert_data(id=id,
-                        name=datum_name,
-                        value=datum['value'],
-                        units=datum.get('units'),
-                        tags=tags,
-                        force_overwrite=True)
+            # Currently only support putting strings/numbers into value table, lists
+            # put into raw
+            if (isinstance(datum['value'], six.string_types) or
+               isinstance(datum['value'], Number)):
+                tags = ([str(x) for x in datum['tags']] if 'tags' in datum
+                        else None)
+                # Check if it's a scalar
+                insert_data = (schema.cross_populate_scalar_and_record
+                               if isinstance(datum['value'], numbers.Real)
+                               else schema.cross_populate_string_and_record)
+                insert_data(id=id,
+                            name=datum_name,
+                            value=datum['value'],
+                            units=datum.get('units'),
+                            tags=tags,
+                            force_overwrite=True)
 
     def _insert_files(self, id, files, force_overwrite=False):
         """
