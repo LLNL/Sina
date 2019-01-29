@@ -61,13 +61,45 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {}.'
                      .format(len(data), id))
         for datum_name, datum in data.items():
-            if (isinstance(datum['value'], six.string_types) or
-               isinstance(datum['value'], numbers.Number)):
+            if isinstance(datum['value'], list):
+                # Store info such as units and tags in master table
                 # Note: SQL doesn't support maps, so we have to convert the
                 # tags to a string (if they exist).
-                # Using json.dumps() instead of str() (or join()) gives valid
-                # JSON
-                tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
+                # Using json.dumps() instead of str() (or join()) gives
+                # valid JSON
+                tags = (json.dumps(datum['tags']) if 'tags' in datum
+
+                                                     else None)
+                # Check if empty list
+                if datum:
+                    kind_master = (schema.ListScalarDataMaster
+                                   if isinstance(datum['value'][0],
+                                                 numbers.Real)
+                                   else schema.ListStringDataMaster)
+                else:
+                    # Default to Scalar table
+                    kind_master = schema.ListScalarDataMaster
+                self.session.add(kind_master(id=id,
+                                             name=datum_name,
+                                             # units might be None, always use
+                                             # get()
+                                             units=datum.get('units'),
+                                             tags=tags))
+
+                # Store list entries in entry table
+                for index, entry in enumerate(datum['value']):
+                    # Check if it's a scalar
+                    kind = (schema.ListScalarDataEntry
+                            if isinstance(entry, numbers.Real)
+                            else schema.ListStringDataEntry)
+                    self.session.add(kind(id=id,
+                                          name=datum_name,
+                                          index=index,
+                                          value=entry))
+            elif (isinstance(datum['value'], six.string_types) or
+                  isinstance(datum['value'], numbers.Number)):
+                tags = (json.dumps(datum['tags']) if 'tags' in datum
+                                                     else None)
                 # Check if it's a scalar
                 kind = (schema.ScalarData if isinstance(datum['value'],
                                                         numbers.Real)
