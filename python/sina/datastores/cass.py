@@ -230,7 +230,7 @@ class RecordDAO(dao.RecordDAO):
         """
         Delete a single Record from the Cassandra backend.
 
-        Removes everything: its data, any relationships its in, files. Relies on
+        Removes everything: its data, any relationships it's in, files. Relies on
         Cassandra batching, one batch per Record.
 
         :param id: The id of the Record to delete
@@ -889,7 +889,7 @@ class RunDAO(dao.RunDAO):
         """
         Delete a single Run from the Cassandra backend.
 
-        Removes everything: its data, any relationships its in, files. Relies on
+        Removes everything: its data, any relationships it's in, files. Relies on
         Cassandra batching, one batch per Run.
 
         :param id: The id of the Run to delete
