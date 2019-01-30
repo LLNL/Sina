@@ -100,6 +100,31 @@ class RecordDAO(object):
             self.insert(item)
 
     @abstractmethod
+    def delete(self, id):
+        """
+        Given the id of a Record, delete all mention of it from the DAO's backend.
+
+        This includes removing all its data, its raw, any relationships
+        involving it, etc.
+
+        :param id: The id of the Record to delete.
+        """
+        raise NotImplementedError
+
+    def delete_many(self, ids_to_delete):
+        """
+        Given a list of Record ids, delete all mentions of them from the DAO's backend.
+
+        If a given DAO's backend can bulk delete more cleverly, this should be
+        reimplemented there.
+
+        :param ids_to_delete: A list of the ids of Records to delete.
+        """
+        LOGGER.debug('Deleting {} records.'.format(len(ids_to_delete)))
+        for item in ids_to_delete:
+            self.delete(item)
+
+    @abstractmethod
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
@@ -363,10 +388,35 @@ class RunDAO(object):
         If a given DAO's backend can bulk insert more cleverly (bulk inserts),
         this should be reimplemented there.
 
-        :param list_to_insert: A list of Records to insert
+        :param list_to_insert: A list of Runs to insert
         """
         for item in list_to_insert:
             self.insert(item)
+
+    @abstractmethod
+    def delete(self, id):
+        """
+        Given the id of a Run, delete all mention of it from the DAO's backend.
+
+        This includes removing all its data, its raw, any relationships
+        involving it, etc.
+
+        :param id: The id of the Run to delete.
+        """
+        raise NotImplementedError
+
+    def delete_many(self, ids_to_delete):
+        """
+        Given a list of Run ids, delete all mentions of them from the DAO's backend.
+
+        If a given DAO's backend can bulk delete more cleverly, this should be
+        reimplemented there.
+
+        :param ids_to_delete: A list of the ids of Runs to delete.
+        """
+        LOGGER.debug('Deleting {} runs.'.format(len(ids_to_delete)))
+        for item in ids_to_delete:
+            self.delete(item)
 
     def get_all(self, ids_only=False):
         """

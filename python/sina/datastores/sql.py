@@ -5,6 +5,7 @@ import logging
 import sqlalchemy
 import json
 from collections import defaultdict
+import six
 
 import sina.dao as dao
 import sina.model as model
@@ -29,11 +30,14 @@ class RecordDAO(dao.RecordDAO):
         """Initialize RecordDAO with session for its SQL database."""
         self.session = session
 
-    def insert(self, record):
+    def insert(self, record, called_from_child=False):
         """
         Given a Record, insert it into the current SQL database.
 
         :param record: A Record to insert
+        :param called_from_child: Whether a child of Record (such as Run) is
+                                  calling this. Used to skip committing in
+                                  order to preserve atomicity.
         """
         LOGGER.debug('Inserting {} into SQL.'.format(record))
         is_valid, warnings = record.is_valid()
@@ -46,7 +50,10 @@ class RecordDAO(dao.RecordDAO):
             self._insert_data(record.id, record.data)
         if record.files:
             self._insert_files(record.id, record.files)
-        self.session.commit()
+
+        # If called from child, child is responsible for committing.
+        if not called_from_child:
+            self.session.commit()
 
     def _insert_data(self, id, data):
         """
@@ -60,19 +67,23 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {}.'
                      .format(len(data), id))
         for datum_name, datum in data.items():
-            # Note: SQL doesn't support maps, so we have to convert the
-            # tags to a string (if they exist).
-            # Using json.dumps() instead of str() (or join()) gives valid JSON
-            tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
-            # Check if it's a scalar
-            kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
-                    else schema.StringData)
-            self.session.add(kind(id=id,
-                                  name=datum_name,
-                                  value=datum['value'],
-                                  # units might be None, always use get()
-                                  units=datum.get('units'),
-                                  tags=tags))
+            if (isinstance(datum['value'], six.string_types) or
+               isinstance(datum['value'], numbers.Number)):
+                # Note: SQL doesn't support maps, so we have to convert the
+                # tags to a string (if they exist).
+                # Using json.dumps() instead of str() (or join()) gives valid
+                # JSON
+                tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
+                # Check if it's a scalar
+                kind = (schema.ScalarData if isinstance(datum['value'],
+                                                        numbers.Real)
+                        else schema.StringData)
+                self.session.add(kind(id=id,
+                                      name=datum_name,
+                                      value=datum['value'],
+                                      # units might be None, always use get()
+                                      units=datum.get('units'),
+                                      tags=tags))
 
     def _insert_files(self, id, files):
         """
@@ -91,6 +102,32 @@ class RecordDAO(dao.RecordDAO):
                                              uri=entry['uri'],
                                              mimetype=entry.get('mimetype'),
                                              tags=tags))
+
+    def delete(self, id):
+        """
+        Given the id of a Record, delete all mention of it from the SQL database.
+
+        This includes removing all its data, its raw, any relationships
+        involving it, etc. Because the id is a foreign key in every table
+        (besides Record itself but including Run, etc), we can rely on
+        cascading to propogate the deletion.
+
+        :param id: The id of the Record to delete.
+        """
+        LOGGER.debug('Deleting record with id: {}'.format(id))
+        self.session.query(schema.Record).filter(schema.Record.id == id).delete()
+        self.session.commit()
+
+    def delete_many(self, ids_to_delete):
+        """
+        Given a list of Record ids, delete all mentions of them from the SQL database.
+
+        :param ids_to_delete: A list of the ids of Records to delete.
+        """
+        LOGGER.debug('Deleting records with ids in: {}'.format(ids_to_delete))
+        (self.session.query(schema.Record).filter(schema.Record.id.in_(ids_to_delete))
+                                          .delete(synchronize_session='fetch'))
+        self.session.commit()
 
     def data_query(self, **kwargs):
         """
@@ -557,20 +594,16 @@ class RunDAO(dao.RunDAO):
 
         :param run: A Run to import
         """
-        LOGGER.debug('Inserting {} into SQL.'.format(run))
+        self.record_DAO.insert(run, called_from_child=True)
         self.session.add(schema.Run(id=run.id,
                                     application=run.application,
                                     user=run.user,
                                     version=run.version))
-        self.record_DAO.insert(run)
         self.session.commit()
-        # TODO: Previous question carried forward:
-        # When inserting to Run, should we also insert to Record?
-        # Or should the "all Runs are Records" be expressed elsewhere?
 
     def get(self, id):
         """
-        Given a run's id, return match (if any) from SQL database.
+        Given a run's id, return match (if any) from the SQL database.
 
         :param id: The id of some run
 
@@ -580,6 +613,25 @@ class RunDAO(dao.RunDAO):
         record = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one())
         return model.generate_run_from_json(json.loads(record.raw))
+
+    def delete(self, id):
+        """
+        Given the id of a Run, delete all mention of it from the SQL database.
+
+        This includes removing all its data, its raw, any relationships
+        involving it, etc.
+
+        :param id: The id of the Run to delete.
+        """
+        self.record_DAO.delete(id)
+
+    def delete_many(self, ids_to_delete):
+        """
+        Given a list of Run ids, delete all mentions of them from the SQL database.
+
+        :param ids_to_delete: A list of the ids of Runs to delete.
+        """
+        self.record_DAO.delete_many(ids_to_delete)
 
     def _convert_record_to_run(self, record):
         """
@@ -629,6 +681,12 @@ class DAOFactory(dao.DAOFactory):
         else:
             engine = sqlalchemy.create_engine('sqlite:///')
             schema.Base.metadata.create_all(engine)
+
+        def configure_on_connect(connection, _):
+            """Activate foreign key support on connection creation."""
+            connection.execute('pragma foreign_keys=ON')
+
+        sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
         session = sqlalchemy.orm.sessionmaker(bind=engine)
         self.session = session()
 

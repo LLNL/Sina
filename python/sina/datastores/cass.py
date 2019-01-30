@@ -20,7 +20,11 @@ table_lookup = {
                 "scalar": {"record_table": schema.RecordFromScalarData,
                            "data_table": schema.ScalarDataFromRecord},
                 "string": {"record_table": schema.RecordFromStringData,
-                           "data_table": schema.StringDataFromRecord}
+                           "data_table": schema.StringDataFromRecord},
+                "stringlist": {"record_table": schema.RecordFromStringListData,
+                               "data_table": schema.StringListDataFromRecord},
+                "scalarlist": {"record_table": schema.RecordFromScalarListData,
+                               "data_table": schema.ScalarListDataFromRecord}
 }
 
 
@@ -66,8 +70,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param list_to_insert: A list of Records to insert
         :param force_overwrite: Whether to forcibly overwrite a preexisting run
-                                that shares this run's id. Currently only used
-                                by Cassandra DAOs.
+                                that shares this run's id.
         :param _type_managed: Whether all records inserted are the same type
                               AND insert_many is called from a method that has
                               special handling for this type. See Run's
@@ -82,6 +85,8 @@ class RecordDAO(dao.RecordDAO):
         # tables whose full per-partition info isn't supplied by one Record
         from_scalar_batch = defaultdict(list)
         from_string_batch = defaultdict(list)
+        from_scalar_list_batch = defaultdict(list)
+        from_string_list_batch = defaultdict(list)
 
         for record in list_to_insert:
             # Insert the Record itself
@@ -96,30 +101,44 @@ class RecordDAO(dao.RecordDAO):
             if record.data:
                 string_from_rec_batch = []
                 scalar_from_rec_batch = []
+                string_list_from_rec_batch = []
+                scalar_list_from_rec_batch = []
+                tags, units, value, datum_name, id = [None]*5
+
+                def _cross_populate_batch(batch_dict, batch_list):
+                    """Insert data into a batch dict and list."""
+                    batch_dict[datum_name].append((value, id, units, tags))
+                    batch_list.append((datum_name, value, units, tags))
+
                 for datum_name, datum in record.data.items():
                     tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
-                    if isinstance(datum['value'], numbers.Real):
-                        from_scalar_batch[datum_name].append((datum['value'],
-                                                              record.id,
-                                                              datum.get('units'),
-                                                              tags))
-                        scalar_from_rec_batch.append((datum_name,
-                                                      datum['value'],
-                                                      datum.get('units'),
-                                                      tags))
+                    units = datum.get('units')
+                    value = datum['value']
+                    id = record.id
+                    if isinstance(value, numbers.Real):
+                        _cross_populate_batch(from_scalar_batch, scalar_from_rec_batch)
+
+                    elif isinstance(value, list):
+                        # Empty lists are stored as though they contain scalars
+                        # This is safe as long as future functionality involving
+                        # modifying already-ingested data checks type on re-ingestion
+                        if not value or isinstance(value[0], numbers.Real):
+                            _cross_populate_batch(from_scalar_list_batch,
+                                                  scalar_list_from_rec_batch)
+                        else:
+                            _cross_populate_batch(from_string_list_batch,
+                                                  string_list_from_rec_batch)
                     else:
-                        from_string_batch[datum_name].append((datum['value'],
-                                                              record.id,
-                                                              datum.get('units'),
-                                                              tags))
-                        string_from_rec_batch.append((datum_name,
-                                                      datum['value'],
-                                                      datum.get('units'),
-                                                      tags))
+                        # It's a string (or it's something else and Cassandra will yell)
+                        _cross_populate_batch(from_string_batch, string_from_rec_batch)
 
                 # We've finished this record's data--do the batch inserts
                 for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
-                                         (schema.StringDataFromRecord, string_from_rec_batch)):
+                                         (schema.StringDataFromRecord, string_from_rec_batch),
+                                         (schema.ScalarListDataFromRecord,
+                                          scalar_list_from_rec_batch),
+                                         (schema.StringListDataFromRecord,
+                                          string_list_from_rec_batch)):
                     with BatchQuery() as b:
                         create = (table.batch(b).create if force_overwrite
                                   else table.batch(b).if_not_exists().create)
@@ -152,7 +171,9 @@ class RecordDAO(dao.RecordDAO):
         # We've gone through every record we were given. The from_scalar_batch
         # and from_string_batch dictionaries are ready for batch inserting.
         for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
-                                      (schema.RecordFromStringData, from_string_batch)):
+                                      (schema.RecordFromStringData, from_string_batch),
+                                      (schema.RecordFromScalarListData, from_scalar_list_batch),
+                                      (schema.RecordFromStringListData, from_string_list_batch)):
             for partition, data_list in six.iteritems(partition_data):
                 with BatchQuery() as b:
                     create = (table.batch(b).create if force_overwrite
@@ -179,17 +200,12 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
                      .format(len(data), id, force_overwrite))
         for datum_name, datum in data.items():
-            tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
-            # Check if it's a scalar
-            insert_data = (schema.cross_populate_scalar_and_record
-                           if isinstance(datum['value'], numbers.Real)
-                           else schema.cross_populate_string_and_record)
-            insert_data(id=id,
-                        name=datum_name,
-                        value=datum['value'],
-                        units=datum.get('units'),
-                        tags=tags,
-                        force_overwrite=True)
+            schema.cross_populate_data_tables(id=id,
+                                              name=datum_name,
+                                              value=datum['value'],
+                                              units=datum.get('units'),
+                                              tags=datum.get('tags'),
+                                              force_overwrite=force_overwrite)
 
     def _insert_files(self, id, files, force_overwrite=False):
         """
@@ -209,6 +225,82 @@ class RecordDAO(dao.RecordDAO):
                    uri=entry['uri'],
                    mimetype=entry.get('mimetype'),
                    tags=entry.get('tags'))
+
+    def delete(self, id):
+        """
+        Delete a single Record from the Cassandra backend.
+
+        Removes everything: its data, any relationships it's in, files. Relies on
+        Cassandra batching, one batch per Record.
+
+        :param id: The id of the Record to delete
+        """
+        with BatchQuery() as batch:
+            self._setup_batch_delete(batch, id)
+
+    def delete_many(self, ids_to_delete):
+        """
+        Delete a list of Records from the Cassandra backend.
+
+        Removes everything: their data, relationships, files. Relies on
+        Cassandra's batching, one batch encompassing all Records. If you want
+        to do one batch per Record, use delete() in a loop.
+
+        :param ids_to_delete: A list of ids of Records to delete
+        """
+        with BatchQuery() as batch:
+            for id in ids_to_delete:
+                self._setup_batch_delete(batch, id)
+
+    def _setup_batch_delete(self, batch, record_id):
+        """
+        Given a batchquery, add the deletion commands for a given record.
+
+        Cassandra has no notion of foreign keys, so we manually define what
+        it means to delete a record, including removing all the data entries,
+        all the files, etc. We add those deletions to a batchquery for later
+        execution.
+
+        :param batch: the batch to add the deletions to
+        :param record_id: the id of the record we're deleting
+        """
+        LOGGER.debug("Generating batch deletion commands for {}".format(record_id))
+        record = self.get(record_id)
+        # Delete from the record table itself
+        schema.Record.objects(id=record_id).batch(batch).delete()
+        # Delete every file
+        schema.DocumentFromRecord.objects(id=record_id).batch(batch).delete()
+        # Delete every piece of data
+        # Done a bit differently because record_id isn't always the partition key
+        for name, datum in record['data'].iteritems():
+            schema.cross_batch_delete_data_tables(id=record_id,
+                                                  name=name,
+                                                  value=datum['value'],
+                                                  batch=batch)
+
+        # Because Relationships are created separately from Records, we have to
+        # manually discover all relationships. Because they are mirrored, we
+        # can do this efficiently and without allow_filtering.
+        obj_when_rec_is_subj = (schema.ObjectFromSubject.objects(subject_id=record_id)
+                                                        .values_list('object_id',
+                                                                     'predicate'))
+        for obj, pred in obj_when_rec_is_subj:
+            (schema.SubjectFromObject.objects(object_id=obj,
+                                              predicate=pred,
+                                              subject_id=record_id)
+             .batch(batch).delete())
+        schema.ObjectFromSubject.objects(subject_id=record_id).batch(batch).delete()
+
+        # Now again with the other table.
+        subj_when_rec_is_obj = (schema.SubjectFromObject.objects(object_id=record_id)
+                                                        .values_list('subject_id',
+                                                                     'predicate'))
+        for subj, pred in subj_when_rec_is_obj:
+            (schema.ObjectFromSubject.objects(subject_id=subj,
+                                              predicate=pred,
+                                              object_id=record_id)
+             .batch(batch).delete())
+        schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
     def data_query(self, **kwargs):
         """
@@ -792,6 +884,34 @@ class RunDAO(dao.RunDAO):
                                     _type_managed=True)
         for item in list_to_insert:
             self._insert_sans_rec(item, force_overwrite)
+
+    def delete(self, id):
+        """
+        Delete a single Run from the Cassandra backend.
+
+        Removes everything: its data, any relationships it's in, files. Relies on
+        Cassandra batching, one batch per Run.
+
+        :param id: The id of the Run to delete
+        """
+        with BatchQuery() as batch:
+            schema.Run.objects(id=id).batch(batch).delete()
+            self.record_DAO._setup_batch_delete(batch, id)
+
+    def delete_many(self, ids_to_delete):
+        """
+        Delete a list of Runs from the Cassandra backend.
+
+        Removes everything: their data, relationships, files. Relies on
+        Cassandra's batching, one batch encompassing all Runs. If you want
+        to do one batch per Run, use delete() in a loop.
+
+        :param ids_to_delete: A list of ids of Runs to delete
+        """
+        with BatchQuery() as batch:
+            for id in ids_to_delete:
+                schema.Run.objects(id=id).batch(batch).delete()
+                self.record_DAO._setup_batch_delete(batch, id)
 
     def get(self, id):
         """
