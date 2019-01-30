@@ -163,7 +163,7 @@ a user and version:
 Complete, Empty Document
 ------------------------
 
-For convenience, below is an empty Mnoda document with all Relationship and generic
+For convenience, below is a Mnoda document template with Relationship and generic
 Record fields represented. Note that :code:`datum_name` should be replaced by the
 actual name of the datum (such as "density" or "max_volume").
 
