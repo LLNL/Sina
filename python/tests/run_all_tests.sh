@@ -5,8 +5,6 @@ set +u
 
 # Wheelhouse used with venv --extra-search-dir to find pip/setuptools
 WHEELHOUSE=/usr/gapps/python/wheelhouse
-# Comma-separated directories to ignore when doing style checks
-IGNORE_STYLE=venv,docs,tests/test_venv,tests/run_tests,.tox
 # Make sure python 3 is available on LC
 export PATH=/usr/apps/python-3.6.0/bin/:$PATH
 
@@ -26,37 +24,30 @@ else
 fi
 
 # Set up and activate virtual environment for testing
-rm -rf $EXEC_HOME/tests/test_venv
-mkdir -p $EXEC_HOME/tests/test_venv
+TEST_VENV=$EXEC_HOME/tests/test_venv
+
+rm -rf $TEST_VENV
+mkdir -p $TEST_VENV
 
 # Default LC setuptools is too old to recognize .whls, hence extra-search-dir
-python -m virtualenv --clear --extra-search-dir $WHEELHOUSE $EXEC_HOME/tests/test_venv/
-source $EXEC_HOME/tests/test_venv/bin/activate
+python -m virtualenv --clear --extra-search-dir $WHEELHOUSE $TEST_VENV
 
-# Install packages into virtual environment
-# Workaround due to overlong shebang in Bamboo agents
-BIN=$EXEC_HOME/tests/test_venv/bin
+TEST_BIN=$TEST_VENV/bin
+source $TEST_BIN/activate
 
 # Nose installed separately to make sure xunit's available
 # Pip settings supplied by setup.py (implicit) and requirements.txt.
-python $BIN/pip install -r requirements.txt
+python $TEST_BIN/pip install -r requirements.txt
 
 set -e
 
 # Test building across python versions, run actual tests
 # Note: if you don't have Cassandra running, Cassandra tests won't run either.
-$BIN/tox
+$TEST_BIN/tox
 
-# Perform PEP8 style checks
-python $BIN/flake8 --max-line-length=99 --exclude=$IGNORE_STYLE | tee $EXEC_HOME/tests/test_venv/flake8.out
-if [ -s $EXEC_HOME/tests/test_venv/flake8.out ]
-then
-    deactivate
-    exit -1
-fi
 
 # Perform a documentation style check using Sphinx and autodoc
 # Side effect: builds documentation
-$BIN/tox -e docs
+$TEST_BIN/tox -e docs
 
 deactivate
