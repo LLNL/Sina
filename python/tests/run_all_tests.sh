@@ -32,6 +32,8 @@ mkdir -p $TEST_VENV
 # Default LC setuptools is too old to recognize .whls, hence extra-search-dir
 python -m virtualenv --clear --extra-search-dir $WHEELHOUSE $TEST_VENV
 
+# Install packages into virtual environment
+# workaround due to overlong shebang in Bamboo agents
 TEST_BIN=$TEST_VENV/bin
 source $TEST_BIN/activate
 
