@@ -49,6 +49,8 @@ RUN_DIR=`pwd`
 TEMP_WHEEL_HOME=$RUN_DIR/$TEMP_WHEEL_HOME
 
 # Run tests (also builds docs)
+# First make sure you have the proper requirements links file
+$RUN_DIR/make links
 $RUN_DIR/tests/run_all_tests.sh
 
 # Tests passed, build the wheel
@@ -86,7 +88,7 @@ cd $RUN_DIR
 VENV_PATH="$DEPLOY_DIR"`basename $WHEEL_PATH .whl`/$VENV_SYM_NAME
 python -m virtualenv --clear --extra-search-dir $WHEELHOUSE $VENV_PATH
 source $VENV_PATH/bin/activate
-python $VENV_PATH/bin/pip install -r $RUN_DIR/requirements.txt
+python $VENV_PATH/bin/pip install -r $RUN_DIR/requirements/development.txt
 python $VENV_PATH/bin/pip install $NEWPATH[jupyter]
 # Ensure that installed Sina is the new wheel (fixes permission issues)
 python $VENV_PATH/bin/pip install --force-reinstall --no-deps $NEWPATH

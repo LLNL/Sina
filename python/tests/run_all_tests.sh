@@ -13,7 +13,7 @@ if [ ! -f setup.py ]
 then
     if [ ! -f ../setup.py ]
     then
-        echo "Please run test script from sina root folder"
+        echo "Please run test script from sina python folder"
         exit -1
     else
         EXEC_HOME=`pwd`/..
@@ -39,7 +39,7 @@ source $TEST_BIN/activate
 
 # Nose installed separately to make sure xunit's available
 # Pip settings supplied by setup.py (implicit) and requirements.txt.
-python $TEST_BIN/pip install -r requirements.txt
+python $TEST_BIN/pip install -r requirements/development.txt
 
 set -e
 
