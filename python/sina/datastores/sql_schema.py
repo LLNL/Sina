@@ -1,6 +1,6 @@
 """SQLAlchemy implementations of Mnoda objects."""
 
-from sqlalchemy import (Column, ForeignKey, String, Text, Float)
+from sqlalchemy import (Column, ForeignKey, String, Text, Float, Integer)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import Index
 
