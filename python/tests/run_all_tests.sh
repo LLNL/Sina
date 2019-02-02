@@ -39,6 +39,8 @@ source $TEST_BIN/activate
 
 # Nose installed separately to make sure xunit's available
 # Pip settings supplied by setup.py (implicit) and requirements.txt.
+# Manually add links.txt until I modify the Makefile to take in the VENV.
+ln -sf lc-links.txt requirements/links.txt
 python $TEST_BIN/pip install -r requirements/development.txt
 
 set -e

@@ -49,9 +49,7 @@ RUN_DIR=`pwd`
 TEMP_WHEEL_HOME=$RUN_DIR/$TEMP_WHEEL_HOME
 
 # Run tests (also builds docs)
-# First make sure you have the proper requirements links file
-$RUN_DIR/make links
-$RUN_DIR/tests/run_all_tests.sh
+(cd $RUN_DIR && make tests)
 
 # Tests passed, build the wheel
 rm -rf $TEMP_WHEEL_HOME
@@ -87,6 +85,9 @@ chown -R :$PERM_GROUP $DOC_PATH
 cd $RUN_DIR
 VENV_PATH="$DEPLOY_DIR"`basename $WHEEL_PATH .whl`/$VENV_SYM_NAME
 python -m virtualenv --clear --extra-search-dir $WHEELHOUSE $VENV_PATH
+# Manually create links.txt until I change the Makefile to accept the venv 
+# environment variable.
+ln -sf lc-links.txt $RUN_DIR/requirements/links.txt
 source $VENV_PATH/bin/activate
 python $VENV_PATH/bin/pip install -r $RUN_DIR/requirements/development.txt
 python $VENV_PATH/bin/pip install $NEWPATH[jupyter]

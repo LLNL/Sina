@@ -1,4 +1,4 @@
-# Define NETWORK if you are on an LC system and either can or do not want to 
+# Define NETWORK if you are on an LC system and either can't or don't want to 
 # use their wheelhouses.  For example,
 #
 # - build:  make NETWORK=scf
@@ -7,11 +7,13 @@
 # Note that use of scf has special meaning until we resolve installation issues
 # or establish a more flexible build process.
 
-# Determine if we are on an LC system base on the presence of the wheelhouse
-HAVE_WHEELHOUSE=$(shell if test -d /usr/gapps/python/wheelhouse; then echo 1; else echo 0; fi)
+# Determine if we are on an LC system based on the presence of the wheelhouse
+# Using 'wget --spider' versus curl as it is MUCH faster.
+# (Inspiration: https://stackoverflow.com/questions/12199059)
+HAVE_WHEELHOUSE=$(shell if wget --spider https://www-lc.llnl.gov/python/wheelhouse 2> /dev/null; then echo 1; else echo 0; fi)
 
-NO_LINKS_FILE=requirements/no-links.txt
-LC_LINKS_FILE=requirements/lc-links.txt
+NO_LINKS_FILE=no-links.txt
+LC_LINKS_FILE=lc-links.txt
 LINKS_FILE=requirements/links.txt
 
 SHELL=/bin/bash
@@ -50,14 +52,14 @@ docs: install
 links:
 	@if [ $(HAVE_WHEELHOUSE) == 0 ]; then \
 	  echo "No LC wheelhouse: using $(NO_LINKS_FILE)"; \
-	  cp -f $(NO_LINKS_FILE) $(LINKS_FILE); \
+	  ln -sf $(NO_LINKS_FILE) $(LINKS_FILE); \
 	else \
 	  if test -z "$(NETWORK)"; then \
 	    echo "NETWORK unspecified: using $(LC_LINKS_FILE)"; \
-	    cp -f $(LC_LINKS_FILE) $(LINKS_FILE); \
+	    ln -sf $(LC_LINKS_FILE) $(LINKS_FILE); \
 	  else \
 	    echo "NETWORK=$(NETWORK): using $(NO_LINKS_FILE)"; \
-	    cp -f $(NO_LINKS_FILE) $(LINKS_FILE); \
+	    ln -sf $(NO_LINKS_FILE) $(LINKS_FILE); \
 	  fi; \
 	fi
 
@@ -71,6 +73,7 @@ clean:
 clean-files:  clean-tests
 	@echo "Cleaning build files.."; \
 	rm -rf build; \
+	rm -f requirements/links.txt; \
 	rm -rf sina.egg-info $(VENV); \
 	find . -name "*.pyc" -exec rm -f {} \; >& /dev/null; \
 	find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
