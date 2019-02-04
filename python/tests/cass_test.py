@@ -64,6 +64,21 @@ def _populate_database_with_data():
     schema.cross_populate_data_tables(id="spam4",
                                       name="val_data_2",
                                       value="double yolks")
+    schema.cross_populate_data_tables(id="spam",
+                                      name="toppings",
+                                      value=["onion", "cheese"])
+    schema.cross_populate_data_tables(id="spam2",
+                                      name="toppings",
+                                      value=["cheese", "mushrooms"])
+    schema.cross_populate_data_tables(id="spam3",
+                                      name="toppings",
+                                      value=["onion"])
+    schema.cross_populate_data_tables(id="spam",
+                                      name="egg_count",
+                                      value=[22, 12, 18, 4])
+    schema.cross_populate_data_tables(id="spam2",
+                                      name="egg_count",
+                                      value=[12])
 
 
 def _populate_database_with_files():
@@ -439,6 +454,20 @@ class TestSearch(unittest.TestCase):
         self.assertEqual(len(ids_only), 3)
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam2"])
+
+    def test_recorddao_get_where_list_contains(self):
+        """Test that we're correctly retrieving Records given contents of their list data."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+        record_dao.insert(Record(id="spam", type="run"))
+        get_one = record_dao.get_where_list_datum_contains("toppings", ["cheese", "onion"],
+                                                           ids_only=False)
+        self.assertEqual(list(get_one), record_dao.get("spam"))
+        get_many = record_dao.get_where_list_datum_contains("toppings", ["cheese"], ids_only=True)
+        six.assertCountEqual(self, list(get_many), ["spam", "spam2"])
+        get_scalar = record_dao.get_where_list_datum_contains("egg_count", [4, 12], ids_only=True)
+        self.assertEqual(list(get_scalar), ["spam"])
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
