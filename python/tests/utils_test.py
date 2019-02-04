@@ -9,6 +9,7 @@ written such that this should not be a testing issue.
 import os
 import shutil
 import unittest
+from types import GeneratorType
 
 import sina.utils
 from sina.utils import DataRange
@@ -78,6 +79,24 @@ class TestSinaUtils(unittest.TestCase):
         self.assertEqual(filename, result,
                          "Expected {}, not {}".format(filename, result))
         os.remove(filename)
+
+    def test_intersect_ordered_generators(self):
+        """Test that the intersect_ordered_generators() function is working."""
+        gen_even = (i for i in range(0, 10, 2))
+        gen_rando = (i for i in [-1, 0, 1, 2, 5, 6, 8])
+        gen_10 = (i for i in range(10))
+        intersect = sina.utils.intersect_ordered_generators([gen_even,
+                                                             gen_rando,
+                                                             gen_10])
+        self.assertTrue(isinstance(intersect, GeneratorType))
+        # Order is important
+        self.assertEqual(list(intersect), [0, 2, 6, 8])
+        gen_none = (i for i in [])
+        gen_empty = sina.utils.intersect_ordered_generators([gen_even,
+                                                             gen_rando,
+                                                             gen_10,
+                                                             gen_none])
+        self.assertEqual(list(gen_empty), [])
 
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""
