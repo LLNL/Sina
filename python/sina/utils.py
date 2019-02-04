@@ -538,7 +538,7 @@ class DataRange(object):
             raise ValueError("Bad inclusiveness specifier for range: {}",
                              format(min_range[0]))
         if len(min_range) > 1:
-            self.min_inclusive = min_range[0] is '['
+            self.min_inclusive = min_range[0] == '['
 
             min_arg = min_range[1:]
             try:
@@ -570,7 +570,7 @@ class DataRange(object):
             raise ValueError("Bad inclusiveness specifier for range: {}",
                              format(max_range[-1]))
         if len(max_range) > 1:
-            self.max_inclusive = max_range[-1] is ']'
+            self.max_inclusive = max_range[-1] == ']'
             # We can take strings, but here we're already taking a string.
             # Thus we need to do a check: '"4"]' is passing us a string, but
             # '4]', despite being a string itself, is passing us an int

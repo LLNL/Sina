@@ -362,11 +362,11 @@ def ingest(args):
                                  "using sql files or Cassandra as the "
                                  "destination.")
     if args.database_type == 'cass' and (not args.cass_keyspace):
-                    error_message.append("{} not provided. In "
-                                         "the future, it will be possible to "
-                                         "set a default. For now, please "
-                                         "specify it to continue!"
-                                         .format(COMMON_OPTION_CASSANDRA_DEST))
+        error_message.append("{} not provided. In "
+                             "the future, it will be possible to "
+                             "set a default. For now, please "
+                             "specify it to continue!"
+                             .format(COMMON_OPTION_CASSANDRA_DEST))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
