@@ -1,7 +1,11 @@
 #!/bin/bash
 
-# If not +u, virtualenv will fail
+# Skip error and exit when expanding unset variables and parameters; otherwise,
+# virtualenv will fail
 set +u
+
+# Exit immediately if a command exits with a non-zero status
+set -e
 
 # Wheelhouse used with venv --extra-search-dir to find pip/setuptools
 WHEELHOUSE=/usr/gapps/python/wheelhouse
@@ -42,8 +46,6 @@ source $TEST_BIN/activate
 # Manually add links.txt until I modify the Makefile to take in the VENV.
 ln -sf lc-links.txt requirements/links.txt
 python $TEST_BIN/pip install -r requirements/development.txt
-
-set -e
 
 # Test building across python versions, run actual tests
 # Note: if you don't have Cassandra running, Cassandra tests won't run either.

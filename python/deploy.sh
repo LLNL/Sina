@@ -85,9 +85,6 @@ chown -R :$PERM_GROUP $DOC_PATH
 cd $RUN_DIR
 VENV_PATH="$DEPLOY_DIR"`basename $WHEEL_PATH .whl`/$VENV_SYM_NAME
 python -m virtualenv --clear --extra-search-dir $WHEELHOUSE $VENV_PATH
-# Manually create links.txt until I change the Makefile to accept the venv 
-# environment variable.
-ln -sf lc-links.txt $RUN_DIR/requirements/links.txt
 source $VENV_PATH/bin/activate
 python $VENV_PATH/bin/pip install -r $RUN_DIR/requirements/development.txt
 python $VENV_PATH/bin/pip install $NEWPATH[jupyter]

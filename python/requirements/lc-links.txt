@@ -1,12 +1,14 @@
 # For use on LLNL's OCF Network.
  --no-index
+
+# Directory containing LC-managed wheels
  --find-links /usr/gapps/python/wheelhouse/
 
-# Not all wheelhouse packages are necessarily installed on the filesystem
-# so use the URL as well.
+# Developers working locally on their laptops depend on the LC-managed wheels 
+# on the web, so include the LC wheelhouse URL.  This link also comes in handy 
+# when working on LC machines when the directory and URL are out-of-sync.
  --trusted-host www-lc.llnl.gov
  --find-links https://www-lc.llnl.gov/python/wheelhouse/
 
-# Used for wheels not yet in the LC wheelhouse.
+# Project directory for wheels not yet in the LC wheelhouse
  --find-links /usr/gapps/wf/packages/third-party
-
