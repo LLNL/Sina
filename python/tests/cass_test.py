@@ -463,7 +463,8 @@ class TestSearch(unittest.TestCase):
         record_dao.insert(Record(id="spam", type="run"))
         get_one = record_dao.get_where_list_datum_contains("toppings", ["cheese", "onion"],
                                                            ids_only=False)
-        self.assertEqual(list(get_one), record_dao.get("spam"))
+
+        self.assertEquals(list(get_one), [record_dao.get("spam")])
         get_many = record_dao.get_where_list_datum_contains("toppings", ["cheese"], ids_only=True)
         six.assertCountEqual(self, list(get_many), ["spam", "spam2"])
         get_scalar = record_dao.get_where_list_datum_contains("egg_count", [4, 12], ids_only=True)

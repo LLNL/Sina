@@ -137,6 +137,15 @@ class Record(object):
         return ('Model Record <id={}, type={}>'
                 .format(self.id, self.type))
 
+    def __eq__(self, rec):
+        """
+        Return whether two Records are equivalent.
+
+        :param rec: Another Record to test equivalence test_data_range_bad_string_setters_max
+        :returns: True if Records are equivalent, else False
+        """
+        return self.__dict__ == rec.__dict__
+
     def to_json(self):
         """
         Create a JSON string from a Record.

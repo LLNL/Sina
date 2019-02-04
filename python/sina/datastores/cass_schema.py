@@ -55,16 +55,24 @@ class ScalarDataFromRecord(Model):
 
 
 class RecordFromScalarListData(Model):
-    """Query table for finding records given scalar list criteria."""
+    """
+    Query table for finding records given scalar list criteria.
+
+    Each entry in a scalar list is given its own row in the database in this
+    table (not in its partner table) to facilitate the specific case of
+    "find Records where x contains (y/a value < y/etc.)" This is more efficient
+    for querying, but does mean that the arrangement of list members, as well as
+    any duplication within a list (rows overwrite) is lost. The partner table
+    is in charge of maintaining this order.
+
+    We store neither units nor tags since they're not required for this type of
+    query. Those are more for 'find me everything tagged "output" in "record_1"'
+    (tags) or simple retrieval (units), both of which use the partner table.
+    """
 
     name = columns.Text(primary_key=True)
-    # CQLEngine support for frozen collections isn't part of their API.
-    # Currently, _freeze_db_type() *is* the least hacky option.
-    value = columns.List(columns.Double(), primary_key=True)
-    value._freeze_db_type()
+    value = columns.Double(primary_key=True)
     id = columns.Text(primary_key=True)
-    units = columns.Text()
-    tags = columns.Set(columns.Text())
 
 
 class ScalarListDataFromRecord(Model):
@@ -72,6 +80,8 @@ class ScalarListDataFromRecord(Model):
 
     id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
+    # CQLEngine support for frozen collections isn't part of their API.
+    # Currently, _freeze_db_type() *is* the least hacky option.
     value = columns.List(columns.Double(), primary_key=True)
     value._freeze_db_type()
     units = columns.Text()
@@ -104,14 +114,15 @@ class StringDataFromRecord(Model):
 
 
 class RecordFromStringListData(Model):
-    """Query table for finding records given scalar list criteria."""
+    """
+    Query table for finding records given string list criteria.
+
+    Differs from its partner in the same ways as RecordFromScalarListData.
+    """
 
     name = columns.Text(primary_key=True)
-    value = columns.List(columns.Text(), primary_key=True)
-    value._freeze_db_type()
+    value = columns.Text(primary_key=True)
     id = columns.Text(primary_key=True)
-    units = columns.Text()
-    tags = columns.Set(columns.Text())
 
 
 class StringListDataFromRecord(Model):
@@ -190,19 +201,19 @@ def _discover_tables_from_value(value):
 
     :param value: The value to evaluate
 
-    :returns: A tuple containing the two query tables.
+    :returns: A tuple containing the two query tables: (XFromRecord, RecordFromX)
     """
     # Check if it's a list
     if isinstance(value, list):
         # Check if it's a scalar or empty
-        table_1, table_2 = ((ScalarListDataFromRecord, RecordFromScalarListData)
-                            if not value or isinstance(value[0], numbers.Real)
-                            else (StringListDataFromRecord, RecordFromStringListData))
+        x_from_rec, rec_from_x = ((ScalarListDataFromRecord, RecordFromScalarListData)
+                                  if not value or isinstance(value[0], numbers.Real)
+                                  else (StringListDataFromRecord, RecordFromStringListData))
     else:
-        table_1, table_2 = ((ScalarDataFromRecord, RecordFromScalarData)
-                            if isinstance(value, numbers.Real)
-                            else (StringDataFromRecord, RecordFromStringData))
-    return (table_1, table_2)
+        x_from_rec, rec_from_x = ((ScalarDataFromRecord, RecordFromScalarData)
+                                  if isinstance(value, numbers.Real)
+                                  else (StringDataFromRecord, RecordFromStringData))
+    return (x_from_rec, rec_from_x)
 
 
 def cross_populate_data_tables(name,
@@ -220,6 +231,10 @@ def cross_populate_data_tables(name,
     different types of queries. The pair to insert into is determined based
     on the value arg's type.
 
+    Includes additional logic for handling the case of list data, where the
+    rearrangement is a bit more involved than swapping column order (splitting
+    a list into overwriting rows or keeping it intact)
+
     Each call handles one entry from one Record's "data" attribute. For mass
     (batch) insertion, see RecordDAO.insert_many().
 
@@ -231,25 +246,34 @@ def cross_populate_data_tables(name,
     :param force_overwrite: Whether to forcibly overwrite an extant entry in
                             the same "slot" in the database
     """
-    table_1, table_2 = _discover_tables_from_value(value)
+    x_from_rec, rec_from_x = _discover_tables_from_value(value)
 
     # Now that we know which tables to use, determine how to insert
-    first_table_create = (table_1.create if force_overwrite
-                          else table_1.if_not_exists().create)
-    second_table_create = (table_2.create if force_overwrite
-                           else table_2.if_not_exists().create)
+    x_from_rec_create = (x_from_rec.create if force_overwrite
+                         else x_from_rec.if_not_exists().create)
+    x_from_rec_create(id=id,
+                      name=name,
+                      value=value,
+                      tags=tags,
+                      units=units)
 
-    # Perform the insertion
-    first_table_create(id=id,
-                       name=name,
-                       value=value,
-                       tags=tags,
-                       units=units)
-    second_table_create(id=id,
-                        name=name,
-                        value=value,
-                        tags=tags,
-                        units=units)
+    if rec_from_x in (RecordFromStringListData, RecordFromScalarListData):
+        # We allow overwriting in the list tables, because we want only one
+        # entry per value (no duplicates tracking). So we rely on the partner
+        # table to detect that first if not force_overwrite (hence the early
+        # insert). Also, since we only want one value per entry, we loop.
+        for entry in value:
+            rec_from_x.create(id=id,
+                              name=name,
+                              value=entry)
+    else:
+        rec_from_x_create = (rec_from_x.create if force_overwrite
+                             else rec_from_x.if_not_exists().create)
+        rec_from_x_create(id=id,
+                          name=name,
+                          value=value,
+                          tags=tags,
+                          units=units)
 
 
 def cross_batch_delete_data_tables(name,
@@ -268,10 +292,15 @@ def cross_batch_delete_data_tables(name,
     :param id: The id of the record containing the entry
     :param batch: The batch object to add the statements to.
     """
-    table_1, table_2 = _discover_tables_from_value(value)
+    x_from_rec, rec_from_x = _discover_tables_from_value(value)
 
-    table_1.objects(id=id, name=name, value=value).batch(batch).delete()
-    table_2.objects(id=id, name=name, value=value).batch(batch).delete()
+    x_from_rec.objects(id=id, name=name, value=value).batch(batch).delete()
+
+    if rec_from_x in (RecordFromStringListData, RecordFromScalarListData):
+        for entry in value:
+            rec_from_x.objects(id=id, name=name, value=entry).batch(batch).delete()
+    else:
+        rec_from_x.objects(id=id, name=name, value=value).batch(batch).delete()
 
 
 def form_connection(keyspace, node_ip_list=None):
