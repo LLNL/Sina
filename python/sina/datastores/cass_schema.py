@@ -60,7 +60,7 @@ class RecordFromScalarListData(Model):
 
     Each entry in a scalar list is given its own row in the database in this
     table (not in its partner table) to facilitate the specific case of
-    "find Records where x contains (y/a value < y/etc.)" This is more efficient
+    "find Records where x contains (y, a value < y, etc.)" This is more efficient
     for querying, but does mean that the arrangement of list members, as well as
     any duplication within a list (rows overwrite) is lost. The partner table
     is in charge of maintaining this order.

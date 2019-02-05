@@ -151,24 +151,21 @@ def intersect_ordered_generators(gen_list):
     for gen in gen_list:
         most_recents.append(six.next(gen))
 
-    try:
-        while True:
-            if most_recents.count(most_recents[0]) == len(most_recents):
-                # All our iterators agree
-                yield most_recents[0]
-                # Get the next
-                for index, gen in enumerate(gen_list):
+    while True:
+        if most_recents.count(most_recents[0]) == len(most_recents):
+            # All our iterators agree
+            yield most_recents[0]
+            # Get the next
+            for index, gen in enumerate(gen_list):
+                most_recents[index] = six.next(gen)
+        else:
+            maxval = max(most_recents)
+            # Because our generators are ordered, and because this is an intersection,
+            # we know there are no more possible matches once one generator runs out.
+            for index, gen in enumerate(gen_list):
+                while most_recents[index] < maxval:
                     most_recents[index] = six.next(gen)
-            else:
-                maxval = max(most_recents)
-                for index, gen in enumerate(gen_list):
-                    while most_recents[index] < maxval:
-                        most_recents[index] = six.next(gen)
-            # Once the above else exits, everything is == or > than max.
-
-    except StopIteration:
-        # Because this is an intersection, when one gen runs out, we're done.
-        raise
+        # Once the above else exits, everything is == or > than max.
 
 
 def export(factory, id_list, scalar_names, output_type, output_file=None):

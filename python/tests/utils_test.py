@@ -82,6 +82,10 @@ class TestSinaUtils(unittest.TestCase):
 
     def test_intersect_ordered_generators(self):
         """Test that the intersect_ordered_generators() function is working."""
+        gen_none = (i for i in [])
+        self.assertFalse(list(sina.utils.intersect_ordered_generators([gen_none])))
+        gen_single = (i for i in [1])
+        self.assertEquals(len(list(sina.utils.intersect_ordered_generators([gen_single]))), 1)
         gen_even = (i for i in range(0, 10, 2))
         gen_rando = (i for i in [-1, 0, 1, 2, 5, 6, 8])
         gen_10 = (i for i in range(10))
@@ -91,12 +95,20 @@ class TestSinaUtils(unittest.TestCase):
         self.assertTrue(isinstance(intersect, GeneratorType))
         # Order is important
         self.assertEqual(list(intersect), [0, 2, 6, 8])
-        gen_none = (i for i in [])
-        gen_empty = sina.utils.intersect_ordered_generators([gen_even,
-                                                             gen_rando,
-                                                             gen_10,
-                                                             gen_none])
-        self.assertEqual(list(gen_empty), [])
+
+        gen_colors = (i for i in ["blue", "orange", "white"])
+        gen_fruits = (i for i in ["apple", "banana", "orange"])
+        intersect_str = sina.utils.intersect_ordered_generators([gen_colors,
+                                                                 gen_fruits])
+        self.assertEqual(list(intersect_str), ["orange"])
+
+        # Repopulate our non-empty generator
+        gen_even = (i for i in range(0, 10, 2))
+        gen_empty = sina.utils.intersect_ordered_generators([gen_even, gen_none])
+        self.assertFalse(list(gen_empty))
+        gen_even = (i for i in range(0, 10, 2))
+        gen_empty_rev = sina.utils.intersect_ordered_generators([gen_none, gen_even])
+        self.assertFalse(list(gen_empty_rev))
 
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""

@@ -465,7 +465,7 @@ class RecordDAO(dao.RecordDAO):
         :param list_of_contents: All the values datum_name must contain. Can be single
                                  values ("egg", 12) or DataRanges.
         :param ids_only: Whether to only return ids rather than full Records.
-        :returns: A list of ids of matching Records or the Records themselves (see ids_only)
+        :returns: A generator of ids of matching Records or the Records themselves (see ids_only)
         :raises TypeError: if given a list that isn't all strings xor scalars.
         """
         LOGGER.info('Finding Records where datum {} contains all of: {}'.format(datum_name,
