@@ -450,7 +450,7 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(query):
                 yield record
 
-    def get_where_list_datum_contains(self, datum_name, list_of_contents, ids_only=False):
+    def get_list_has_all(self, datum_name, list_of_contents, ids_only=False):
         """
         Given a list datum's name and values, return Records where the datum contains all values.
 
@@ -467,6 +467,7 @@ class RecordDAO(dao.RecordDAO):
         :param ids_only: Whether to only return ids rather than full Records.
         :returns: A generator of ids of matching Records or the Records themselves (see ids_only)
         :raises TypeError: if given a list that isn't all strings xor scalars.
+        :raises ValueError: if list_of_contents is empty.
         """
         LOGGER.info('Finding Records where datum {} contains all of: {}'.format(datum_name,
                                                                                 list_of_contents))

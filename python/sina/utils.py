@@ -128,26 +128,32 @@ def _process_relationship_entry(entry, local_ids):
     return (subj, obj)
 
 
-def intersect_ordered_generators(gen_list):
+def intersect_ordered(iterables):
     """
-    Return a generator that yields the intersection of ordered generators.
+    Return a generator that yields the intersection of ordered iterators.
 
-    Used when compositing queries where each step returns a generator of Record
+    Used when compositing queries where each step returns an iterator of Record
     ids. Important to avoid too much being stored in memory; here, we only store
-    the generator stack plus (len(gen_list)+C) values.
+    the generator stack plus (len(iterables)+C) values.
 
-    :param gen_list: A list of generators. Must be ordered by the same criteria!
+    :param gen_list: A list of iterators. Must be ordered by the same criteria!
 
-    :returns: A generator that crawls through the other generators and returns
+    :returns: A generator that crawls through the iterators and returns
               values that all of them share.
 
     :raises StopIteration: when it runs out of values
     """
     # Quit fast as we'll be assuming at least one generator.
-    if not gen_list:
+    if not iterables:
         return
-    most_recents = []
+
+    # Standardize all iterators to generators
+    gen_list = []
+    for iter in iterables:
+        gen_list.append(x for x in iter)
+
     # Get our first set
+    most_recents = []
     for gen in gen_list:
         most_recents.append(six.next(gen))
 
@@ -158,6 +164,7 @@ def intersect_ordered_generators(gen_list):
             # Get the next
             for index, gen in enumerate(gen_list):
                 most_recents[index] = six.next(gen)
+        # Once this "else" exits, everything is == or > than max:
         else:
             maxval = max(most_recents)
             # Because our generators are ordered, and because this is an intersection,
@@ -165,7 +172,6 @@ def intersect_ordered_generators(gen_list):
             for index, gen in enumerate(gen_list):
                 while most_recents[index] < maxval:
                     most_recents[index] = six.next(gen)
-        # Once the above else exits, everything is == or > than max.
 
 
 def export(factory, id_list, scalar_names, output_type, output_file=None):
