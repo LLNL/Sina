@@ -93,8 +93,14 @@ Enter the following command to set up your initial environment::
 
     $ python -m virtualenv venv   # venv can be any name you want
 
-Now activate the environment \(see "Activating the Virtual Environment"\)
-before proceeding to install dependencies.
+Now activate the environment \(see "Activating the Virtual Environment"\).
+
+You need to be in the proper Sina directory before proceeding to install
+dependencies, so enter the following command::
+
+    (venv) $ cd $SINA_PYTHON
+
+where `SINA_PYTHON` is the `python` subdirectory of the Sina source code.
 
 
 Installing Software Dependencies
@@ -130,8 +136,9 @@ Activating the Virtual Environment
 ==================================
 Enter the following command to enter the virtual environment::
 
-    $ source venv/bin/activate    # for csh use activate.csh
+    $ source $SINA_PYTHON/venv/bin/activate  # use activate.csh if in a [t]csh
 
+where `SINA_PYTHON` is the python subdirectory of the Sina source code.
 You will need to do this every time you want to start up a session in the named
 virtual environment.
 
@@ -140,7 +147,7 @@ Deactivating the Virtual Environment
 ====================================
 Enter the following command to deactivate the virtual environment::
 
-    $(venv) deactivate
+    (venv) $ deactivate
 
 when you are done.
 
@@ -156,7 +163,7 @@ set. To use the notebooks, you'll first need to run getting_started.ipynb
 lc.llnl.gov/jupyter. After that, you'll be ready to run the rest of the notebooks.
 To clean all output from the notebooks::
 
-  $(venv) make clean-notebooks
+    (venv) $ make clean-notebooks
 
 
 Testing
@@ -165,7 +172,7 @@ Testing
 This package uses nosetests to run unit tests.  Enter the following while in
 your virtual environment::
 
-    $(venv) nosetests
+    (venv) $ nosetests
 
 Additional tests, which include checks for PEP8 compliance and proper
 documentation, can be run my entering the following::
@@ -196,4 +203,4 @@ Feel free to contact us at siboka@llnl.gov if you have questions or want to
 add to our list of supported environments.
 
 
-Updated: 7/17/2018
+Updated: 2/5/2019
