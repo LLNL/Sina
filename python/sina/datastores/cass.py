@@ -327,13 +327,13 @@ class RecordDAO(dao.RecordDAO):
         # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
         if not kwargs.items():
             raise ValueError("You must supply at least one criterion.")
-        scalar_criteria, string_criteria = sort_and_standardize_criteria(kwargs)
+        scalar, string, scalarlist, stringlist = sort_and_standardize_criteria(kwargs)
 
-        if scalar_criteria:
-            scalar_ids = self._apply_ranges_to_query(scalar_criteria,
+        if scalar:
+            scalar_ids = self._apply_ranges_to_query(scalar,
                                                      "scalar")
-        if string_criteria:
-            string_ids = self._apply_ranges_to_query(string_criteria,
+        if string:
+            string_ids = self._apply_ranges_to_query(string,
                                                      "string")
 
         # If we have more than one set of data, we need to perform a union.

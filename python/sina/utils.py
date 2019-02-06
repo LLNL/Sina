@@ -8,8 +8,9 @@ import uuid
 import csv
 import time
 import datetime
-from numbers import Number
+import numbers
 from six import string_types
+from enum import Enum
 
 from multiprocessing.pool import ThreadPool
 from collections import OrderedDict
@@ -18,6 +19,14 @@ import sina.model as model
 
 LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
+
+
+class ListOperation(Enum):
+    """Describe operations possible on ListContains."""
+
+    ANY = "ANY"
+    ALL = "ALL"
+    ONLY = "ONLY"
 
 
 def import_many_jsons(factory, json_list):
@@ -280,7 +289,7 @@ def sort_and_standardize_criteria(criteria_dict):
     scalar_criteria = []
     string_criteria = []
     for data_name, criterion in criteria_dict.items():
-        if isinstance(criterion, Number):
+        if isinstance(criterion, numbers.numbers.Number):
             scalar_criteria.append((data_name, DataRange(min=criterion,
                                                          max=criterion,
                                                          max_inclusive=True)))
@@ -384,6 +393,76 @@ def get_example_path(relpath, suffix="-new",
     return filename
 
 
+class ListContains(object):
+    """
+    Express some criteria a list datum must fulfill, such as "contains foo and bar".
+
+    Supports the following types of operation:
+    ANY: Passes if one of the entries is found.
+    ALL: Passes if all the entries are found.
+    ONLY: Passes if ONLY the entries are found, though there can be duplicates.
+
+    Helper object. See has_any(), has_all(), and has_only() for more info. Used with
+    data_query() in the backends.
+    """
+
+    def __init__(self, entries, operation):
+        """
+        Initialize ListContains with necessary info.
+
+        :param entries: List of entries the operation will be used with.
+        :param operation: The operation the ListContains represents.
+        """
+        self.entries = entries
+        self.operation = ListOperation(operation)
+        # This sets self.is_numeric and self.is_lexographic
+        self.validate_and_set_type()
+
+    def __repr__(self):
+        """Return a comprehensive (debug) representation of a ListContains."""
+        return ('ListContains <entries={}, operation={}>'
+                .format(self.entries,
+                        self.operation))
+
+    def __str__(self):
+        """Return a string representation of a ListContains."""
+        return self.__repr__()
+
+    def validate_and_set_type(self):
+        """
+        Ensure entries are all of one type, raise exception if not.
+
+        :raises TypeError: if not all entries are strings xor numbers, or if there's no entries
+        """
+        if not self.entries:
+            raise TypeError("Entries must be a list of strings or of scalars, not empty")
+        if all(isinstance(x, numbers.Real) for x in self.entries):
+            self.is_numeric = True
+            self.is_lexographic = False
+        elif all(isinstance(x, string_types) for x in self.entries):
+            self.is_numeric = False
+            self.is_lexographic = True
+        else:
+            raise TypeError("Entries must be only strings or only scalars")
+
+    def set_entries(self, entries):
+        """
+        Validate and set entries for ListContains.
+
+        :param entries: New list of entries for ListContains
+        """
+        self.entries = entries
+        self.validate_and_set_type()
+
+    def set_operator(self, operator):
+        """
+        Set operator for ListContains.
+
+        :param entries: New list of entries for ListContains
+        """
+        self.operator = ListOperation(operator)
+
+
 class DataRange(object):
     """
     Express a range some data must be within and provide parsing utility functions.
@@ -453,12 +532,12 @@ class DataRange(object):
         """
         Return whether the DataRange describes a numeric range.
 
-        We know that if one is a Number, the other must be a Number or None,
+        We know that if one is a numbers.Number, the other must be a numbers.Number or None,
         because we perform validation when they're changed. If the other is
         None, it's still a numeric range, albeit open on one side
         (x<4 vs 3<x<4).
         """
-        return (isinstance(self.min, Number) or isinstance(self.max, Number))
+        return (isinstance(self.min, numbers.Number) or isinstance(self.max, numbers.Number))
 
     def is_single_value(self):
         """Return whether the DataRange represents simple equivalence (foo=5)."""
@@ -575,7 +654,7 @@ class DataRange(object):
             raise ValueError("Null DataRange; min or max must be defined")
         try:
             # Case 1: min or max is number. Other must be number or None.
-            if isinstance(self.min, Number) or isinstance(self.max, Number):
+            if isinstance(self.min, numbers.Number) or isinstance(self.max, numbers.Number):
                 self.min = float(self.min) if self.min is not None else None
                 self.max = float(self.max) if self.max is not None else None
             # Case 2: neither min nor max is number. Both must be None or string
