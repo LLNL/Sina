@@ -9,6 +9,7 @@ written such that this should not be a testing issue.
 import os
 import shutil
 import unittest
+from types import GeneratorType
 
 import sina.utils
 from sina.utils import DataRange
@@ -78,6 +79,88 @@ class TestSinaUtils(unittest.TestCase):
         self.assertEqual(filename, result,
                          "Expected {}, not {}".format(filename, result))
         os.remove(filename)
+
+    def test_intersect_ordered_empty(self):
+        """Test that the intersection of empty iterators is empty."""
+        gen_none = (i for i in [])
+        gen_also_none = (i for i in [])
+        self.assertFalse(list(sina.utils.intersect_ordered([gen_none,
+                                                            gen_also_none])))
+
+    def test_intersect_ordered_one(self):
+        """Test that the intersection of a single iterator is the contents of that iterator."""
+        alone_list = [1, 2, 3, 4]
+        gen_alone = (i for i in alone_list)
+        self.assertEquals(list(sina.utils.intersect_ordered([gen_alone])),
+                          alone_list)
+
+    def test_intersect_ordered_empty_nonempty(self):
+        """Test that the intersection of an empty and non-empty iterator is empty."""
+        gen_none = (i for i in [])
+        gen_some = (i for i in [1, 2, 3])
+        self.assertFalse(list(sina.utils.intersect_ordered([gen_none,
+                                                            gen_some])))
+
+    def test_intersect_ordered_nonempty_empty(self):
+        """
+        Test that the intersection of a non-empty and empty iterator is empty.
+
+        Essentially, test that order doesn't matter.
+        """
+        gen_none = (i for i in [])
+        gen_some = (i for i in [1, 2, 3])
+        self.assertFalse(list(sina.utils.intersect_ordered([gen_some,
+                                                            gen_none])))
+
+    def test_intersect_ordered_many(self):
+        """Test that non-empty iterators return the intersection of their contents."""
+        gen_even = (i for i in range(0, 10, 2))
+        gen_rando = (i for i in [-1, 0, 1, 2, 5, 6, 8])
+        gen_10 = (i for i in range(10))
+        intersect = sina.utils.intersect_ordered([gen_even,
+                                                  gen_rando,
+                                                  gen_10])
+        # Order is important
+        self.assertEqual(list(intersect), [0, 2, 6, 8])
+
+        gen_colors = (i for i in ["blue", "orange", "white"])
+        gen_fruits = (i for i in ["apple", "banana", "orange"])
+        intersect_str = sina.utils.intersect_ordered([gen_colors,
+                                                      gen_fruits])
+        self.assertEqual(list(intersect_str), ["orange"])
+
+    def test_intersect_ordered_lists(self):
+        """Test that intersect_ordered works with lists as well as generators."""
+        list_even = range(0, 10, 2)
+        list_rando = [-1, 0, 1, 2, 5, 6, 8]
+        list_10 = range(10)
+        intersect = sina.utils.intersect_ordered([list_even,
+                                                  list_rando,
+                                                  list_10])
+        # Order is important
+        self.assertEqual(list(intersect), [0, 2, 6, 8])
+
+        gen_colors = (i for i in ["blue", "orange", "white"])
+        list_fruits = ["apple", "banana", "orange"]
+        intersect_str = sina.utils.intersect_ordered([gen_colors,
+                                                      list_fruits])
+        self.assertEqual(list(intersect_str), ["orange"])
+
+    def test_intersect_ordered_return_type(self):
+        """Test that, no matter the type of iterator given, what's returned is a generator."""
+        list_many = [1, 2, 3, 4]
+        list_many_more = [3, 4, 5, 6]
+        gen_many = (i for i in list_many)
+        gen_many_more = (i for i in list_many_more)
+        list_and_list = sina.utils.intersect_ordered([list_many, list_many_more])
+        self.assertTrue(isinstance(list_and_list, GeneratorType))
+        gen_and_gen = sina.utils.intersect_ordered([gen_many, gen_many_more])
+        self.assertTrue(isinstance(gen_and_gen, GeneratorType))
+        iterator_mix = sina.utils.intersect_ordered([gen_many, list_many_more,
+                                                     list_many, gen_many_more])
+        self.assertTrue(isinstance(iterator_mix, GeneratorType))
+        no_iterator = sina.utils.intersect_ordered([])
+        self.assertTrue(isinstance(no_iterator, GeneratorType))
 
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""
