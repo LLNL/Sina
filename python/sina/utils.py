@@ -327,14 +327,17 @@ def sort_and_standardize_criteria(criteria_dict):
     If any simple equivalence criteria are found (x=5), convert them to DataRanges.
 
     :param criteria_dict: A dictionary of the form {name_1: criterion_1}
-    :returns: A tuple of lists of the form (scalar_criteria, string_criteria)
-              Each entry in each list is (name, datarange_criterion)
+    :returns: A tuple of lists of the form (scalar_criteria, string_criteria,
+              scalar_list_criteria, string_list_criteria). Each entry in each
+              list is (name, datarange_criterion)
     :raises ValueError: if passed any criterion that isn't a number, string,
-                        numerical DataRange, or lexographic DataRange
+                        DataRange, or ListContains.
     """
     LOGGER.debug('Sorting and standardizing criteria: {}'.format(criteria_dict))
     scalar_criteria = []
     string_criteria = []
+    scalar_list_criteria = []
+    string_list_criteria = []
     for data_name, criterion in criteria_dict.items():
         if isinstance(criterion, Real):
             scalar_criteria.append((data_name, DataRange(min=criterion,
@@ -348,14 +351,20 @@ def sort_and_standardize_criteria(criteria_dict):
                                                          max_inclusive=True)))
         elif isinstance(criterion, DataRange) and criterion.is_lexographic_range():
             string_criteria.append((data_name, criterion))
+        elif isinstance(criterion, ListContains):
+            if criterion.is_numeric:
+                scalar_list_criteria.append((data_name, criterion))
+            else:
+                string_list_criteria.append((data_name, criterion))
         else:
             # Probably a null range; we don't know what table to look in
             # While we may support this in the future, we don't now.
             # Might also be a dict or something else strange.
             raise ValueError("criteria must be a number, string, numerical"
-                             "DataRange, or lexographic DataRange. Given {}:{}"
+                             "or lexographic DataRange, or numerical or lexographic"
+                             "ListContains. Given {}:{}"
                              .format(data_name, criterion))
-    return (scalar_criteria, string_criteria)
+    return (scalar_criteria, string_criteria, scalar_list_criteria, string_list_criteria)
 
 
 def create_file(path):
@@ -439,6 +448,23 @@ def get_example_path(relpath, suffix="-new",
     return filename
 
 
+def has_all(*args):
+    """
+    Create a ListContains representing the "ALL" operator.
+
+    As an example of a "has_all", given "pineapple" and "cheese", as pizza
+    toppings, "has_all" would match a "pineapple" and "cheese" pizza
+    or a"pineapple", "cheese", and "pepperoni" pizza, but not a plain "cheese"
+    pizza.
+
+    :param args: The values the ListContains will represent. Can be either single values
+                 (like "egg" or 12) or DataRanges. Every arg must represent the same
+                 type of data, either scalars or strings.
+    :returns: A ListContains object representing this criterion.
+    """
+    return ListContains(entries=args, operation="ALL")
+
+
 class ListContains(object):
     """
     Express some criteria a list datum must fulfill, such as "contains foo and bar".
@@ -459,7 +485,8 @@ class ListContains(object):
         :param entries: List of entries the operation will be used with.
         :param operation: The operation the ListContains represents.
         """
-        self.entries = entries
+        # Entries should not be modified except through set_entries()
+        self.entries = tuple(entries)
         self.operation = ListOperation(operation)
         # This sets self.is_numeric and self.is_lexographic
         self.validate_and_set_type()
@@ -482,10 +509,14 @@ class ListContains(object):
         """
         if not self.entries:
             raise TypeError("Entries must be a list of strings or of scalars, not empty")
-        if all(isinstance(x, numbers.Real) for x in self.entries):
+        if all((isinstance(x, Real) or
+                (isinstance(x, DataRange) and x.is_numeric_range()))
+               for x in self.entries):
             self.is_numeric = True
             self.is_lexographic = False
-        elif all(isinstance(x, string_types) for x in self.entries):
+        elif all((isinstance(x, string_types) or
+                  (isinstance(x, DataRange) and x.is_lexographic_range()))
+                 for x in self.entries):
             self.is_numeric = False
             self.is_lexographic = True
         else:
@@ -500,13 +531,13 @@ class ListContains(object):
         self.entries = entries
         self.validate_and_set_type()
 
-    def set_operator(self, operator):
+    def set_operation(self, operation):
         """
-        Set operator for ListContains.
+        Set the operation the ListContains represents.
 
-        :param entries: New list of entries for ListContains
+        :param operation: The operation ("ALL", "ANY", etc)
         """
-        self.operator = ListOperation(operator)
+        self.operation = ListOperation(operation)
 
 
 class DataRange(object):

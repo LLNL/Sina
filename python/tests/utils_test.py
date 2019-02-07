@@ -12,7 +12,7 @@ import unittest
 from types import GeneratorType
 
 import sina.utils
-from sina.utils import DataRange
+from sina.utils import DataRange, ListContains, sort_and_standardize_criteria
 
 # Path to the directory for running tests involving temporary files.  (Use this
 # file's directory as the basis for the path for now.)
@@ -292,26 +292,47 @@ class TestSinaUtils(unittest.TestCase):
             with_strings.parse_max("4")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
 
+    def test_basic_listcontains(self):
+        """Test that ListContains can be initialized properly."""
+        strings = ("spam", "eggs")
+        scalars = (1, 2, 3)
+        with_strings = ListContains(entries=strings, operation="ALL")
+        with_scalars = ListContains(entries=scalars, operation="ALL")
+        self.assertEqual(with_strings.entries, strings)
+        self.assertEqual(with_scalars.entries, scalars)
+        self.assertEqual(with_strings.operation, with_scalars.operation,
+                         sina.utils.ListOperation.ALL)
+
+    def test_has_all(self):
+        """Test that has_all is creating the expected ListContains object."""
+        has_all = sina.utils.has_all("spam", "egg")
+        equiv = ListContains(entries=["spam", "egg"], operation="ALL")
+        self.assertEqual(has_all.entries, equiv.entries)
+        self.assertEqual(has_all.operation, equiv.operation)
+
     def test_sort_and_standardizing(self):
         """Test the function for processing query criteria."""
         criteria = {"numra": DataRange(1, 2),
                     "lexra": DataRange("bar", "foo"),
                     "num": 12,
                     "num2": 2,
+                    "listnum": ListContains(entries=[1, 2], operation="ALL"),
                     "lex": "cat"}
-        scalar_crit, string_crit = sina.utils.sort_and_standardize_criteria(criteria)
+        scalar, string, scalar_list, string_list = sort_and_standardize_criteria(criteria)
         num_equiv = DataRange(12, 12, max_inclusive=True)
         num2_equiv = DataRange(2, 2, max_inclusive=True)
         lex_equiv = DataRange("cat", "cat", max_inclusive=True)
         # assertCountEqual WOULD make sense, except it seems to test on object
         # identity and not using the == operator. Instead, we sort
-        scalar_crit.sort()
-        string_crit.sort()
-        self.assertEqual(scalar_crit, [("num", num_equiv),
-                                       ("num2", num2_equiv),
-                                       ("numra", criteria["numra"])])
-        self.assertEqual(string_crit, [("lex", lex_equiv),
-                                       ("lexra", criteria["lexra"])])
+        scalar.sort()
+        string.sort()
+        self.assertEqual(scalar, [("num", num_equiv),
+                                  ("num2", num2_equiv),
+                                  ("numra", criteria["numra"])])
+        self.assertEqual(string, [("lex", lex_equiv),
+                                  ("lexra", criteria["lexra"])])
+        self.assertEqual(scalar_list[0], ("listnum", criteria["listnum"]))
+        self.assertFalse(string_list)
 
         with self.assertRaises(ValueError) as context:
             sina.utils.sort_and_standardize_criteria({"bork": ["meow"]})

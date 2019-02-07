@@ -184,7 +184,7 @@ class RecordDAO(dao.RecordDAO):
         # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
         if not kwargs.items():
             raise ValueError("You must supply at least one criterion.")
-        scalar_criteria, string_criteria = sort_and_standardize_criteria(kwargs)
+        scalar_criteria, string_criteria, _, _ = sort_and_standardize_criteria(kwargs)
 
         if scalar_criteria:
             scalar_query = self.session.query(schema.ScalarData.id)
