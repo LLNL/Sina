@@ -463,7 +463,8 @@ class RecordDAO(dao.RecordDAO):
 
         :param datum_name: The name of the datum
         :param list_of_contents: All the values datum_name must contain. Can be single
-                                 values ("egg", 12) or DataRanges.
+                                 values (like "egg" or 12) or DataRanges. All values must
+                                 describe the same type of data, either scalar or string.
         :param ids_only: Whether to only return ids rather than full Records.
         :returns: A generator of ids of matching Records or the Records themselves (see ids_only)
         :raises TypeError: if given a list that isn't all strings xor scalars.
@@ -477,9 +478,13 @@ class RecordDAO(dao.RecordDAO):
                              .format(datum_name))
         criteria_tuples = [(datum_name, x) for x in list_of_contents]
         # If this becomes an internal method, might want caller to do these checks
-        if all(isinstance(x, numbers.Real) for x in list_of_contents):
+        if all((isinstance(x, numbers.Real) or
+                (isinstance(x, utils.DataRange) and x.is_numeric_range()))
+               for x in list_of_contents):
             ids = self._apply_ranges_to_query(table="scalarlist", data=criteria_tuples)
-        elif all(isinstance(x, six.string_types) for x in list_of_contents):
+        elif all((isinstance(x, six.string_types) or
+                  (isinstance(x, utils.DataRange) and x.is_lexographic_range()))
+                 for x in list_of_contents):
             ids = self._apply_ranges_to_query(table="stringlist", data=criteria_tuples)
         else:
             raise TypeError("list_of_contents must be only strings or only scalars")

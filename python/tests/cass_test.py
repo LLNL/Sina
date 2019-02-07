@@ -472,6 +472,10 @@ class TestSearch(unittest.TestCase):
         six.assertCountEqual(self, list(get_many), ["spam", "spam2"])
         get_scalar = record_dao.get_list_has_all("egg_count", [4, 12], ids_only=True)
         self.assertEqual(list(get_scalar), ["spam"])
+        get_with_datarange = record_dao.get_list_has_all("egg_count",
+                                                         [DataRange(0, 5)],
+                                                         ids_only=True)
+        self.assertEqual(list(get_with_datarange), ["spam"])
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
