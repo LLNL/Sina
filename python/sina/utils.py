@@ -7,8 +7,9 @@ import errno
 import uuid
 import csv
 import time
+import six
 import datetime
-from numbers import Number
+from numbers import Real
 from six import string_types
 
 from multiprocessing.pool import ThreadPool
@@ -125,6 +126,52 @@ def _process_relationship_entry(entry, local_ids):
         LOGGER.error(msg)
         raise ValueError(msg)
     return (subj, obj)
+
+
+def intersect_ordered(iterables):
+    """
+    Return a generator that yields the intersection of ordered iterators.
+
+    Used when compositing queries where each step returns an iterator of Record
+    ids. Important to avoid too much being stored in memory; here, we only store
+    the generator stack plus (len(iterables)+C) values.
+
+    :param gen_list: A list of iterators. Must be ordered by the same criteria!
+
+    :returns: A generator that crawls through the iterators and returns
+              values that all of them share.
+
+    :raises StopIteration: when it runs out of values
+    """
+    # Quit fast as we'll be assuming at least one generator.
+    if not iterables:
+        return
+
+    # Standardize all iterators to generators
+    gen_list = []
+    for iter in iterables:
+        gen_list.append(x for x in iter)
+
+    # Get our first set
+    most_recents = []
+    for gen in gen_list:
+        most_recents.append(six.next(gen))
+
+    while True:
+        if most_recents.count(most_recents[0]) == len(most_recents):
+            # All our iterators agree
+            yield most_recents[0]
+            # Get the next
+            for index, gen in enumerate(gen_list):
+                most_recents[index] = six.next(gen)
+        # Once this "else" exits, everything is == or > than max:
+        else:
+            maxval = max(most_recents)
+            # Because our generators are ordered, and because this is an intersection,
+            # we know there are no more possible matches once one generator runs out.
+            for index, gen in enumerate(gen_list):
+                while most_recents[index] < maxval:
+                    most_recents[index] = six.next(gen)
 
 
 def export(factory, id_list, scalar_names, output_type, output_file=None):
@@ -280,7 +327,7 @@ def sort_and_standardize_criteria(criteria_dict):
     scalar_criteria = []
     string_criteria = []
     for data_name, criterion in criteria_dict.items():
-        if isinstance(criterion, Number):
+        if isinstance(criterion, Real):
             scalar_criteria.append((data_name, DataRange(min=criterion,
                                                          max=criterion,
                                                          max_inclusive=True)))
@@ -339,8 +386,7 @@ def get_example_path(relpath, suffix="-new",
                                    os.path.realpath(os.path.join(os.path.dirname(__file__),
                                                     "../../examples/"))]):
     """
-    Return the fully qualified path name for the appropriate example data store and
-    raises an exception if none is found.
+    Return the fully qualified path name for an example data store, raise exception if none.
 
     This function checks the paths listed in <example_dirs> for the file specified
     with <relpath>.
@@ -388,7 +434,8 @@ class DataRange(object):
     """
     Express a range some data must be within and provide parsing utility functions.
 
-    By default, a DataRange is min inclusive and max exclusive.
+    By default, a DataRange is min inclusive and max exclusive. It can represent
+    strings and real numbers (SQL can't handle imaginary numbers)
     """
 
     def __init__(self, min=None, max=None, min_inclusive=True, max_inclusive=False):
@@ -458,7 +505,7 @@ class DataRange(object):
         None, it's still a numeric range, albeit open on one side
         (x<4 vs 3<x<4).
         """
-        return (isinstance(self.min, Number) or isinstance(self.max, Number))
+        return (isinstance(self.min, Real) or isinstance(self.max, Real))
 
     def is_single_value(self):
         """Return whether the DataRange represents simple equivalence (foo=5)."""
@@ -494,7 +541,7 @@ class DataRange(object):
             raise ValueError("Bad inclusiveness specifier for range: {}",
                              format(min_range[0]))
         if len(min_range) > 1:
-            self.min_inclusive = min_range[0] is '['
+            self.min_inclusive = min_range[0] == '['
 
             min_arg = min_range[1:]
             try:
@@ -526,7 +573,7 @@ class DataRange(object):
             raise ValueError("Bad inclusiveness specifier for range: {}",
                              format(max_range[-1]))
         if len(max_range) > 1:
-            self.max_inclusive = max_range[-1] is ']'
+            self.max_inclusive = max_range[-1] == ']'
             # We can take strings, but here we're already taking a string.
             # Thus we need to do a check: '"4"]' is passing us a string, but
             # '4]', despite being a string itself, is passing us an int
@@ -575,7 +622,7 @@ class DataRange(object):
             raise ValueError("Null DataRange; min or max must be defined")
         try:
             # Case 1: min or max is number. Other must be number or None.
-            if isinstance(self.min, Number) or isinstance(self.max, Number):
+            if isinstance(self.min, Real) or isinstance(self.max, Real):
                 self.min = float(self.min) if self.min is not None else None
                 self.max = float(self.max) if self.max is not None else None
             # Case 2: neither min nor max is number. Both must be None or string
