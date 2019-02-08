@@ -12,7 +12,7 @@ import unittest
 from types import GeneratorType
 
 import sina.utils
-from sina.utils import DataRange, ListContains, sort_and_standardize_criteria
+from sina.utils import DataRange, ListCriteria, sort_and_standardize_criteria
 
 # Path to the directory for running tests involving temporary files.  (Use this
 # file's directory as the basis for the path for now.)
@@ -292,21 +292,84 @@ class TestSinaUtils(unittest.TestCase):
             with_strings.parse_max("4")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
 
-    def test_basic_listcontains(self):
-        """Test that ListContains can be initialized properly."""
+    def test_basic_listcriteria(self):
+        """Test that ListCriteria can be initialized properly."""
         strings = ("spam", "eggs")
         scalars = (1, 2, 3)
-        with_strings = ListContains(entries=strings, operation="ALL")
-        with_scalars = ListContains(entries=scalars, operation="ALL")
+        all_alt = sina.utils.ListQueryOperation.ALL
+        with_strings = ListCriteria(entries=strings, operation="ALL")
+        with_scalars = ListCriteria(entries=scalars, operation=all_alt)
         self.assertEqual(with_strings.entries, strings)
         self.assertEqual(with_scalars.entries, scalars)
         self.assertEqual(with_strings.operation, with_scalars.operation,
-                         sina.utils.ListOperation.ALL)
+                         sina.utils.ListQueryOperation.ALL)
+
+    def test_listcriteria_assignment(self):
+        """Verify ListCriteria setters and getters are working as expected."""
+        strings = ("spam", "eggs")
+        scalars = (1, 2, 3)
+        criteria = ListCriteria(entries=strings, operation="ALL")
+        # Setters (we're using @property)
+        criteria.entries = scalars
+        criteria.operation = "ANY"
+        # Getters
+        self.assertEqual(criteria.entries, scalars)
+        self.assertEqual(criteria.operation, sina.utils.ListQueryOperation.ANY)
+
+    def test_listcriteria_tostring(self):
+        """Verify that ListCriteria display as expected."""
+        scalars = (1, 2, 3)
+        all_alt = sina.utils.ListQueryOperation.ALL
+        criteria = ListCriteria(entries=scalars, operation=all_alt)
+        self.assertEqual(criteria.__repr__(), criteria.__str__(),
+                         'ListCriteria <entries={}, operation={}>'
+                         .format(scalars, all_alt))
+
+    def test_listcriteria_type(self):
+        """Verify that ListCriteria have is_lexographic and is_numeric set."""
+        strings = ("spam", "eggs")
+        scalars = (1, 2, 3)
+        criteria = ListCriteria(entries=strings, operation="ONLY")
+        self.assertTrue(criteria.is_lexographic)
+        self.assertFalse(criteria.is_numeric)
+        # Switching entry type should set fields appropriately.
+        criteria.entries = scalars
+        self.assertFalse(criteria.is_lexographic)
+        self.assertTrue(criteria.is_numeric)
+        criteria.entries = strings
+        self.assertTrue(criteria.is_lexographic)
+        self.assertFalse(criteria.is_numeric)
+
+    def test_listcriteria_validation(self):
+        """Test ListCriteria validation logic."""
+        valid_vals = ("spam", "eggs")
+        invalid_vals = ("spam", 12)
+        disallowed_iter = [1, 2, 3]
+        no_vals = ()
+        criteria = ListCriteria(entries=valid_vals, operation="ALL")
+
+        with self.assertRaises(TypeError) as context:
+            criteria.entries = disallowed_iter
+        self.assertIn('Entries must be expressed as a tuple',
+                      str(context.exception))
+
+        with self.assertRaises(TypeError) as context:
+            criteria.entries = invalid_vals
+        self.assertIn('Entries must be only strings or only scalars', str(context.exception))
+
+        with self.assertRaises(TypeError) as context:
+            criteria.entries = no_vals
+        self.assertIn('Entries must be a list of strings or of scalars, not empty',
+                      str(context.exception))
+
+        with self.assertRaises(ValueError) as context:
+            criteria.operation = "FORBIDDEN_OPERATOR"
+        self.assertIn('is not a valid ListQueryOperation', str(context.exception))
 
     def test_has_all(self):
-        """Test that has_all is creating the expected ListContains object."""
+        """Test that has_all is creating the expected ListCriteria object."""
         has_all = sina.utils.has_all("spam", "egg")
-        equiv = ListContains(entries=["spam", "egg"], operation="ALL")
+        equiv = ListCriteria(entries=("spam", "egg"), operation="ALL")
         self.assertEqual(has_all.entries, equiv.entries)
         self.assertEqual(has_all.operation, equiv.operation)
 
@@ -316,7 +379,7 @@ class TestSinaUtils(unittest.TestCase):
                     "lexra": DataRange("bar", "foo"),
                     "num": 12,
                     "num2": 2,
-                    "listnum": ListContains(entries=[1, 2], operation="ALL"),
+                    "listnum": ListCriteria(entries=(1, 2), operation="ALL"),
                     "lex": "cat"}
         scalar, string, scalar_list, string_list = sort_and_standardize_criteria(criteria)
         num_equiv = DataRange(12, 12, max_inclusive=True)

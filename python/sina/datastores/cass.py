@@ -357,14 +357,14 @@ class RecordDAO(dao.RecordDAO):
                 # Unpack the criterion
                 datum_name, list_contains = criterion
                 # has_all queries are broken up and treated like a scalar or string
-                if list_contains.operation == utils.ListOperation.ALL:
+                if list_contains.operation == utils.ListQueryOperation.ALL:
                     criterion_tuples = [(datum_name, x) for x in list_contains.entries]
                     print(criterion_tuples)
                     ids = self._apply_ranges_to_query(table=table_type, data=criterion_tuples)
                     result_ids.append(ids)
                 else:
                     raise ValueError("Currently, only {} list operations are supported. "
-                                     "Given {}".format(utils.ListOperation.ALL,
+                                     "Given {}".format(utils.ListQueryOperation.ALL,
                                                        list_contains.operation))
 
         # If we have more than one set of data, we need to find the intersect.
