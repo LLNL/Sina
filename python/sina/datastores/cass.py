@@ -283,7 +283,7 @@ class RecordDAO(dao.RecordDAO):
         schema.DocumentFromRecord.objects(id=record_id).batch(batch).delete()
         # Delete every piece of data
         # Done a bit differently because record_id isn't always the partition key
-        for name, datum in record['data'].iteritems():
+        for name, datum in six.iteritems(record['data']):
             schema.cross_batch_delete_data_tables(id=record_id,
                                                   name=name,
                                                   value=datum['value'],
@@ -355,17 +355,16 @@ class RecordDAO(dao.RecordDAO):
                                      (stringlist, "stringlist")):
             for criterion in criteria:
                 # Unpack the criterion
-                datum_name, list_contains = criterion
+                datum_name, list_criteria = criterion
                 # has_all queries are broken up and treated like a scalar or string
-                if list_contains.operation == utils.ListQueryOperation.ALL:
-                    criterion_tuples = [(datum_name, x) for x in list_contains.entries]
-                    print(criterion_tuples)
+                if list_criteria.operation == utils.ListQueryOperation.ALL:
+                    criterion_tuples = [(datum_name, x) for x in list_criteria.entries]
                     ids = self._apply_ranges_to_query(table=table_type, data=criterion_tuples)
                     result_ids.append(ids)
                 else:
                     raise ValueError("Currently, only {} list operations are supported. "
                                      "Given {}".format(utils.ListQueryOperation.ALL,
-                                                       list_contains.operation))
+                                                       list_criteria.operation))
 
         # If we have more than one set of data, we need to find the intersect.
         if len(result_ids) > 1:

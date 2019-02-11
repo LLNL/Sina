@@ -340,12 +340,10 @@ class TestSinaUtils(unittest.TestCase):
         self.assertTrue(criteria.is_lexographic)
         self.assertFalse(criteria.is_numeric)
 
-    def test_listcriteria_validation(self):
-        """Test ListCriteria validation logic."""
+    def test_listcriteria_validation_tuples(self):
+        """Test ListCriteria only accepts tuples."""
         valid_vals = ("spam", "eggs")
-        invalid_vals = ("spam", 12)
         disallowed_iter = [1, 2, 3]
-        no_vals = ()
         criteria = ListCriteria(entries=valid_vals, operation="ALL")
 
         with self.assertRaises(TypeError) as context:
@@ -353,18 +351,47 @@ class TestSinaUtils(unittest.TestCase):
         self.assertIn('Entries must be expressed as a tuple',
                       str(context.exception))
 
+    def test_listcriteria_validation_entries_type(self):
+        """Test ListCriteria enforces entries being numeric xor lexographic."""
+        valid_vals = ("spam", "eggs")
+        invalid_vals = ("spam", 12)
+        criteria = ListCriteria(entries=valid_vals, operation="ALL")
         with self.assertRaises(TypeError) as context:
             criteria.entries = invalid_vals
-        self.assertIn('Entries must be only strings or only scalars', str(context.exception))
+        self.assertIn("Entries must be only strings/lexographic DataRanges "
+                      "or only scalars/numeric DataRanges.", str(context.exception))
 
+    def test_listcriteria_validation_entries_exist(self):
+        """Test ListCriteria enforces entries a non-empty entries list."""
+        valid_vals = ("spam", "eggs")
+        no_vals = ()
+        criteria = ListCriteria(entries=valid_vals, operation="ALL")
         with self.assertRaises(TypeError) as context:
             criteria.entries = no_vals
-        self.assertIn('Entries must be a list of strings or of scalars, not empty',
+        self.assertIn("Entries must be a tuple of strings/lexographic DataRanges, "
+                      "or of scalars/numeric DataRanges, not empty",
                       str(context.exception))
 
+    def test_listcriteria_validation_operator(self):
+        """Test ListCriteria enforces choosing an existing ListQueryOperation."""
+        criteria = ListCriteria(entries=("spam", "eggs"), operation="ALL")
         with self.assertRaises(ValueError) as context:
             criteria.operation = "FORBIDDEN_OPERATOR"
         self.assertIn('is not a valid ListQueryOperation', str(context.exception))
+
+    def list_criteria_numeric_protection(self):
+        """Test that ListCriteria's is_numeric cannot be set by hand."""
+        criteria = ListCriteria(entries=("spam", "eggs"), operation="ALL")
+        with self.assertRaises(ValueError) as context:
+            criteria.is_numeric = True
+        self.assertIn('is_numeric cannot be set manually;', str(context.exception))
+
+    def list_criteria_lexographic_protection(self):
+        """Test that ListCriteria's is_lexographic cannot be set by hand."""
+        criteria = ListCriteria(entries=("spam", "eggs"), operation="ALL")
+        with self.assertRaises(ValueError) as context:
+            criteria.is_lexographic = True
+        self.assertIn('is_lexographic cannot be set manually;', str(context.exception))
 
     def test_has_all(self):
         """Test that has_all is creating the expected ListCriteria object."""
