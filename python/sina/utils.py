@@ -552,16 +552,6 @@ class ListCriteria(object):
         """
         return self._is_numeric
 
-    @is_numeric.setter
-    def is_numeric(self, is_numeric):
-        """
-        Protects is_numeric from being wrongfully assigned.
-
-        :raises AttributeError: to warn user not to set it manually.
-        """
-        raise AttributeError("is_numeric cannot be modified manually; it is set "
-                             "automatically depending on a ListCriteria's entries.")
-
     @property
     def is_lexographic(self):
         """
@@ -573,16 +563,6 @@ class ListCriteria(object):
         :returns: whether this ListCriteria is lexographic.
         """
         return self._is_lexographic
-
-    @is_lexographic.setter
-    def is_lexographic(self, is_numeric):
-        """
-        Protects is_lexographic from being wrongfully assigned.
-
-        :raises AttributeError: to warn user not to set it manually.
-        """
-        raise AttributeError("is_lexographic cannot be set manually; it is set "
-                             "automatically depending on a ListCriteria's entries.")
 
     def __repr__(self):
         """Return a comprehensive (debug) representation of a ListCriteria."""

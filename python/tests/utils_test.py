@@ -379,19 +379,19 @@ class TestSinaUtils(unittest.TestCase):
             criteria.operation = "FORBIDDEN_OPERATOR"
         self.assertIn('is not a valid ListQueryOperation', str(context.exception))
 
-    def list_criteria_numeric_protection(self):
+    def test_list_criteria_numeric_protection(self):
         """Test that ListCriteria's is_numeric cannot be set by hand."""
         criteria = ListCriteria(entries=("spam", "eggs"), operation="ALL")
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(AttributeError) as context:
             criteria.is_numeric = True
-        self.assertIn('is_numeric cannot be set manually;', str(context.exception))
+        self.assertIn("can't set attribute", str(context.exception))
 
-    def list_criteria_lexographic_protection(self):
+    def test_list_criteria_lexographic_protection(self):
         """Test that ListCriteria's is_lexographic cannot be set by hand."""
         criteria = ListCriteria(entries=("spam", "eggs"), operation="ALL")
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(AttributeError) as context:
             criteria.is_lexographic = True
-        self.assertIn('is_lexographic cannot be set manually;', str(context.exception))
+        self.assertIn("can't set attribute", str(context.exception))
 
     def test_has_all(self):
         """Test that has_all is creating the expected ListCriteria object."""
