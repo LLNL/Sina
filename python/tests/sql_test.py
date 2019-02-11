@@ -755,12 +755,12 @@ class TestSQLRecordDAOGetListHasAll(unittest.TestCase):
         """Set up data for testing get_list_has_all."""
         factory = sina_sql.DAOFactory()
         self.record_dao = factory.createRecordDAO()
-        data = {"eggs": {"value": [0, 1, 2, 3], "tags": ["breakfast"]}}
-        data_2 = {"eggs": {"value": [1, 2, 3, 4, 5], "tags": ["breakfast"]}}
-        data_3 = {"eggs": {"value": [4, 5, 6, 7], "tags": ["breakfast"]}}
-        data_4 = {"spam": {"value": ["awesome", "canned", "zebra"], "tags": ["breakfast"]}}
-        data_5 = {"spam": {"value": ["fried", "toasted", "zebra"], "tags": ["breakfast"]}}
-        data_6 = {"spam": {"value": ["tree", "honey"], "tags": ["breakfast"]}}
+        data = {"eggs": {"value": [0, 1, 2, 3]}}
+        data_2 = {"eggs": {"value": [1, 2, 3, 4, 5]}}
+        data_3 = {"eggs": {"value": [4, 5, 6, 7]}}
+        data_4 = {"spam": {"value": ["awesome", "canned", "zebra"]}}
+        data_5 = {"spam": {"value": ["fried", "toasted", "zebra"]}}
+        data_6 = {"spam": {"value": ["tree", "honey"]}}
         self.record_1 = Record(id="rec_1", type="sample", data=data)
         self.record_2 = Record(id="rec_2", type="sample", data=data_2)
         self.record_3 = Record(id="rec_3", type="sample", data=data_3)
