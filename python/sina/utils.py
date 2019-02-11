@@ -11,6 +11,7 @@ import six
 import datetime
 from numbers import Real
 from six import string_types
+from enum import Enum
 
 from multiprocessing.pool import ThreadPool
 from collections import OrderedDict
@@ -19,6 +20,14 @@ import sina.model as model
 
 LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
+
+
+class ListQueryOperation(Enum):
+    """Describe operations possible on ListCriteria."""
+
+    ANY = "ANY"
+    ALL = "ALL"
+    ONLY = "ONLY"
 
 
 def import_many_jsons(factory, json_list):
@@ -318,14 +327,17 @@ def sort_and_standardize_criteria(criteria_dict):
     If any simple equivalence criteria are found (x=5), convert them to DataRanges.
 
     :param criteria_dict: A dictionary of the form {name_1: criterion_1}
-    :returns: A tuple of lists of the form (scalar_criteria, string_criteria)
-              Each entry in each list is (name, datarange_criterion)
-    :raises ValueError: if passed any criterion that isn't a number, string,
-                        numerical DataRange, or lexographic DataRange
+    :returns: A tuple of lists of the form (scalar_criteria, string_criteria,
+              scalar_list_criteria, string_list_criteria). Each entry in each
+              list is (name, datarange_criterion)
+    :raises ValueError: if passed any criterion that isn't a valid number,
+                        string, DataRange, or ListCriteria.
     """
     LOGGER.debug('Sorting and standardizing criteria: {}'.format(criteria_dict))
     scalar_criteria = []
     string_criteria = []
+    scalar_list_criteria = []
+    string_list_criteria = []
     for data_name, criterion in criteria_dict.items():
         if isinstance(criterion, Real):
             scalar_criteria.append((data_name, DataRange(min=criterion,
@@ -339,14 +351,25 @@ def sort_and_standardize_criteria(criteria_dict):
                                                          max_inclusive=True)))
         elif isinstance(criterion, DataRange) and criterion.is_lexographic_range():
             string_criteria.append((data_name, criterion))
+        elif isinstance(criterion, ListCriteria):
+            if criterion.is_numeric:
+                scalar_list_criteria.append((data_name, criterion))
+            elif criterion.is_lexographic:
+                string_list_criteria.append((data_name, criterion))
+            else:
+                raise ValueError("criteria must be a number, string, numerical"
+                                 "or lexographic DataRange, or numerical or lexographic"
+                                 "ListCriteria. Given a ListCriteria that is neither"
+                                 "numerical nor lexographic: {}".format(criterion))
         else:
             # Probably a null range; we don't know what table to look in
             # While we may support this in the future, we don't now.
             # Might also be a dict or something else strange.
             raise ValueError("criteria must be a number, string, numerical"
-                             "DataRange, or lexographic DataRange. Given {}:{}"
+                             "or lexographic DataRange, or numerical or lexographic"
+                             "ListCriteria. Given {}:{}"
                              .format(data_name, criterion))
-    return (scalar_criteria, string_criteria)
+    return (scalar_criteria, string_criteria, scalar_list_criteria, string_list_criteria)
 
 
 def create_file(path):
@@ -430,6 +453,155 @@ def get_example_path(relpath, suffix="-new",
     return filename
 
 
+def has_all(*args):
+    """
+    Create a ListCriteria representing the "ALL" operator.
+
+    As an example of a "has_all", given "pineapple" and "cheese", as pizza
+    toppings, "has_all" would match a "pineapple" and "cheese" pizza
+    or a"pineapple", "cheese", and "pepperoni" pizza, but not a plain "cheese"
+    pizza.
+
+    :param args: The values the ListCriteria will represent. Can be either single values
+                 (like "egg" or 12) or DataRanges. Every arg must represent the same
+                 type of data, either scalars or strings.
+    :returns: A ListCriteria object representing this criterion.
+    """
+    return ListCriteria(entries=args, operation="ALL")
+
+
+class ListCriteria(object):
+    """
+    Express some criteria a list datum must fulfill, such as "contains foo and bar".
+
+    Supports the following types of operation:
+    ANY: Passes if one of the entries is found.
+    ALL: Passes if all the entries are found.
+    ONLY: Passes if ONLY the entries are found, though there can be duplicates.
+
+    Helper object. See has_any(), has_all(), and has_only() for more info. Used with
+    data_query() in the backends.
+    """
+
+    def __init__(self, entries, operation):
+        """
+        Initialize ListCriteria with necessary info.
+
+        :param entries: A tuple of entries the operation will be used with.
+        :param operation: The operation the ListCriteria represents.
+        """
+        # The attributes on the next line are all set via properties.
+        self._entries, self._operation, self._is_numeric, self._is_lexographic = [None]*4
+        self.entries = entries
+        self.operation = operation
+
+    @property
+    def entries(self):
+        """
+        Get the ListCriteria's tuple of entries.
+
+        :returns: the ListCriteria's entries.
+        """
+        return self._entries
+
+    @entries.setter
+    def entries(self, entries):
+        """
+        Set the Listcriteria's entries.
+
+        :param entries: The ListCriteria's entries
+
+        :raises TypeError: if entries aren't a tuple.
+        """
+        if not isinstance(entries, tuple):
+            raise TypeError("Entries must be expressed as a tuple, were {}."
+                            .format(entries))
+        self._validate_and_set_entries_and_type(entries)
+
+    @property
+    def operation(self):
+        """
+        Get the operation the ListCriteria represents.
+
+        :returns: The ListCriteria's operation, a ListQueryOperation.
+        """
+        return self._operation
+
+    @operation.setter
+    def operation(self, operation):
+        """
+        Set the operation the ListCriteria represents.
+
+        :param operation: A string representing the ListCriteria's operation
+                          ("ANY", "ALL", or "ONLY") or a valid ListQueryOperation.
+        """
+        if not isinstance(operation, ListQueryOperation):
+            self._operation = ListQueryOperation(operation)
+        else:
+            self._operation = operation
+
+    @property
+    def is_numeric(self):
+        """
+        Get whether the ListCriteria is numeric.
+
+        A numeric ListCriteria's entries are all scalars or numeric DataRanges.
+        A ListCriteria cannot be both numeric and lexographic.
+
+        :returns: whether this ListCriteria is numeric.
+        """
+        return self._is_numeric
+
+    @property
+    def is_lexographic(self):
+        """
+        Get whether the ListCriteria is lexographic.
+
+        A numeric ListCriteria's entries are all strings or lexographic DataRanges.
+        A ListCriteria cannot be both lexographic and numeric.
+
+        :returns: whether this ListCriteria is lexographic.
+        """
+        return self._is_lexographic
+
+    def __repr__(self):
+        """Return a comprehensive (debug) representation of a ListCriteria."""
+        return ('ListCriteria <entries={}, operation={}>'
+                .format(self.entries,
+                        self.operation))
+
+    def __str__(self):
+        """Return a string representation of a ListCriteria."""
+        return self.__repr__()
+
+    def _validate_and_set_entries_and_type(self, entries):
+        """
+        Ensure entries are valid. If so, updates ListCriteria appropriately.
+
+        :param entries: A tuple of entries the ListCriteria should represent.
+        :raises TypeError: if not all entries are lexographic xor numeric,
+                           or if there's no entries
+        """
+        if not entries:
+            raise TypeError("Entries must be a tuple of strings/lexographic DataRanges, "
+                            "or of scalars/numeric DataRanges, not empty")
+        if all((isinstance(x, Real) or
+                (isinstance(x, DataRange) and x.is_numeric_range()))
+               for x in entries):
+            self._is_numeric = True
+            self._is_lexographic = False
+            self._entries = entries
+        elif all((isinstance(x, string_types) or
+                  (isinstance(x, DataRange) and x.is_lexographic_range()))
+                 for x in entries):
+            self._is_numeric = False
+            self._is_lexographic = True
+            self._entries = entries
+        else:
+            raise TypeError("Entries must be only strings/lexographic DataRanges "
+                            "or only scalars/numeric DataRanges.")
+
+
 class DataRange(object):
     """
     Express a range some data must be within and provide parsing utility functions.
@@ -500,7 +672,7 @@ class DataRange(object):
         """
         Return whether the DataRange describes a numeric range.
 
-        We know that if one is a Number, the other must be a Number or None,
+        We know that if one is a number, the other must be a number or None,
         because we perform validation when they're changed. If the other is
         None, it's still a numeric range, albeit open on one side
         (x<4 vs 3<x<4).

@@ -283,7 +283,7 @@ class RecordDAO(dao.RecordDAO):
         schema.DocumentFromRecord.objects(id=record_id).batch(batch).delete()
         # Delete every piece of data
         # Done a bit differently because record_id isn't always the partition key
-        for name, datum in record['data'].iteritems():
+        for name, datum in six.iteritems(record['data']):
             schema.cross_batch_delete_data_tables(id=record_id,
                                                   name=name,
                                                   value=datum['value'],
@@ -329,40 +329,52 @@ class RecordDAO(dao.RecordDAO):
 
         :param kwargs: Pairs of the names of data and the criteria that data
                          must fulfill.
-        :returns: A generator of Records that fulfill all criteria.
+        :returns: A generator of Record ids that fulfill all criteria.
 
-        :raises ValueError: if not supplied at least one criterion.
+        :raises ValueError: if not supplied at least one criterion or given
+                            a criterion it does not support.
         """
         LOGGER.debug('Finding all records fulfilling criteria: {}'
                      .format(kwargs.items()))
-        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
+        # No kwargs is bad usage. Bad kwargs are caught in sort_and_standardize_criteria().
+        # We will always have at least one entry in one of scalar, string, scalarlist, etc.
         if not kwargs.items():
             raise ValueError("You must supply at least one criterion.")
-        scalar_criteria, string_criteria = utils.sort_and_standardize_criteria(kwargs)
+        scalar, string, scalarlist, stringlist = utils.sort_and_standardize_criteria(kwargs)
+        result_ids = []
 
-        if scalar_criteria:
-            scalar_ids = self._apply_ranges_to_query(scalar_criteria,
-                                                     "scalar")
-        if string_criteria:
-            string_ids = self._apply_ranges_to_query(string_criteria,
-                                                     "string")
+        # String and scalar values can be passed directly to _apply_ranges_to_query
+        for criteria, table_type in ((scalar, "scalar"),
+                                     (string, "string")):
+            if criteria:
+                result_ids.append(self._apply_ranges_to_query(criteria,
+                                                              table_type))
 
-        # If we have more than one set of data, we need to perform a union.
-        # Cassandra doesn't support join-like operations, though, so we
-        # handle it. Note that we'll be storing a full list of ids in memory,
-        # but because Cassandra already required that to perform the query,
-        # we're not in danger of running out of memory if we've reached here.
-        if scalar_criteria and string_criteria:
-            string_ids = set(string_ids)
-            for id in scalar_ids:
-                if id in string_ids:
-                    yield id
-        # Otherwise, just find which one has something to return
-        elif scalar_criteria:
-            for id in scalar_ids:
+        # Different types of list criteria require different logic
+        for criteria, table_type in ((scalarlist, "scalarlist"),
+                                     (stringlist, "stringlist")):
+            for criterion in criteria:
+                # Unpack the criterion
+                datum_name, list_criteria = criterion
+                # has_all queries are broken up and treated like a scalar or string
+                if list_criteria.operation == utils.ListQueryOperation.ALL:
+                    criterion_tuples = [(datum_name, x) for x in list_criteria.entries]
+                    ids = self._apply_ranges_to_query(table=table_type, data=criterion_tuples)
+                    result_ids.append(ids)
+                else:
+                    raise ValueError("Currently, only {} list operations are supported. "
+                                     "Given {}".format(utils.ListQueryOperation.ALL,
+                                                       list_criteria.operation))
+
+        # If we have more than one set of data, we need to find the intersect.
+        if len(result_ids) > 1:
+            valid_ids = set(result_ids[0])
+            for entry in result_ids[1:]:
+                valid_ids = valid_ids.intersection(entry)
+            for id in valid_ids:
                 yield id
         else:
-            for id in string_ids:
+            for id in result_ids[0]:
                 yield id
 
     def _apply_ranges_to_query(self, data, table):
@@ -371,7 +383,7 @@ class RecordDAO(dao.RecordDAO):
 
         Done per table, unlike data_query. This is only meant to be used in
         conjunction with data_query() and related. Criteria can be DataRanges
-        or single values (12, "dog", etc)
+        or single values (12, "dog", etc).
 
         Because each piece of data is its own row and we need to compare between
         rows, we can't use a simple AND. In SQL, we get around this with
@@ -449,50 +461,6 @@ class RecordDAO(dao.RecordDAO):
         else:
             for record in self.get_many(query):
                 yield record
-
-    def get_list_has_all(self, datum_name, list_of_contents, ids_only=False):
-        """
-        Given a list datum's name and values, return Records where the datum contains all values.
-
-        As an example, given "pizza_toppings" and ["pineapple", "cheese"],
-        this method would return Records where "pizza_toppings" is ["pineapple", "cheese"]
-        or ["pineapple", "cheese", "pepperoni"], but not just ["cheese"].
-
-        Note that if datum_name isn't found, no record_ids will be found, so be sure
-        datum_name is the name of a list-type datum (timeseries, etc).
-
-        :param datum_name: The name of the datum
-        :param list_of_contents: All the values datum_name must contain. Can be single
-                                 values (like "egg" or 12) or DataRanges. All values must
-                                 describe the same type of data, either scalar or string.
-        :param ids_only: Whether to only return ids rather than full Records.
-        :returns: A generator of ids of matching Records or the Records themselves (see ids_only)
-        :raises TypeError: if given a list that isn't all strings xor scalars.
-        :raises ValueError: if list_of_contents is empty.
-        """
-        LOGGER.info('Finding Records where datum {} contains all of: {}'.format(datum_name,
-                                                                                list_of_contents))
-        # We don't know what someone means when they pass us no contents for datum_name
-        if not list_of_contents:
-            raise ValueError("Must supply at least one entry in list_of_contents for {}"
-                             .format(datum_name))
-        criteria_tuples = [(datum_name, x) for x in list_of_contents]
-        # If this becomes an internal method, might want caller to do these checks
-        if all((isinstance(x, numbers.Real) or
-                (isinstance(x, utils.DataRange) and x.is_numeric_range()))
-               for x in list_of_contents):
-            ids = self._apply_ranges_to_query(table="scalarlist", data=criteria_tuples)
-        elif all((isinstance(x, six.string_types) or
-                  (isinstance(x, utils.DataRange) and x.is_lexographic_range()))
-                 for x in list_of_contents):
-            ids = self._apply_ranges_to_query(table="stringlist", data=criteria_tuples)
-        else:
-            raise TypeError("list_of_contents must be only strings or only scalars")
-
-        if ids_only:
-            return ids
-        else:
-            return self.get_many(list(ids))
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """

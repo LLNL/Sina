@@ -13,7 +13,7 @@ from nose.plugins.attrib import attr
 
 import sina.datastores.cass as sina_cass
 import sina.datastores.cass_schema as schema
-from sina.utils import DataRange, import_json
+from sina.utils import DataRange, import_json, has_all
 
 from sina.model import Run, Record
 
@@ -401,14 +401,15 @@ class TestSearch(unittest.TestCase):
                                     val_data_2="double yolks")  # Matches 1 and 3
         self.assertEqual(len(list(one)), 1)
 
-    def test_recorddao_data_query_strings_and_records(self):
-        """Test that the RecordDAO is retrieving on scalars and strings correctly."""
+    def test_recorddao_data_query_mixed(self):
+        """Test that the RecordDAO is retrieving mixed criteria types correctly."""
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
         _populate_database_with_data()
 
         just_3 = record_dao.data_query(spam_scal=DataRange(10.1, 400),  # 2 and 3
-                                       val_data_2="double yolks")  # 1, 3, and 4
+                                       val_data_2="double yolks",  # 1, 3, and 4
+                                       toppings=has_all("onion"))  # 1 and 3
         just_3_list = list(just_3)
         self.assertEqual(len(just_3_list), 1)
         self.assertEqual(just_3_list[0], "spam3")
@@ -455,27 +456,27 @@ class TestSearch(unittest.TestCase):
         self.assertIsInstance(ids_only[0], six.string_types)
         six.assertCountEqual(self, ids_only, ["spam", "spam1", "spam2"])
 
-    def test_recorddao_get_list_has_all(self):
-        """Test that we're correctly retrieving Records given contents of their list data."""
+    def test_recorddao_list_data_query_all(self):
+        """Test that we're correctly retrieving Records on has_all list criteria."""
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
         _populate_database_with_data()
         record_dao.insert(Record(id="spam", type="run"))
-        get_one = list(record_dao.get_list_has_all("toppings", ["cheese", "onion"],
-                                                   ids_only=False))
-        spam_rec = record_dao.get("spam")
+
+        get_one = list(record_dao.data_query(toppings=has_all("cheese", "onion")))
         self.assertEqual(len(get_one), 1)
-        self.assertEqual(get_one[0].id, spam_rec.id)
-        self.assertEqual(get_one[0].data, spam_rec.data)
-        get_many = record_dao.get_list_has_all("toppings", ["cheese"], ids_only=True)
+        self.assertEqual(get_one[0], "spam")
+
+        get_many = record_dao.data_query(toppings=has_all("cheese"))
         self.assertIsInstance(get_many, types.GeneratorType)
         six.assertCountEqual(self, list(get_many), ["spam", "spam2"])
-        get_scalar = record_dao.get_list_has_all("egg_count", [4, 12], ids_only=True)
+        get_scalar = record_dao.data_query(egg_count=has_all(4, 12))
         self.assertEqual(list(get_scalar), ["spam"])
-        get_with_datarange = record_dao.get_list_has_all("egg_count",
-                                                         [DataRange(0, 5)],
-                                                         ids_only=True)
+        get_with_datarange = record_dao.data_query(egg_count=has_all(DataRange(0, 5)))
         self.assertEqual(list(get_with_datarange), ["spam"])
+        get_with_mix = record_dao.data_query(toppings=has_all(DataRange("oniom", "onioo"),
+                                                              "cheese"))
+        self.assertEqual(list(get_with_mix), ["spam"])
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
