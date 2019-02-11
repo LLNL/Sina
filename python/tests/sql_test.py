@@ -785,7 +785,8 @@ class TestSQLRecordDAOGetListHasAll(unittest.TestCase):
             list_of_contents=self.list_to_check,
             ids_only=True))
         self.assertEqual(len(records), 2)
-        self.assertEqual(records, [self.record_2.id, self.record_1.id])
+        self.assertTrue(self.record_2.id in records)
+        self.assertTrue(self.record_1.id in records)
         records = list(self.record_dao.get_list_has_all(
             datum_name="eggs",
             list_of_contents=self.list_to_check))
@@ -846,7 +847,8 @@ class TestSQLRecordDAOGetListHasAll(unittest.TestCase):
             list_of_contents=self.list_to_check,
             ids_only=True))
         self.assertEqual(len(records), 2)
-        self.assertEqual(records, [self.record_4.id, self.record_5.id])
+        self.assertTrue(self.record_4.id in records)
+        self.assertTrue(self.record_5.id in records)
         records = list(self.record_dao.get_list_has_all(
             datum_name="spam",
             list_of_contents=self.list_to_check))
