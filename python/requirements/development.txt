@@ -1,0 +1,17 @@
+# Read in system-specific link constraints.
+-r links.txt
+
+# Development dependencies
+tox
+flake8
+mock
+jsonschema
+
+# Install nose independently of tox to ensure xunit functionality is available
+nose
+sphinx==1.4.4
+sphinx_rtd_theme
+
+# Install the project in editable (development) mode, which also adds 
+# setup.py's install_requires packages.
+-e .

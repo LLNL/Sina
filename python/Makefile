@@ -1,12 +1,33 @@
+# Define NETWORK if you are on an LC system and either can't or don't want to 
+# use their wheelhouses.  For example,
+#
+# - build:  make NETWORK=scf
+# - tests:  make tests NETWORK=scf
+#
+# Note that use of scf has special meaning until we resolve installation issues
+# or establish a more flexible build process.
+
+# Determine if we are on an LC system based on the presence of the wheelhouse
+# Using 'wget --spider' versus curl as it is MUCH faster.
+# (Inspiration: https://stackoverflow.com/questions/12199059)
+HAVE_WHEELHOUSE=$(shell if wget --spider https://www-lc.llnl.gov/python/wheelhouse 2> /dev/null; then echo 1; else echo 0; fi)
+
+NO_LINKS_FILE=no-links.txt
+LC_LINKS_FILE=lc-links.txt
+LINKS_FILE=requirements/links.txt
+
 SHELL=/bin/bash
 
 VENV=venv
 VACT=$(VENV)/bin/activate
 PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual env"
 
-.PHONY: all clean clean-files clean-notebooks clean-tests docs install tests
+.PHONY: all clean clean-files clean-notebooks clean-tests docs install links tests
 
-install:
+# TODO: Continue to install Jupyter requirements outside the wheelhouse until
+# SIBO-537 work is done, where a separate requirements/jupyter.txt file is 
+# defined and optionally included.
+install: links
 	@if test ! -d $(VENV); then \
 	  echo "Making virtual environment in $(VENV)"; \
 	  python -m virtualenv $(VENV); \
@@ -15,8 +36,10 @@ install:
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
 	$(VENV)/bin/pip install --upgrade pip; \
-	$(VENV)/bin/pip install -r requirements.txt; \
-	$(VENV)/bin/pip install -e .[jupyter]; \
+	$(VENV)/bin/pip install -r requirements/development.txt; \
+	if test -z "$(NETWORK)"; then \
+	  $(VENV)/bin/pip install -e .[jupyter]; \
+	fi; \
 	echo $(PR_ACT)
 
 all: clean docs tests
@@ -24,7 +47,23 @@ all: clean docs tests
 docs: install
 	@$(VENV)/bin/tox -e docs
 
-tests:
+# Ensure the appropriate requirement links are established.  This is important
+# for building and testing purposes.
+links:
+	@if [ $(HAVE_WHEELHOUSE) == 0 ]; then \
+	  echo "No LC wheelhouse: using $(NO_LINKS_FILE)"; \
+	  ln -sf $(NO_LINKS_FILE) $(LINKS_FILE); \
+	else \
+	  if test -z "$(NETWORK)"; then \
+	    echo "NETWORK unspecified: using $(LC_LINKS_FILE)"; \
+	    ln -sf $(LC_LINKS_FILE) $(LINKS_FILE); \
+	  else \
+	    echo "NETWORK=$(NETWORK): using $(NO_LINKS_FILE)"; \
+	    ln -sf $(NO_LINKS_FILE) $(LINKS_FILE); \
+	  fi; \
+	fi
+
+tests: links
 	@tests/run_all_tests.sh
 
 clean:
@@ -34,9 +73,10 @@ clean:
 clean-files:  clean-tests
 	@echo "Cleaning build files.."; \
 	rm -rf build; \
+	rm -f requirements/links.txt; \
 	rm -rf sina.egg-info $(VENV); \
 	find . -name "*.pyc" -exec rm -f {} \; >& /dev/null; \
-	find . -name __pycache__ -exec rm -rf {} \; >& /dev/null; \
+	find . -name __pycache__ -exec rm -rf {} \; >& /dev/null
 
 # It is assumed any version/installation of Jupyter will properly remove outputs
 # and that we do not want to have to [re-]install the virtual environment just

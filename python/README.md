@@ -31,8 +31,9 @@ back to your default environment or end your session.
 Software Dependencies
 =====================
 
-We have a single requirements file for setting up the initial development 
-virtual environment.  The file is called [requirements.txt](requirements.txt).
+We have a requirements file for setting up the initial development virtual
+environment.  The file is called [development.txt](development.txt),
+which resides in the python requirements subdirectory.
 
 
 LC Setup
@@ -71,8 +72,7 @@ Test are run by entering::
 
     $ make tests
 
-Alternatively, you can install, build, and run all of the above by entering
-the following::
+Alternatively, you can run all of the above by entering the following::
 
     $ make all
 
@@ -99,14 +99,28 @@ before proceeding to install dependencies.
 
 Installing Software Dependencies
 --------------------------------
-Enter the following command to install basic Sina dependencies::
+You first need to make sure there is a requirements/links.txt file that contains
+the appropriate link constraints.  There are two requirements files containing
+flags and links used in our supported environments::
 
-    $(venv) pip install -r requirements.txt
+- requirements/lc-links.txt
+- requirements/no-links.txt
+
+The first file contains the options needed to restrict packages to those
+available on the wheelhouse hosted on the Open Computing Facility (OCF) at
+Lawrence Livermore National Laboratory.  The second file contains no flags.
+The links.txt file is included in other requirements files to ensure the
+options are consistent for the build and testing processes.
+
+Once you have a suitable requirements/links.txt file, enter the following
+command to install basic Sina dependencies::
+
+    $(venv) pip install -r requirements/development.txt
 
 
 Completing the Installation
 ---------------------------
-The requirements files should install the package in editable mode but, if
+The requirements file should install the package in editable mode but, if
 not, you can install the package via::
 
     $(venv) pip install -e .
