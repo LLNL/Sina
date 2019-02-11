@@ -283,6 +283,12 @@ class RecordDAO(dao.RecordDAO):
         list_of_record_ids_sets = []
 
         def _list_query(table):
+            """
+            For each criterion, execute a query and add the set result to a list.
+
+            :param table: Which table to query on: ListScalarDataEntry or
+                          ListStringDataEntry.
+            """
             for criterion in criteria_tuples:
                 scalar_list_query = self.session.query(table.id)
                 records_list = self._apply_ranges_to_query(query=scalar_list_query,
@@ -301,6 +307,8 @@ class RecordDAO(dao.RecordDAO):
             _list_query(table=schema.ListStringDataEntry)
         else:
             raise TypeError("list_of_contents must be only strings or only scalars")
+        # This reduce "ands" together all the sets (one per criterion),
+        # creating one set that adheres to all our individual criterion sets.
         record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
 
         if ids_only:
