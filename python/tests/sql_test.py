@@ -790,8 +790,10 @@ class TestSQLRecordDAOGetListHasAll(unittest.TestCase):
         records = list(self.record_dao.get_list_has_all(
             datum_name="eggs",
             list_of_contents=self.list_to_check))
-        self.assertEqual(records[1].raw, self.record_1.raw)
-        self.assertEqual(records[0].raw, self.record_2.raw)
+        records_to_check = {records[0].id: records[0],
+                            records[1].id: records[1]}
+        self.assertEqual(records_to_check[self.record_1.id].raw, self.record_1.raw)
+        self.assertEqual(records_to_check[self.record_2.id].raw, self.record_2.raw)
 
     def test_get_list_has_all_scalars_scal_dr_mixed(self):
         """
@@ -852,8 +854,10 @@ class TestSQLRecordDAOGetListHasAll(unittest.TestCase):
         records = list(self.record_dao.get_list_has_all(
             datum_name="spam",
             list_of_contents=self.list_to_check))
-        self.assertEqual(records[0].raw, self.record_4.raw)
-        self.assertEqual(records[1].raw, self.record_5.raw)
+        records_to_check = {records[0].id: records[0],
+                            records[1].id: records[1]}
+        self.assertEqual(records_to_check[self.record_4.id].raw, self.record_4.raw)
+        self.assertEqual(records_to_check[self.record_5.id].raw, self.record_5.raw)
 
     def test_get_list_has_all_empty_list(self):
         """Given an empty list, we should raise a ValueError."""
