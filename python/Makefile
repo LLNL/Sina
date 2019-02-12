@@ -16,9 +16,18 @@ NO_LINKS_FILE=no-links.txt
 LC_LINKS_FILE=lc-links.txt
 LINKS_FILE=requirements/links.txt
 
+# Work-around for LC Python 3.6 installation-related issues
+LC_PYTHON3=/usr/apps/python-3.6.0/bin
+HAVE_LC_PY3=$(shell if test -d $(LC_PYTHON3); then echo 1; else echo 0; fi)
+ifeq ($(HAVE_LC_PY3),1)
+  TEST_PATH:=$(LC_PYTHON3):$(PATH)
+else
+  TEST_PATH:=$(PATH)
+endif
+
 SHELL=/bin/bash
 
-VENV=venv
+VENV?=venv
 VACT=$(VENV)/bin/activate
 PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual env"
 
@@ -66,14 +75,15 @@ links:
 	fi
 
 
-# Set up a test virtual environment that only contains tox (since tox will
-# create separate test environments.
+# Set up a clean test virtual environment before running tests.
+
+tests: export PATH=$(TEST_PATH)
 tests: links
-	@export PATH=/usr/apps/python-3.6.0/bin:$$PATH; \
-	python -m virtualenv --clear $(TEST_VENV); \
-	set -e; \
-	$(TEST_VENV)/bin/pip install --upgrade pip; \
-	$(TEST_VENV)/bin/pip install tox; \
+	@if test ! -d $(TEST_VENV); then \
+	  echo "Removing existing $(TEST_VENV)"; \
+	  rm -rf $(TEST_VENV); \
+	fi; \
+	make --no-print-directory VENV=$(TEST_VENV); \
 	$(TEST_VENV)/bin/tox
 
 clean:
