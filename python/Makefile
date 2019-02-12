@@ -22,6 +22,8 @@ VENV=venv
 VACT=$(VENV)/bin/activate
 PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual env"
 
+TEST_VENV=tests/test_venv
+
 .PHONY: all clean clean-files clean-notebooks clean-tests docs install links tests
 
 # TODO: Continue to install Jupyter requirements outside the wheelhouse until
@@ -63,8 +65,16 @@ links:
 	  fi; \
 	fi
 
+
+# Set up a test virtual environment that only contains tox (since tox will
+# create separate test environments.
 tests: links
-	@tests/run_all_tests.sh
+	@export PATH=/usr/apps/python-3.6.0/bin:$$PATH; \
+	python -m virtualenv --clear $(TEST_VENV); \
+	set -e; \
+	$(TEST_VENV)/bin/pip install --upgrade pip; \
+	$(TEST_VENV)/bin/pip install tox; \
+	$(TEST_VENV)/bin/tox
 
 clean:
 	@make --no-print-directory clean-notebooks; \

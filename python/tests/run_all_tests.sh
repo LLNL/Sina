@@ -51,9 +51,4 @@ python $TEST_BIN/pip install -r requirements/development.txt
 # Note: if you don't have Cassandra running, Cassandra tests won't run either.
 $TEST_BIN/tox
 
-
-# Perform a documentation style check using Sphinx and autodoc
-# Side effect: builds documentation
-$TEST_BIN/tox -e docs
-
 deactivate
