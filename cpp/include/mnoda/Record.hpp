@@ -24,7 +24,7 @@ namespace mnoda {
  * might have a "contains" Relationship for all the runs within it), etc.
  *
  * Each Record must have a type and an id. Each Record can also have a list of
- * Datum and File objects.
+ * File objects and a map of Datum objects.
  *
  * \code
  * mnoda::ID myID{"my_record", mnoda::IDType::Local};
@@ -36,7 +36,7 @@ namespace mnoda {
  * \endcode
  *
  * The output would be:
- * \code{.json} 
+ * \code{.json}
  * {"local_id":"my_record","type":"my_type","data":{"my_scalar":{"tags":["input"],"value":12.0}}}
  * \endcode
  */
