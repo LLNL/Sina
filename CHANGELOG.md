@@ -2,8 +2,20 @@ Overview
 ========
 
 This file summarizes the major changes in each version of Sina. For a full list,
-see the commit log at: 
+see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
+
+1.4
+===
+- Added list support to Record data
+- Added support for querying on list data
+- Added new example notebooks (basic Sina usage and Record comparison)
+- Replaced ScalarRanges with the more flexible and powerful DataRanges
+- Added data_query(), the core method for finding Records based on data
+- Added Record comparison
+- Merged in Mnoda CPP
+- Cleaned and clarified Makefile
+- Introduced ability to delete Records
 
 1.3
 ===
