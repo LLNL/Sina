@@ -1,4 +1,4 @@
-# Define NETWORK if you are on an LC system and either can't or don't want to 
+# Define NETWORK if you are on an LC system and either can't or don't want to
 # use their wheelhouses.  For example,
 #
 # - build:  make NETWORK=scf
@@ -33,19 +33,19 @@ PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual e
 
 TEST_VENV=tests/test_venv
 
-.PHONY: all 
-.PHONY: clean 
-.PHONY: clean-files 
-.PHONY: clean-notebooks 
-.PHONY: clean-tests 
+.PHONY: all
+.PHONY: clean
+.PHONY: clean-files
+.PHONY: clean-notebooks
+.PHONY: clean-tests
 .PHONY: clean-tests-venv
-.PHONY: docs 
-.PHONY: install 
+.PHONY: docs
+.PHONY: install
 .PHONY: links
 .PHONY: tests
 
 # TODO: Continue to install Jupyter requirements outside the wheelhouse until
-# SIBO-537 work is done, where a separate requirements/jupyter.txt file is 
+# SIBO-537 work is done, where a separate requirements/jupyter.txt file is
 # defined and optionally included.
 install: links
 	@if test ! -d $(VENV); then \
