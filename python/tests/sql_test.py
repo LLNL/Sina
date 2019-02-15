@@ -836,7 +836,6 @@ class TestSQL(unittest.TestCase):
         run_dao.record_DAO.insert(rec)
         run_dao.insert_many([run, run2])
         multi_scalar = list(run_dao.data_query(spam_scal=DataRange(-500, 500)))
-        print(multi_scalar)
         self.assertEqual(len(multi_scalar), 2)
         # No guaranteed order per docs, but we get primary key order here
         spam_run = run_dao.get(multi_scalar[0])
