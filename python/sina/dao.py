@@ -141,7 +141,10 @@ class RecordDAO(object):
 
         :param kwargs: Pairs of the names of data and the criteria that data
                          must fulfill.
-        :returns: A list of ids of Records who fulfill all criteria.
+        :returns: A generator of Record ids that fulfill all criteria.
+
+        :raises ValueError: if not supplied at least one criterion or given
+                            a criterion it does not support
         """
         raise NotImplementedError
 
@@ -438,10 +441,12 @@ class RunDAO(object):
 
         :returns: A generator of run ids fitting the criteria
         """
+        print('In run dao getting: {}'.format(kwargs))
         run_gen = self.get_all(ids_only=True)
         if run_gen is None:
             return
         matched_records = set(self.record_DAO.data_query(**kwargs))
+        print('Matched records: {}'.format(matched_records))
         if matched_records:
             for run in run_gen:
                 if run in matched_records:

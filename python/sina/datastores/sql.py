@@ -181,14 +181,21 @@ class RecordDAO(dao.RecordDAO):
 
         :param kwargs: Pairs of the names of data and the criteria that data
                          must fulfill.
-        :returns: A generator of Records that fulfill all criteria.
+        :returns: A generator of Record ids that fulfill all criteria.
+
+        :raises ValueError: if not supplied at least one criterion or given
+                            a criterion it does not support
         """
         LOGGER.debug('Finding all records fulfilling criteria: {}'
                      .format(kwargs.items()))
         # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
         if not kwargs.items():
             raise ValueError("You must supply at least one criterion.")
-        scalar_criteria, string_criteria, _, _ = sort_and_standardize_criteria(kwargs)
+        (scalar_criteria,
+         string_criteria,
+         scalarlist,
+         stringlist) = sort_and_standardize_criteria(kwargs)
+        result_ids = []
 
         if scalar_criteria:
             scalar_query = self.session.query(schema.ScalarData.id)
@@ -200,19 +207,40 @@ class RecordDAO(dao.RecordDAO):
             string_query = self._apply_ranges_to_query(string_query,
                                                        string_criteria,
                                                        schema.StringData)
-
         #  If we have more than one set of data, we need to perform a union
         if scalar_criteria and string_criteria:
             and_query = scalar_query.intersect(string_query)
-            for x in and_query.all():
-                yield x[0]
+            result_ids.append((str(x[0]) for x in and_query.all()))
         # Otherwise, just find which one has something to return
         elif scalar_criteria:
-            for x in scalar_query.all():
-                yield x[0]
+            result_ids.append((str(x[0]) for x in scalar_query.all()))
+        elif string_criteria:
+            result_ids.append((str(x[0]) for x in string_query.all()))
+        for criteria, table_type in ((scalarlist, "scalarlist"),
+                                     (stringlist, "stringlist")):
+            for criterion in criteria:
+                # Unpack the criterion
+                datum_name, list_criteria = criterion
+                # has_all queries are broken up and treated like a scalar or string
+                if list_criteria.operation == utils.ListQueryOperation.ALL:
+                    ids = self.get_list_has_all(datum_name=datum_name,
+                                                list_of_contents=list_criteria.entries,
+                                                ids_only=True)
+                    result_ids.append(ids)
+                else:
+                    raise ValueError("Currently, only {} list operations are supported. "
+                                     "Given {}".format(utils.ListQueryOperation.ALL,
+                                                       list_criteria.operation))
+        # If we have more than one set of data, we need to find the intersect.
+        if len(result_ids) > 1:
+            valid_ids = set(result_ids[0])
+            for entry in result_ids[1:]:
+                valid_ids = valid_ids.intersection(entry)
+            for id in valid_ids:
+                yield id
         else:
-            for x in string_query.all():
-                yield x[0]
+            for id in result_ids[0]:
+                yield id
 
     def get(self, id):
         """

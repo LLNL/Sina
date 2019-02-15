@@ -14,7 +14,7 @@ import types
 
 import sina.datastores.sql as sina_sql
 import sina.datastores.sql_schema as schema
-from sina.utils import DataRange, import_json, export, _export_csv
+from sina.utils import DataRange, import_json, export, _export_csv, has_all
 from sina.model import Run, Record
 
 LOGGER = logging.getLogger(__name__)
@@ -42,6 +42,9 @@ def _populate_database_with_data(session):
     session.add(schema.ScalarData(id="spam3",
                                   name="spam_scal_2",
                                   value=10.5))
+    session.add(schema.ScalarData(id="spam5",
+                                  name="spam_scal_3",
+                                  value=46))
     session.add(schema.StringData(id="spam1",
                                   name="val_data",
                                   value="runny",
@@ -59,6 +62,45 @@ def _populate_database_with_data(session):
     session.add(schema.StringData(id="spam4",
                                   name="val_data_2",
                                   value="double yolks"))
+    session.add(schema.StringData(id="spam5",
+                                  name="val_data_3",
+                                  value="sugar"))
+    session.add(schema.StringData(id="spam6",
+                                  name="val_data_3",
+                                  value="syrup"))
+    # Add some lists
+    session.add(schema.ListScalarDataEntry(id="spam5",
+                                           name="val_data_list_1",
+                                           index=0,
+                                           value=0))
+    session.add(schema.ListScalarDataEntry(id="spam5",
+                                           name="val_data_list_1",
+                                           index=1,
+                                           value=9.3))
+    session.add(schema.ListScalarDataEntry(id="spam6",
+                                           name="val_data_list_1",
+                                           index=0,
+                                           value=8))
+    session.add(schema.ListScalarDataEntry(id="spam6",
+                                           name="val_data_list_1",
+                                           index=1,
+                                           value=20))
+    session.add(schema.ListStringDataEntry(id="spam5",
+                                           name="val_data_list_2",
+                                           index=0,
+                                           value='eggs'))
+    session.add(schema.ListStringDataEntry(id="spam5",
+                                           name="val_data_list_2",
+                                           index=1,
+                                           value='pancake'))
+    session.add(schema.ListStringDataEntry(id="spam6",
+                                           name="val_data_list_2",
+                                           index=0,
+                                           value='eggs'))
+    session.add(schema.ListStringDataEntry(id="spam6",
+                                           name="val_data_list_2",
+                                           index=1,
+                                           value='yellow'))
     session.commit()
 
 
@@ -495,6 +537,84 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(just_3_list), 1)
         self.assertEqual(just_3_list[0], "spam3")
 
+    def test_recorddao_data_query_scalar_list_has_all(self):
+        """Test that the RecordDAO is retrieving on a list of scalars."""
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        just_5_and_6 = list(record_dao.data_query(
+            val_data_list_1=has_all(DataRange(-10, 8.5), DataRange(8.9, 25))))  # 5 & 6
+        self.assertEqual(len(just_5_and_6), 2)
+        self.assertIn("spam5", just_5_and_6)
+        self.assertIn("spam6", just_5_and_6)
+
+    def test_recorddao_data_query_mixed_1(self):
+        """
+        Test that the RecordDAO is retrieving on mixed data types.
+
+        Test that we can mix searching on scalars and lists of scalars.
+        """
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        just_5 = list(record_dao.data_query(
+            val_data_list_1=has_all(DataRange(-10, 8.5), DataRange(8.9, 25)),  # 5 & 6
+            spam_scal_3=DataRange(0, 50)))  # 5 only
+        self.assertEqual(len(just_5), 1)
+        self.assertEqual(just_5[0], "spam5")
+
+    def test_recorddao_data_query_string_list_has_all(self):
+        """Test that the RecordDAO is retrieving on a list of strings."""
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        just_5_and_6 = list(record_dao.data_query(
+            val_data_list_2=has_all('eggs', DataRange('o', 'z'))))  # 5 & 6
+        self.assertEqual(len(just_5_and_6), 2)
+        self.assertIn("spam5", just_5_and_6)
+        self.assertIn("spam6", just_5_and_6)
+
+    def test_recorddao_data_query_mixed_2(self):
+        """
+        Test that the RecordDAO is retrieving on mixed data types.
+
+        Test that we can mix searching on strings and lists of strings.
+        """
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        just_6 = list(record_dao.data_query(
+            val_data_list_2=has_all('eggs', DataRange('o', 'z')),  # 5 & 6
+            val_data_3='syrup'))  # 6 only
+        self.assertEqual(len(just_6), 1)
+        self.assertEqual(just_6[0], "spam6")
+
+    def test_recorddao_data_query_mixed_3(self):
+        """
+        Test that the RecordDAO is retrieving on mixed data types.
+
+        Test that we can mix searching on strings, scalars, lists of strings,
+        and lists of scalars.
+        """
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        no_match = list(record_dao.data_query(
+            val_data_list_1=has_all(DataRange(-10, 8.5), DataRange(8.9, 25)),  # 5 & 6
+            spam_scal_3=DataRange(0, 50),  # 5 only
+            val_data_list_2=has_all('eggs', DataRange('o', 'z')),  # 5 & 6
+            val_data_3='syrup'))  # 6 only
+        self.assertFalse(no_match)
+
+        just_5 = list(record_dao.data_query(
+            val_data_list_1=has_all(DataRange(-10, 8.5), DataRange(8.9, 25)),  # 5 & 6
+            spam_scal_3=DataRange(0, 50),  # 5 only
+            val_data_list_2=has_all('eggs', DataRange('o', 'z')),  # 5 & 6
+            val_data_3='sugar'))  # 5 only
+
+        self.assertEqual(len(just_5), 1)
+        self.assertEqual(just_5[0], "spam5")
+
     def test_recorddao_type(self):
         """Test the RecordDAO is retrieving based on type correctly."""
         factory = sina_sql.DAOFactory()
@@ -716,6 +836,7 @@ class TestSQL(unittest.TestCase):
         run_dao.record_DAO.insert(rec)
         run_dao.insert_many([run, run2])
         multi_scalar = list(run_dao.data_query(spam_scal=DataRange(-500, 500)))
+        print(multi_scalar)
         self.assertEqual(len(multi_scalar), 2)
         # No guaranteed order per docs, but we get primary key order here
         spam_run = run_dao.get(multi_scalar[0])
