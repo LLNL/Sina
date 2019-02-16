@@ -210,12 +210,12 @@ class RecordDAO(dao.RecordDAO):
         #  If we have more than one set of data, we need to perform a union
         if scalar_criteria and string_criteria:
             and_query = scalar_query.intersect(string_query)
-            result_ids.append((str(x[0]) for x in and_query.all()))
+            result_ids.append(str(x[0]) for x in and_query.all())
         # Otherwise, just find which one has something to return
         elif scalar_criteria:
-            result_ids.append((str(x[0]) for x in scalar_query.all()))
+            result_ids.append(str(x[0]) for x in scalar_query.all())
         elif string_criteria:
-            result_ids.append((str(x[0]) for x in string_query.all()))
+            result_ids.append(str(x[0]) for x in string_query.all())
         for criteria, table_type in ((scalarlist, "scalarlist"),
                                      (stringlist, "stringlist")):
             for criterion in criteria:
