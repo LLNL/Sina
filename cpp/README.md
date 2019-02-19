@@ -23,7 +23,7 @@ properly for your platform. For a list of dependencies that will be
 used/installed, see [the package file](package.py).
 
 ```bash
-    cd /path/to/mnoda-cpp
+    cd <path_to_sina>/cpp 
     mkdir build
     cd build
     export SPACK_COMPILER=clang
