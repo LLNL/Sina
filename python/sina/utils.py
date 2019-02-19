@@ -330,8 +330,8 @@ def sort_and_standardize_criteria(criteria_dict):
     :returns: A tuple of lists of the form (scalar_criteria, string_criteria,
               scalar_list_criteria, string_list_criteria). Each entry in each
               list is (name, datarange_criterion)
-    :raises ValueError: if passed any criterion that isn't a number, string,
-                        DataRange, or ListCriteria.
+    :raises ValueError: if passed any criterion that isn't a valid number,
+                        string, DataRange, or ListCriteria.
     """
     LOGGER.debug('Sorting and standardizing criteria: {}'.format(criteria_dict))
     scalar_criteria = []
@@ -354,8 +354,13 @@ def sort_and_standardize_criteria(criteria_dict):
         elif isinstance(criterion, ListCriteria):
             if criterion.is_numeric:
                 scalar_list_criteria.append((data_name, criterion))
-            else:
+            elif criterion.is_lexographic:
                 string_list_criteria.append((data_name, criterion))
+            else:
+                raise ValueError("criteria must be a number, string, numerical"
+                                 "or lexographic DataRange, or numerical or lexographic"
+                                 "ListCriteria. Given a ListCriteria that is neither"
+                                 "numerical nor lexographic: {}".format(criterion))
         else:
             # Probably a null range; we don't know what table to look in
             # While we may support this in the future, we don't now.
@@ -485,6 +490,8 @@ class ListCriteria(object):
         :param entries: A tuple of entries the operation will be used with.
         :param operation: The operation the ListCriteria represents.
         """
+        # The attributes on the next line are all set via properties.
+        self._entries, self._operation, self._is_numeric, self._is_lexographic = [None]*4
         self.entries = entries
         self.operation = operation
 
@@ -533,6 +540,30 @@ class ListCriteria(object):
         else:
             self._operation = operation
 
+    @property
+    def is_numeric(self):
+        """
+        Get whether the ListCriteria is numeric.
+
+        A numeric ListCriteria's entries are all scalars or numeric DataRanges.
+        A ListCriteria cannot be both numeric and lexographic.
+
+        :returns: whether this ListCriteria is numeric.
+        """
+        return self._is_numeric
+
+    @property
+    def is_lexographic(self):
+        """
+        Get whether the ListCriteria is lexographic.
+
+        A numeric ListCriteria's entries are all strings or lexographic DataRanges.
+        A ListCriteria cannot be both lexographic and numeric.
+
+        :returns: whether this ListCriteria is lexographic.
+        """
+        return self._is_lexographic
+
     def __repr__(self):
         """Return a comprehensive (debug) representation of a ListCriteria."""
         return ('ListCriteria <entries={}, operation={}>'
@@ -547,24 +578,28 @@ class ListCriteria(object):
         """
         Ensure entries are valid. If so, updates ListCriteria appropriately.
 
-        :raises TypeError: if not all entries are strings xor numbers, or if there's no entries
+        :param entries: A tuple of entries the ListCriteria should represent.
+        :raises TypeError: if not all entries are lexographic xor numeric,
+                           or if there's no entries
         """
         if not entries:
-            raise TypeError("Entries must be a list of strings or of scalars, not empty")
+            raise TypeError("Entries must be a tuple of strings/lexographic DataRanges, "
+                            "or of scalars/numeric DataRanges, not empty")
         if all((isinstance(x, Real) or
                 (isinstance(x, DataRange) and x.is_numeric_range()))
                for x in entries):
-            self.is_numeric = True
-            self.is_lexographic = False
+            self._is_numeric = True
+            self._is_lexographic = False
             self._entries = entries
         elif all((isinstance(x, string_types) or
                   (isinstance(x, DataRange) and x.is_lexographic_range()))
                  for x in entries):
-            self.is_numeric = False
-            self.is_lexographic = True
+            self._is_numeric = False
+            self._is_lexographic = True
             self._entries = entries
         else:
-            raise TypeError("Entries must be only strings or only scalars")
+            raise TypeError("Entries must be only strings/lexographic DataRanges "
+                            "or only scalars/numeric DataRanges.")
 
 
 class DataRange(object):

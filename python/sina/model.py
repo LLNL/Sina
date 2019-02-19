@@ -401,7 +401,6 @@ def generate_run_from_json(json_input):
     LOGGER.debug('Generating run from json input: {}'.format(json_input))
     # Programatically-created Records
     try:
-        print(json_input)
         run = Run(id=json_input['id'],
                   user=json_input.get('user'),
                   user_defined=json_input.get('user_defined'),
