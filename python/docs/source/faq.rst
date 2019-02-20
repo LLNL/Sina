@@ -30,13 +30,15 @@ What does a workflow using Sina look like?
 
 This depends mainly on whether you run then insert or run *and* insert.
 
-**Run first, write JSON, insert when done**
+Run first, write JSON, insert when done
+#######################################
 You will need to modify your code to write Mnoda-compliant JSON. Use the Sina
 CLI to ingest this JSON; it will handle setting up the backend (though you'll
 need a pre-existing keyspace for Cassandra). That's it! Once ingestion completes,
 you can begin querying your data.
 
-**Embed Sina in your workflow**
+Embed Sina in your workflow
+###########################
 See the API examples for specifics. Generally, you'll use Sina as one of the final
 steps, when writing a completed run to file. You'll first need to create a
 "factory" object (which will also set up the backend), then a DAO for whatever

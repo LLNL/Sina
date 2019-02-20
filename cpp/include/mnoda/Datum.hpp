@@ -12,7 +12,8 @@
 namespace mnoda {
 
 /**
- * Represents whether a Datum is a String or Scalar (double).
+ * Represents whether a Datum is a String, Scalar (double), array of Strings,
+ * or array of Scalars.
  */
 enum class ValueType {
     String,
@@ -30,7 +31,7 @@ enum class ValueType {
  * Every Datum must have a value; units and tags are optional.
  *
  * The value of a Datum may be a string, a double, an array of strings,
- * or an array of doubles. 
+ * or an array of doubles.
  *
  * \code
  * mnoda::Datum myDatum{12.34};
@@ -71,14 +72,14 @@ public:
     /**
      * Construct a new Datum.
      *
-     * @param value the string array value of the datum 
+     * @param value the string array value of the datum
      */
     Datum(std::vector<std::string> value);
 
     /**
      * Construct a new Datum.
      *
-     * @param value the scalar array value of the datum 
+     * @param value the scalar array value of the datum
      */
     Datum(std::vector<double> value);
 
@@ -173,6 +174,7 @@ public:
      * @return the JSON representation of this Datum.
      */
     nlohmann::json toJson() const;
+
 private:
     std::string stringValue;
     double scalarValue;
