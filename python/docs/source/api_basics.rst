@@ -56,6 +56,8 @@ documentation of all the methods available to each DAO, please see the
 Filtering Records Based on Their Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Basic Filtration
+################
 Records have a :code:`data` field that holds the experimental data they're
 associated with. This can be inputs, outputs, start times, etc. This data
 is queryable, and can be used to find Records fitting criteria. For example, let's
@@ -65,15 +67,24 @@ a :code:`quadrant` of "NW"::
   records = record_dao.get_given_data(final_volume=310, quadrant="NW")
 
 This will find all the records record_dao knows about (so those in
-:code:`somefile.sqlite`) that fit our specifications. Of course, sometimes we're
-interested in data within a range::
+:code:`somefile.sqlite`) that fit our specifications.
+
+IMPORTANT NOTE: when providing multiple criteria, only entries fulfilling all criteria
+will be returned (boolean AND). If OR-like functionality is desired, see the next
+section, :ref:`Ids_Only`.
+
+Filtering on a Range
+####################
+Perhaps we don't want a :code:`final_volume` of 310 exactly, but rather one
+between 200 and 311. DataRanges allow us to specify this. They follow the Python
+convention of min-inclusive, max-exclusive, but this can be altered::
 
   from sina.utils import DataRange
 
   # data_query is aliased to get_given_data, they're interchangeable
-  records = record_dao.data_query(final_volume=DataRange(200,310),
-                                  final_acceleration=DataRange(max=20,
-                                                               min=12,
+  records = record_dao.data_query(final_volume=DataRange(200, 311),
+                                  final_acceleration=DataRange(min=12,
+                                                               max=20,
                                                                min_inclusive=False,
                                                                max_inclusive=True),
                                   schema=DataRange(max="bb_12"),
@@ -84,10 +95,29 @@ and < 310, a :code:`final_acceleration` > 12 and <= 20, a :code:`schema`
 that comes before "bb_12" alphabetically, and a :code:`quadrant` = "NW". For an
 interactive demo, see examples/fukushima/fukushima_subsecting_data.ipynb.
 
-NOTE: when providing multiple criteria, only entries fulfilling all criteria
-will be returned (boolean AND). If OR-like functionality is desired, see the next
-section.
+Filtering on Lists
+##################
+Because there are several possible ways a list might "match" some criteria,
+the syntax for performing the query is slightly different. Let's say we want all
+Records, again with a :code:`final_volume` of 310, but now they must fulfill several
+criteria for :code:`velocity`, a timeseries. It must have at one point had a
+:code:`velocity` between 10 and 15, inclusive, as well as between 0 and 5,
+exclusive. For example:  :code:`velocity=[0, 1, 4, 5, 15, 20, 21]` or
+:code:`velocity=[1, 10]`::
 
+  from sina.utils import has_all
+
+  records = record_dao.data_query(final_volume=310,
+                                  velocity=has_all(DataRange(10, 15, max_inclusive=True),
+                                                   DataRange(0, 5, min_inclusive=False)))
+
+Note that order and count don't matter with :code:`has_all`. It cannot be
+used to find Records where :code:`velocity>0` three times. Further queries may
+be developed to cover these cases.
+
+See examples/basic_usage.ipynb for list queries in use.
+
+.. _Ids_Only:
 
 Combining Filters using "IDs Only" Logic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -109,11 +139,11 @@ the recommended way of combining queries or implementing more complex logic::
   print(xor_recs)
 
 
-Getting Specific Data for Many Scalars
+Getting Specific Data for Many Records
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You may want, for example, to get the final_speed and shape of each
-Record matching the above criteria. Rather than building Record objects for
+You may want, for example, to get the :code:`final_speed` and :code:`shape` of
+each Record matching the above criteria. Rather than building Record objects for
 all matches and then selecting only the data you want, you can use
 get_data_for_records() to find specific data entries across a list of Records::
 
