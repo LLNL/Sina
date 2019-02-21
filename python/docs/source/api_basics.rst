@@ -3,22 +3,31 @@
 API Basics
 ==========
 
-The Sina API is organized around Records and Relationships. A Record is
-a piece of data conforming to the Mnoda JSON schema. It typically represents
-something like a run, msub, or experiment (for examples, please see
-the :ref:`mnoda`). Relationships (also documented in the schema) represent
-the links between Records, such as which msub submitted which job.
+Major API Concepts
+~~~~~~~~~~~~~~~~~~
+The Sina API is organized around Records and Relationships.
+A Record typically represents something like a run, msub, or experiment, while a
+Relationship represents a link between Records, such as which msub submitted which
+job. Records and Relationships are both valid JSON objects, and are documented
+further in the :ref:`mnoda`. Sina's API allows users to store, query, and retrieve
+these objects from several backends, including SQL and Cassandra, using
+backend-agnostic Python.
 
+
+Special Record Types
+####################
 While a Record can represent anything, there are special types of Records,
-such as runs, that support additional queries. Any Record with a :code:`type`
+such as Runs, that support additional queries. Any Record with a :code:`type`
 equal to the name of a special type will be sorted somewhat differently
 to allow for these queries. To see what types are available, please see the
 `Model documentation <generated_docs/sina.model.html>`__
 
-The API itself makes use of DAOs to streamline accessing data independently
-of the backend. There's one "factory" object per supported backend, and this
-factory can be used to create the DAOs used to interact with Records, special
-Record types, and Relationships. For a simple demonstration::
+Basic Access
+############
+The API makes use of "DAOs" (Data Access Objects) to streamline accessing data
+independently of the backend. There's one "factory" object per supported backend,
+and this factory can be used to create the DAOs used to interact with Records,
+special Record types, and Relationships. For a simple demonstration::
 
   import sina.datastores.sql as sina_sql
 
