@@ -13,10 +13,9 @@
 # (Sources: https://stackoverflow.com/questions/12199059,
 #  https://unix.stackexchange.com/questions/84814)
 #
-# Note the use of '-k' curl option for insecure existence check, which will
-# terminate the build on a laptop if the user does not have the necessary
-# certificates installed.  Otherwise, the build would proceed with pythonhosted.
-HAVE_WHEELHOUSE=$(shell if curl -sSfk -o /dev/null https://www-lc.llnl.gov/python/wheelhouse; then echo 1; else echo 0; fi)
+# It is important to note that the laptop must have the necessary certificates
+# in order to build using the LC wheelhouse URI.
+HAVE_WHEELHOUSE=$(shell if curl -sSf -o /dev/null https://www-lc.llnl.gov/python/wheelhouse; then echo 1; else echo 0; fi)
 
 # We'll also check if we have access to LC and internal wheelhouses
 LC_WHEELHOUSE_DIR=/usr/gapps/python/wheelhouse
