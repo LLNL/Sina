@@ -8,12 +8,18 @@
 # or establish a more flexible build process.
 
 # Determine if we are on an LC system based on the presence of the wheelhouse
-# Using 'wget --spider' versus curl as it is MUCH faster.
-# (Inspiration: https://stackoverflow.com/questions/12199059)
-HAVE_WHEELHOUSE=$(shell if wget --spider https://www-lc.llnl.gov/python/wheelhouse 2> /dev/null; then echo 1; else echo 0; fi)
+# Using curl (versus 'wget --spider') despite being slower since former 
+# appears to be installed on Macs while latter is not.
+# (Sources: https://stackoverflow.com/questions/12199059,
+#  https://unix.stackexchange.com/questions/84814)
+HAVE_WHEELHOUSE=$(shell if curl -sSf -o /dev/null https://www-lc.llnl.gov/python/wheelhouse; then echo 1; else echo 0; fi)
+
+# We'll also check if we have access to LC and internal wheelhouses
+LC_WHEELHOUSE_DIR=/usr/gapps/python/wheelhouse
 
 NO_LINKS_FILE=no-links.txt
 LC_LINKS_FILE=lc-links.txt
+LC_URL_FILE=lc-url-links.txt
 LINKS_FILE=requirements/links.txt
 
 # Work-around for LC Python 3.6 installation-related issues for testing purposes
@@ -71,12 +77,17 @@ docs: install
 # for building and testing purposes.
 links:
 	@if [ $(HAVE_WHEELHOUSE) == 0 ]; then \
-	  echo "No LC wheelhouse: using $(NO_LINKS_FILE)"; \
+	  echo "No LC wheelhouse URL access: using $(NO_LINKS_FILE)"; \
 	  ln -sf $(NO_LINKS_FILE) $(LINKS_FILE); \
 	else \
 	  if test -z "$(NETWORK)"; then \
-	    echo "NETWORK unspecified: using $(LC_LINKS_FILE)"; \
-	    ln -sf $(LC_LINKS_FILE) $(LINKS_FILE); \
+	    if test -d $(LC_WHEELHOUSE_DIR); then \
+	        echo "LC wheelhouse directory access: using $(LC_LINKS_FILE)"; \
+	        ln -sf $(LC_LINKS_FILE) $(LINKS_FILE); \
+	    else \
+	        echo "NETWORK unspecified and no wheelhouse dir: using $(LC_URL_FILE)"; \
+	        ln -sf $(LC_URL_FILE) $(LINKS_FILE); \
+	    fi; \
 	  else \
 	    echo "NETWORK=$(NETWORK): using $(NO_LINKS_FILE)"; \
 	    ln -sf $(NO_LINKS_FILE) $(LINKS_FILE); \
