@@ -9,9 +9,10 @@ written such that this should not be a testing issue.
 import os
 import shutil
 import unittest
+from types import GeneratorType
 
 import sina.utils
-from sina.utils import DataRange
+from sina.utils import DataRange, ListCriteria, sort_and_standardize_criteria
 
 # Path to the directory for running tests involving temporary files.  (Use this
 # file's directory as the basis for the path for now.)
@@ -78,6 +79,88 @@ class TestSinaUtils(unittest.TestCase):
         self.assertEqual(filename, result,
                          "Expected {}, not {}".format(filename, result))
         os.remove(filename)
+
+    def test_intersect_ordered_empty(self):
+        """Test that the intersection of empty iterators is empty."""
+        gen_none = (i for i in [])
+        gen_also_none = (i for i in [])
+        self.assertFalse(list(sina.utils.intersect_ordered([gen_none,
+                                                            gen_also_none])))
+
+    def test_intersect_ordered_one(self):
+        """Test that the intersection of a single iterator is the contents of that iterator."""
+        alone_list = [1, 2, 3, 4]
+        gen_alone = (i for i in alone_list)
+        self.assertEquals(list(sina.utils.intersect_ordered([gen_alone])),
+                          alone_list)
+
+    def test_intersect_ordered_empty_nonempty(self):
+        """Test that the intersection of an empty and non-empty iterator is empty."""
+        gen_none = (i for i in [])
+        gen_some = (i for i in [1, 2, 3])
+        self.assertFalse(list(sina.utils.intersect_ordered([gen_none,
+                                                            gen_some])))
+
+    def test_intersect_ordered_nonempty_empty(self):
+        """
+        Test that the intersection of a non-empty and empty iterator is empty.
+
+        Essentially, test that order doesn't matter.
+        """
+        gen_none = (i for i in [])
+        gen_some = (i for i in [1, 2, 3])
+        self.assertFalse(list(sina.utils.intersect_ordered([gen_some,
+                                                            gen_none])))
+
+    def test_intersect_ordered_many(self):
+        """Test that non-empty iterators return the intersection of their contents."""
+        gen_even = (i for i in range(0, 10, 2))
+        gen_rando = (i for i in [-1, 0, 1, 2, 5, 6, 8])
+        gen_10 = (i for i in range(10))
+        intersect = sina.utils.intersect_ordered([gen_even,
+                                                  gen_rando,
+                                                  gen_10])
+        # Order is important
+        self.assertEqual(list(intersect), [0, 2, 6, 8])
+
+        gen_colors = (i for i in ["blue", "orange", "white"])
+        gen_fruits = (i for i in ["apple", "banana", "orange"])
+        intersect_str = sina.utils.intersect_ordered([gen_colors,
+                                                      gen_fruits])
+        self.assertEqual(list(intersect_str), ["orange"])
+
+    def test_intersect_ordered_lists(self):
+        """Test that intersect_ordered works with lists as well as generators."""
+        list_even = range(0, 10, 2)
+        list_rando = [-1, 0, 1, 2, 5, 6, 8]
+        list_10 = range(10)
+        intersect = sina.utils.intersect_ordered([list_even,
+                                                  list_rando,
+                                                  list_10])
+        # Order is important
+        self.assertEqual(list(intersect), [0, 2, 6, 8])
+
+        gen_colors = (i for i in ["blue", "orange", "white"])
+        list_fruits = ["apple", "banana", "orange"]
+        intersect_str = sina.utils.intersect_ordered([gen_colors,
+                                                      list_fruits])
+        self.assertEqual(list(intersect_str), ["orange"])
+
+    def test_intersect_ordered_return_type(self):
+        """Test that, no matter the type of iterator given, what's returned is a generator."""
+        list_many = [1, 2, 3, 4]
+        list_many_more = [3, 4, 5, 6]
+        gen_many = (i for i in list_many)
+        gen_many_more = (i for i in list_many_more)
+        list_and_list = sina.utils.intersect_ordered([list_many, list_many_more])
+        self.assertTrue(isinstance(list_and_list, GeneratorType))
+        gen_and_gen = sina.utils.intersect_ordered([gen_many, gen_many_more])
+        self.assertTrue(isinstance(gen_and_gen, GeneratorType))
+        iterator_mix = sina.utils.intersect_ordered([gen_many, list_many_more,
+                                                     list_many, gen_many_more])
+        self.assertTrue(isinstance(iterator_mix, GeneratorType))
+        no_iterator = sina.utils.intersect_ordered([])
+        self.assertTrue(isinstance(no_iterator, GeneratorType))
 
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""
@@ -209,26 +292,137 @@ class TestSinaUtils(unittest.TestCase):
             with_strings.parse_max("4")
         self.assertIn('Bad inclusiveness specifier', str(context.exception))
 
+    def test_basic_listcriteria(self):
+        """Test that ListCriteria can be initialized properly."""
+        strings = ("spam", "eggs")
+        scalars = (1, 2, 3)
+        all_alt = sina.utils.ListQueryOperation.ALL
+        with_strings = ListCriteria(entries=strings, operation="ALL")
+        with_scalars = ListCriteria(entries=scalars, operation=all_alt)
+        self.assertEqual(with_strings.entries, strings)
+        self.assertEqual(with_scalars.entries, scalars)
+        self.assertEqual(with_strings.operation, with_scalars.operation,
+                         sina.utils.ListQueryOperation.ALL)
+
+    def test_listcriteria_assignment(self):
+        """Verify ListCriteria setters and getters are working as expected."""
+        strings = ("spam", "eggs")
+        scalars = (1, 2, 3)
+        criteria = ListCriteria(entries=strings, operation="ALL")
+        # Setters (we're using @property)
+        criteria.entries = scalars
+        criteria.operation = "ANY"
+        # Getters
+        self.assertEqual(criteria.entries, scalars)
+        self.assertEqual(criteria.operation, sina.utils.ListQueryOperation.ANY)
+
+    def test_listcriteria_tostring(self):
+        """Verify that ListCriteria display as expected."""
+        scalars = (1, 2, 3)
+        all_alt = sina.utils.ListQueryOperation.ALL
+        criteria = ListCriteria(entries=scalars, operation=all_alt)
+        self.assertEqual(criteria.__repr__(), criteria.__str__(),
+                         'ListCriteria <entries={}, operation={}>'
+                         .format(scalars, all_alt))
+
+    def test_listcriteria_type(self):
+        """Verify that ListCriteria have is_lexographic and is_numeric set."""
+        strings = ("spam", "eggs")
+        scalars = (1, 2, 3)
+        criteria = ListCriteria(entries=strings, operation="ONLY")
+        self.assertTrue(criteria.is_lexographic)
+        self.assertFalse(criteria.is_numeric)
+        # Switching entry type should set fields appropriately.
+        criteria.entries = scalars
+        self.assertFalse(criteria.is_lexographic)
+        self.assertTrue(criteria.is_numeric)
+        criteria.entries = strings
+        self.assertTrue(criteria.is_lexographic)
+        self.assertFalse(criteria.is_numeric)
+
+    def test_listcriteria_validation_tuples(self):
+        """Test ListCriteria only accepts tuples."""
+        valid_vals = ("spam", "eggs")
+        disallowed_iter = [1, 2, 3]
+        criteria = ListCriteria(entries=valid_vals, operation="ALL")
+
+        with self.assertRaises(TypeError) as context:
+            criteria.entries = disallowed_iter
+        self.assertIn('Entries must be expressed as a tuple',
+                      str(context.exception))
+
+    def test_listcriteria_validation_entries_type(self):
+        """Test ListCriteria enforces entries being numeric xor lexographic."""
+        valid_vals = ("spam", "eggs")
+        invalid_vals = ("spam", 12)
+        criteria = ListCriteria(entries=valid_vals, operation="ALL")
+        with self.assertRaises(TypeError) as context:
+            criteria.entries = invalid_vals
+        self.assertIn("Entries must be only strings/lexographic DataRanges "
+                      "or only scalars/numeric DataRanges.", str(context.exception))
+
+    def test_listcriteria_validation_entries_exist(self):
+        """Test ListCriteria enforces entries a non-empty entries list."""
+        valid_vals = ("spam", "eggs")
+        no_vals = ()
+        criteria = ListCriteria(entries=valid_vals, operation="ALL")
+        with self.assertRaises(TypeError) as context:
+            criteria.entries = no_vals
+        self.assertIn("Entries must be a tuple of strings/lexographic DataRanges, "
+                      "or of scalars/numeric DataRanges, not empty",
+                      str(context.exception))
+
+    def test_listcriteria_validation_operator(self):
+        """Test ListCriteria enforces choosing an existing ListQueryOperation."""
+        criteria = ListCriteria(entries=("spam", "eggs"), operation="ALL")
+        with self.assertRaises(ValueError) as context:
+            criteria.operation = "FORBIDDEN_OPERATOR"
+        self.assertIn('is not a valid ListQueryOperation', str(context.exception))
+
+    def test_list_criteria_numeric_protection(self):
+        """Test that ListCriteria's is_numeric cannot be set by hand."""
+        criteria = ListCriteria(entries=("spam", "eggs"), operation="ALL")
+        with self.assertRaises(AttributeError) as context:
+            criteria.is_numeric = True
+        self.assertIn("can't set attribute", str(context.exception))
+
+    def test_list_criteria_lexographic_protection(self):
+        """Test that ListCriteria's is_lexographic cannot be set by hand."""
+        criteria = ListCriteria(entries=("spam", "eggs"), operation="ALL")
+        with self.assertRaises(AttributeError) as context:
+            criteria.is_lexographic = True
+        self.assertIn("can't set attribute", str(context.exception))
+
+    def test_has_all(self):
+        """Test that has_all is creating the expected ListCriteria object."""
+        has_all = sina.utils.has_all("spam", "egg")
+        equiv = ListCriteria(entries=("spam", "egg"), operation="ALL")
+        self.assertEqual(has_all.entries, equiv.entries)
+        self.assertEqual(has_all.operation, equiv.operation)
+
     def test_sort_and_standardizing(self):
         """Test the function for processing query criteria."""
         criteria = {"numra": DataRange(1, 2),
                     "lexra": DataRange("bar", "foo"),
                     "num": 12,
                     "num2": 2,
+                    "listnum": ListCriteria(entries=(1, 2), operation="ALL"),
                     "lex": "cat"}
-        scalar_crit, string_crit = sina.utils.sort_and_standardize_criteria(criteria)
+        scalar, string, scalar_list, string_list = sort_and_standardize_criteria(criteria)
         num_equiv = DataRange(12, 12, max_inclusive=True)
         num2_equiv = DataRange(2, 2, max_inclusive=True)
         lex_equiv = DataRange("cat", "cat", max_inclusive=True)
         # assertCountEqual WOULD make sense, except it seems to test on object
         # identity and not using the == operator. Instead, we sort
-        scalar_crit.sort()
-        string_crit.sort()
-        self.assertEqual(scalar_crit, [("num", num_equiv),
-                                       ("num2", num2_equiv),
-                                       ("numra", criteria["numra"])])
-        self.assertEqual(string_crit, [("lex", lex_equiv),
-                                       ("lexra", criteria["lexra"])])
+        scalar.sort()
+        string.sort()
+        self.assertEqual(scalar, [("num", num_equiv),
+                                  ("num2", num2_equiv),
+                                  ("numra", criteria["numra"])])
+        self.assertEqual(string, [("lex", lex_equiv),
+                                  ("lexra", criteria["lexra"])])
+        self.assertEqual(scalar_list[0], ("listnum", criteria["listnum"]))
+        self.assertFalse(string_list)
 
         with self.assertRaises(ValueError) as context:
             sina.utils.sort_and_standardize_criteria({"bork": ["meow"]})

@@ -12,7 +12,7 @@ from cassandra.cqlengine.query import DoesNotExist, BatchQuery
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.cass_schema as schema
-from sina.utils import sort_and_standardize_criteria
+import sina.utils as utils
 
 LOGGER = logging.getLogger(__name__)
 
@@ -171,9 +171,7 @@ class RecordDAO(dao.RecordDAO):
         # We've gone through every record we were given. The from_scalar_batch
         # and from_string_batch dictionaries are ready for batch inserting.
         for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
-                                      (schema.RecordFromStringData, from_string_batch),
-                                      (schema.RecordFromScalarListData, from_scalar_list_batch),
-                                      (schema.RecordFromStringListData, from_string_list_batch)):
+                                      (schema.RecordFromStringData, from_string_batch)):
             for partition, data_list in six.iteritems(partition_data):
                 with BatchQuery() as b:
                     create = (table.batch(b).create if force_overwrite
@@ -184,6 +182,19 @@ class RecordDAO(dao.RecordDAO):
                                id=entry[1],
                                units=entry[2],
                                tags=entry[3])
+        # The RecordFromList-type tables differ form their partners slightly more
+        # to support their associated queries
+        for table, partition_data in ((schema.RecordFromScalarListData, from_scalar_list_batch),
+                                      (schema.RecordFromStringListData, from_string_list_batch)):
+            for partition, data_list in six.iteritems(partition_data):
+                with BatchQuery() as b:
+                    # We no longer worry about overriding, trusting the partner
+                    # table to catch it if necessary.
+                    for entry in data_list:
+                        for value in entry[0]:
+                            table.batch(b).create(name=partition,
+                                                  value=value,
+                                                  id=entry[1])
 
     def _insert_data(self, data, id, force_overwrite=False):
         """
@@ -272,7 +283,7 @@ class RecordDAO(dao.RecordDAO):
         schema.DocumentFromRecord.objects(id=record_id).batch(batch).delete()
         # Delete every piece of data
         # Done a bit differently because record_id isn't always the partition key
-        for name, datum in record['data'].iteritems():
+        for name, datum in six.iteritems(record['data']):
             schema.cross_batch_delete_data_tables(id=record_id,
                                                   name=name,
                                                   value=datum['value'],
@@ -318,40 +329,52 @@ class RecordDAO(dao.RecordDAO):
 
         :param kwargs: Pairs of the names of data and the criteria that data
                          must fulfill.
-        :returns: A generator of Records that fulfill all criteria.
+        :returns: A generator of Record ids that fulfill all criteria.
 
-        :raises ValueError: if not supplied at least one criterion.
+        :raises ValueError: if not supplied at least one criterion or given
+                            a criterion it does not support.
         """
         LOGGER.debug('Finding all records fulfilling criteria: {}'
                      .format(kwargs.items()))
-        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
+        # No kwargs is bad usage. Bad kwargs are caught in sort_and_standardize_criteria().
+        # We will always have at least one entry in one of scalar, string, scalarlist, etc.
         if not kwargs.items():
             raise ValueError("You must supply at least one criterion.")
-        scalar_criteria, string_criteria = sort_and_standardize_criteria(kwargs)
+        scalar, string, scalarlist, stringlist = utils.sort_and_standardize_criteria(kwargs)
+        result_ids = []
 
-        if scalar_criteria:
-            scalar_ids = self._apply_ranges_to_query(scalar_criteria,
-                                                     "scalar")
-        if string_criteria:
-            string_ids = self._apply_ranges_to_query(string_criteria,
-                                                     "string")
+        # String and scalar values can be passed directly to _apply_ranges_to_query
+        for criteria, table_type in ((scalar, "scalar"),
+                                     (string, "string")):
+            if criteria:
+                result_ids.append(self._apply_ranges_to_query(criteria,
+                                                              table_type))
 
-        # If we have more than one set of data, we need to perform a union.
-        # Cassandra doesn't support join-like operations, though, so we
-        # handle it. Note that we'll be storing a full list of ids in memory,
-        # but because Cassandra already required that to perform the query,
-        # we're not in danger of running out of memory if we've reached here.
-        if scalar_criteria and string_criteria:
-            string_ids = set(string_ids)
-            for id in scalar_ids:
-                if id in string_ids:
-                    yield id
-        # Otherwise, just find which one has something to return
-        elif scalar_criteria:
-            for id in scalar_ids:
+        # Different types of list criteria require different logic
+        for criteria, table_type in ((scalarlist, "scalarlist"),
+                                     (stringlist, "stringlist")):
+            for criterion in criteria:
+                # Unpack the criterion
+                datum_name, list_criteria = criterion
+                # has_all queries are broken up and treated like a scalar or string
+                if list_criteria.operation == utils.ListQueryOperation.ALL:
+                    criterion_tuples = [(datum_name, x) for x in list_criteria.entries]
+                    ids = self._apply_ranges_to_query(table=table_type, data=criterion_tuples)
+                    result_ids.append(ids)
+                else:
+                    raise ValueError("Currently, only {} list operations are supported. "
+                                     "Given {}".format(utils.ListQueryOperation.ALL,
+                                                       list_criteria.operation))
+
+        # If we have more than one set of data, we need to find the intersect.
+        if len(result_ids) > 1:
+            valid_ids = set(result_ids[0])
+            for entry in result_ids[1:]:
+                valid_ids = valid_ids.intersection(entry)
+            for id in valid_ids:
                 yield id
         else:
-            for id in string_ids:
+            for id in result_ids[0]:
                 yield id
 
     def _apply_ranges_to_query(self, data, table):
@@ -359,7 +382,8 @@ class RecordDAO(dao.RecordDAO):
         Return the ids of all Records whose data fulfill table-specific criteria.
 
         Done per table, unlike data_query. This is only meant to be used in
-        conjunction with data_query() and related. Criteria must be DataRanges.
+        conjunction with data_query() and related. Criteria can be DataRanges
+        or single values (12, "dog", etc).
 
         Because each piece of data is its own row and we need to compare between
         rows, we can't use a simple AND. In SQL, we get around this with
@@ -377,7 +401,6 @@ class RecordDAO(dao.RecordDAO):
         :returns: a generator of ids fitting the criteria
         """
         rec_table = table_lookup[table]["record_table"]
-        data_table = table_lookup[table]["data_table"]
         query = rec_table.objects
         # Cassandra requires a list for the in-predicate
         filtered_ids = list(self._configure_query_for_criteria(query,
@@ -385,11 +408,11 @@ class RecordDAO(dao.RecordDAO):
                                                                criteria=data[0][1])
                             .values_list('id', flat=True))
 
-        # Only do the next part if there's more scalars and at least one id
+        # Only do the next part if there's more criteria and at least one id
         for counter, (name, criteria) in enumerate(data[1:]):
             if filtered_ids:
-                query = (data_table.objects.filter(id__in=filtered_ids))
-                query = self._configure_query_for_criteria(query, name, criteria)
+                query = (self._configure_query_for_criteria(rec_table.objects, name, criteria)
+                         .filter(id__in=filtered_ids))
                 if counter < (len(data[1:]) - 1):
                     # Cassandra requires a list for the id__in attribute
                     filtered_ids = list(query.values_list('id', flat=True).all())
@@ -525,7 +548,9 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Configuring <query={}> with <criteria={}>.'
                      .format(query, criteria))
         query = query.filter(name=name)
-        if criteria.is_single_value():
+        if not isinstance(criteria, utils.DataRange):
+            query = query.filter(value=criteria)
+        elif criteria.is_single_value():
             query = query.filter(value=criteria.min)
         else:
             if criteria.min is not None:

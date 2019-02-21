@@ -141,7 +141,10 @@ class RecordDAO(object):
 
         :param kwargs: Pairs of the names of data and the criteria that data
                          must fulfill.
-        :returns: A list of ids of Records who fulfill all criteria.
+        :returns: A generator of Record ids that fulfill all criteria.
+
+        :raises ValueError: if not supplied at least one criterion or given
+                            a criterion it does not support
         """
         raise NotImplementedError
 
