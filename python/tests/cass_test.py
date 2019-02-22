@@ -13,7 +13,7 @@ from nose.plugins.attrib import attr
 
 import sina.datastores.cass as sina_cass
 import sina.datastores.cass_schema as schema
-from sina.utils import DataRange, import_json, has_all
+from sina.utils import DataRange, import_json, has_all, has_any
 
 from sina.model import Run, Record
 
@@ -477,6 +477,30 @@ class TestSearch(unittest.TestCase):
         get_with_mix = record_dao.data_query(toppings=has_all(DataRange("oniom", "onioo"),
                                                               "cheese"))
         self.assertEqual(list(get_with_mix), ["spam"])
+
+    def test_recorddao_list_data_query_any(self):
+        """Test that we're correctly retrieving Records on has_any list criteria."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+        record_dao.insert(Record(id="spam", type="run"))
+
+        get_one = list(record_dao.data_query(toppings=has_any("mushrooms")))
+        self.assertEqual(len(get_one), 1)
+        self.assertEqual(get_one[0], "spam2")
+
+        get_many = record_dao.data_query(toppings=has_any("onion", "mushrooms"))
+        self.assertIsInstance(get_many, types.GeneratorType)
+        six.assertCountEqual(self, list(get_many), ["spam", "spam2", "spam3"])
+        get_scalar = record_dao.data_query(egg_count=has_any(4, 12, 22))
+        six.assertCountEqual(self, list(get_scalar), ["spam", "spam2"])
+        get_with_datarange = record_dao.data_query(egg_count=has_any(DataRange(0, 5)))
+        six.assertCountEqual(self, list(get_with_datarange), ["spam"])
+        get_with_mix = record_dao.data_query(toppings=has_any(DataRange("oniom", "onioo"),
+                                                              "capsicum"))
+        six.assertCountEqual(self, list(get_with_mix), ["spam", "spam3"])
+        get_none = record_dao.data_query(toppings=has_any("capsicum", "anchovy"))
+        self.assertFalse(list(get_none))
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""

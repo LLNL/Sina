@@ -459,7 +459,7 @@ def has_all(*args):
 
     As an example of a "has_all", given "pineapple" and "cheese", as pizza
     toppings, "has_all" would match a "pineapple" and "cheese" pizza
-    or a"pineapple", "cheese", and "pepperoni" pizza, but not a plain "cheese"
+    or a "pineapple", "cheese", and "pepperoni" pizza, but not a plain "cheese"
     pizza.
 
     :param args: The values the ListCriteria will represent. Can be either single values
@@ -468,6 +468,23 @@ def has_all(*args):
     :returns: A ListCriteria object representing this criterion.
     """
     return ListCriteria(entries=args, operation="ALL")
+
+
+def has_any(*args):
+    """
+    Create a ListCriteria representing the "ANY" operator.
+
+    As an example of a "has_any", given "pineapple" and "cheese", as pizza
+    toppings, "has_any" would match a "pineapple" and "cheese" pizza
+    or a "pineapple", "cheese", and "pepperoni" pizza, or a plain "cheese"
+    pizza, but not a "pepperoni" pizza.
+
+    :param args: The values the ListCriteria will represent. Can be either single values
+                 (like "egg" or 12) or DataRanges. Every arg must represent the same
+                 type of data, either scalars or strings.
+    :returns: A ListCriteria object representing this criterion.
+    """
+    return ListCriteria(entries=args, operation="ANY")
 
 
 class ListCriteria(object):
