@@ -216,7 +216,6 @@ def _check_notebook_style(checker, path):
         errors = []
         if os.path.isfile(testname):
             if result:
-                check_outputs = _build_pep8_output(result)
                 with open(testname, "a") as outfile:
                     outfile.write("\n#################\n")
                     outfile.write("# {} Output #\n".format(checker))
