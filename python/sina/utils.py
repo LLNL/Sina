@@ -23,7 +23,12 @@ MAX_THREADS = 8
 
 
 class ListQueryOperation(Enum):
-    """Describe operations possible on ListCriteria."""
+    """
+    Describe operations possible on ListCriteria.
+
+    For descriptions of their functionality, see their helper methods
+    (has_all(), etc).
+    """
 
     ANY = "ANY"
     ALL = "ALL"
@@ -135,6 +140,64 @@ def _process_relationship_entry(entry, local_ids):
         LOGGER.error(msg)
         raise ValueError(msg)
     return (subj, obj)
+
+
+def invert_ranges(list_of_ranges):
+    """
+    Given a list of DataRanges, give a new list that represents their opposites.
+
+    Used for has_only queries involving ranges to produce criteria describing
+    what a Record must NOT contain.
+
+    :param list_of_ranges: A list of DataRanges to combine and invert.
+
+    :returns: A new list of DataRanges expressing the opposite criteria.
+
+    :raises ValueError: if given nothing to invert.
+    :raises TypeError: if given both numerical and lexicographic DataRanges.
+    """
+    if not list_of_ranges:
+        raise ValueError("list_of_ranges must contain at least one DataRange")
+    if not (all(x.is_numeric_range() for x in list_of_ranges)
+            or all(x.is_lexographic_range() for x in list_of_ranges)):
+        raise TypeError("list_of_ranges must be only numeric DataRanges or "
+                        "only lexicographic DataRanges")
+    # First, we sort the DataRanges with regards to their min (their "left side")
+    sorted_ranges = sorted(list_of_ranges, key=lambda range: range.min)
+    merged_ranges = [sorted_ranges[0]]
+    for current_range in sorted_ranges[1:]:
+        prior_range = merged_ranges[-1]
+        # Check for overlap
+        if (current_range.min < prior_range.max
+            or (current_range.min == prior_range.max
+                and (current_range.min_inclusive or prior_range.max_inclusive))):
+            new_range = DataRange(min=prior_range.min,
+                                  min_inclusive=prior_range.min_inclusive,
+                                  max=current_range.max,
+                                  max_inclusive=current_range.max_inclusive)
+            merged_ranges[-1] = new_range
+        else:
+            merged_ranges.append(current_range)
+    # If the "leftmost" DataRange is left-closed, we need the inverse to be left-open
+    if merged_ranges[0].min:
+        inverted_ranges = [DataRange(max=merged_ranges[0].min,
+                                     max_inclusive=(not merged_ranges[0].min_inclusive))]
+    else:
+        inverted_ranges = []
+    # We continue to find the "gap" between adjacent DataRanges
+    for x in range(len(merged_ranges)-1):
+        current_range = merged_ranges[x+1]
+        prior_range = merged_ranges[x]
+        new_range = DataRange(min=prior_range.max,
+                              min_inclusive=(not prior_range.max_inclusive),
+                              max=current_range.min,
+                              max_inclusive=(not current_range.min_inclusive))
+        inverted_ranges.append(new_range)
+    # As with the leftmost, the rightmost is special. We decide open or closed.
+    if merged_ranges[-1].max:
+        inverted_ranges.append(DataRange(min=merged_ranges[-1].max,
+                                         min_inclusive=(not merged_ranges[-1].max_inclusive)))
+    return inverted_ranges
 
 
 def intersect_ordered(iterables):
@@ -483,6 +546,22 @@ def has_any(*args):
     :returns: A ListCriteria object representing this criterion.
     """
     return ListCriteria(entries=args, operation="ANY")
+
+
+def has_only(*args):
+    """
+    Create a ListCriteria representing the "ONLY" operator.
+
+    As an example, has_only("pineapple", "cheese") would match
+    ["cheese", "pineapple", "cheese"], but not ["pineapple", "cheese", "pepperoni"]
+    or ["cheese"].
+
+    :param args: The values the ListCriteria will represent. Can be either single values
+                 (like "egg" or 12) or DataRanges. Every arg must represent the same
+                 type of data, either scalars or strings.
+    :returns: A ListCriteria object representing this criterion.
+    """
+    return ListCriteria(entries=args, operation="ONLY")
 
 
 class ListCriteria(object):

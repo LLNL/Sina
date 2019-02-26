@@ -162,6 +162,50 @@ class TestSinaUtils(unittest.TestCase):
         no_iterator = sina.utils.intersect_ordered([])
         self.assertTrue(isinstance(no_iterator, GeneratorType))
 
+    def test_invert_ranges_one_range(self):
+        """Test that we correctly invert a single DataRange."""
+        range = DataRange(min=2, max=4)
+        opposite_ranges = [DataRange(max=2, max_inclusive=False),
+                           DataRange(min=4, min_inclusive=True)]
+        self.assertEqual(sina.utils.invert_ranges([range]), opposite_ranges)
+
+    def test_invert_ranges_many_ranges(self):
+        """Test that we correctly invert multiple DataRanges."""
+        ranges = [DataRange(max=2, max_inclusive=False),
+                  DataRange(min=4, min_inclusive=True)]
+        opposite_range = DataRange(min=2, max=4)
+        self.assertEqual(sina.utils.invert_ranges(ranges), [opposite_range])
+
+    def test_invert_ranges_overlapping_ranges(self):
+        """Test that we merge overlapping DataRanges before inverting."""
+        ranges = [DataRange(max=2, max_inclusive=False),
+                  DataRange(min=1, max=5)]
+        opposite_range = DataRange(min=5, min_inclusive=True)
+        self.assertEqual(sina.utils.invert_ranges(ranges), [opposite_range])
+
+    def test_invert_ranges_strings(self):
+        """Test that range inversion works with strings."""
+        ranges = [DataRange(max="cat", max_inclusive=True),
+                  DataRange(min="dog", min_inclusive=False)]
+        opposite_range = DataRange(min="cat", max="dog",
+                                   min_inclusive=False, max_inclusive=True)
+        self.assertEqual(sina.utils.invert_ranges(ranges), [opposite_range])
+
+    def test_invert_ranges_multitype_error(self):
+        """Test that a TypeError is raised if mixed types of ranges are inverted."""
+        ranges = [DataRange(max="cat", max_inclusive=True),
+                  DataRange(min=2, min_inclusive=False)]
+        with self.assertRaises(TypeError) as context:
+            sina.utils.invert_ranges(ranges)
+        self.assertIn('must be only numeric DataRanges or', str(context.exception))
+
+    def test_invert_ranges_none_error(self):
+        """Test that a ValueError is raised if no ranges are inverted."""
+        ranges = []
+        with self.assertRaises(ValueError) as context:
+            sina.utils.invert_ranges(ranges)
+        self.assertIn('must contain at least one DataRange', str(context.exception))
+
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""
         basic_case = DataRange(1, 2)
@@ -406,6 +450,13 @@ class TestSinaUtils(unittest.TestCase):
         equiv = ListCriteria(entries=("spam", "egg"), operation="ANY")
         self.assertEqual(has_any.entries, equiv.entries)
         self.assertEqual(has_any.operation, equiv.operation)
+
+    def test_has_only(self):
+        """Test that has_only is creating the expected ListCriteria object."""
+        has_only = sina.utils.has_only("spam", "egg")
+        equiv = ListCriteria(entries=("spam", "egg"), operation="ONLY")
+        self.assertEqual(has_only.entries, equiv.entries)
+        self.assertEqual(has_only.operation, equiv.operation)
 
     def test_sort_and_standardizing(self):
         """Test the function for processing query criteria."""
