@@ -400,6 +400,13 @@ class TestSinaUtils(unittest.TestCase):
         self.assertEqual(has_all.entries, equiv.entries)
         self.assertEqual(has_all.operation, equiv.operation)
 
+    def test_has_any(self):
+        """Test that has_any is creating the expected ListCriteria object."""
+        has_any = sina.utils.has_any("spam", "egg")
+        equiv = ListCriteria(entries=("spam", "egg"), operation="ANY")
+        self.assertEqual(has_any.entries, equiv.entries)
+        self.assertEqual(has_any.operation, equiv.operation)
+
     def test_sort_and_standardizing(self):
         """Test the function for processing query criteria."""
         criteria = {"numra": DataRange(1, 2),
