@@ -13,9 +13,22 @@
 # (Sources: https://stackoverflow.com/questions/12199059,
 #  https://unix.stackexchange.com/questions/84814)
 #
-# It is important to note that the laptop must have the necessary certificates
-# in order to build using the LC wheelhouse URI.
-HAVE_WHEELHOUSE=$(shell if curl -sSf -o /dev/null https://www-lc.llnl.gov/python/wheelhouse; then echo 1; else echo 0; fi)
+# Notice the use of curl's '-k' (or insecure) option to check access to the
+# LC wheelhouse URI.
+HAVE_WHEELHOUSE=$(shell if curl -sSfk -o /dev/null https://www-lc.llnl.gov/python/wheelhouse; then echo 1; else echo 0; fi)
+
+# Workaround for pip install failing to recognize --trusted-host options
+# in requirements files (see https://github.com/pypa/pip/issues/3799).
+#
+# WARNING: Adding --no-index option below can cause the build to fail on a
+# Mac ("no such option --trusted-host"); wherease, leaving it out resulted
+# in pythonhosted.org used to upgrade pip then the trusted host for the
+# requirements file.
+ifeq ($(HAVE_WHEELHOUSE),1)
+  PIP_OPTIONS:=--trusted-host www-lc.llnl.gov $(PIP_OPTIONS)
+else
+  PIP_OPTIONS:=$(PIP_OPTIONS)
+endif
 
 # We'll also check if we have access to LC and internal wheelhouses
 LC_WHEELHOUSE_DIR=/usr/gapps/python/wheelhouse
@@ -64,10 +77,10 @@ install: links
 	else \
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
-	$(VENV)/bin/pip install --upgrade pip; \
-	$(VENV)/bin/pip install -r requirements/development.txt; \
+	$(VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip; \
+	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/development.txt; \
 	if test -z "$(NETWORK)"; then \
-	  $(VENV)/bin/pip install -e .[jupyter]; \
+	  $(VENV)/bin/pip install $(PIP_OPTIONS) -e .[jupyter]; \
 	fi; \
 	echo $(PR_ACT)
 
