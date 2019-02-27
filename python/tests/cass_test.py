@@ -478,29 +478,62 @@ class TestSearch(unittest.TestCase):
                                                               "cheese"))
         self.assertEqual(list(get_with_mix), ["spam"])
 
-    def test_recorddao_list_data_query_any(self):
-        """Test that we're correctly retrieving Records on has_any list criteria."""
+    def test_recorddao_list_data_query_any_one(self):
+        """Test that we're correctly retrieving a Record on has_any list criteria."""
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
         record_dao = factory.createRecordDAO()
         _populate_database_with_data()
-        record_dao.insert(Record(id="spam", type="run"))
 
         get_one = list(record_dao.data_query(toppings=has_any("mushrooms")))
         self.assertEqual(len(get_one), 1)
         self.assertEqual(get_one[0], "spam2")
 
+    def test_recorddao_list_data_query_any_many(self):
+        """Test that we're correctly retrieving Records on has_any list criteria."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+
         get_many = record_dao.data_query(toppings=has_any("onion", "mushrooms"))
         self.assertIsInstance(get_many, types.GeneratorType)
         six.assertCountEqual(self, list(get_many), ["spam", "spam2", "spam3"])
+
+    def test_recorddao_list_data_query_any_none(self):
+        """Test that we're correctly retrieving no Records on unmatched has_any list criteria."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+
+        get_none = record_dao.data_query(toppings=has_any("capsicum", "anchovy"))
+        self.assertFalse(list(get_none))
+
+    def test_recorddao_list_data_query_any_scalar(self):
+        """Test that has_any works with scalars."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+
         get_scalar = record_dao.data_query(egg_count=has_any(4, 12, 22))
         six.assertCountEqual(self, list(get_scalar), ["spam", "spam2"])
-        get_with_datarange = record_dao.data_query(egg_count=has_any(DataRange(0, 5)))
-        six.assertCountEqual(self, list(get_with_datarange), ["spam"])
+
+    def test_recorddao_list_data_query_any_mixed(self):
+        """Test that has_any works with scalars."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+
         get_with_mix = record_dao.data_query(toppings=has_any(DataRange("oniom", "onioo"),
                                                               "capsicum"))
         six.assertCountEqual(self, list(get_with_mix), ["spam", "spam3"])
-        get_none = record_dao.data_query(toppings=has_any("capsicum", "anchovy"))
-        self.assertFalse(list(get_none))
+
+    def test_recorddao_list_data_query_any_ranges(self):
+        """Test that has_any works with DataRanges."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+
+        get_with_datarange = record_dao.data_query(egg_count=has_any(DataRange(0, 5)))
+        six.assertCountEqual(self, list(get_with_datarange), ["spam"])
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
