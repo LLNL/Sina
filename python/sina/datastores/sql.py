@@ -223,13 +223,21 @@ class RecordDAO(dao.RecordDAO):
                 datum_name, list_criteria = criterion
                 # has_all queries are broken up and treated like a scalar or string
                 if list_criteria.operation == utils.ListQueryOperation.ALL:
-                    ids = self.get_list_has_all(datum_name=datum_name,
-                                                list_of_contents=list_criteria.entries,
-                                                ids_only=True)
+                    ids = self.get_list(datum_name=datum_name,
+                                        list_of_contents=list_criteria.entries,
+                                        ids_only=True,
+                                        operation=list_criteria.operation)
+                    result_ids.append(ids)
+                elif list_criteria.operation == utils.ListQueryOperation.ANY:
+                    ids = self.get_list(datum_name=datum_name,
+                                        list_of_contents=list_criteria.entries,
+                                        ids_only=True,
+                                        operation=list_criteria.operation)
                     result_ids.append(ids)
                 else:
-                    raise ValueError("Currently, only {} list operations are supported. "
+                    raise ValueError("Currently, only [{}, {}] list operations are supported. "
                                      "Given {}".format(utils.ListQueryOperation.ALL,
+                                                       utils.ListQueryOperation.ANY,
                                                        list_criteria.operation))
         # If we have more than one set of data, we need to find the intersect.
         if len(result_ids) > 1:
@@ -278,17 +286,18 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
-    def get_list_has_all(self,
-                         datum_name,
-                         list_of_contents,
-                         ids_only=False):
+    def get_list(self,
+                 datum_name,
+                 list_of_contents,
+                 operation,
+                 ids_only=False):
         """
-        Given a list datum's name and values, return Records where the datum contains all values.
+        Given a list datum's name and values, return Records where the datum contains those values.
 
-        As an example, given "pizza_toppings" and ["pineapple", "cheese"],
-        this method would return Records where "pizza_toppings" is
-        ["pineapple", "cheese"] or ["pineapple", "cheese", "pepperoni"], but
-        not just ["cheese"].
+        As an example, given "pizza_toppings", ["pineapple", "cheese"], and the
+        operation of ListQueryOperation.ALL, this method would return Records
+        where "pizza_toppings" is ["pineapple", "cheese"] or
+        ["pineapple", "cheese", "pepperoni"], but not just ["cheese"].
 
         Note that if datum_name isn't found, no record_ids will be found, so be
         sure datum_name is the name of a list-type datum (timeseries, etc).
@@ -296,6 +305,7 @@ class RecordDAO(dao.RecordDAO):
         :param datum_name: The name of the datum
         :param list_of_contents: All the values datum_name must contain. Can be
                                  single values ("egg", 12) or DataRanges.
+        :pram operation: What kind of ListQueryOperation to do.
         :param ids_only: Whether to only return ids rather than full Records.
         :returns: A generator of ids of matching Records or the Records
                   themselves (see ids_only).
@@ -337,8 +347,10 @@ class RecordDAO(dao.RecordDAO):
             raise TypeError("list_of_contents must be only strings or only scalars")
         # This reduce "ands" together all the sets (one per criterion),
         # creating one set that adheres to all our individual criterion sets.
-        record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
-
+        if operation == utils.ListQueryOperation.ALL:
+            record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
+        elif operation == utils.ListQueryOperation.ANY:
+            record_ids = set.union(*list_of_record_ids_sets)
         if ids_only:
             for record_id in record_ids:
                 yield record_id
