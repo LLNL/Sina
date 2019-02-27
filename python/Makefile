@@ -83,9 +83,20 @@ links:
 	  fi; \
 	fi
 
+# Adding PEP8 as an optional check until we discuss which flake8 plugins
+# we want to add.
+pep8: export PATH=$(TEST_PATH)
+pep8:
+	@if test ! -d $(TEST_VENV); then \
+	  echo "Making test virtual environment in $(TEST_VENV)"; \
+	  make --no-print-directory install VENV=$(TEST_VENV); \
+	else \
+	  echo "You already have the test virtual environment $(TEST_VENV)"; \
+	fi; \
+	$(TEST_VENV)/bin/tox -e pep8
+
 
 # Set up a clean test virtual environment before running tests.
-
 # Recursively call make to ensure the work is done in the specified order
 tests: export PATH=$(TEST_PATH)
 tests: links

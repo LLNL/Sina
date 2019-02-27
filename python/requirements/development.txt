@@ -4,7 +4,6 @@
 # Development dependencies
 tox
 flake8
-pep8
 mock
 jsonschema
 
