@@ -142,6 +142,45 @@ def _process_relationship_entry(entry, local_ids):
     return (subj, obj)
 
 
+def merge_ranges(list_of_ranges):
+    """
+    Given a list of DataRanges, merge together any that overlap.
+
+    The new list will be ordered by the ranges' minimums in ascending order.
+
+    :param list_of_ranges: A list of DataRanges to combine.
+
+    :returns: list_of_ranges but merged where applicable and sorted by
+              minimums in ascending order.
+    """
+    # First, we sort the DataRanges with regards to their min (their "left side")
+    # This is done to make simple, accurate comparisons; if our ranges are ordered,
+    # we can compare a max to its following min, rather than trying to maintain
+    # awareness of the full list. The "range.min is not None" clause makes sure None is
+    # considered the "smallest possible" for Python 3.
+    sorted_ranges = sorted(list_of_ranges, key=lambda range: (range.min is not None, range.min))
+
+    merged_ranges = [sorted_ranges[0]]
+    for _range in sorted_ranges[1:]:
+        # Prior_range is always the most recent entry in merged_ranges
+        prior_range = merged_ranges[-1]
+        if _range.overlaps(prior_range):
+            # In case one range encompasses another (remember that max==None represents infinity)
+            if (_range.max is None or
+                    (prior_range.max is not None and _range.max > prior_range.max)):
+                max_range = _range
+            else:
+                max_range = prior_range
+            new_range = DataRange(min=prior_range.min,
+                                  min_inclusive=prior_range.min_inclusive,
+                                  max=max_range.max,
+                                  max_inclusive=max_range.max_inclusive)
+            merged_ranges[-1] = new_range
+        else:
+            merged_ranges.append(_range)
+    return merged_ranges
+
+
 def invert_ranges(list_of_ranges):
     """
     Given a list of DataRanges, give a new list that represents their opposites.
@@ -153,31 +192,18 @@ def invert_ranges(list_of_ranges):
 
     :returns: A new list of DataRanges expressing the opposite criteria.
 
-    :raises ValueError: if given nothing to invert.
+    :raises ValueError: if given nothing to invert; "nothing" inverted is "everything",
+                        but we don't allow DataRanges with both ends open, as we
+                        won't know if we should be comparing to scalars or strings.
     :raises TypeError: if given both numerical and lexicographic DataRanges.
     """
     if not list_of_ranges:
         raise ValueError("list_of_ranges must contain at least one DataRange")
-    if not (all(x.is_numeric_range() for x in list_of_ranges)
-            or all(x.is_lexographic_range() for x in list_of_ranges)):
+    if not (all(x.is_numeric_range() for x in list_of_ranges) or
+            all(x.is_lexographic_range() for x in list_of_ranges)):
         raise TypeError("list_of_ranges must be only numeric DataRanges or "
                         "only lexicographic DataRanges")
-    # First, we sort the DataRanges with regards to their min (their "left side")
-    sorted_ranges = sorted(list_of_ranges, key=lambda range: range.min)
-    merged_ranges = [sorted_ranges[0]]
-    for current_range in sorted_ranges[1:]:
-        prior_range = merged_ranges[-1]
-        # Check for overlap
-        if (current_range.min < prior_range.max
-            or (current_range.min == prior_range.max
-                and (current_range.min_inclusive or prior_range.max_inclusive))):
-            new_range = DataRange(min=prior_range.min,
-                                  min_inclusive=prior_range.min_inclusive,
-                                  max=current_range.max,
-                                  max_inclusive=current_range.max_inclusive)
-            merged_ranges[-1] = new_range
-        else:
-            merged_ranges.append(current_range)
+    merged_ranges = merge_ranges(list_of_ranges)
     # If the "leftmost" DataRange is left-closed, we need the inverse to be left-open
     if merged_ranges[0].min:
         inverted_ranges = [DataRange(max=merged_ranges[0].min,
@@ -185,9 +211,7 @@ def invert_ranges(list_of_ranges):
     else:
         inverted_ranges = []
     # We continue to find the "gap" between adjacent DataRanges
-    for x in range(len(merged_ranges)-1):
-        current_range = merged_ranges[x+1]
-        prior_range = merged_ranges[x]
+    for prior_range, current_range in zip(merged_ranges[:-1], merged_ranges[1:]):
         new_range = DataRange(min=prior_range.max,
                               min_inclusive=(not prior_range.max_inclusive),
                               max=current_range.min,
@@ -789,6 +813,28 @@ class DataRange(object):
         (x<"dog" vs "cat"<x<"dog").
         """
         return (isinstance(self.min, string_types) or isinstance(self.max, string_types))
+
+    def overlaps(self, other):
+        """
+        Return whether this DataRange and another overlap.
+
+        :param other: Another DataRange to check against for overlap.
+        :returns: Whether or not this DataRange and the other overlap.
+
+        :raises TypeError: If trying to check DataRanges of mismatched type for overlap.
+        """
+        if not (self.is_numeric_range() == other.is_numeric_range()):
+            # Comparing numbers and strings may give unexpected behavior. Conceptually
+            # they *don't* overlap, but in Python they do; better to leave it to the user.
+            raise TypeError("Only DataRanges of the same type (numeric or lexicographic)"
+                            " can be tested for overlap.")
+        # We standardize our logic by figuring out which is the "lesser" (leftmost on numberline)
+        if self.min is None or (other.min is not None and self.min < other.min):
+            lesser, greater = self, other
+        else:
+            lesser, greater = other, self
+        return (lesser.max > greater.min or
+                (lesser.max == greater.min and (lesser.max_inclusive or greater.min_inclusive)))
 
     def parse_min(self, min_range):
         """

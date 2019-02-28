@@ -162,6 +162,36 @@ class TestSinaUtils(unittest.TestCase):
         no_iterator = sina.utils.intersect_ordered([])
         self.assertTrue(isinstance(no_iterator, GeneratorType))
 
+    def test_merge_overlapping_ranges(self):
+        """Test that we merge overlapping DataRanges."""
+        ranges = [DataRange(max=0),
+                  DataRange(min=0, max=5),
+                  DataRange(min=3, max=4)]
+        merged_range = DataRange(max=5)
+        self.assertEqual(sina.utils.merge_ranges(ranges), [merged_range])
+
+    def test_merge_non_overlapping_ranges(self):
+        """Test that we don't merge non-overlapping DataRanges."""
+        ranges = [DataRange(min=3, max=4),
+                  DataRange(min=5, max=6)]
+        self.assertEqual(sina.utils.merge_ranges(ranges), ranges)
+
+    def test_merge_disordered_ranges(self):
+        """Test that we correctly order our ranges and their mergings."""
+        ranges = [DataRange(min=5.5),
+                  DataRange(min=3, max=4, min_inclusive=False),
+                  DataRange(min=5, max=6)]
+        merged_ranges = [DataRange(min=3, max=4, min_inclusive=False),
+                         DataRange(min=5)]
+        self.assertEqual(sina.utils.merge_ranges(ranges), merged_ranges)
+
+    def test_merge_string_ranges(self):
+        """Test that we merge string ranges correctly."""
+        ranges = [DataRange(min="cat", max="giraffe", min_inclusive=False),
+                  DataRange(min="dog", max="zebra")]
+        merged_ranges = [DataRange(min="cat", max="zebra", min_inclusive=False)]
+        self.assertEqual(sina.utils.merge_ranges(ranges), merged_ranges)
+
     def test_invert_ranges_one_range(self):
         """Test that we correctly invert a single DataRange."""
         range = DataRange(min=2, max=4)
@@ -174,13 +204,6 @@ class TestSinaUtils(unittest.TestCase):
         ranges = [DataRange(max=2, max_inclusive=False),
                   DataRange(min=4, min_inclusive=True)]
         opposite_range = DataRange(min=2, max=4)
-        self.assertEqual(sina.utils.invert_ranges(ranges), [opposite_range])
-
-    def test_invert_ranges_overlapping_ranges(self):
-        """Test that we merge overlapping DataRanges before inverting."""
-        ranges = [DataRange(max=2, max_inclusive=False),
-                  DataRange(min=1, max=5)]
-        opposite_range = DataRange(min=5, min_inclusive=True)
         self.assertEqual(sina.utils.invert_ranges(ranges), [opposite_range])
 
     def test_invert_ranges_strings(self):
@@ -269,6 +292,35 @@ class TestSinaUtils(unittest.TestCase):
         self.assertFalse(100 in inf_max)
         self.assertTrue("foo_c" in with_strings)
         self.assertFalse("foo_a" in with_strings)
+
+    def test_data_range_overlaps(self):
+        """Test that we detect when DataRanges overlap."""
+        lesser = DataRange(1, None)
+        greater = DataRange(-4, 5)
+        self.assertTrue(lesser.overlaps(greater))
+        self.assertTrue(greater.overlaps(lesser))
+
+    def test_data_range_no_overlap(self):
+        """Test that we detect when DataRanges don't overlap."""
+        lesser = DataRange(1, 2)
+        greater = DataRange(3, 5)
+        self.assertFalse(lesser.overlaps(greater))
+        self.assertFalse(greater.overlaps(lesser))
+
+    def test_data_range_overlap_strings(self):
+        """Test that we detect overlapping string DataRanges."""
+        lesser = DataRange("cat", "horse")
+        greater = DataRange("dog", "fish")
+        self.assertTrue(greater.overlaps(lesser))
+
+    def test_data_range_overlap_bad_types(self):
+        """Test that we refuse to check type-mismatched DataRanges for overlap."""
+        strings = DataRange("cat", "horse")
+        scalars = DataRange(42, 45)
+        with self.assertRaises(TypeError) as context:
+            self.assertFalse(strings.overlaps(scalars))
+        self.assertIn('Only DataRanges of the same type (numeric or lexicographic)',
+                      str(context.exception))
 
     def test_data_range_is_single(self):
         """Test the DataRange is_single_value method."""
