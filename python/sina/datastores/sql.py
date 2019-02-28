@@ -222,13 +222,9 @@ class RecordDAO(dao.RecordDAO):
                 # Unpack the criterion
                 datum_name, list_criteria = criterion
                 # has_all queries are broken up and treated like a scalar or string
-                if list_criteria.operation == utils.ListQueryOperation.ALL:
-                    ids = self.get_list(datum_name=datum_name,
-                                        list_of_contents=list_criteria.entries,
-                                        ids_only=True,
-                                        operation=list_criteria.operation)
-                    result_ids.append(ids)
-                elif list_criteria.operation == utils.ListQueryOperation.ANY:
+                if (list_criteria.operation in
+                    [utils.ListQueryOperation.ALL,
+                     utils.ListQueryOperation.ANY]):
                     ids = self.get_list(datum_name=datum_name,
                                         list_of_contents=list_criteria.entries,
                                         ids_only=True,
