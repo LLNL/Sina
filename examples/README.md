@@ -55,10 +55,9 @@ Naming Conventions
 
 Facilitating sharing of individual example files outside of the context of 
 repository clones involves ensuring that converters and example scripts
-include the name of the dataset on which they operate.  So each 
-The directory name shall be the name of the dataset and the names of associated
-converters, ingestors, and example scripts shall start with the name of the
-dataset.  
+include the name of the dataset on which they operate.  So each directory name 
+shall be the name of the dataset. Also, the names of associated converters, 
+ingestors, and example scripts shall start with the name of the dataset.  
 
 Furthermore, the name of each converter script shall conform to the convention
 of `dataset_sourcetype2desttype.py`, where `dataset` is replaced with the name 
