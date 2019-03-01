@@ -81,10 +81,10 @@ README
 
 Each example is required to have a README.md file that includes:
 
-1. Describe the dataset;
-1. Describe the records extracted from the dataset;
-1. Describe the process for building the database; and
-1. List references that include attribution to the source of the data.
+1. a description of the dataset;
+1. a description of the records extracted from the dataset;
+1. a description of the process for building the database; and
+1.  references that include attribution to the source of the data to include links and or copyright information.
 
 *It is critical that the README.md file includes appropriate attribution.*
 For Open datasets, this mean there is a URL to the data source.  Data
