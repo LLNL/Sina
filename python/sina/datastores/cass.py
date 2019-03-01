@@ -452,7 +452,8 @@ class RecordDAO(dao.RecordDAO):
         # dedicated query table that stores list data as a set (order and count are explicitly
         # ignored for has_only). This will only work if has_only is invoked with no
         # DataRanges. Until then, we convert simple equivalence (x="foo") to DataRanges.
-        ranges = [x if isinstance(x, utils.DataRange) else utils.DataRange(x, x, max_inclusive=True)
+        ranges = [x if isinstance(x, utils.DataRange)
+                  else utils.DataRange(x, x, max_inclusive=True)
                   for x in datum_criteria]
         excluded_ids = self._apply_has_any_to_query(datum_name,
                                                     utils.invert_ranges(ranges),
@@ -532,12 +533,12 @@ class RecordDAO(dao.RecordDAO):
         elif criteria.is_single_value():
             query = query.filter(value=criteria.min)
         else:
-            if criteria.min is not None:
+            if criteria.min_is_finite():
                 if criteria.min_inclusive:
                     query = query.filter(value__gte=criteria.min)
                 else:
                     query = query.filter(value__gt=criteria.min)
-            if criteria.max is not None:
+            if criteria.max_is_finite():
                 if criteria.max_inclusive:
                     query = query.filter(value__lte=criteria.max)
                 else:

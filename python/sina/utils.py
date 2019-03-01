@@ -166,8 +166,8 @@ def merge_ranges(list_of_ranges):
         prior_range = merged_ranges[-1]
         if _range.overlaps(prior_range):
             # In case one range encompasses another (remember that max==None represents infinity)
-            if (_range.max is None or
-                    (prior_range.max is not None and _range.max > prior_range.max)):
+            if (not _range.max_is_finite() or
+                    (prior_range.max_is_finite() and _range.max > prior_range.max)):
                 max_range = _range
             else:
                 max_range = prior_range
@@ -205,7 +205,7 @@ def invert_ranges(list_of_ranges):
                         "only lexicographic DataRanges")
     merged_ranges = merge_ranges(list_of_ranges)
     # If the "leftmost" DataRange is left-closed, we need the inverse to be left-open
-    if merged_ranges[0].min:
+    if merged_ranges[0].min_is_finite():
         inverted_ranges = [DataRange(max=merged_ranges[0].min,
                                      max_inclusive=(not merged_ranges[0].min_inclusive))]
     else:
@@ -218,7 +218,7 @@ def invert_ranges(list_of_ranges):
                               max_inclusive=(not current_range.min_inclusive))
         inverted_ranges.append(new_range)
     # As with the leftmost, the rightmost is special. We decide open or closed.
-    if merged_ranges[-1].max:
+    if merged_ranges[-1].max_is_finite():
         inverted_ranges.append(DataRange(min=merged_ranges[-1].max,
                                          min_inclusive=(not merged_ranges[-1].max_inclusive)))
     return inverted_ranges
@@ -758,8 +758,8 @@ class DataRange(object):
     def __str__(self):
         """Return a DataRange in range format ({x, y} [x, y}, {,y], etc.)."""
         return "{}{}, {}{}".format(("[" if self.min_inclusive else "("),
-                                   (self.min if self.min is not None else "-inf"),
-                                   (self.max if self.max is not None else "inf"),
+                                   (self.min if self.min_is_finite() else "-inf"),
+                                   (self.max if self.max_is_finite() else "inf"),
                                    ("]" if self.max_inclusive else ")"))
 
     def __contains__(self, value):
@@ -768,11 +768,11 @@ class DataRange(object):
 
         :param other: The value to check.
         """
-        if self.min is not None:
+        if self.min_is_finite():
             greater_than_min = value >= self.min if self.min_inclusive else value > self.min
         else:
             greater_than_min = True
-        if self.max is not None:
+        if self.max_is_finite():
             less_than_max = value <= self.max if self.max_inclusive else value < self.max
         else:
             less_than_max = True
@@ -803,6 +803,26 @@ class DataRange(object):
         # and max can't both be None, and they can't be equal but not inclusive.
         return self.min == self.max
 
+    def max_is_finite(self):
+        """
+        Return whether the DataRange has a finite max bound.
+
+        Used to clarify what code is checking for where DataRanges are
+        involved, and to help avoid pitfalls with Python's "0 is False" behavior
+        (if datarange.max).
+
+        :returns: whether self.max is finite. If False, its upper bound is infinity.
+        """
+        return self.max is not None
+
+    def min_is_finite(self):
+        """
+        Return whether the DataRange has finite min bound.
+
+        :returns: whether self.min is finite. If False, its lower bound is negative infinity.
+        """
+        return self.min is not None
+
     def is_lexographic_range(self):
         """
         Return whether the DataRange describes a lexographic range.
@@ -829,7 +849,7 @@ class DataRange(object):
             raise TypeError("Only DataRanges of the same type (numeric or lexicographic)"
                             " can be tested for overlap.")
         # We standardize our logic by figuring out which is the "lesser" (leftmost on numberline)
-        if self.min is None or (other.min is not None and self.min < other.min):
+        if not self.min_is_finite() or (other.min_is_finite() and self.min < other.min):
             lesser, greater = self, other
         else:
             lesser, greater = other, self
@@ -930,13 +950,13 @@ class DataRange(object):
         # This method defines the assumptions we make about DataRanges. If you
         # change this logic, methods like is_single_value() need changed as well
         LOGGER.debug('Validating and standardizing range of: {}'.format(self))
-        if self.min is None and self.max is None:
+        if (not self.min_is_finite()) and (not self.max_is_finite()):
             raise ValueError("Null DataRange; min or max must be defined")
         try:
             # Case 1: min or max is number. Other must be number or None.
             if isinstance(self.min, Real) or isinstance(self.max, Real):
-                self.min = float(self.min) if self.min is not None else None
-                self.max = float(self.max) if self.max is not None else None
+                self.min = float(self.min) if self.min_is_finite() else None
+                self.max = float(self.max) if self.max_is_finite() else None
             # Case 2: neither min nor max is number. Both must be None or string
             elif (not isinstance(self.min, (string_types, type(None)) or
                   not isinstance(self.max, (string_types, type(None))))):
@@ -948,9 +968,9 @@ class DataRange(object):
             LOGGER.error(msg)
             raise TypeError(msg)  # TypeError, as ValueError is a bit broad
 
-        if self.min is not None:
-            min_gt_max = self.max is not None and self.min > self.max
-            max_eq_min = self.max is not None and self.min == self.max
+        if self.min_is_finite():
+            min_gt_max = self.max_is_finite() and self.min > self.max
+            max_eq_min = self.max_is_finite() and self.min == self.max
             impossible_range = max_eq_min and not (self.min_inclusive and self.max_inclusive)
             if min_gt_max or impossible_range:
                 msg = ("Bad range for data, min must be <= max: {}"

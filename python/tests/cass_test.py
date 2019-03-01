@@ -84,7 +84,7 @@ def _populate_database_with_data():
                                       value=["cayenne", "paprika"])
     schema.cross_populate_data_tables(id="spam2",
                                       name="spices",
-                                      value=["paprika", "cayenne"])
+                                      value=["paprika", "cayenne", "cayenne"])
     schema.cross_populate_data_tables(id="spam3",
                                       name="spices",
                                       value=["paprika", "garlic salt", "cayenne"])

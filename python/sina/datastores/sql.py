@@ -513,13 +513,13 @@ class RecordDAO(dao.RecordDAO):
         elif criteria.is_single_value():
             conditions.append(" = :eq{}{}".format(index, offset))
         else:
-            if criteria.min is not None:
+            if criteria.min_is_finite():
                 conditions.append(" >= " if criteria.min_inclusive else " > ")
                 conditions.append(":min{}{}".format(index, offset))
             # If two-sided range, begin preparing new condition
-            if (criteria.min is not None) and (criteria.max is not None):
+            if (criteria.min_is_finite()) and (criteria.max_is_finite()):
                 conditions.append(" AND {}.value ".format(tablename))
-            if criteria.max is not None:
+            if criteria.max_is_finite():
                 conditions.append(" <= " if criteria.max_inclusive else " < ")
                 conditions.append(":max{}{}".format(index, offset))
         # This helper method should NEVER see a (None, None) range due to the
