@@ -199,6 +199,17 @@ class TestSinaUtils(unittest.TestCase):
                            DataRange(min=4, min_inclusive=True)]
         self.assertEqual(sina.utils.invert_ranges([range]), opposite_ranges)
 
+    def test_invert_ranges_one_range_zeroes(self):
+        """
+        Test that we correctly invert a single DataRange.
+
+        Checks for correct behavior on range bounds that are "Falsey" (ex: zero).
+        """
+        range = DataRange(min=0, max=0, max_inclusive=True)
+        opposite_ranges = [DataRange(max=0),
+                           DataRange(min=0, min_inclusive=False)]
+        self.assertEqual(sina.utils.invert_ranges([range]), opposite_ranges)
+
     def test_invert_ranges_many_ranges(self):
         """Test that we correctly invert multiple DataRanges."""
         ranges = [DataRange(max=2, max_inclusive=False),
@@ -321,6 +332,20 @@ class TestSinaUtils(unittest.TestCase):
             self.assertFalse(strings.overlaps(scalars))
         self.assertIn('Only DataRanges of the same type (numeric or lexicographic)',
                       str(context.exception))
+
+    def test_data_range_min_is_finite(self):
+        """Test that we correctly detect a DataRanges with closed min bounds."""
+        open_min = DataRange(max=12)
+        bounded_min = DataRange(min=12)
+        self.assertFalse(open_min.min_is_finite())
+        self.assertTrue(bounded_min.min_is_finite())
+
+    def test_data_range_max_is_finite(self):
+        """Test that we correctly detect a DataRanges with closed max bounds."""
+        open_max = DataRange(min=12)
+        bounded_max = DataRange(max=12)
+        self.assertFalse(open_max.max_is_finite())
+        self.assertTrue(bounded_max.max_is_finite())
 
     def test_data_range_is_single(self):
         """Test the DataRange is_single_value method."""
