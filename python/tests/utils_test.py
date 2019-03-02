@@ -162,6 +162,84 @@ class TestSinaUtils(unittest.TestCase):
         no_iterator = sina.utils.intersect_ordered([])
         self.assertTrue(isinstance(no_iterator, GeneratorType))
 
+    def test_merge_overlapping_ranges(self):
+        """Test that we merge overlapping DataRanges."""
+        ranges = [DataRange(max=0),
+                  DataRange(min=0, max=5),
+                  DataRange(min=3, max=4)]
+        merged_range = DataRange(max=5)
+        self.assertEqual(sina.utils.merge_ranges(ranges), [merged_range])
+
+    def test_merge_non_overlapping_ranges(self):
+        """Test that we don't merge non-overlapping DataRanges."""
+        ranges = [DataRange(min=3, max=4),
+                  DataRange(min=5, max=6)]
+        self.assertEqual(sina.utils.merge_ranges(ranges), ranges)
+
+    def test_merge_disordered_ranges(self):
+        """Test that we correctly order our ranges and their mergings."""
+        ranges = [DataRange(min=5.5),
+                  DataRange(min=3, max=4, min_inclusive=False),
+                  DataRange(min=5, max=6)]
+        merged_ranges = [DataRange(min=3, max=4, min_inclusive=False),
+                         DataRange(min=5)]
+        self.assertEqual(sina.utils.merge_ranges(ranges), merged_ranges)
+
+    def test_merge_string_ranges(self):
+        """Test that we merge string ranges correctly."""
+        ranges = [DataRange(min="cat", max="giraffe", min_inclusive=False),
+                  DataRange(min="dog", max="zebra")]
+        merged_ranges = [DataRange(min="cat", max="zebra", min_inclusive=False)]
+        self.assertEqual(sina.utils.merge_ranges(ranges), merged_ranges)
+
+    def test_invert_ranges_one_range(self):
+        """Test that we correctly invert a single DataRange."""
+        range = DataRange(min=2, max=4)
+        opposite_ranges = [DataRange(max=2, max_inclusive=False),
+                           DataRange(min=4, min_inclusive=True)]
+        self.assertEqual(sina.utils.invert_ranges([range]), opposite_ranges)
+
+    def test_invert_ranges_one_range_zeroes(self):
+        """
+        Test that we correctly invert a single DataRange.
+
+        Checks for correct behavior on range bounds that are "Falsey" (ex: zero).
+        """
+        range = DataRange(min=0, max=0, max_inclusive=True)
+        opposite_ranges = [DataRange(max=0),
+                           DataRange(min=0, min_inclusive=False)]
+        self.assertEqual(sina.utils.invert_ranges([range]), opposite_ranges)
+
+    def test_invert_ranges_many_ranges(self):
+        """Test that we correctly invert multiple DataRanges."""
+        ranges = [DataRange(max=2, max_inclusive=False),
+                  DataRange(min=4, min_inclusive=True)]
+        opposite_range = DataRange(min=2, max=4)
+        self.assertEqual(sina.utils.invert_ranges(ranges), [opposite_range])
+
+    def test_invert_ranges_strings(self):
+        """Test that range inversion works with strings."""
+        ranges = [DataRange(max="cat", max_inclusive=True),
+                  DataRange(min="dog", min_inclusive=False)]
+        opposite_range = DataRange(min="cat", max="dog",
+                                   min_inclusive=False, max_inclusive=True)
+        self.assertEqual(sina.utils.invert_ranges(ranges), [opposite_range])
+
+    def test_invert_ranges_multitype_error(self):
+        """Test that a TypeError is raised if mixed types of ranges are inverted."""
+        ranges = [DataRange(max="cat", max_inclusive=True),
+                  DataRange(min=2, min_inclusive=False)]
+        with self.assertRaises(TypeError) as context:
+            sina.utils.invert_ranges(ranges)
+        self.assertIn('must be only numeric DataRanges or', str(context.exception))
+
+    def test_invert_ranges_none_error(self):
+        """Test that a ValueError is raised if no ranges are inverted."""
+        ranges = []
+        with self.assertRaises(ValueError) as context:
+            sina.utils.invert_ranges(ranges)
+        self.assertIn('must contain at least one DataRange', str(context.exception))
+
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""
         basic_case = DataRange(1, 2)
@@ -225,6 +303,49 @@ class TestSinaUtils(unittest.TestCase):
         self.assertFalse(100 in inf_max)
         self.assertTrue("foo_c" in with_strings)
         self.assertFalse("foo_a" in with_strings)
+
+    def test_data_range_overlaps(self):
+        """Test that we detect when DataRanges overlap."""
+        lesser = DataRange(1, None)
+        greater = DataRange(-4, 5)
+        self.assertTrue(lesser.overlaps(greater))
+        self.assertTrue(greater.overlaps(lesser))
+
+    def test_data_range_no_overlap(self):
+        """Test that we detect when DataRanges don't overlap."""
+        lesser = DataRange(1, 2)
+        greater = DataRange(3, 5)
+        self.assertFalse(lesser.overlaps(greater))
+        self.assertFalse(greater.overlaps(lesser))
+
+    def test_data_range_overlap_strings(self):
+        """Test that we detect overlapping string DataRanges."""
+        lesser = DataRange("cat", "horse")
+        greater = DataRange("dog", "fish")
+        self.assertTrue(greater.overlaps(lesser))
+
+    def test_data_range_overlap_bad_types(self):
+        """Test that we refuse to check type-mismatched DataRanges for overlap."""
+        strings = DataRange("cat", "horse")
+        scalars = DataRange(42, 45)
+        with self.assertRaises(TypeError) as context:
+            self.assertFalse(strings.overlaps(scalars))
+        self.assertIn('Only DataRanges of the same type (numeric or lexicographic)',
+                      str(context.exception))
+
+    def test_data_range_min_is_finite(self):
+        """Test that we correctly detect a DataRanges with closed min bounds."""
+        open_min = DataRange(max=12)
+        bounded_min = DataRange(min=12)
+        self.assertFalse(open_min.min_is_finite())
+        self.assertTrue(bounded_min.min_is_finite())
+
+    def test_data_range_max_is_finite(self):
+        """Test that we correctly detect a DataRanges with closed max bounds."""
+        open_max = DataRange(min=12)
+        bounded_max = DataRange(max=12)
+        self.assertFalse(open_max.max_is_finite())
+        self.assertTrue(bounded_max.max_is_finite())
 
     def test_data_range_is_single(self):
         """Test the DataRange is_single_value method."""
@@ -406,6 +527,13 @@ class TestSinaUtils(unittest.TestCase):
         equiv = ListCriteria(entries=("spam", "egg"), operation="ANY")
         self.assertEqual(has_any.entries, equiv.entries)
         self.assertEqual(has_any.operation, equiv.operation)
+
+    def test_has_only(self):
+        """Test that has_only is creating the expected ListCriteria object."""
+        has_only = sina.utils.has_only("spam", "egg")
+        equiv = ListCriteria(entries=("spam", "egg"), operation="ONLY")
+        self.assertEqual(has_only.entries, equiv.entries)
+        self.assertEqual(has_only.operation, equiv.operation)
 
     def test_sort_and_standardizing(self):
         """Test the function for processing query criteria."""

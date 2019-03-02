@@ -23,7 +23,12 @@ MAX_THREADS = 8
 
 
 class ListQueryOperation(Enum):
-    """Describe operations possible on ListCriteria."""
+    """
+    Describe operations possible on ListCriteria.
+
+    For descriptions of their functionality, see their helper methods
+    (has_all(), etc).
+    """
 
     ANY = "ANY"
     ALL = "ALL"
@@ -135,6 +140,88 @@ def _process_relationship_entry(entry, local_ids):
         LOGGER.error(msg)
         raise ValueError(msg)
     return (subj, obj)
+
+
+def merge_ranges(list_of_ranges):
+    """
+    Given a list of DataRanges, merge together any that overlap.
+
+    The new list will be ordered by the ranges' minimums in ascending order.
+
+    :param list_of_ranges: A list of DataRanges to combine.
+
+    :returns: list_of_ranges but merged where applicable and sorted by
+              minimums in ascending order.
+    """
+    # First, we sort the DataRanges with regards to their min (their "left side")
+    # This is done to make simple, accurate comparisons; if our ranges are ordered,
+    # we can compare a max to its following min, rather than trying to maintain
+    # awareness of the full list. The "range.min is not None" clause makes sure None is
+    # considered the "smallest possible" for Python 3.
+    sorted_ranges = sorted(list_of_ranges, key=lambda range: (range.min is not None, range.min))
+
+    merged_ranges = [sorted_ranges[0]]
+    for _range in sorted_ranges[1:]:
+        # Prior_range is always the most recent entry in merged_ranges
+        prior_range = merged_ranges[-1]
+        if _range.overlaps(prior_range):
+            # In case one range encompasses another (remember that max==None represents infinity)
+            if (not _range.max_is_finite() or
+                    (prior_range.max_is_finite() and _range.max > prior_range.max)):
+                max_range = _range
+            else:
+                max_range = prior_range
+            new_range = DataRange(min=prior_range.min,
+                                  min_inclusive=prior_range.min_inclusive,
+                                  max=max_range.max,
+                                  max_inclusive=max_range.max_inclusive)
+            merged_ranges[-1] = new_range
+        else:
+            merged_ranges.append(_range)
+    return merged_ranges
+
+
+def invert_ranges(list_of_ranges):
+    """
+    Given a list of DataRanges, give a new list that represents their opposites.
+
+    Used for has_only queries involving ranges to produce criteria describing
+    what a Record must NOT contain.
+
+    :param list_of_ranges: A list of DataRanges to combine and invert.
+
+    :returns: A new list of DataRanges expressing the opposite criteria.
+
+    :raises ValueError: if given nothing to invert; "nothing" inverted is "everything",
+                        but we don't allow DataRanges with both ends open, as we
+                        won't know if we should be comparing to scalars or strings.
+    :raises TypeError: if given both numerical and lexicographic DataRanges.
+    """
+    if not list_of_ranges:
+        raise ValueError("list_of_ranges must contain at least one DataRange")
+    if not (all(x.is_numeric_range() for x in list_of_ranges) or
+            all(x.is_lexographic_range() for x in list_of_ranges)):
+        raise TypeError("list_of_ranges must be only numeric DataRanges or "
+                        "only lexicographic DataRanges")
+    merged_ranges = merge_ranges(list_of_ranges)
+    # If the "leftmost" DataRange is left-closed, we need the inverse to be left-open
+    if merged_ranges[0].min_is_finite():
+        inverted_ranges = [DataRange(max=merged_ranges[0].min,
+                                     max_inclusive=(not merged_ranges[0].min_inclusive))]
+    else:
+        inverted_ranges = []
+    # We continue to find the "gap" between adjacent DataRanges
+    for prior_range, current_range in zip(merged_ranges[:-1], merged_ranges[1:]):
+        new_range = DataRange(min=prior_range.max,
+                              min_inclusive=(not prior_range.max_inclusive),
+                              max=current_range.min,
+                              max_inclusive=(not current_range.min_inclusive))
+        inverted_ranges.append(new_range)
+    # As with the leftmost, the rightmost is special. We decide open or closed.
+    if merged_ranges[-1].max_is_finite():
+        inverted_ranges.append(DataRange(min=merged_ranges[-1].max,
+                                         min_inclusive=(not merged_ranges[-1].max_inclusive)))
+    return inverted_ranges
 
 
 def intersect_ordered(iterables):
@@ -485,6 +572,22 @@ def has_any(*args):
     return ListCriteria(entries=args, operation="ANY")
 
 
+def has_only(*args):
+    """
+    Create a ListCriteria representing the "ONLY" operator.
+
+    As an example, has_only("pineapple", "cheese") would match
+    ["cheese", "pineapple", "cheese"], but not ["pineapple", "cheese", "pepperoni"]
+    or ["cheese"].
+
+    :param args: The values the ListCriteria will represent. Can be either single values
+                 (like "egg" or 12) or DataRanges. Every arg must represent the same
+                 type of data, either scalars or strings.
+    :returns: A ListCriteria object representing this criterion.
+    """
+    return ListCriteria(entries=args, operation="ONLY")
+
+
 class ListCriteria(object):
     """
     Express some criteria a list datum must fulfill, such as "contains foo and bar".
@@ -655,8 +758,8 @@ class DataRange(object):
     def __str__(self):
         """Return a DataRange in range format ({x, y} [x, y}, {,y], etc.)."""
         return "{}{}, {}{}".format(("[" if self.min_inclusive else "("),
-                                   (self.min if self.min is not None else "-inf"),
-                                   (self.max if self.max is not None else "inf"),
+                                   (self.min if self.min_is_finite() else "-inf"),
+                                   (self.max if self.max_is_finite() else "inf"),
                                    ("]" if self.max_inclusive else ")"))
 
     def __contains__(self, value):
@@ -665,11 +768,11 @@ class DataRange(object):
 
         :param other: The value to check.
         """
-        if self.min is not None:
+        if self.min_is_finite():
             greater_than_min = value >= self.min if self.min_inclusive else value > self.min
         else:
             greater_than_min = True
-        if self.max is not None:
+        if self.max_is_finite():
             less_than_max = value <= self.max if self.max_inclusive else value < self.max
         else:
             less_than_max = True
@@ -700,6 +803,26 @@ class DataRange(object):
         # and max can't both be None, and they can't be equal but not inclusive.
         return self.min == self.max
 
+    def max_is_finite(self):
+        """
+        Return whether the DataRange has a finite max bound.
+
+        Used to clarify what code is checking for where DataRanges are
+        involved, and to help avoid pitfalls with Python's "0 is False" behavior
+        (if datarange.max).
+
+        :returns: whether self.max is finite. If False, its upper bound is infinity.
+        """
+        return self.max is not None
+
+    def min_is_finite(self):
+        """
+        Return whether the DataRange has finite min bound.
+
+        :returns: whether self.min is finite. If False, its lower bound is negative infinity.
+        """
+        return self.min is not None
+
     def is_lexographic_range(self):
         """
         Return whether the DataRange describes a lexographic range.
@@ -710,6 +833,28 @@ class DataRange(object):
         (x<"dog" vs "cat"<x<"dog").
         """
         return (isinstance(self.min, string_types) or isinstance(self.max, string_types))
+
+    def overlaps(self, other):
+        """
+        Return whether this DataRange and another overlap.
+
+        :param other: Another DataRange to check against for overlap.
+        :returns: Whether or not this DataRange and the other overlap.
+
+        :raises TypeError: If trying to check DataRanges of mismatched type for overlap.
+        """
+        if not (self.is_numeric_range() == other.is_numeric_range()):
+            # Comparing numbers and strings may give unexpected behavior. Conceptually
+            # they *don't* overlap, but in Python they do; better to leave it to the user.
+            raise TypeError("Only DataRanges of the same type (numeric or lexicographic)"
+                            " can be tested for overlap.")
+        # We standardize our logic by figuring out which is the "lesser" (leftmost on numberline)
+        if not self.min_is_finite() or (other.min_is_finite() and self.min < other.min):
+            lesser, greater = self, other
+        else:
+            lesser, greater = other, self
+        return (lesser.max > greater.min or
+                (lesser.max == greater.min and (lesser.max_inclusive or greater.min_inclusive)))
 
     def parse_min(self, min_range):
         """
@@ -805,13 +950,13 @@ class DataRange(object):
         # This method defines the assumptions we make about DataRanges. If you
         # change this logic, methods like is_single_value() need changed as well
         LOGGER.debug('Validating and standardizing range of: {}'.format(self))
-        if self.min is None and self.max is None:
+        if (not self.min_is_finite()) and (not self.max_is_finite()):
             raise ValueError("Null DataRange; min or max must be defined")
         try:
             # Case 1: min or max is number. Other must be number or None.
             if isinstance(self.min, Real) or isinstance(self.max, Real):
-                self.min = float(self.min) if self.min is not None else None
-                self.max = float(self.max) if self.max is not None else None
+                self.min = float(self.min) if self.min_is_finite() else None
+                self.max = float(self.max) if self.max_is_finite() else None
             # Case 2: neither min nor max is number. Both must be None or string
             elif (not isinstance(self.min, (string_types, type(None)) or
                   not isinstance(self.max, (string_types, type(None))))):
@@ -823,9 +968,9 @@ class DataRange(object):
             LOGGER.error(msg)
             raise TypeError(msg)  # TypeError, as ValueError is a bit broad
 
-        if self.min is not None:
-            min_gt_max = self.max is not None and self.min > self.max
-            max_eq_min = self.max is not None and self.min == self.max
+        if self.min_is_finite():
+            min_gt_max = self.max_is_finite() and self.min > self.max
+            max_eq_min = self.max_is_finite() and self.min == self.max
             impossible_range = max_eq_min and not (self.min_inclusive and self.max_inclusive)
             if min_gt_max or impossible_range:
                 msg = ("Bad range for data, min must be <= max: {}"

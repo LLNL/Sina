@@ -481,12 +481,12 @@ class RecordDAO(dao.RecordDAO):
         elif criteria.is_single_value():
             query = query.filter(value=criteria.min)
         else:
-            if criteria.min is not None:
+            if criteria.min_is_finite():
                 if criteria.min_inclusive:
                     query = query.filter(value__gte=criteria.min)
                 else:
                     query = query.filter(value__gt=criteria.min)
-            if criteria.max is not None:
+            if criteria.max_is_finite():
                 if criteria.max_inclusive:
                     query = query.filter(value__lte=criteria.max)
                 else:
