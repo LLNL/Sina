@@ -35,7 +35,7 @@ endif
 #
 # Define the pylint virtual environment since it is currently built and run
 # for on-demand use and not part of the normal Sina process.
-PYLINT_VENV=tests/pylint-venv
+PYLINT_VENV=tests/pylint_venv
 
 # Establish a path for the Pylint capability (until build issues are addressed)
 PYLINT_PATH:=$(PYLINT_VENV)/bin:$(PATH)
