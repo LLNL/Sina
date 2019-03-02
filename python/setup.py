@@ -17,8 +17,9 @@ setup(name='sina',
       },
       extras_require={
         'jupyter': [
-            'plotly',
-            'ipykernel',
+            'ipykernel<5;python_version<"3"',
+            'ipykernel>=5;python_version>="3"',
+            'pyzmq<18',
             'ipywidgets',
             'tabulate',
             'matplotlib'

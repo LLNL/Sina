@@ -8,7 +8,7 @@
 # or establish a more flexible build process.
 
 # Determine if we are on an LC system based on the presence of the wheelhouse
-# Using curl (versus 'wget --spider') despite being slower since former 
+# Using curl (versus 'wget --spider') despite being slower since former
 # appears to be installed on Macs while latter is not.
 # (Sources: https://stackoverflow.com/questions/12199059,
 #  https://unix.stackexchange.com/questions/84814)
@@ -80,7 +80,7 @@ install: links
 	$(VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip; \
 	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/development.txt; \
 	if test -z "$(NETWORK)"; then \
-	  $(VENV)/bin/pip install $(PIP_OPTIONS) -e .[jupyter]; \
+	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/jupyter.txt; \
 	fi; \
 	echo $(PR_ACT)
 
