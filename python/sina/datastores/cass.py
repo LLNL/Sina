@@ -441,7 +441,7 @@ class RecordDAO(dao.RecordDAO):
         where n is a list of criteria, but as cqlengine does not support negation
         at time of writing, the logic here differs to accomodate.
 
-        :param datum_name: The name of the datum the has_any is performed against.
+        :param datum_name: The name of the datum the has_only is performed against.
         :param datum_criteria: The criteria to apply to the query
         :param table: The name of the table, to look up in table_lookup (module-level var).
 

@@ -571,7 +571,7 @@ class TestSearch(unittest.TestCase):
         record_dao = factory.createRecordDAO()
         _populate_database_with_data()
         get_scalar = record_dao.data_query(egg_count=has_only(12))
-        six.assertCountEqual(self, list(get_scalar), ["spam2"])
+        six.assertEqual(self, list(get_scalar), ["spam2"])
         get_none = record_dao.data_query(toppings=has_only("cheese"))
         self.assertFalse(list(get_none))
 
