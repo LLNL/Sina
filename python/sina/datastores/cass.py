@@ -356,15 +356,22 @@ class RecordDAO(dao.RecordDAO):
             for criterion in criteria:
                 # Unpack the criterion
                 datum_name, list_criteria = criterion
-                # has_all queries are broken up and treated like a scalar or string
+                # Figure out which function to use
                 if list_criteria.operation == utils.ListQueryOperation.ALL:
-                    criterion_tuples = [(datum_name, x) for x in list_criteria.entries]
-                    ids = self._apply_ranges_to_query(table=table_type, data=criterion_tuples)
-                    result_ids.append(ids)
+                    query_func = self._apply_has_all_to_query
+                elif list_criteria.operation == utils.ListQueryOperation.ANY:
+                    query_func = self._apply_has_any_to_query
+                elif list_criteria.operation == utils.ListQueryOperation.ONLY:
+                    query_func = self._apply_has_only_to_query
                 else:
                     raise ValueError("Currently, only {} list operations are supported. "
-                                     "Given {}".format(utils.ListQueryOperation.ALL,
+                                     "Given {}".format((utils.ListQueryOperation.ALL,
+                                                        utils.ListQueryOperation.ANY,
+                                                        utils.ListQueryOperation.ONLY),
                                                        list_criteria.operation))
+                result_ids.append(query_func(table=table_type,
+                                             datum_name=datum_name,
+                                             datum_criteria=list_criteria.entries))
 
         # If we have more than one set of data, we need to find the intersect.
         if len(result_ids) > 1:
@@ -377,9 +384,88 @@ class RecordDAO(dao.RecordDAO):
             for id in result_ids[0]:
                 yield id
 
+    def _apply_has_all_to_query(self, datum_name, datum_criteria, table):
+        """
+        Return the ids of all Records whose data fulfill table-specific has_all criteria.
+
+        Used with data_query(), specifically for the has_all list query, which is
+        documented further in sina.utils.has_all().
+
+        :param datum_name: The name of the datum the has_all is performed against.
+        :param datum_criteria: The criteria to apply to the query
+        :param table: The name of the table, to look up in table_lookup (module-level var).
+
+        :returns: a generator of ids fitting the criteria
+        """
+        criterion_tuples = [(datum_name, x) for x in datum_criteria]
+        ids = self._apply_ranges_to_query(table=table, data=criterion_tuples)
+        return ids
+
+    def _apply_has_any_to_query(self, datum_name, datum_criteria, table):
+        """
+        Return the ids of all Records whose data fulfill table-specific has_any criteria.
+
+        Used with data_query(), specifically for the has_any list query, which is
+        documented further in sina.utils.has_any().
+
+        :param datum_name: The name of the datum the has_any is performed against.
+        :param datum_criteria: The criteria to apply to the query
+        :param table: The name of the table, to look up in table_lookup (module-level var).
+
+        :returns: a set of ids fitting the criteria
+        """
+        rec_table = table_lookup[table]["record_table"]
+        # Cassandra has no OR operator. Ordinarily we'd chain queries as generators,
+        # but it's possible to get duplicate ids, so we do need to store all results
+        # in memory to filter dupes.
+        distinct_ids = set()
+        for criterion in datum_criteria:
+            ids = self._configure_query_for_criteria(rec_table.objects,
+                                                     datum_name,
+                                                     criterion).values_list('id', flat=True)
+            for id in ids:
+                distinct_ids.add(id)
+        return distinct_ids
+
+    def _apply_has_only_to_query(self, datum_name, datum_criteria, table):
+        """
+        Return the ids of all Records whose data fulfill table-specific has_only criteria.
+
+        Used with data_query(), specifically for the has_only list query, which is
+        documented further in sina.utils.has_only().
+
+        The simplest expression of this in query terms is something like::
+
+            has_only(n) = has_all(n) - has_any(anything not n)
+
+        where n is a list of criteria, but as cqlengine does not support negation
+        at time of writing, the logic here differs to accomodate.
+
+        :param datum_name: The name of the datum the has_only is performed against.
+        :param datum_criteria: The criteria to apply to the query
+        :param table: The name of the table, to look up in table_lookup (module-level var).
+
+        :returns: a set of ids fitting the criteria
+        """
+        included_ids = set(self._apply_has_all_to_query(datum_name, datum_criteria, table))
+        # If this query proves popular but nonperformant, we may want to make a
+        # dedicated query table that stores list data as a set (order and count are explicitly
+        # ignored for has_only). This will only work if has_only is invoked with no
+        # DataRanges. Until then, we convert simple equivalence (x="foo") to DataRanges.
+        ranges = [x if isinstance(x, utils.DataRange)
+                  else utils.DataRange(x, x, max_inclusive=True)
+                  for x in datum_criteria]
+        excluded_ids = self._apply_has_any_to_query(datum_name,
+                                                    utils.invert_ranges(ranges),
+                                                    table)
+        for id in excluded_ids:
+            if id in included_ids:
+                included_ids.remove(id)
+        return included_ids
+
     def _apply_ranges_to_query(self, data, table):
         """
-        Return the ids of all Records whose data fulfill table-specific criteria.
+        Return the ids of all Records whose data fulfill table-specific AND criteria.
 
         Done per table, unlike data_query. This is only meant to be used in
         conjunction with data_query() and related. Criteria can be DataRanges
@@ -424,6 +510,40 @@ class RecordDAO(dao.RecordDAO):
 
         for id in filtered_ids:
             yield id
+
+    def _configure_query_for_criteria(self, query, name, criteria):
+        """
+        Use criteria to build a query.
+
+        Note that this returns a query object, not a completed query. It's
+        used by the data query methods to build the queries they execute.
+
+        :param query: The query object to consider
+        :param name: The name of the data being queries
+        :param criteria: The criteria we're filtering the query on.
+
+        :returns: The query object with criteria-appropriate filters
+                  applied.
+        """
+        LOGGER.debug('Configuring <query={}> with <criteria={}>.'
+                     .format(query, criteria))
+        query = query.filter(name=name)
+        if not isinstance(criteria, utils.DataRange):
+            query = query.filter(value=criteria)
+        elif criteria.is_single_value():
+            query = query.filter(value=criteria.min)
+        else:
+            if criteria.min_is_finite():
+                if criteria.min_inclusive:
+                    query = query.filter(value__gte=criteria.min)
+                else:
+                    query = query.filter(value__gt=criteria.min)
+            if criteria.max_is_finite():
+                if criteria.max_inclusive:
+                    query = query.filter(value__lte=criteria.max)
+                else:
+                    query = query.filter(value__lt=criteria.max)
+        return query
 
     def get(self, id):
         """
@@ -530,40 +650,6 @@ class RecordDAO(dao.RecordDAO):
         else:
             for record in self.get_many(match_ids):
                 yield record
-
-    def _configure_query_for_criteria(self, query, name, criteria):
-        """
-        Use criteria to build a query.
-
-        Note that this returns a query object, not a completed query. It's
-        used by the data query methods to build the queries they execute.
-
-        :param query: The query object to consider
-        :param name: The name of the data being queries
-        :param criteria: The criteria we're filtering the query on.
-
-        :returns: The query object with criteria-appropriate filters
-                  applied.
-        """
-        LOGGER.debug('Configuring <query={}> with <criteria={}>.'
-                     .format(query, criteria))
-        query = query.filter(name=name)
-        if not isinstance(criteria, utils.DataRange):
-            query = query.filter(value=criteria)
-        elif criteria.is_single_value():
-            query = query.filter(value=criteria.min)
-        else:
-            if criteria.min is not None:
-                if criteria.min_inclusive:
-                    query = query.filter(value__gte=criteria.min)
-                else:
-                    query = query.filter(value__gt=criteria.min)
-            if criteria.max is not None:
-                if criteria.max_inclusive:
-                    query = query.filter(value__lte=criteria.max)
-                else:
-                    query = query.filter(value__lt=criteria.max)
-        return query
 
     def get_data_for_records(self, id_list, data_list, omit_tags=False):
         """
