@@ -13,7 +13,7 @@ from nose.plugins.attrib import attr
 
 import sina.datastores.cass as sina_cass
 import sina.datastores.cass_schema as schema
-from sina.utils import DataRange, import_json, has_all, has_any
+from sina.utils import DataRange, import_json, has_all, has_any, has_only
 
 from sina.model import Run, Record
 
@@ -79,6 +79,18 @@ def _populate_database_with_data():
     schema.cross_populate_data_tables(id="spam2",
                                       name="egg_count",
                                       value=[12])
+    schema.cross_populate_data_tables(id="spam",
+                                      name="spices",
+                                      value=["cayenne", "paprika"])
+    schema.cross_populate_data_tables(id="spam2",
+                                      name="spices",
+                                      value=["paprika", "cayenne", "cayenne"])
+    schema.cross_populate_data_tables(id="spam3",
+                                      name="spices",
+                                      value=["paprika", "garlic salt", "cayenne"])
+    schema.cross_populate_data_tables(id="spam4",
+                                      name="spices",
+                                      value=["paprika", "garlic salt", "cayenne", "saffron"])
 
 
 def _populate_database_with_files():
@@ -534,6 +546,44 @@ class TestSearch(unittest.TestCase):
 
         get_with_datarange = record_dao.data_query(egg_count=has_any(DataRange(0, 5)))
         six.assertCountEqual(self, list(get_with_datarange), ["spam"])
+
+    def test_recorddao_list_data_query_only_one(self):
+        """Test that we're correctly retrieving Records on a has_only list criterion."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+        get_one = list(record_dao.data_query(toppings=has_only("onion")))
+        self.assertEqual(len(get_one), 1)
+        self.assertEqual(get_one[0], "spam3")
+
+    def test_recorddao_list_data_query_only_many(self):
+        """Test that we're correctly retrieving Records on has_only list criteria."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+        get_many = record_dao.data_query(spices=has_only("cayenne", "paprika"))
+        self.assertIsInstance(get_many, types.GeneratorType)
+        six.assertCountEqual(self, list(get_many), ["spam", "spam2"])
+
+    def test_recorddao_list_data_query_only_scalar(self):
+        """Test that we're correctly retrieving Records on scalar has_only list criteria."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+        get_scalar = record_dao.data_query(egg_count=has_only(12))
+        six.assertEqual(self, list(get_scalar), ["spam2"])
+        get_none = record_dao.data_query(toppings=has_only("cheese"))
+        self.assertFalse(list(get_none))
+
+    def test_recorddao_list_data_query_only_ranges(self):
+        """Test that we're correctly retrieving Records on has_only with DataRanges."""
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data()
+        get_range = record_dao.data_query(spices=has_only(DataRange("cayenne",
+                                                                    "paprika",
+                                                                    max_inclusive=True)))
+        six.assertCountEqual(self, list(get_range), ["spam", "spam2", "spam3"])
 
     def test_recorddao_get_files(self):
         """Test that the RecordDAO is getting files for records correctly."""
