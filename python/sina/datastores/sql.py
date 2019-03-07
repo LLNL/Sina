@@ -222,15 +222,22 @@ class RecordDAO(dao.RecordDAO):
                 # Unpack the criterion
                 datum_name, list_criteria = criterion
                 # has_all queries are broken up and treated like a scalar or string
-                if list_criteria.operation == utils.ListQueryOperation.ALL:
-                    ids = self.get_list_has_all(datum_name=datum_name,
-                                                list_of_contents=list_criteria.entries,
-                                                ids_only=True)
+                if (list_criteria.operation in
+                    [utils.ListQueryOperation.ALL,
+                     utils.ListQueryOperation.ANY,
+                     utils.ListQueryOperation.ONLY]):
+                    ids = self.get_list(datum_name=datum_name,
+                                        list_of_contents=list_criteria.entries,
+                                        ids_only=True,
+                                        operation=list_criteria.operation)
                     result_ids.append(ids)
                 else:
-                    raise ValueError("Currently, only {} list operations are supported. "
-                                     "Given {}".format(utils.ListQueryOperation.ALL,
-                                                       list_criteria.operation))
+                    raise ValueError("Currently, only [{}, {}, {}] list "
+                                     "operations are supported. Given {}"
+                                     .format(utils.ListQueryOperation.ALL,
+                                             utils.ListQueryOperation.ANY,
+                                             utils.ListQueryOperation.ONLY,
+                                             list_criteria.operation))
         # If we have more than one set of data, we need to find the intersect.
         if len(result_ids) > 1:
             valid_ids = set(result_ids[0])
@@ -278,17 +285,18 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
-    def get_list_has_all(self,
-                         datum_name,
-                         list_of_contents,
-                         ids_only=False):
+    def get_list(self,
+                 datum_name,
+                 list_of_contents,
+                 operation,
+                 ids_only=False):
         """
-        Given a list datum's name and values, return Records where the datum contains all values.
+        Given a list datum's name and values, return Records where the datum contains those values.
 
-        As an example, given "pizza_toppings" and ["pineapple", "cheese"],
-        this method would return Records where "pizza_toppings" is
-        ["pineapple", "cheese"] or ["pineapple", "cheese", "pepperoni"], but
-        not just ["cheese"].
+        As an example, given "pizza_toppings", ["pineapple", "cheese"], and the
+        operation of ListQueryOperation.ALL, this method would return Records
+        where "pizza_toppings" is ["pineapple", "cheese"] or
+        ["pineapple", "cheese", "pepperoni"], but not just ["cheese"].
 
         Note that if datum_name isn't found, no record_ids will be found, so be
         sure datum_name is the name of a list-type datum (timeseries, etc).
@@ -296,6 +304,7 @@ class RecordDAO(dao.RecordDAO):
         :param datum_name: The name of the datum
         :param list_of_contents: All the values datum_name must contain. Can be
                                  single values ("egg", 12) or DataRanges.
+        :pram operation: What kind of ListQueryOperation to do.
         :param ids_only: Whether to only return ids rather than full Records.
         :returns: A generator of ids of matching Records or the Records
                   themselves (see ids_only).
@@ -307,44 +316,78 @@ class RecordDAO(dao.RecordDAO):
         if not list_of_contents:
             raise ValueError("Must supply at least one entry in "
                              "list_of_contents for {}".format(datum_name))
-        criteria_tuples = [(datum_name, x) for x in list_of_contents]
+
         list_of_record_ids_sets = []
-
-        def _list_query(table):
-            """
-            For each criterion, execute a query and add the set result to a list.
-
-            :param table: Which table to query on: ListScalarDataEntry or
-                          ListStringDataEntry.
-            """
-            for criterion in criteria_tuples:
-                scalar_list_query = self.session.query(table.id)
-                records_list = self._apply_ranges_to_query(query=scalar_list_query,
-                                                           table=table,
-                                                           data=[criterion]).all()
-                list_of_record_ids_sets.append(set(str(record_id[0])
-                                               for record_id in records_list))
 
         if all(isinstance(x, numbers.Real) or
                (isinstance(x, utils.DataRange) and x.is_numeric_range())
                for x in list_of_contents):
-            _list_query(table=schema.ListScalarDataEntry)
+            numeric = True
+            list_of_record_ids_sets.extend(
+                self._list_query(table=schema.ListScalarDataEntry,
+                                 datum_name=datum_name,
+                                 list_of_contents=list_of_contents))
         elif all(isinstance(x, six.string_types) or
                  (isinstance(x, utils.DataRange) and x.is_lexographic_range())
                  for x in list_of_contents):
-            _list_query(table=schema.ListStringDataEntry)
+            numeric = False
+            list_of_record_ids_sets.extend(
+                self._list_query(table=schema.ListStringDataEntry,
+                                 datum_name=datum_name,
+                                 list_of_contents=list_of_contents))
         else:
             raise TypeError("list_of_contents must be only strings or only scalars")
         # This reduce "ands" together all the sets (one per criterion),
         # creating one set that adheres to all our individual criterion sets.
-        record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
-
+        if operation == utils.ListQueryOperation.ALL:
+            record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
+        elif operation == utils.ListQueryOperation.ANY:
+            record_ids = set.union(*list_of_record_ids_sets)
+        elif operation == utils.ListQueryOperation.ONLY:
+            record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
+            ranges = [x if isinstance(x, utils.DataRange)
+                      else utils.DataRange(x, x, max_inclusive=True)
+                      for x in list_of_contents]
+            if numeric:
+                excluded_ids = self._list_query(table=schema.ListScalarDataEntry,
+                                                datum_name=datum_name,
+                                                list_of_contents=utils.invert_ranges(ranges))
+            else:
+                excluded_ids = self._list_query(table=schema.ListStringDataEntry,
+                                                datum_name=datum_name,
+                                                list_of_contents=utils.invert_ranges(ranges))
+            for id_ in excluded_ids:
+                if id_ in record_ids:
+                    record_ids.remove(id_)
         if ids_only:
             for record_id in record_ids:
                 yield record_id
         else:
             for record in self.get_many(record_ids):
                 yield record
+
+    def _list_query(self, table, datum_name, list_of_contents):
+        """
+        For each criterion, execute a query and add the set result to a list.
+
+        :param table: Which table to query on: ListScalarDataEntry or
+                      ListStringDataEntry.
+        :param datum_name: The name of the datum
+        :param list_of_contents: All the values datum_name must contain. Can be
+                                 single values ("egg", 12) or DataRanges.
+        :returns: A list of sets of record ids, where each set is the result
+                  set of one query with one criterion.
+        """
+        criteria_tuples = [(datum_name, x) for x in list_of_contents]
+        list_of_record_ids_sets = []
+        for criterion in criteria_tuples:
+            scalar_list_query = self.session.query(table.id)
+            records_list = self._apply_ranges_to_query(query=scalar_list_query,
+                                                       table=table,
+                                                       data=[criterion]).all()
+            list_of_record_ids_sets.append(set(str(record_id[0])
+                                           for record_id in records_list))
+        return list_of_record_ids_sets
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """

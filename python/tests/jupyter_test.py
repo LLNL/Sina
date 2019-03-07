@@ -1,7 +1,7 @@
 """
 Tests for example Jupyter Notebooks, which include:
 - executing them on the default or, if relevant, a test database; and
-- performing flake8 checks on them (once re-enabled).
+- performing flake8 checks on them.
 
 Sources:
 1) Parameterized unit test generation follows the post by Guy at:
@@ -45,7 +45,7 @@ def _build_pep8_output(result):
     """
     Build the PEP8 output based on flake8 results.
 
-    Flake8 output results conform to the following format:
+    Results from both tools conform to the following format:
 
       <filename>:<line number>:<column number>: <issue code> <issue desc>
 
@@ -57,7 +57,7 @@ def _build_pep8_output(result):
     """
     # Aggregate individual errors by error
     _dict = collections.defaultdict(list)
-    for line in result.split("\n"):
+    for line in str(result).split("\n"):
         if line:
             # Preserve only the code and brief description for each issue to
             # facilitate aggregating the results.  For example,
@@ -170,6 +170,7 @@ def _check_notebook_style(path):
     Check the notebook style against PEP8 requirements.
 
     :param path: fully qualified path to the notebook
+
     :returns: list of error message(s)
     """
     _, basename = os.path.split(path)
@@ -195,13 +196,10 @@ def _check_notebook_style(path):
         return ["Failed to create {}".format(testname)]
 
     try:
-        #
         # Ignore the following error(s):
         # - E303 too many blank lines (always a problem with the notebooks)
         # - E501 line too long (problem with cell magic cells)
         # - W391 blank line at end of file (apparently result of conversion)
-        #
-        # and set the max length to be the same we use for our tests.
         args = ["flake8", "--ignore=E303,E501,W391", testname, "; exit 0"]
         result = subprocess.check_output(" ".join(args), shell=True,
                                          stderr=subprocess.STDOUT)
@@ -289,16 +287,16 @@ class TestJupyterNotebooks(type):
                                                     join(errors)))
             return test_exec
 
-        def gen_test_style(filename):
+        def gen_test_flake8(filename):
             """
-            Notebook PEP8 style check test constructor.
+            Notebook flake8 style check test constructor.
 
             :param filename: fully qualifed notebook path
             """
             def test_style(self):
                 errors = _check_notebook_style(filename)
                 # Indent output of each error (if any)
-                self.assertEqual(errors, [], "Style errors detected in {}:\n  "
+                self.assertEqual(errors, [], "Flake8 errors detected in {}:\n  "
                                  "{}".format(filename, "\n  ".join(errors)))
             return test_style
 
@@ -308,7 +306,7 @@ class TestJupyterNotebooks(type):
                 test_name = "test_{}".format(os.path.splitext(
                                              os.path.basename(filename))[0])
                 _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
-                _dict["{}_style".format(test_name)] = gen_test_style(filename)
+                _dict["{}_flake8".format(test_name)] = gen_test_flake8(filename)
 
         return type.__new__(meta, name, bases, _dict)
 
