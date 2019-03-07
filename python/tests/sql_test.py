@@ -15,7 +15,7 @@ import types
 import sina.datastores.sql as sina_sql
 import sina.datastores.sql_schema as schema
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
-                        has_any)
+                        has_any, has_only)
 from sina.model import Run, Record
 
 LOGGER = logging.getLogger(__name__)
@@ -560,6 +560,16 @@ class TestSQL(unittest.TestCase):
         self.assertIn("spam5", just_5_and_6)
         self.assertIn("spam6", just_5_and_6)
 
+    def test_recorddao_data_query_scalar_list_has_only(self):
+        """Test that the RecordDAO is retrieving on a list of scalars."""
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        just_5 = list(record_dao.data_query(
+            val_data_list_1=has_only(DataRange(-1, 1), DataRange(7.5, 10))))  # 5 only
+        self.assertEqual(len(just_5), 1)
+        self.assertIn("spam5", just_5)
+
     def test_recorddao_data_query_has_all_mixed_1(self):
         """
         Test that the RecordDAO is retrieving on mixed data types.
@@ -590,6 +600,21 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(just_5), 1)
         self.assertEqual(just_5[0], "spam5")
 
+    def test_recorddao_data_query_has_only_mixed_1(self):
+        """
+        Test that the RecordDAO is retrieving on mixed data types.
+
+        Test that we can mix searching on scalars and lists of scalars.
+        """
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        just_5 = list(record_dao.data_query(
+            val_data_list_1=has_only(DataRange(-1, 1), DataRange(7.5, 21)),  # 5 & 6
+            spam_scal_3=DataRange(0, 50)))  # 5 only
+        self.assertEqual(len(just_5), 1)
+        self.assertEqual(just_5[0], "spam5")
+
     def test_recorddao_data_query_string_list_has_all(self):
         """Test that the RecordDAO is retrieving on a list of strings."""
         factory = sina_sql.DAOFactory()
@@ -612,6 +637,16 @@ class TestSQL(unittest.TestCase):
         self.assertIn("spam5", just_5_and_6)
         self.assertIn("spam6", just_5_and_6)
 
+    def test_recorddao_data_query_string_list_has_only(self):
+        """Test that the RecordDAO is retrieving on a list of strings."""
+        factory = sina_sql.DAOFactory()
+        record_dao = factory.createRecordDAO()
+        _populate_database_with_data(factory.session)
+        just_5 = list(record_dao.data_query(
+            val_data_list_2=has_only('eggs', 'pancake')))  # 5 only
+        self.assertEqual(len(just_5), 1)
+        self.assertIn("spam5", just_5)
+
     def test_recorddao_data_query_has_all_mixed_2(self):
         """
         Test that the RecordDAO is retrieving on mixed data types.
@@ -627,7 +662,7 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(len(just_6), 1)
         self.assertEqual(just_6[0], "spam6")
 
-    def test_recorddao_data_query_mixed_3(self):
+    def test_recorddao_data_query_has_all_mixed_3(self):
         """
         Test that the RecordDAO is retrieving on mixed data types.
 
