@@ -311,8 +311,10 @@ class RecordDAO(dao.RecordDAO):
         :raises ValueError: if given an empty list_of_contents
         :raises TypeError: if given a list that isn't all strings xor scalars.
         """
-        LOGGER.info('Finding Records where datum {} contains all of: {}'
-                    .format(datum_name, list_of_contents))
+        LOGGER.info('Finding Records where datum {} contains {}: {}'
+                    .format(datum_name,
+                            operation.value.split('.')[0],
+                            list_of_contents))
         if not list_of_contents:
             raise ValueError("Must supply at least one entry in "
                              "list_of_contents for {}".format(datum_name))
@@ -356,9 +358,10 @@ class RecordDAO(dao.RecordDAO):
                 excluded_ids = self._list_query(table=schema.ListStringDataEntry,
                                                 datum_name=datum_name,
                                                 list_of_contents=utils.invert_ranges(ranges))
-            for id_ in excluded_ids:
-                if id_ in record_ids:
-                    record_ids.remove(id_)
+            for set_ids in excluded_ids:
+                for id_ in set_ids:
+                    if id_ in record_ids:
+                        record_ids.remove(id_)
         if ids_only:
             for record_id in record_ids:
                 yield record_id
