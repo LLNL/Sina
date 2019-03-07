@@ -212,7 +212,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         of string DataRanges.
         """
         list_to_check = [DataRange(min="a", max="c", max_inclusive=True),
-                              DataRange(min="d", max="g", max_inclusive=True)]
+                         DataRange(min="d", max="g", max_inclusive=True)]
         records = list(self.record_dao.get_list(
             datum_name="spam",
             list_of_contents=list_to_check,
@@ -239,7 +239,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         of strings and DataRanges.
         """
         list_to_check = [DataRange(min="a", max="c", max_inclusive=True),
-                              "honey"]
+                         "honey"]
         records = list(self.record_dao.get_list(
             datum_name="spam",
             list_of_contents=list_to_check,
@@ -321,7 +321,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         of string DataRanges.
         """
         list_to_check = [DataRange(min="a", max="f", max_inclusive=True),
-                              DataRange(min="y", max="zebra", max_inclusive=True)]
+                         DataRange(min="y", max="zebra", max_inclusive=True)]
         records = list(self.record_dao.get_list(
             datum_name="spam",
             list_of_contents=list_to_check,
@@ -339,7 +339,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         of strings and DataRanges.
         """
         list_to_check = [DataRange(min="q", max="u", max_inclusive=True),
-                              "honey"]
+                         "honey"]
         records = list(self.record_dao.get_list(
             datum_name="spam",
             list_of_contents=list_to_check,
