@@ -1,0 +1,7 @@
+# For use on LLNL's OCF Network.
+ --no-index
+
+# Developers working locally on their laptops depend on the LC-managed wheels 
+# on the web, so include the LC wheelhouse URL.
+ --trusted-host www-lc.llnl.gov
+ --find-links https://www-lc.llnl.gov/python/wheelhouse/
