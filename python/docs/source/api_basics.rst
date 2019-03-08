@@ -120,7 +120,7 @@ exclusive. For example:  :code:`velocity=[0, 1, 4, 5, 15, 20, 21]` or
                                   velocity=has_all(DataRange(10, 15, max_inclusive=True),
                                                    DataRange(0, 5, min_inclusive=False)))
 
-In addition to :code:`has_all()`, Sina includes :code:`has_any()` and :code:`has_only()`::
+In addition to :code:`has_all()` above, Sina includes :code:`has_any()` and :code:`has_only()`::
 
   from sina.utils import has_any, has_only
 
