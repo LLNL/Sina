@@ -120,9 +120,20 @@ exclusive. For example:  :code:`velocity=[0, 1, 4, 5, 15, 20, 21]` or
                                   velocity=has_all(DataRange(10, 15, max_inclusive=True),
                                                    DataRange(0, 5, min_inclusive=False)))
 
-Note that order and count don't matter with :code:`has_all`. It cannot be
-used to find Records where :code:`velocity>0` three times. Further queries may
-be developed to cover these cases.
+In addition to :code:`has_all()` above, Sina includes :code:`has_any()` and :code:`has_only()`::
+
+  from sina.utils import has_any, has_only
+
+  # Retrieve all Records whose quadrants included at least one of "NW" or "SW"
+  records = record_dao.data_query(has_any=["NW", "SW"])
+
+  # Retrieve all Records whose quadrants were ONLY "NW" and "SW".
+  # ["SW", "NW", "NW"] would be returned, but ["SW", "NW", "NE"] would not be
+  records = record_dao.data_query(has_only=["NW", "SW"])
+
+Note that order and count don't matter in the above list queries. They cannot be
+used to, for example, find a Record whose list of quadrants contains exactly two
+instances of "NW".
 
 See examples/basic_usage.ipynb for list queries in use.
 
