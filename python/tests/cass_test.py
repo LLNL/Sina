@@ -7,12 +7,20 @@ from mock import MagicMock, patch
 import types
 import six
 
-import cassandra.cqlengine.connection as connection
-import cassandra.cqlengine.management as management
+try:
+    import cassandra.cqlengine.connection as connection
+    import cassandra.cqlengine.management as management
+
+    import sina.datastores.cass as sina_cass
+    import sina.datastores.cass_schema as schema
+except ImportError:
+    # Not having Cassandra for tests is a valid case and should be coupled with
+    # an "-a '!cassandra'" flag for Nose. If not, another error will be raised.
+    # Even though none of the tests in this file are run with the above flag,
+    # Nose doesn't know that initially, and thus tries these imports anyways.
+    pass
 from nose.plugins.attrib import attr
 
-import sina.datastores.cass as sina_cass
-import sina.datastores.cass_schema as schema
 from sina.utils import DataRange, import_json, has_all, has_any, has_only
 
 from sina.model import Run, Record

@@ -1,0 +1,8 @@
+# Read in system-specific link constraints.
+-r links.txt
+ 
+# Dependencies for the Cassandra backend
+# Include cython separately;
+# necessary workaround for one of our target environments 
+cython
+cassandra-driver

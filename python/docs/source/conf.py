@@ -75,6 +75,10 @@ language = None
 exclude_patterns = ['generated_docs/sina_api.*', 'generated_docs/sina_model.*',
                     'generated_docs/sina_cli.*', 'generated_docs/setup*']
 
+# Soft dependencies, to avoid autodoc erroring out trying to import unavailable modules.
+autodoc_mock_imports = ['cassandra.cqlengine.query',
+                        'cassandra.cqlengine.management']
+
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 

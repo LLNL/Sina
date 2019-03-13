@@ -28,7 +28,6 @@ setup(name='sina',
       install_requires=[
         'six',
         'sqlalchemy',
-        'cassandra-driver',
         'deepdiff',
         'texttable'
       ]
