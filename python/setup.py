@@ -16,6 +16,9 @@ setup(name='sina',
         ]
       },
       extras_require={
+        'cassandra': [
+            'cassandra-driver',
+        ],
         'jupyter': [
             'ipykernel<5;python_version<"3"',
             'ipykernel>=5;python_version>="3"',
