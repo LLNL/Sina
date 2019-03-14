@@ -14,9 +14,19 @@
             "properties": {
                 "uri": { "type": "string" },
                 "mimetype": { "type": "string" },
-                "tags": { "$ref": "#/definitions/stringArray" }
+                "tags": { "$ref": "#/definitions/tagArray" }
             },
             "required" :  [ "uri" ]
+        },
+        "stringDataArray" : {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": false
+        },
+        "scalarDataArray" : {
+            "type": "array",
+            "items": { "type": "number" },
+            "uniqueItems": false
         },
         "objectType" : {
             "description": "Object being acted upon by the subject record",
@@ -116,7 +126,7 @@
             ],
             "additionalProperties": false
         },
-        "stringArray" : {
+        "tagArray" : {
             "type": "array",
             "items": { "type": "string" },
             "uniqueItems": true
@@ -151,11 +161,28 @@
         "dataType" : {
             "description": "User-defined data values",
             "type": "object",
-            "properties": {
-                "value": { "type": [ "string", "number" ] },
+            "oneOf": [
+              {"properties": {
+                "value": { "type": "string" },
                 "units": { "type": "string" },
-                "tags": { "$ref": "#/definitions/stringArray" }
-            },
+                "tags": { "$ref": "#/definitions/tagArray" }
+            }},
+              {"properties": {
+                "value": { "type": "number" },
+                "units": { "type": "string" },
+                "tags": { "$ref": "#/definitions/tagArray" }
+            }},
+              {"properties": {
+                "value": { "$ref": "#/definitions/scalarDataArray" },
+                "units": { "type": "string" },
+                "tags": { "$ref": "#/definitions/tagArray" }
+            }},
+              {"properties": {
+                "value": { "$ref": "#/definitions/stringDataArray" },
+                "units": { "type": "string" },
+                "tags": { "$ref": "#/definitions/tagArray" }
+            }}
+            ],
             "required" :  [ "value" ]
         }
     },
@@ -165,7 +192,7 @@
             "description" : "Simulation metadata (e.g., runs, invocations)",
             "type" : "array",
             "minItems" : 1,
-            "items": { 
+            "items": {
                 "oneOf": [
                     { "$ref": "#/definitions/record" },
                     { "$ref": "#/definitions/run" }
