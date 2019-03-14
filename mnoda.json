@@ -161,28 +161,18 @@
         "dataType" : {
             "description": "User-defined data values",
             "type": "object",
-            "oneOf": [
-              {"properties": {
-                "value": { "type": "string" },
+            "properties": {
+                "value": {
+                    "oneOf": [
+                        { "type": "string" },
+                        { "type": "number" },
+                        { "$ref": "#/definitions/scalarDataArray" },
+                        { "$ref": "#/definitions/stringDataArray" }
+                    ]
+                },
                 "units": { "type": "string" },
                 "tags": { "$ref": "#/definitions/tagArray" }
-            }},
-              {"properties": {
-                "value": { "type": "number" },
-                "units": { "type": "string" },
-                "tags": { "$ref": "#/definitions/tagArray" }
-            }},
-              {"properties": {
-                "value": { "$ref": "#/definitions/scalarDataArray" },
-                "units": { "type": "string" },
-                "tags": { "$ref": "#/definitions/tagArray" }
-            }},
-              {"properties": {
-                "value": { "$ref": "#/definitions/stringDataArray" },
-                "units": { "type": "string" },
-                "tags": { "$ref": "#/definitions/tagArray" }
-            }}
-            ],
+            },
             "required" :  [ "value" ]
         }
     },
