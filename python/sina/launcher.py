@@ -279,6 +279,26 @@ def add_compare_subparser(subparsers):
                                 help='The second id of the record to compare.')
 
 
+def _validate_cassandra_args(args):
+    """
+    Check to see if Cassandra is usable and used correctly.
+
+    :param args: The args passed by the user.
+    :returns: A list of any issues encountered.
+    """
+    error_message = []
+    if not cassandra_present:
+        error_message.append("The Cassandra driver has not been installed; "
+                             "no Cassandra functionality is available.")
+    if not args.cass_keyspace:
+        error_message.append("{} not provided. In "
+                             "the future, it will be possible to "
+                             "set a default. For now, please "
+                             "specify it to continue!"
+                             .format(COMMON_OPTION_CASSANDRA_DEST))
+    return error_message
+
+
 def setup_logging(args):
     """
     Set up logging based on provided log params.
@@ -367,15 +387,7 @@ def ingest(args):
                                  "using sql files or Cassandra as the "
                                  "destination.")
     if args.database_type == 'cass':
-        if not args.cass_keyspace:
-            error_message.append("{} not provided. In "
-                                 "the future, it will be possible to "
-                                 "set a default. For now, please "
-                                 "specify it to continue!"
-                                 .format(COMMON_OPTION_CASSANDRA_DEST))
-        if not cassandra_present:
-            error_message.append("The Cassandra driver has not been installed; "
-                                 "no Cassandra functionality is available.")
+            error_message.extend(_validate_cassandra_args(args))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
@@ -456,15 +468,7 @@ def query(args):
             error_message.append("Currently, querying is only supported when "
                                  "querying sql files or Cassandra.")
     if args.database_type == 'cass':
-        if not args.cass_keyspace:
-            error_message.append("{} not provided. In "
-                                 "the future, it will be possible to "
-                                 "set a default. For now, please "
-                                 "specify it to continue!"
-                                 .format(COMMON_OPTION_CASSANDRA_DEST))
-        if not cassandra_present:
-            error_message.append("The Cassandra driver has not been installed; "
-                                 "no Cassandra functionality is available.")
+            error_message.extend(_validate_cassandra_args(args))
     if not args.raw and not args.scalar and not args.uri:
         error_message.append("You must specify a query type!")
     elif args.raw and (args.scalar or args.uri or args.id):
@@ -534,15 +538,7 @@ def compare_records(args):
             error_message.append("Currently, comparing is only supported when "
                                  "querying sql files or Cassandra.")
     if args.database_type == 'cass':
-        if not args.cass_keyspace:
-            error_message.append("{} not provided. In "
-                                 "the future, it will be possible to "
-                                 "set a default. For now, please "
-                                 "specify it to continue!"
-                                 .format(COMMON_OPTION_CASSANDRA_DEST))
-        if not cassandra_present:
-            error_message.append("The Cassandra driver has not been installed; "
-                                 "no Cassandra functionality is available.")
+            error_message.extend(_validate_cassandra_args(args))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
