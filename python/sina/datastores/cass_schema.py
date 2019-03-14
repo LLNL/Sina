@@ -18,6 +18,9 @@ except ImportError:
     # represents a "fixed" mock. Note that trying to use this without Cassandra
     # installed outside of autodocs will still raise the expected ImportError,
     # due to importing sync_table (which autodocs CAN mock).
+
+    # This should be revisited if we drop support for Python 2, as Python 3
+    # includes more flexible mocking.
     Model = object
 
     class _AutodocFakeColumn:
@@ -35,7 +38,6 @@ except ImportError:
     columns.Set = lambda a, primary_key=True, required=False: a
     columns.Double = lambda primary_key=True, required=False: 0
     columns.List = lambda a, primary_key=True, required=False: _AutodocFakeColumn()
-    pass
 
 LOGGER = logging.getLogger(__name__)
 

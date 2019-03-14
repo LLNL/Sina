@@ -76,8 +76,13 @@ Alternatively, you can run all of the above by entering the following::
 
     $ make all
 
+This will install Sina with its default backend (SQL).
+
 Once installation is complete you are ready to activate the environment -- see
-"Activating the Virtual Environment" -- and begin using Sina.
+"Activating the Virtual Environment" -- and begin using Sina. Once this
+environment is activated, you can install the optional Cassandra backend with::
+
+  (venv) $ pip install -r requirements/cassandra.txt
 
 
 Manual Setup
