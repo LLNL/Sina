@@ -5,6 +5,8 @@ from six.moves import cStringIO as StringIO
 import sys
 import unittest
 import warnings
+import json
+import jsonschema
 
 import cassandra.cqlengine.connection as connection
 import cassandra.cqlengine.management as management
@@ -30,6 +32,10 @@ class TestSQLIntegration(unittest.TestCase):
                                             'null.json'])
         self.location = os.path.dirname(os.path.realpath(__file__))
         self.created_db = os.path.join(self.location, TEMP_DB_NAME)
+        self.test_files = [os.path.join(self.location,
+                                        "test_files/mnoda_1.json"),
+                           os.path.join(self.location,
+                                        "test_files/mnoda_2.json")]
 
     def tearDown(self):
         """Clean up after each test by removing the created_db tempfile."""
@@ -38,13 +44,21 @@ class TestSQLIntegration(unittest.TestCase):
         except OSError:
             pass
 
+    def test_file_validity(self):
+        """Make sure the files we're importing are valid Mnoda."""
+        schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                   '../../mnoda.json')
+        with open(schema_file) as schema:
+            schema = json.load(schema)
+            for test_file in self.test_files:
+                with open(test_file) as loaded_test:
+                    file_json = json.load(loaded_test)
+                    jsonschema.validate(file_json, schema)
+
     # Create a sql database and query it
     def test_sql_workflow(self):
         """Verify integration between CLI and API for SQL."""
-        self.args.source = ",".join([os.path.join(self.location,
-                                                  "test_files/mnoda_1.json"),
-                                     os.path.join(self.location,
-                                                  "test_files/mnoda_2.json")])
+        self.args.source = ",".join(self.test_files)
         self.args.subparser_name = 'ingest'
         self.args.database = self.created_db
         launcher.ingest(self.args)
