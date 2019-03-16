@@ -105,7 +105,7 @@ cassandra:
 	  echo "You must create $(VENV) first. Run 'make install'"; \
 	else \
 	  echo "Installing cassandra in $(VENV)"; \
-	  $(VENV)/bin/pip install -r requirements/cassandra.txt; \
+	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/cassandra.txt; \
 	fi
 
 docs: install
@@ -152,7 +152,7 @@ pylint:
 	rm -rf $(PYLINT_VENV); \
 	python -m virtualenv $(PYLINT_VENV); \
 	set -e; \
-	$(PYLINT_VENV)/bin/pip install --upgrade pip tox pylint; \
+	$(PYLINT_VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip tox pylint; \
 	$(PYLINT_VENV)/bin/tox -e pylint
 
 # Set up a clean test virtual environment before running tests.
