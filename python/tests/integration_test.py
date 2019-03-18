@@ -125,7 +125,7 @@ class TestCassIntegration(unittest.TestCase):
                                      os.path.join(self.location,
                                                   "test_files/mnoda_2.json")])
         self.args.subparser_name = 'ingest'
-        self.args.database = ['127.0.0.1']
+        self.args.database = '127.0.0.1'
         self.args.database_type = 'cass'
         self.args.cass_keyspace = TEMP_KEYSPACE_NAME
         launcher.ingest(self.args)
