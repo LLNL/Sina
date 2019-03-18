@@ -134,7 +134,7 @@ class TestSearch(unittest.TestCase):
         Note that, due to use of the abc module in DAOs, this test will fail
         if any of the required DAOs do not implement all required methods.
         """
-        ip = '192.168.1.2:9042'
+        ip = ['192.168.1.2:9042']
         factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME, node_ip_list=ip)
         args, kwargs = mock_form_conn.call_args
         self.assertEqual(args[0], TEMP_KEYSPACE_NAME)
