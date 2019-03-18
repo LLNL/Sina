@@ -359,7 +359,8 @@ class TestSearch(unittest.TestCase):
         just_right_range = DataRange(min=0, max=300, max_inclusive=True)
         just_right = record_dao.data_query(spam_scal=just_right_range)
         self.assertEqual(len(list(just_right)), 3)
-        no_scalar = record_dao.data_query(nonexistant_scalar=just_right_range)
+        no_scalar = record_dao.data_query(spam_scal=just_right_range,
+                                          nonexistant_scalar=just_right_range)
         self.assertFalse(list(no_scalar))
         multi_range = DataRange(min=-100, max=100)
         multi = record_dao.data_query(spam_scal=multi_range)
