@@ -123,7 +123,8 @@ class TestSearch(unittest.TestCase):
         """Remove test keyspace."""
         management.drop_keyspace(TEMP_KEYSPACE_NAME)
 
-    def test_factory_production(self):
+    @patch('sina.datastores.cass_schema.form_connection', autospec=True)
+    def test_factory_production(self, mock_form_conn):
         """
         Test to ensure DAOFactory can create all required DAOs.
 
@@ -133,7 +134,11 @@ class TestSearch(unittest.TestCase):
         Note that, due to use of the abc module in DAOs, this test will fail
         if any of the required DAOs do not implement all required methods.
         """
-        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME)
+        ip = ['192.168.1.2:9042']
+        factory = sina_cass.DAOFactory(TEMP_KEYSPACE_NAME, node_ip_list=ip)
+        args, kwargs = mock_form_conn.call_args
+        self.assertEqual(args[0], TEMP_KEYSPACE_NAME)
+        self.assertEqual(kwargs['node_ip_list'], ip)
         record_dao = factory.createRecordDAO()
         self.assertIsInstance(record_dao, sina_cass.RecordDAO)
         rel_dao = factory.createRelationshipDAO()

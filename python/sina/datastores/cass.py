@@ -1080,7 +1080,7 @@ class DAOFactory(dao.DAOFactory):
         """
         self.keyspace = keyspace
         self.node_ip_list = node_ip_list
-        schema.form_connection(keyspace, node_ip_list=None)
+        schema.form_connection(keyspace, node_ip_list=self.node_ip_list)
 
     def createRecordDAO(self):
         """
