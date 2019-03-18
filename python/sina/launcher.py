@@ -595,7 +595,7 @@ def _make_factory(args):
     """
     LOGGER.debug('Making {} factory.'.format(args.database_type))
     if args.database_type == "cass":
-        return cass.DAOFactory(node_ip_list=args.database,
+        return cass.DAOFactory(node_ip_list=[args.database],
                                keyspace=args.cass_keyspace)
     elif args.database_type == "sql":
         return sql.DAOFactory(args.database)
