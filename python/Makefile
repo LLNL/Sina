@@ -66,6 +66,7 @@ PR_ACT="Enter 'source $(VACT)' or 'source $(VACT).csh' to activate the virtual e
 TEST_VENV=tests/test_venv
 
 .PHONY: all
+.PHONY: cassandra
 .PHONY: clean
 .PHONY: clean-files
 .PHONY: clean-notebooks
@@ -97,6 +98,15 @@ install: links
 	echo $(PR_ACT)
 
 all: clean docs tests
+
+# Add cassandra to an existing virtual environment since it is optional.
+cassandra:
+	@if test ! -d $(VENV); then \
+	  echo "You must create $(VENV) first. Run 'make install'"; \
+	else \
+	  echo "Installing cassandra in $(VENV)"; \
+	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/cassandra.txt; \
+	fi
 
 docs: install
 	@$(VENV)/bin/tox -e docs
@@ -142,10 +152,11 @@ pylint:
 	rm -rf $(PYLINT_VENV); \
 	python -m virtualenv $(PYLINT_VENV); \
 	set -e; \
-	$(PYLINT_VENV)/bin/pip install --upgrade pip tox pylint; \
+	$(PYLINT_VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip tox pylint; \
 	$(PYLINT_VENV)/bin/tox -e pylint
 
 # Set up a clean test virtual environment before running tests.
+
 # Recursively call make to ensure the work is done in the specified order
 tests: export PATH=$(TEST_PATH)
 tests: links
