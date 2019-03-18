@@ -397,9 +397,18 @@ class RecordDAO(dao.RecordDAO):
 
         :returns: a generator of ids fitting the criteria
         """
-        criterion_tuples = [(datum_name, x) for x in datum_criteria]
-        ids = self._apply_ranges_to_query(table=table, data=criterion_tuples)
-        return ids
+        # Initially, it seemed as though _apply_ranges_to_query was all that was
+        # needed here, but there's an important caveat: _apply_ranges relies on
+        # both the DataFromRecord and RecordFromData tables, and the former
+        # looks much different for list data. And so:
+        rec_table = table_lookup[table]["record_table"]
+        result_sets = []
+        for criterion in datum_criteria:
+            result_sets.append(set(self._configure_query_for_criteria(rec_table.objects,
+                                                                      name=datum_name,
+                                                                      criteria=criterion)
+                                   .values_list('id', flat=True)))
+        return set.intersection(*result_sets)
 
     def _apply_has_any_to_query(self, datum_name, datum_criteria, table):
         """
@@ -487,6 +496,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: a generator of ids fitting the criteria
         """
         rec_table = table_lookup[table]["record_table"]
+        data_table = table_lookup[table]["data_table"]
         query = rec_table.objects
         # Cassandra requires a list for the in-predicate
         filtered_ids = list(self._configure_query_for_criteria(query,
@@ -497,7 +507,7 @@ class RecordDAO(dao.RecordDAO):
         # Only do the next part if there's more criteria and at least one id
         for counter, (name, criteria) in enumerate(data[1:]):
             if filtered_ids:
-                query = (self._configure_query_for_criteria(rec_table.objects, name, criteria)
+                query = (self._configure_query_for_criteria(data_table.objects, name, criteria)
                          .filter(id__in=filtered_ids))
                 if counter < (len(data[1:]) - 1):
                     # Cassandra requires a list for the id__in attribute
