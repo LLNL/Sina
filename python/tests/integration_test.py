@@ -8,11 +8,18 @@ import warnings
 import json
 import jsonschema
 
-import cassandra.cqlengine.connection as connection
-import cassandra.cqlengine.management as management
 from nose.plugins.attrib import attr
 
 from sina import launcher
+
+try:
+    import cassandra.cqlengine.connection as connection
+    import cassandra.cqlengine.management as management
+except ImportError:
+    # Not having Cassandra for tests is a valid case and should be coupled with
+    # an "-a '!cassandra'" flag for Nose. If not, another error will be raised,
+    # and this case is addressed there.
+    pass
 
 TEMP_DB_NAME = "temp_sqlite_testfile.sqlite"
 # CQLEngine needs a keyspace to start. Will not be edited.

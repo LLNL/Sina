@@ -17,15 +17,20 @@ import sys
 import os
 from argparse import ArgumentParser, RawTextHelpFormatter
 
-from cassandra.cluster import Cluster
 from sqlite3 import connect
 from sqlalchemy.orm.exc import NoResultFound
 
 from sina import model
 from sina import utils
 from sina.utils import import_many_jsons, import_json, parse_data_string, create_file
-import sina.datastores.cass as cass
 import sina.datastores.sql as sql
+
+try:
+    from cassandra.cluster import Cluster
+    import sina.datastores.cass as cass
+    cassandra_present = True
+except ImportError:
+    cassandra_present = False
 
 ROOTLOGGER = logging.getLogger(inspect.getmodule(__name__))
 LOGGER = logging.getLogger(__name__)
@@ -274,6 +279,26 @@ def add_compare_subparser(subparsers):
                                 help='The second id of the record to compare.')
 
 
+def _validate_cassandra_args(args):
+    """
+    Check to see if Cassandra is usable and used correctly.
+
+    :param args: The args passed by the user.
+    :returns: A list of any issues encountered.
+    """
+    error_message = []
+    if not cassandra_present:
+        error_message.append("The Cassandra driver has not been installed; "
+                             "no Cassandra functionality is available.")
+    if not args.cass_keyspace:
+        error_message.append("{} not provided. In "
+                             "the future, it will be possible to "
+                             "set a default. For now, please "
+                             "specify it to continue!"
+                             .format(COMMON_OPTION_CASSANDRA_DEST))
+    return error_message
+
+
 def setup_logging(args):
     """
     Set up logging based on provided log params.
@@ -361,12 +386,8 @@ def ingest(args):
             error_message.append("Currently, ingesting is only supported when "
                                  "using sql files or Cassandra as the "
                                  "destination.")
-    if args.database_type == 'cass' and (not args.cass_keyspace):
-        error_message.append("{} not provided. In "
-                             "the future, it will be possible to "
-                             "set a default. For now, please "
-                             "specify it to continue!"
-                             .format(COMMON_OPTION_CASSANDRA_DEST))
+    if args.database_type == 'cass':
+            error_message.extend(_validate_cassandra_args(args))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
@@ -446,12 +467,8 @@ def query(args):
         elif args.database_type not in ('cass', 'sql'):
             error_message.append("Currently, querying is only supported when "
                                  "querying sql files or Cassandra.")
-    if args.database_type == 'cass' and (not args.cass_keyspace):
-        error_message.append("{} not provided. In "
-                             "the future, it will be possible to "
-                             "set a default. For now, please "
-                             "specify it to continue!"
-                             .format(COMMON_OPTION_CASSANDRA_DEST))
+    if args.database_type == 'cass':
+            error_message.extend(_validate_cassandra_args(args))
     if not args.raw and not args.scalar and not args.uri:
         error_message.append("You must specify a query type!")
     elif args.raw and (args.scalar or args.uri or args.id):
@@ -520,12 +537,8 @@ def compare_records(args):
         elif args.database_type not in ('cass', 'sql'):
             error_message.append("Currently, comparing is only supported when "
                                  "querying sql files or Cassandra.")
-    if args.database_type == 'cass' and (not args.cass_keyspace):
-        error_message.append("{} not provided. In "
-                             "the future, it will be possible to "
-                             "set a default. For now, please "
-                             "specify it to continue!"
-                             .format(COMMON_OPTION_CASSANDRA_DEST))
+    if args.database_type == 'cass':
+            error_message.extend(_validate_cassandra_args(args))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
@@ -643,7 +656,6 @@ def main():
         msg = ('Problem with CLI command: {}, full stacktrace written to log'
                .format(e))
         LOGGER.exception(msg)
-        print(msg)
     LOGGER.info('Exiting program.')
 
 

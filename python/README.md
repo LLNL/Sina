@@ -76,8 +76,13 @@ Alternatively, you can run all of the above by entering the following::
 
     $ make all
 
-Once installation is complete you are ready to activate the environment -- see
-"Activating the Virtual Environment" -- and begin using Sina.
+This will install Sina with its default backend (SQL).
+
+Once installation is complete, you are ready to activate the environment -- see
+"Activating the Virtual Environment" -- and begin using Sina. You can also install
+the optional Cassandra backend with::
+
+    $ make cassandra
 
 
 Manual Setup

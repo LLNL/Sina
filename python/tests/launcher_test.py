@@ -10,8 +10,15 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from sina import launcher
 from sina.datastores import sql as sina_sql
-from sina.datastores import cass as sina_cass
 from sina.utils import DataRange, import_json, _process_relationship_entry
+
+try:
+    from sina.datastores import cass as sina_cass
+except ImportError:
+    # Not having Cassandra for tests is a valid case and should be coupled with
+    # an "-a '!cassandra'" flag for Nose. If not, another error will be raised,
+    # and this case is addressed there.
+    pass
 
 TEMP_DB_NAME = "temp_sqlite_testfile.sqlite"
 
@@ -176,6 +183,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(mock_uri_args['accepted_ids_list'][0],
                          mock_data.return_value[0])
 
+    @attr('cassandra')
     @patch('sina.launcher.cass.RecordDAO.get_given_document_uri')
     @patch('sina.launcher.sql.RecordDAO.get_given_document_uri')
     def test_query_error_messages(self, mock_sql_query, mock_cass_query):

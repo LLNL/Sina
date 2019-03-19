@@ -6,9 +6,38 @@ Based on Mnoda
 import numbers
 import logging
 
-from cassandra.cqlengine.models import Model
 from cassandra.cqlengine.management import sync_table
-from cassandra.cqlengine import columns, connection
+
+try:
+    from cassandra.cqlengine.models import Model
+    from cassandra.cqlengine import columns, connection
+except ImportError:
+    # Sphinx autodoc will import this file regardless of whether Cassandra is
+    # installed. Ordinarily it can mock imports, but the type of usage
+    # seen by "columns" exceeds what it's able to mock. This set of definitions
+    # represents a "fixed" mock. Note that trying to use this without Cassandra
+    # installed outside of autodocs will still raise the expected ImportError,
+    # due to importing sync_table (which autodocs CAN mock).
+
+    # This should be revisited if we drop support for Python 2, as Python 3
+    # includes more flexible mocking.
+    Model = object
+
+    class _AutodocFakeColumn:
+        """Mock column members that can't be mocked by Sphinx's autodoc."""
+
+        def __init__(self, **kwargs):
+            """Create a simple object that can take arbitrary attributes."""
+            self.__dict__.update(kwargs)
+
+        def _freeze_db_type(self):
+            """Mock the freezing method, itself a workaround."""
+            pass
+    columns = _AutodocFakeColumn()
+    columns.Text = lambda primary_key=True, required=False: 0
+    columns.Set = lambda a, primary_key=True, required=False: a
+    columns.Double = lambda primary_key=True, required=False: 0
+    columns.List = lambda a, primary_key=True, required=False: _AutodocFakeColumn()
 
 LOGGER = logging.getLogger(__name__)
 
