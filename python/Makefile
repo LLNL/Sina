@@ -90,7 +90,7 @@ install: links
 	else \
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
-	$(VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip; \
+	$(VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip setuptools; \
 	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/development.txt; \
 	if test -z "$(NETWORK)"; then \
 	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/jupyter.txt; \
