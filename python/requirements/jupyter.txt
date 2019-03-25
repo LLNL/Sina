@@ -2,10 +2,6 @@
 -r links.txt
 
 # Dependencies for running example Jupyter notebooks
-# Note matplotlib is included separately
-ipython>=5,<6;python_version<"3"  # ipython 6 drops support for Python 2 
-ipykernel<5;python_version<"3"
-ipykernel>=5;python_version>="3"
-pyzmq<18  # pyzmq 18.0 has a bug on Python 3, use anything below
-ipywidgets
-tabulate
+# .. Environment markers aren't working in requirements files, so use
+#    them from the setup.py file.
+-e .[jupyter]

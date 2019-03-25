@@ -6,10 +6,11 @@ from setuptools import setup, find_packages
 version = __import__('sina').get_version()
 
 setup(name='sina',
-      # namespace_packages=['sina_api','sina_cli','sina_model'],
       version=version,
-      author='Daniel Laney, Jessica Semler, Joseph Eklund, Rebecca Haluska',
+      author='Siboka Team',
       packages=find_packages(),
+      description='Simulation INsight and Analysis',
+      long_description=open('README.md').read(),
       entry_points={
         'console_scripts': [
             'sina = sina.launcher:main'
@@ -19,10 +20,16 @@ setup(name='sina',
         'cassandra': [
             'cassandra-driver',
         ],
+        'jupyter:python_version<"3"': [
+            'ipython>=5,<6',  # ipython 6 drops support for Python 2
+            'ipykernel<5'
+        ],
+        'jupyter:python_version>="3"': [
+            'ipython',
+            'ipykernel>=5'
+        ],
         'jupyter': [
-            'ipykernel<5;python_version<"3"',
-            'ipykernel>=5;python_version>="3"',
-            'pyzmq<18',
+            'pyzmq<18',   # pyzmq 18.0 has bug on Python 3, use anything below
             'ipywidgets',
             'tabulate',
             'matplotlib'
@@ -31,6 +38,7 @@ setup(name='sina',
       install_requires=[
         'six',
         'sqlalchemy',
+        'enum34;python_version<"3.4"',
         'deepdiff',
         'texttable'
       ]
