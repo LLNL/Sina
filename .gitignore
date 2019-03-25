@@ -6,17 +6,18 @@
 *.log
 *.coverage
 .tox/
-python/tests/run_tests
-python/tests/test_venv
+pylint_venv/
+run_tests/
+test_venv/
 cover/
 dist/
-examples/*/.ipynb_checkpoints/*
+.ipynb_checkpoints/
 
 # Ignore auto-generated doc files
-python/docs/source/generated_docs
+generated_docs/
 
-*/migrations/*
-venv/*
+migrations/
+venv/
 
 nosetests*.xml*
 links.txt
