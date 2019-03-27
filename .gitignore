@@ -5,24 +5,26 @@
 *.egg-info/
 *.log
 *.coverage
-.tox/
-python/tests/run_tests
-python/tests/test_venv
+python/.tox/
+python/tests/pylint_venv/
+python/tests/run_tests/
+python/tests/test_venv/
 cover/
 dist/
-examples/*/.ipynb_checkpoints/*
+examples/*/.ipynb_checkpoints/
 
 # Ignore auto-generated doc files
-python/docs/source/generated_docs
+python/docs/source/generated_docs/
 
-*/migrations/*
-venv/*
+python/venv/
 
-nosetests*.xml*
-links.txt
+python/nosetests*.xml*
+python/requirements/links.txt
 
 # Build directories
-build*
+cpp/build/
+python/build/
+python/docs/build/
 
 # for CLion
 cmake-build-debug
@@ -30,3 +32,4 @@ cmake-build-debug
 
 # editor files
 .*.swp
+*.bak
