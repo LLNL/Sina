@@ -387,7 +387,7 @@ def ingest(args):
                                  "using sql files or Cassandra as the "
                                  "destination.")
     if args.database_type == 'cass':
-            error_message.extend(_validate_cassandra_args(args))
+        error_message.extend(_validate_cassandra_args(args))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
@@ -468,7 +468,7 @@ def query(args):
             error_message.append("Currently, querying is only supported when "
                                  "querying sql files or Cassandra.")
     if args.database_type == 'cass':
-            error_message.extend(_validate_cassandra_args(args))
+        error_message.extend(_validate_cassandra_args(args))
     if not args.raw and not args.scalar and not args.uri:
         error_message.append("You must specify a query type!")
     elif args.raw and (args.scalar or args.uri or args.id):
@@ -538,7 +538,7 @@ def compare_records(args):
             error_message.append("Currently, comparing is only supported when "
                                  "querying sql files or Cassandra.")
     if args.database_type == 'cass':
-            error_message.extend(_validate_cassandra_args(args))
+        error_message.extend(_validate_cassandra_args(args))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
