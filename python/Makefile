@@ -98,14 +98,17 @@ cassandra:
 docs: install
 	@$(VENV)/bin/tox -e docs
 
-# Add Jupyter to an existing virtual environment since it is optional.
-jupyter:
+# Create the virtual environment if it does not already exist.  This process
+# recursively calls make.
+jupyter: links
 	@if test ! -d $(VENV); then \
-	  echo "You must create $(VENV) first. Run 'make install'"; \
+	  echo "Installing sina core in $(VENV)"; \
+	  make --no-print-directory install VENV=$(VENV); \
 	else \
-	  echo "Installing jupyter in $(VENV)"; \
-	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/jupyter.txt; \
-	fi
+	  echo "You already have the virtual environment $(VENV)"; \
+	fi; \
+	echo "Installing jupyter in $(VENV)"; \
+	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/jupyter.txt; \
 
 # Ensure the appropriate requirement links are established.  This is important
 # for building and testing purposes.
@@ -160,15 +163,19 @@ tests: links
 	make --no-print-directory install VENV=$(TEST_VENV); \
 	$(TEST_VENV)/bin/tox
 
-# Don't recreate the virtual environment or re-run the core tests
+# Recursively call make if it is necessary to create the test virtual environment.
 test-jupyter: export PATH=$(TEST_PATH)
-test-jupyter:
+test-jupyter: links
 	@if test ! -d $(TEST_VENV); then \
-	  echo "You must create $(TEST_VENV) first. Run 'make tests'"; \
+	  echo "Making the test virtual environment in $(TEST_VENV)"; \
+	  make --no-print-directory install VENV=$(TEST_VENV); \
 	else \
-	  echo "Running jupyter tests using $(TEST_VENV)"; \
-	  $(TEST_VENV)/bin/tox -e jupyter; \
-	fi
+	  echo "You already have the test virtual environment $(TEST_VENV)"; \
+	fi; \
+	echo "Installing jupyter in $(TEST_VENV)"; \
+	make --no-print-directory jupyter VENV=$(TEST_VENV); \
+	echo "Running jupyter tests using $(TEST_VENV)"; \
+	$(TEST_VENV)/bin/tox -e jupyter
 
 # Recursively call make to ensure the work is done in the specified order
 clean:

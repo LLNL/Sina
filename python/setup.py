@@ -8,6 +8,7 @@ version = __import__('sina').get_version()
 setup(name='sina',
       version=version,
       author='Siboka Team',
+      author_email='siboka@llnl.gov',
       packages=find_packages(),
       description='Simulation INsight and Analysis',
       long_description=open('README.md').read(),

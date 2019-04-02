@@ -16,7 +16,7 @@ try:
     from nbconvert.preprocessors import ExecutePreprocessor
     import nbformat
 except ImportError:
-    print("Please install Jupyter dependencies to use its features.")
+    pass
 
 import collections
 import io

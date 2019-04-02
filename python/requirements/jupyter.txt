@@ -2,6 +2,6 @@
 -r links.txt
 
 # Dependencies for running example Jupyter notebooks
-# .. Environment markers aren't working in requirements files, so use
-#    them from the setup.py file.
+# .. Tox appears to have trouble with environment markers in requirements
+#    files so grab them from setup.py.
 -e .[jupyter]
