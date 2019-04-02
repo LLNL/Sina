@@ -1,12 +1,3 @@
-# Define NETWORK if you are on an LC system and either can't or don't want to
-# use their wheelhouses.  For example,
-#
-# - build:  make NETWORK=scf
-# - tests:  make tests NETWORK=scf
-#
-# Note that use of scf has special meaning until we resolve installation issues
-# or establish a more flexible build process.
-
 # Determine if we are on an LC system based on the presence of the wheelhouse
 # Using curl (versus 'wget --spider') despite being slower since former
 # appears to be installed on Macs while latter is not.
@@ -74,14 +65,13 @@ TEST_VENV=tests/test_venv
 .PHONY: clean-tests-venv
 .PHONY: docs
 .PHONY: install
+.PHONY: jupyter
 .PHONY: links
 .PHONY: pep8
 .PHONY: pylint
 .PHONY: tests
+.PHONY: test-jupyter
 
-# TODO: Continue to install Jupyter requirements outside the wheelhouse until
-# SIBO-537 work is done, where a separate requirements/jupyter.txt file is
-# defined and optionally included.
 install: links
 	@if test ! -d $(VENV); then \
 	  echo "Making virtual environment in $(VENV)"; \
@@ -92,9 +82,6 @@ install: links
 	fi; \
 	$(VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip setuptools; \
 	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/development.txt; \
-	if test -z "$(NETWORK)"; then \
-	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/jupyter.txt; \
-	fi; \
 	echo $(PR_ACT)
 
 all: clean docs tests
@@ -110,6 +97,18 @@ cassandra:
 
 docs: install
 	@$(VENV)/bin/tox -e docs
+
+# Create the virtual environment if it does not already exist.  This process
+# recursively calls make.
+jupyter: links
+	@if test ! -d $(VENV); then \
+	  echo "Installing sina core in $(VENV)"; \
+	  make --no-print-directory install VENV=$(VENV); \
+	else \
+	  echo "You already have the virtual environment $(VENV)"; \
+	fi; \
+	echo "Installing jupyter in $(VENV)"; \
+	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/jupyter.txt; \
 
 # Ensure the appropriate requirement links are established.  This is important
 # for building and testing purposes.
@@ -163,6 +162,20 @@ tests: links
 	@make --no-print-directory clean-tests-venv; \
 	make --no-print-directory install VENV=$(TEST_VENV); \
 	$(TEST_VENV)/bin/tox
+
+# Recursively call make if it is necessary to create the test virtual environment.
+test-jupyter: export PATH=$(TEST_PATH)
+test-jupyter: links
+	@if test ! -d $(TEST_VENV); then \
+	  echo "Making the test virtual environment in $(TEST_VENV)"; \
+	  make --no-print-directory install VENV=$(TEST_VENV); \
+	else \
+	  echo "You already have the test virtual environment $(TEST_VENV)"; \
+	fi; \
+	echo "Installing jupyter in $(TEST_VENV)"; \
+	make --no-print-directory jupyter VENV=$(TEST_VENV); \
+	echo "Running jupyter tests using $(TEST_VENV)"; \
+	$(TEST_VENV)/bin/tox -e jupyter
 
 # Recursively call make to ensure the work is done in the specified order
 clean:

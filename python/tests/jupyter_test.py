@@ -10,15 +10,21 @@ Sources:
 2) Execution tests via the API at:
     https://nbconvert.readthedocs.io/en/latest/execute_api.html
 """
+import unittest
+
+try:
+    from nbconvert.preprocessors import ExecutePreprocessor
+    import nbformat
+except ImportError:
+    pass
+
 import collections
 import io
-from nbconvert.preprocessors import ExecutePreprocessor
-import nbformat
+from nose.plugins.attrib import attr
 import os
 import shutil
 from six import with_metaclass
 import subprocess
-import unittest
 
 # Assumed root directory for examples, etc.
 #
@@ -261,6 +267,7 @@ def _write_magics_template():
 """)
 
 
+@attr('jupyter')
 class TestJupyterNotebooks(type):
     """Jupyter Notebook metaclass."""
 
