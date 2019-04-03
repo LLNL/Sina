@@ -1,3 +1,11 @@
+# The following environment variables can be used to change the behavior of
+# building the virtual environment:
+#
+#   PIP_OPTIONS  = Additional options to pip (e.g., '--no-index')
+#   VENV         = Name of the Sina virtual environment (default 'venv')
+#   VENV_OPTIONS = Additional options when the venv is created (e.g.,
+#                  '--system-site-packages' to inherit system packages
+
 # Determine if we are on an LC system based on the presence of the wheelhouse
 # Using curl (versus 'wget --spider') despite being slower since former
 # appears to be installed on Macs while latter is not.
@@ -12,7 +20,7 @@ HAVE_WHEELHOUSE=$(shell if curl -sSfk -o /dev/null https://www-lc.llnl.gov/pytho
 # in requirements files (see https://github.com/pypa/pip/issues/3799).
 #
 # WARNING: Adding --no-index option below can cause the build to fail on a
-# Mac ("no such option --trusted-host"); wherease, leaving it out resulted
+# Mac ("no such option --trusted-host"); whereas, leaving it out resulted
 # in pythonhosted.org used to upgrade pip then the trusted host for the
 # requirements file.
 ifeq ($(HAVE_WHEELHOUSE),1)
@@ -21,8 +29,8 @@ else
   PIP_OPTIONS:=$(PIP_OPTIONS)
 endif
 
-# TODO: Build challenges must be addressed to integrate pylint into the 
-# normal development process.
+# TODO: Pylint issues must be addressed before including it in the normal CI
+# process.
 #
 # Define the pylint virtual environment since it is currently built and run
 # for on-demand use and not part of the normal Sina process.
@@ -75,7 +83,7 @@ TEST_VENV=tests/test_venv
 install: links
 	@if test ! -d $(VENV); then \
 	  echo "Making virtual environment in $(VENV)"; \
-	  python -m virtualenv $(VENV); \
+	  python -m virtualenv $(VENV_OPTIONS) $(VENV); \
 	  set -e; \
 	else \
 	  echo "You already have the virtual environment $(VENV)"; \
@@ -149,7 +157,7 @@ pylint: export PATH=$(PYLINT_PATH)
 pylint: 
 	@echo "Creating $(PYLINT_VENV)"; \
 	rm -rf $(PYLINT_VENV); \
-	python -m virtualenv $(PYLINT_VENV); \
+	python -m virtualenv $(VENV_OPTIONS) $(PYLINT_VENV); \
 	set -e; \
 	$(PYLINT_VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip tox pylint; \
 	$(PYLINT_VENV)/bin/tox -e pylint
