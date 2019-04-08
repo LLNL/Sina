@@ -143,15 +143,13 @@ pep8:
 	fi; \
 	$(TEST_VENV)/bin/tox -e pep8
 
-# TODO: Address challenges of installing pylint within our constraints at
-# another time.
 pylint: export PATH=$(PYLINT_PATH)
 pylint: 
 	@echo "Creating $(PYLINT_VENV)"; \
 	rm -rf $(PYLINT_VENV); \
 	python -m virtualenv $(PYLINT_VENV); \
 	set -e; \
-	$(PYLINT_VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip tox pylint; \
+	$(PYLINT_VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip tox; \
 	$(PYLINT_VENV)/bin/tox -e pylint
 
 # Set up a clean test virtual environment before running tests.
