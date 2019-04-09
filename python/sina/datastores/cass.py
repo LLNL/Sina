@@ -87,7 +87,6 @@ class RecordDAO(dao.RecordDAO):
         from_string_batch = defaultdict(list)
         from_scalar_list_batch = defaultdict(list)
         from_string_list_batch = defaultdict(list)
-
         for record in list_to_insert:
             # Insert the Record itself
             is_valid, warnings = record.is_valid()
@@ -164,9 +163,6 @@ class RecordDAO(dao.RecordDAO):
                                uri=doc[0],
                                mimetype=doc[1],
                                tags=doc[2])
-            if not _type_managed:
-                if record.type == "run":
-                    self.RunDAO._insert_sans_rec(record, force_overwrite)
 
         # We've gone through every record we were given. The from_scalar_batch
         # and from_string_batch dictionaries are ready for batch inserting.
@@ -598,10 +594,9 @@ class RecordDAO(dao.RecordDAO):
 
         Temporary implementation. THIS IS A VERY SLOW, BRUTE-FORCE STRATEGY!
         You use it at your own risk! Do not expect it to be performant or
-        particularly stable. Due to some cassandra limitations, this returns
-        potentially duplicate items. One work around for this is to wrap this
-        call in a set() like this:
-        get_many(set(get_given_document_uri(<args>, ids_only=True))).
+        particularly stable. To avoid duplications, while it does return
+        a generator, it actually returns a generator of a set (so there's
+        no memory conserved).
 
         Supports the use of % as a wildcard character.
 
@@ -611,7 +606,7 @@ class RecordDAO(dao.RecordDAO):
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
-        :returns: A generator of found records or (if ids_only) a
+        :returns: A generator of unique found records or (if ids_only) a
                   generator of their ids.
         """
         LOGGER.debug('Getting all records related to uri={}.'.format(uri))
@@ -655,10 +650,10 @@ class RecordDAO(dao.RecordDAO):
             match_ids = base_query.filter(uri=uri).values_list('id', flat=True)
 
         if ids_only:
-            for id in match_ids:
+            for id in set(match_ids):
                 yield id
         else:
-            for record in self.get_many(match_ids):
+            for record in self.get_many(set(match_ids)):
                 yield record
 
     def get_data_for_records(self, id_list, data_list, omit_tags=False):
