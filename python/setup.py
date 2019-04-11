@@ -34,13 +34,15 @@ setup(name='sina',
             'ipywidgets',
             'tabulate',
             'matplotlib'
+        ],
+        'cli_tools': [
+            'deepdiff',
+            'texttable'
         ]
       },
       install_requires=[
         'six',
         'sqlalchemy',
-        'enum34;python_version<"3.4"',
-        'deepdiff',
-        'texttable'
+        'enum34;python_version<"3.4"'
       ]
       )

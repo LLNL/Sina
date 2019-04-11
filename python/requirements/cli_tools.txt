@@ -1,0 +1,6 @@
+# Read in system-specific link constraints.
+-r links.txt
+
+# Dependencies for deepdiff record comparison tool
+deepdiff
+texttable

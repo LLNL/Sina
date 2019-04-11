@@ -20,7 +20,6 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 from sqlite3 import connect
 from sqlalchemy.orm.exc import NoResultFound
 
-from sina import model
 from sina import utils
 from sina.utils import import_many_jsons, import_json, parse_data_string, create_file
 import sina.datastores.sql as sql
@@ -31,6 +30,12 @@ try:
     cassandra_present = True
 except ImportError:
     cassandra_present = False
+
+try:
+    from sina import cli_tools
+    cli_tools_present = True
+except ImportError:
+    cli_tools_present = False
 
 ROOTLOGGER = logging.getLogger(inspect.getmodule(__name__))
 LOGGER = logging.getLogger(__name__)
@@ -71,7 +76,8 @@ def setup_arg_parser():
     add_ingest_subparser(subparsers)
     add_export_subparser(subparsers)
     add_query_subparser(subparsers)
-    add_compare_subparser(subparsers)
+    if cli_tools_present:
+        add_compare_subparser(subparsers)
     return parser
 
 
@@ -548,8 +554,8 @@ def compare_records(args):
         record_one = record_dao.get(args.id_one)
         try:
             record_two = record_dao.get(args.id_two)
-            model.print_diff_records(record_one=record_one,
-                                     record_two=record_two)
+            cli_tools.print_diff_records(record_one=record_one,
+                                         record_two=record_two)
         except NoResultFound:
             print('Could not find record with id <{}>. Check id and '
                   'database.'.format(args.id_two))

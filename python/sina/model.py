@@ -6,9 +6,6 @@ import collections
 import six
 import numbers
 
-import deepdiff
-from texttable import Texttable
-
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
 RESERVED_TYPES = ["run"]  # Types reserved by Record's children
@@ -296,26 +293,32 @@ class Run(Record):
 
     @property
     def application(self):
+        """Return the Run's application."""
         return self['application']
 
     @application.setter
     def application(self, application):
+        """Set the Run's application."""
         self['application'] = application
 
     @property
     def user(self):
+        """Return the Run's user."""
         return self['user']
 
     @user.setter
     def user(self, user):
+        """Set the Run's user."""
         self['user'] = user
 
     @property
     def version(self):
+        """Return the Run's version."""
         return self['version']
 
     @version.setter
     def version(self, version):
+        """Set the Run's version."""
         self['version'] = version
 
     def __repr__(self):
@@ -417,62 +420,3 @@ def generate_run_from_json(json_input):
                     if key not in ['id', 'user', 'user_defined', 'version',
                                    'type', 'application', 'data', 'files']})
     return run
-
-
-def print_diff_records(record_one, record_two, significant_digits=None):
-    """
-    Print a table showing the difference between two Records.
-
-    :param record_one: The first record to compare.
-    :param record_two: The second record to compare.
-    :param significant_digits: int >= 0, default None. Digits after the
-                               decimal point.
-    """
-    deep_diff = deepdiff.DeepDiff(record_one.raw,
-                                  record_two.raw,
-                                  significant_digits=significant_digits,
-                                  verbose_level=2,
-                                  view='tree')
-
-    def get_diff_attribute(name):
-        return (list(zip(deep_diff[name]))
-                if name in deep_diff else [])
-
-    titles = ['key', record_one.id, record_two.id]
-    values_changed = get_diff_attribute('values_changed')
-    type_changes = get_diff_attribute('type_changes')
-    iterable_item_removed = get_diff_attribute('iterable_item_removed')
-    iterable_item_added = get_diff_attribute('iterable_item_added')
-    dict_item_removed = get_diff_attribute('dictionary_item_removed')
-    dict_item_added = get_diff_attribute('dictinoary_item_added')
-    set_item_added = get_diff_attribute('set_item_added')
-    set_item_removed = get_diff_attribute('set_item_removed')
-    attribute_added = get_diff_attribute('attribute_added')
-    attribute_removed = get_diff_attribute('attribute_removed')
-    repitition_change = get_diff_attribute('repitition_change')
-    data = (values_changed +
-            type_changes +
-            iterable_item_removed +
-            iterable_item_added +
-            dict_item_removed +
-            dict_item_added +
-            set_item_added +
-            set_item_removed +
-            attribute_added +
-            attribute_removed +
-            repitition_change)
-    data_list = []
-    for d in data:
-        key = d[0].path().strip('root')
-        if key == "['id']":
-            continue
-        id_one_output = d[0].t1
-        id_two_output = d[0].t2
-        data_list.append([key, id_one_output, id_two_output])
-    data_list.sort()
-    data_list = [titles] + data_list
-    table = Texttable()
-    table.set_cols_align(['c', 'c', 'c'])
-    table.set_cols_valign(['m', 'm', 'm'])
-    table.add_rows(data_list)
-    print(table.draw() + '\n')

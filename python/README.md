@@ -84,6 +84,10 @@ the optional Cassandra backend with::
 
     $ make cassandra
 
+Additional command line tools (such as diffing Records) are available with::
+
+    $ make cli-tools
+
 
 Manual Setup
 ============
