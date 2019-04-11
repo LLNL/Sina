@@ -1,7 +1,7 @@
 # The following environment variables can be used to change the behavior of
 # building the virtual environment:
 #
-#   PIP_OPTIONS  = Additional options to pip (e.g., '--no-index')
+#   SINA_PIP_OPTIONS = Additional options to pip (e.g., '--no-index')
 #   VENV         = Name of the Sina virtual environment (default 'venv')
 #   VENV_OPTIONS = Additional options when the venv is created (e.g.,
 #                  '--system-site-packages' to inherit system packages
@@ -24,10 +24,11 @@ HAVE_WHEELHOUSE=$(shell if curl -sSfk -o /dev/null https://www-lc.llnl.gov/pytho
 # in pythonhosted.org used to upgrade pip then the trusted host for the
 # requirements file.
 ifeq ($(HAVE_WHEELHOUSE),1)
-  PIP_OPTIONS:=--trusted-host www-lc.llnl.gov $(PIP_OPTIONS)
+  SINA_PIP_OPTIONS:=--trusted-host www-lc.llnl.gov $(SINA_PIP_OPTIONS)
 else
-  PIP_OPTIONS:=$(PIP_OPTIONS)
+  SINA_PIP_OPTIONS:=$(SINA_PIP_OPTIONS)
 endif
+export SINA_PIP_OPTIONS
 
 # TODO: Pylint issues must be addressed before including it in the normal CI
 # process.
@@ -88,8 +89,8 @@ install: links
 	else \
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
-	$(VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip setuptools; \
-	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/development.txt; \
+	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip setuptools; \
+	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/development.txt; \
 	echo $(PR_ACT)
 
 all: clean docs tests
@@ -100,7 +101,7 @@ cassandra:
 	  echo "You must create $(VENV) first. Run 'make install'"; \
 	else \
 	  echo "Installing cassandra in $(VENV)"; \
-	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/cassandra.txt; \
+	  $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/cassandra.txt; \
 	fi
 
 docs: install
@@ -116,7 +117,7 @@ jupyter: links
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
 	echo "Installing jupyter in $(VENV)"; \
-	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/jupyter.txt; \
+	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/jupyter.txt; \
 
 # Ensure the appropriate requirement links are established.  This is important
 # for building and testing purposes.
@@ -139,7 +140,7 @@ links:
 	  fi; \
 	fi
 
-# PEP8 is an optional check until we discuss which flake8 plugins we want to 
+# PEP8 is an optional check until we discuss which flake8 plugins we want to
 # add (see SIBO-675).
 pep8: export PATH=$(TEST_PATH)
 pep8:
@@ -152,12 +153,12 @@ pep8:
 	$(TEST_VENV)/bin/tox -e pep8
 
 pylint: export PATH=$(PYLINT_PATH)
-pylint: 
+pylint:
 	@echo "Creating $(PYLINT_VENV)"; \
 	rm -rf $(PYLINT_VENV); \
 	python -m virtualenv $(VENV_OPTIONS) $(PYLINT_VENV); \
 	set -e; \
-	$(PYLINT_VENV)/bin/pip install $(PIP_OPTIONS) --upgrade pip tox; \
+	$(PYLINT_VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip tox; \
 	$(PYLINT_VENV)/bin/tox -e pylint
 
 # Set up a clean test virtual environment before running tests.
