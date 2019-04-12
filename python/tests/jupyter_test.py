@@ -10,8 +10,6 @@ Sources:
 2) Execution tests via the API at:
     https://nbconvert.readthedocs.io/en/latest/execute_api.html
 """
-import unittest
-
 try:
     from nbconvert.preprocessors import ExecutePreprocessor
     import nbformat
@@ -20,11 +18,13 @@ except ImportError:
 
 import collections
 import io
-from nose.plugins.attrib import attr
 import os
 import shutil
-from six import with_metaclass
 import subprocess
+import unittest
+
+from nose.plugins.attrib import attr
+from six import with_metaclass
 
 # Assumed root directory for examples, etc.
 #

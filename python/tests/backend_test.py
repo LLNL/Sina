@@ -6,10 +6,11 @@ import unittest
 import json
 import csv
 import logging
-import six
-from mock import patch
 from collections import OrderedDict
 import types
+
+from mock import patch
+import six
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, has_only)

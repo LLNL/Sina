@@ -2,11 +2,12 @@
 import os
 import numbers
 import logging
-import sqlalchemy
 import json
 from collections import defaultdict
-import six
 from functools import reduce
+
+import six
+import sqlalchemy
 
 import sina.dao as dao
 import sina.model as model
