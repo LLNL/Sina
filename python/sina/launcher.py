@@ -32,7 +32,7 @@ except ImportError:
     cassandra_present = False
 
 try:
-    from sina import cli_tools
+    import sina.cli.diff
     cli_tools_present = True
 except ImportError:
     cli_tools_present = False
@@ -554,8 +554,8 @@ def compare_records(args):
         record_one = record_dao.get(args.id_one)
         try:
             record_two = record_dao.get(args.id_two)
-            cli_tools.print_diff_records(record_one=record_one,
-                                         record_two=record_two)
+            sina.cli.diff.print_diff_records(record_one=record_one,
+                                             record_two=record_two)
         except NoResultFound:
             print('Could not find record with id <{}>. Check id and '
                   'database.'.format(args.id_two))

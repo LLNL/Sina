@@ -10,7 +10,7 @@ from nose.plugins.attrib import attr
 
 from sina.model import Record
 try:
-    import sina.cli_tools
+    import sina.cli.diff
 except ImportError:
     # Not having the cli tools for tests is a valid case and should be coupled with
     # an "-a '!cli_tools'" flag for Nose. If not, another error will be raised.
@@ -55,8 +55,8 @@ class TestRecordDiff(unittest.TestCase):
         try:
             # Grab stdout and send to string io
             sys.stdout = cStringIO()
-            sina.cli_tools.print_diff_records(record_one=self.record_one,
-                                              record_two=self.record_one)
+            sina.cli.diff.print_diff_records(record_one=self.record_one,
+                                             record_two=self.record_one)
             std_output = sys.stdout.getvalue()
             self.assertEqual(std_output, '+-----+------+------+\n'
                                          '| key | spam | spam |\n'
@@ -71,8 +71,8 @@ class TestRecordDiff(unittest.TestCase):
         try:
             # Grab stdout and send to string io
             sys.stdout = cStringIO()
-            sina.cli_tools.print_diff_records(record_one=self.record_one,
-                                              record_two=self.record_three)
+            sina.cli.diff.print_diff_records(record_one=self.record_one,
+                                             record_two=self.record_three)
             std_output = sys.stdout.getvalue()
             self.assertEqual(
                 std_output,

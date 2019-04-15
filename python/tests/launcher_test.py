@@ -210,7 +210,7 @@ class TestCLI(unittest.TestCase):
         mock_cass_query.assert_not_called()
 
     @patch('sina.launcher.sql.RecordDAO.get')
-    @patch('sina.launcher.cli_tools.print_diff_records')
+    @patch('sina.launcher.sina.cli.diff.print_diff_records')
     @attr('cli_tools')
     def test_compare_records_good(self, mock_model_print, mock_get):
         """Verify compare subcommand prints the correct output."""
@@ -224,7 +224,7 @@ class TestCLI(unittest.TestCase):
         mock_model_print.assert_called_once()
 
     @patch('sina.launcher.sql.RecordDAO.get')
-    @patch('sina.launcher.cli_tools.print_diff_records')
+    @patch('sina.launcher.sina.cli.diff.print_diff_records')
     @attr('cli_tools')
     def test_compare_records_bad(self, mock_model_print, mock_get):
         """Verify compare subcommand prints useful error if given a bad id."""
