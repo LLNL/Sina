@@ -3,9 +3,9 @@
 import json
 import logging
 import collections
-import six
 import numbers
 
+import six
 import deepdiff
 from texttable import Texttable
 

@@ -3,6 +3,7 @@
 import unittest
 import json
 import sys
+
 from six.moves import cStringIO as StringIO
 
 from sina.model import Record
@@ -13,9 +14,7 @@ class TestModel(unittest.TestCase):
     """Unit tests for the model utility methods."""
 
     def setUp(self):
-        """
-        Create records used for testing.
-        """
+        """Create records used for testing."""
         self.record_one = Record(id="spam",
                                  type="new_eggs",
                                  data={"foo": {"value": 12},

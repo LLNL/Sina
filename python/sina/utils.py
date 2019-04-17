@@ -7,14 +7,13 @@ import errno
 import uuid
 import csv
 import time
-import six
 import datetime
 from numbers import Real
-from six import string_types
 from enum import Enum
-
 from multiprocessing.pool import ThreadPool
 from collections import OrderedDict
+
+import six
 
 import sina.model as model
 
@@ -432,7 +431,7 @@ def sort_and_standardize_criteria(criteria_dict):
                                                          max_inclusive=True)))
         elif isinstance(criterion, DataRange) and criterion.is_numeric_range():
             scalar_criteria.append((data_name, criterion))
-        elif isinstance(criterion, string_types):
+        elif isinstance(criterion, six.string_types):
             string_criteria.append((data_name, DataRange(min=criterion,
                                                          max=criterion,
                                                          max_inclusive=True)))
@@ -518,7 +517,7 @@ def get_example_path(relpath, suffix="-new",
     LOGGER.debug("Retrieving example data store path: {}, {}, {}".
                  format(relpath, suffix, example_dirs))
 
-    dirs = [example_dirs] if isinstance(example_dirs, string_types) else example_dirs
+    dirs = [example_dirs] if isinstance(example_dirs, six.string_types) else example_dirs
 
     paths = [relpath]
     if os.getenv("SINA_TEST_KERNEL") is not None:
@@ -709,7 +708,7 @@ class ListCriteria(object):
             self._is_numeric = True
             self._is_lexographic = False
             self._entries = entries
-        elif all((isinstance(x, string_types) or
+        elif all((isinstance(x, six.string_types) or
                   (isinstance(x, DataRange) and x.is_lexographic_range()))
                  for x in entries):
             self._is_numeric = False
@@ -832,7 +831,7 @@ class DataRange(object):
         None, it's still a lexographic range, albeit open on one side
         (x<"dog" vs "cat"<x<"dog").
         """
-        return (isinstance(self.min, string_types) or isinstance(self.max, string_types))
+        return (isinstance(self.min, six.string_types) or isinstance(self.max, six.string_types))
 
     def overlaps(self, other):
         """
@@ -958,8 +957,8 @@ class DataRange(object):
                 self.min = float(self.min) if self.min_is_finite() else None
                 self.max = float(self.max) if self.max_is_finite() else None
             # Case 2: neither min nor max is number. Both must be None or string
-            elif (not isinstance(self.min, (string_types, type(None)) or
-                  not isinstance(self.max, (string_types, type(None))))):
+            elif (not isinstance(self.min, (six.string_types, type(None)) or
+                  not isinstance(self.max, (six.string_types, type(None))))):
                 raise ValueError
             # Note that both being None is a special case, since then we don't
             # know if what we're ultimately looking for is a number or string.
