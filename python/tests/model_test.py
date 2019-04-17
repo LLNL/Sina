@@ -2,9 +2,6 @@
 
 import unittest
 import json
-import sys
-
-from six.moves import cStringIO as StringIO
 
 from sina.model import Record
 import sina.model as model
@@ -17,53 +14,15 @@ class TestModel(unittest.TestCase):
         """Create records used for testing."""
         self.record_one = Record(id="spam",
                                  type="new_eggs",
-                                 data={"foo": {"value": 12},
+                                 data={"list_scalars": {"value": [1, 2, 3]},
+                                       "list_strings": {"value": ['apple',
+                                                                  'orange']},
                                        "bar": {"value": "1",
                                                "tags": ["in"]}},
                                  files=[{"uri": "ham.png", "mimetype": "png"},
-                                        {"uri": "ham.curve", "tags":
-                                        ["hammy"]}],
+                                        {"uri": "ham.curve", "tags": ["hammy"]}],
                                  user_defined={})
-        self.record_two = Record(id="spam",
-                                 type="new_eggs",
-                                 data={"foo": {"value": 12},
-                                       "bar": {"value": "1",
-                                               "tags": ["in"]}},
-                                 files=[{"uri": "ham.png", "mimetype": "png"},
-                                        {"uri": "ham.curve", "tags":
-                                        ["hammy"]}],
-                                 user_defined={})
-        self.record_three = Record(id="spam2",
-                                   type="super_eggs",
-                                   data={"foo": {"value": 13},
-                                         "bar": {"value": "1",
-                                                 "tags": ["in"]}},
-                                   files=[{"uri": "ham.png", "mimetype":
-                                           "png"},
-                                          {"uri": "ham.curve", "tags":
-                                          ["hammy"]}],
-                                   user_defined={})
-        self.record_four = Record(id="spam4",
-                                  type="new_eggs",
-                                  data={"foo": {"value": 12},
-                                        "bar": {"value": "1",
-                                                "tags": ["in"]}},
-                                  files=[{"uri": "ham.png", "mimetype": "png"},
-                                         {"uri": "ham.curve", "tags":
-                                         ["hammy"]}],
-                                  user_defined={})
-        self.record_five = Record(id="spam5",
-                                  type="new_eggs",
-                                  data={"list_scalars": {"value": [1, 2, 3]},
-                                        "list_strings": {"value": ['apple',
-                                                                   'orange']},
-                                        "bar": {"value": "1",
-                                                "tags": ["in"]}},
-                                  files=[{"uri": "ham.png", "mimetype": "png"},
-                                         {"uri": "ham.curve", "tags":
-                                         ["hammy"]}],
-                                  user_defined={})
-        self.record_six = Record(id="spam6",
+        self.record_two = Record(id="spam2",
                                  type="new_eggs",
                                  data={"bad_list": {"value": ['bad', 3]},
                                        "bad_list_2": {"value":
@@ -117,9 +76,9 @@ class TestModel(unittest.TestCase):
     def test__is_valid_list_good(self):
         """Test we report a list as valid when it is."""
         self.assertTrue(model._is_valid_list(
-            self.record_five.data['list_scalars']['value']))
+            self.record_one.data['list_scalars']['value']))
         self.assertTrue(model._is_valid_list(
-            self.record_five.data['list_strings']['value']))
+            self.record_one.data['list_strings']['value']))
 
     def test__is_valid_list_unsupported(self):
         """
@@ -129,7 +88,7 @@ class TestModel(unittest.TestCase):
         ValueError.
         """
         with self.assertRaises(ValueError) as context:
-            model._is_valid_list(self.record_six.data['bad_list_2']['value'])
+            model._is_valid_list(self.record_two.data['bad_list_2']['value'])
         self.assertIn("List of data contains entry that isn't a "
                       "string or scalar.", str(context.exception))
 
@@ -143,7 +102,7 @@ class TestModel(unittest.TestCase):
         (validated,
             scalar_index,
             string_index) = model._is_valid_list(
-            self.record_six.data['bad_list']['value'])
+            self.record_two.data['bad_list']['value'])
         self.assertFalse(validated)
         self.assertEqual(scalar_index, 1)
         self.assertEqual(string_index, 0)
@@ -299,40 +258,3 @@ class TestModel(unittest.TestCase):
             model.generate_run_from_json(json_input=json_input)
         self.assertIn("Missing required key <'application'>.",
                       str(context.exception))
-
-    def test_pprint_deep_diff_equal(self):
-        """Check we print an empty texttable when comparing an empty ddiff."""
-        try:
-            # Grab stdout and send to string io
-            sys.stdout = StringIO()
-            model.print_diff_records(record_one=self.record_one,
-                                     record_two=self.record_one)
-            std_output = sys.stdout.getvalue()
-            self.assertEqual(std_output, '+-----+------+------+\n'
-                                         '| key | spam | spam |\n'
-                                         '+=====+======+======+\n'
-                                         '+-----+------+------+\n\n')
-        finally:
-            # Reset stdout
-            sys.stdout = sys.__stdout__
-
-    def test_pprint_deep_diff_not_equal(self):
-        """Check we print a correct texttable when comparing nonempty ddiff."""
-        try:
-            # Grab stdout and send to string io
-            sys.stdout = StringIO()
-            model.print_diff_records(record_one=self.record_one,
-                                     record_two=self.record_three)
-            std_output = sys.stdout.getvalue()
-            self.assertEqual(
-                std_output,
-                "+--------------------------+----------+------------+\n"
-                "|           key            |   spam   |   spam2    |\n"
-                "+==========================+==========+============+\n"
-                "| ['data']['foo']['value'] |    12    |     13     |\n"
-                "+--------------------------+----------+------------+\n"
-                "|         ['type']         | new_eggs | super_eggs |\n"
-                "+--------------------------+----------+------------+\n\n")
-        finally:
-            # Reset stdout
-            sys.stdout = sys.__stdout__

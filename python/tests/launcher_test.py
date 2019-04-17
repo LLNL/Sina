@@ -16,9 +16,9 @@ from sina.utils import DataRange, import_json, _process_relationship_entry
 try:
     from sina.datastores import cass as sina_cass
 except ImportError:
-    # Not having Cassandra for tests is a valid case and should be coupled with
-    # an "-a '!cassandra'" flag for Nose. If not, another error will be raised,
-    # and this case is addressed there.
+    # Not having Cassandra or cli_tools for tests is a valid case and should be
+    # coupled with (an) appropriate flag(s) for Nose. If not, another error will
+    # be raised, and this case is addressed there.
     pass
 
 TEMP_DB_NAME = "temp_sqlite_testfile.sqlite"
@@ -218,7 +218,8 @@ class TestCLI(unittest.TestCase):
         mock_cass_query.assert_not_called()
 
     @patch('sina.launcher.sql.RecordDAO.get')
-    @patch('sina.launcher.model.print_diff_records')
+    @patch('sina.launcher.sina.cli.diff.print_diff_records')
+    @attr('cli_tools')
     def test_compare_records_good(self, mock_model_print, mock_get):
         """Verify compare subcommand prints the correct output."""
         self.args.database = "fake.sqlite"
@@ -231,7 +232,8 @@ class TestCLI(unittest.TestCase):
         mock_model_print.assert_called_once()
 
     @patch('sina.launcher.sql.RecordDAO.get')
-    @patch('sina.launcher.model.print_diff_records')
+    @patch('sina.launcher.sina.cli.diff.print_diff_records')
+    @attr('cli_tools')
     def test_compare_records_bad(self, mock_model_print, mock_get):
         """Verify compare subcommand prints useful error if given a bad id."""
         self.args.database = "fake.sqlite"

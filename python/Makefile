@@ -67,6 +67,7 @@ TEST_VENV=tests/test_venv
 
 .PHONY: all
 .PHONY: cassandra
+.PHONY: cli-tools
 .PHONY: clean
 .PHONY: clean-files
 .PHONY: clean-notebooks
@@ -79,6 +80,7 @@ TEST_VENV=tests/test_venv
 .PHONY: pep8
 .PHONY: pylint
 .PHONY: tests
+.PHONY: test-cli-tools
 .PHONY: test-jupyter
 
 install: links
@@ -102,6 +104,15 @@ cassandra:
 	else \
 	  echo "Installing cassandra in $(VENV)"; \
 	  $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/cassandra.txt; \
+	fi
+
+# Add command line tools to an existing virtual environment since it is optional.
+cli-tools:
+	@if test ! -d $(VENV); then \
+	  echo "You must create $(VENV) first. Run 'make install'"; \
+	else \
+	  echo "Installing Sina's commandline tool dependencies in $(VENV)"; \
+	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/cli_tools.txt; \
 	fi
 
 docs: install
@@ -169,6 +180,17 @@ tests: links
 	@make --no-print-directory clean-tests-venv; \
 	make --no-print-directory install VENV=$(TEST_VENV); \
 	$(TEST_VENV)/bin/tox
+
+# Recursive call to make in case test venv doesn't exist
+test-cli-tools: export PATH=$(TEST_PATH)
+test-cli-tools: links
+	@if test ! -d $(TEST_VENV); then \
+          echo "Making the test virtual environment in $(TEST_VENV)"; \
+          make --no-print-directory install VENV=$(TEST_VENV); \
+	fi; \
+	echo "Running cli_tools tests $(TEST_VENV)"; \
+        $(TEST_VENV)/bin/tox -e cli_tools
+
 
 # Recursively call make if it is necessary to create the test virtual environment.
 test-jupyter: export PATH=$(TEST_PATH)
