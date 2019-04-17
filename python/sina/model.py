@@ -3,8 +3,9 @@
 import json
 import logging
 import collections
-import six
 import numbers
+
+import six
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ class TestModel(unittest.TestCase):
 
     def setUp(self):
         """Create records used for testing."""
-        self.record_one = Record(id="spam5",
+        self.record_one = Record(id="spam",
                                  type="new_eggs",
                                  data={"list_scalars": {"value": [1, 2, 3]},
                                        "list_strings": {"value": ['apple',
@@ -22,7 +22,7 @@ class TestModel(unittest.TestCase):
                                  files=[{"uri": "ham.png", "mimetype": "png"},
                                         {"uri": "ham.curve", "tags": ["hammy"]}],
                                  user_defined={})
-        self.record_two = Record(id="spam6",
+        self.record_two = Record(id="spam2",
                                  type="new_eggs",
                                  data={"bad_list": {"value": ['bad', 3]},
                                        "bad_list_2": {"value":

@@ -3,11 +3,11 @@ import numbers
 import logging
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
-import six
 from collections import defaultdict
 import json
 
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery
+import six
 
 import sina.dao as dao
 import sina.model as model

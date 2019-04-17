@@ -1,7 +1,6 @@
 """Integration tests for the CLI and API working together."""
 import ast
 import os
-from six.moves import cStringIO as StringIO
 import sys
 import unittest
 import warnings
@@ -9,6 +8,7 @@ import json
 import jsonschema
 
 from nose.plugins.attrib import attr
+from six.moves import cStringIO as StringIO
 
 from sina import launcher
 
