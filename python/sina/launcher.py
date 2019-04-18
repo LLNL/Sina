@@ -87,33 +87,12 @@ def add_ingest_subparser(subparsers):
         'ingest', help='ingest complete Mnoda-type information and insert into'
                        ' a specified database. See "sina ingest -h" for more '
                        'information.')
-    required = parser_ingest.add_argument_group("required arguments")
-    required.add_argument(COMMON_SHORT_OPTION_DATABASE,
-                          COMMON_OPTION_DATABASE, type=str,
-                          required=True, dest='database',
-                          help='URI of database to ingest into.\n'
-                          'For Cassandra: <IP>[:port], use {}'
-                          ' to specify keyspace. '
-                          'For SQLite: <filepath>'
-                          .format(COMMON_OPTION_CASSANDRA_DEST))
+    _add_common_args(parser=parser_ingest)
     # TODO: If use case is Localhost and/or RZSonar, might make sense to have
     # keyspace be the database arg and provide IP/port the special way.
     # This isn't out of line with cql, which will start fine without an
     # ip/port provided (assumes Localhost) and can take a keyspace.
-    parser_ingest.add_argument(COMMON_OPTION_CASSANDRA_DEST, type=str,
-                               dest='cass_keyspace',
-                               help='If using a Cassandra database, the '
-                               'keyspace to use. Ignored by other database '
-                               'types.')
-    # TODO Expand the 'choices' args below as we add more supported backends.
-    parser_ingest.add_argument(COMMON_OPTION_DATABASE_TYPE, type=str,
-                               dest='database_type',
-                               help='Type of database to ingest into. Sina '
-                               'will try to infer this from {} if '
-                               'that is provided, but {} is not.'
-                               .format(COMMON_OPTION_DATABASE,
-                                       COMMON_OPTION_DATABASE_TYPE),
-                               choices=['cass', 'sql'])
+
     parser_ingest.add_argument('source', type=str,
                                help='The URI or list of URIs to ingest from. '
                                'Data must be compliant with the Mnoda schema, '
@@ -143,27 +122,7 @@ def add_export_subparser(subparsers):
                        'for more information.'
                        'Currently, the only supported export format is csv.')
     required = parser_export.add_argument_group("required arguments")
-    required.add_argument(COMMON_SHORT_OPTION_DATABASE,
-                          COMMON_OPTION_DATABASE, type=str,
-                          required=True, dest='database',
-                          help='URI of database to export from.\n'
-                          'For Cassandra: <IP>[:port], use {}'
-                          ' to specify keyspace. '
-                          'For SQLite: <filepath>'
-                          .format(COMMON_OPTION_CASSANDRA_DEST))
-    parser_export.add_argument(COMMON_OPTION_CASSANDRA_DEST, type=str,
-                               dest='cass_keyspace',
-                               help='If using a Cassandra database, the '
-                               'keyspace to use. Ignored by other database '
-                               'types.')
-    parser_export.add_argument(COMMON_OPTION_DATABASE_TYPE, type=str,
-                               dest='database_type',
-                               help='Type of database to export from. Sina '
-                               'will try to infer this from {} if '
-                               'that is provided, but {} is not.'
-                               .format(COMMON_OPTION_DATABASE,
-                                       COMMON_OPTION_DATABASE_TYPE),
-                               choices=['cass', 'sql'])
+    _add_common_args(parser=parser_export, required_group=required)
     parser_export.add_argument('--export-type', default='csv',
                                type=str, help='The type of export to run. '
                                'Currently support: csv (default).',
@@ -184,28 +143,7 @@ def add_query_subparser(subparsers):
     parser_query = subparsers.add_parser(
         'query', help='perform a query against a Mnoda-compliant backend. '
                       'See "sina query -h" for more information.')
-    required = parser_query.add_argument_group("required arguments")
-    required.add_argument(COMMON_SHORT_OPTION_DATABASE,
-                          COMMON_OPTION_DATABASE, type=str,
-                          dest='database', required=True,
-                          help='URI of database to query.\n'
-                          'For Cassandra: <IP>[:port], use {}'
-                          ' to specify keyspace. '
-                          'For SQLite: <filepath>'
-                          .format(COMMON_OPTION_CASSANDRA_DEST))
-    parser_query.add_argument(COMMON_OPTION_CASSANDRA_DEST, type=str,
-                              dest='cass_keyspace',
-                              help='If using a Cassandra database, the '
-                              'keyspace to use. Ignored by other database '
-                              'types.')
-    parser_query.add_argument(COMMON_OPTION_DATABASE_TYPE, type=str,
-                              dest='database_type',
-                              help='Type of database to query. Sina '
-                              'will try to infer this from {} if '
-                              'that is provided, but {} is not.'
-                              .format(COMMON_OPTION_DATABASE,
-                                      COMMON_OPTION_DATABASE_TYPE),
-                              choices=['cass', 'sql'])
+    _add_common_args(parser=parser_query)
     # TODO: This is the prior formatting. But if do comma-separated and hit
     # something that doesn't look like an entire scalar, it's either a range
     # or an error, and it should be easy enough to tell the difference. Given
@@ -257,32 +195,44 @@ def add_compare_subparser(subparsers):
     parser_compare = subparsers.add_parser(
         'compare', help='perform a comparison against two records. '
                         'See "sina compare -h" for more information.')
-    required = parser_compare.add_argument_group("required arguments")
-    required.add_argument(COMMON_SHORT_OPTION_DATABASE,
-                          COMMON_OPTION_DATABASE, type=str,
-                          dest='database', required=True,
-                          help='URI of database to query.\n'
-                          'For Cassandra: <IP>[:port], use {}'
-                          ' to specify keyspace. '
-                          'For SQLite: <filepath>'
-                          .format(COMMON_OPTION_CASSANDRA_DEST))
-    parser_compare.add_argument(COMMON_OPTION_CASSANDRA_DEST, type=str,
-                                dest='cass_keyspace',
-                                help='If using a Cassandra database, the '
-                                'keyspace to use. Ignored by other database '
-                                'types.')
-    parser_compare.add_argument(COMMON_OPTION_DATABASE_TYPE, type=str,
-                                dest='database_type',
-                                help='Type of database to query. Sina '
-                                'will try to infer this from {} if '
-                                'that is provided, but {} is not.'
-                                .format(COMMON_OPTION_DATABASE,
-                                        COMMON_OPTION_DATABASE_TYPE),
-                                choices=['cass', 'sql'])
+    _add_common_args(parser=parser_compare)
     parser_compare.add_argument('id_one', type=str,
                                 help='The first id of the record to compare.')
     parser_compare.add_argument('id_two', type=str,
                                 help='The second id of the record to compare.')
+
+
+def _add_common_args(parser, required_group=None):
+    """
+    Add common arguments to the given parser.
+
+    :param parser: The parser to add the args to.
+    :param required_group: The argument group to add required arguments to. If None, will create
+        one.
+    """
+    if not required_group:
+        required_group = parser.add_argument_group("required arguments")
+    required_group.add_argument(COMMON_SHORT_OPTION_DATABASE,
+                                COMMON_OPTION_DATABASE,
+                                type=str,
+                                required=True,
+                                dest='database',
+                                help='URI of database to connect to. For Cassandra: <ip>:<port>, '
+                                'use {} to specify keyspace. For SQLite: <filepath>.'
+                                .format(COMMON_OPTION_CASSANDRA_DEST))
+    parser.add_argument(COMMON_OPTION_CASSANDRA_DEST,
+                        type=str,
+                        dest='cass_keyspace',
+                        help='If using a Cassandra database, the keyspace to use. Ignored by '
+                        'other database types.')
+    parser.add_argument(COMMON_OPTION_DATABASE_TYPE,
+                        type=str,
+                        dest='database_type',
+                        help='Type of database to connect to. Sina will try to infer this from {} '
+                        'if that is provided, but {} is not.'
+                        .format(COMMON_OPTION_DATABASE,
+                                COMMON_OPTION_DATABASE_TYPE),
+                        choices=['cass', 'sql'])
 
 
 def _validate_cassandra_args(args):
@@ -378,20 +328,7 @@ def ingest(args):
         elif args.source_type not in ('json'):
             error_message.append("Currently, ingesting is only supported when "
                                  "using json files as the source.")
-    if not args.database_type:
-        args.database_type = _get_guessed_database_type(args.database)
-        if not args.database_type:
-            error_message.append("{flag} not provided and unable "
-                                 "to guess type from source. Please "
-                                 "specify {flag}. Currently, "
-                                 "only cass and sql are supported for "
-                                 "ingesting.".format(flag=COMMON_OPTION_DATABASE_TYPE))
-        elif args.database_type not in ('cass', 'sql'):
-            error_message.append("Currently, ingesting is only supported when "
-                                 "using sql files or Cassandra as the "
-                                 "destination.")
-    if args.database_type == 'cass':
-        error_message.extend(_validate_cassandra_args(args))
+    error_message.extend(_check_common_args(args=args))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
@@ -415,19 +352,7 @@ def export(args):
     LOGGER.info('Exporting ids=%s and scalars=%s from database_type=%s '
                 'to target=%s.', args.ids, args.scalars, args.database_type, args.target)
     error_message = []
-    if not args.database_type:
-        args.database_type = _get_guessed_database_type(args.database)
-        if not args.database_type:
-            error_message.append("{flag} not provided and unable "
-                                 "to guess type from source. Please "
-                                 "specify {flag}. Currently, "
-                                 "only cass and sql are supported for "
-                                 "exporting from.".format(flag=COMMON_OPTION_DATABASE_TYPE))
-    args.database_type = args.database_type.lower()
-    if args.database_type not in ('cass', 'sql'):
-        error_message.append("Currently, exporting is only supported when "
-                             "using sql files or Cassandra as the "
-                             "database to export from.")
+    error_message.extend(_check_common_args(args=args))
     if not args.ids:
         error_message.append('Require one or more record ids to export.')
     if not args.scalars:
@@ -455,19 +380,7 @@ def query(args):
     """
     LOGGER.info('Querying %s.', args.database_type)
     error_message = []
-    if not args.database_type:
-        args.database_type = _get_guessed_database_type(args.database)
-        if not args.database_type:
-            error_message.append("{flag} not provided and unable "
-                                 "to guess type from source. Please "
-                                 "specify {flag}. Currently, "
-                                 "only cass and sql are supported for "
-                                 "querying.".format(flag=COMMON_OPTION_DATABASE_TYPE))
-        elif args.database_type not in ('cass', 'sql'):
-            error_message.append("Currently, querying is only supported when "
-                                 "querying sql files or Cassandra.")
-    if args.database_type == 'cass':
-        error_message.extend(_validate_cassandra_args(args))
+    error_message.extend(_check_common_args(args=args))
     if not args.raw and not args.scalar and not args.uri:
         error_message.append("You must specify a query type!")
     elif args.raw and (args.scalar or args.uri or args.id):
@@ -524,19 +437,7 @@ def compare_records(args):
     """
     LOGGER.info('Comparing %s to %s.', args.id_one, args.id_two)
     error_message = []
-    if not args.database_type:
-        args.database_type = _get_guessed_database_type(args.database)
-        if not args.database_type:
-            error_message.append("{flag} not provided and unable "
-                                 "to guess type from source. Please "
-                                 "specify {flag}. Currently, "
-                                 "only cass and sql are supported for "
-                                 "comparing.".format(flag=COMMON_OPTION_DATABASE_TYPE))
-        elif args.database_type not in ('cass', 'sql'):
-            error_message.append("Currently, comparing is only supported when "
-                                 "querying sql files or Cassandra.")
-    if args.database_type == 'cass':
-        error_message.extend(_validate_cassandra_args(args))
+    error_message.extend(_check_common_args(args=args))
     if error_message:
         msg = "\n".join(error_message)
         LOGGER.error(msg)
@@ -554,6 +455,31 @@ def compare_records(args):
     except NoResultFound:
         print('Could not find record with id <{}>. Check id and '
               'database.'.format(args.id_one))
+
+
+def _check_common_args(args):
+    """
+    Check common arguments for issues.
+
+    :params args: (ArgumentParser, req) Command line args that tell us database to use.
+    :returns: A list of error messages.
+    """
+    error_message = []
+    if not args.database_type:
+        args.database_type = _get_guessed_database_type(args.database)
+        if not args.database_type:
+            error_message.append("{flag} not provided and unable "
+                                 "to guess type from source. Please "
+                                 "specify {flag}. Currently, "
+                                 "only cass and sql are supported for "
+                                 "ingesting."
+                                 .format(flag=COMMON_OPTION_DATABASE_TYPE))
+        elif args.database_type not in ('cass', 'sql'):
+            error_message.append("Can only {} when connecting to sql files or Cassandra."
+                                 .format(args.subparser_name))
+    if args.database_type == 'cass':
+        error_message.extend(_validate_cassandra_args(args))
+    return error_message
 
 
 def version():

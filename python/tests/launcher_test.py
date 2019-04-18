@@ -7,6 +7,7 @@ from mock import patch, MagicMock
 from nose.plugins.attrib import attr
 from six.moves import cStringIO as StringIO
 from sqlalchemy.orm.exc import NoResultFound
+import argparse
 
 from sina import launcher
 from sina.datastores import sql as sina_sql
@@ -33,6 +34,13 @@ class TestCLI(unittest.TestCase):
         self.args = self.parser.parse_args(['ingest', '-d', 'null.sqlite',
                                             'null.json'])
         self.created_db = "fake.sqlite"
+        self.temp_parser = argparse.ArgumentParser(prog='sina_tester',
+                                                   description='A software package to process '
+                                                   'data stored in the sina_model format.',
+                                                   formatter_class=argparse.RawTextHelpFormatter)
+        self.subparsers = self.temp_parser.add_subparsers(
+            title='subcommands', help='Available sub-commands.', dest='subparser_name')
+        self.temp_subparser = self.subparsers.add_parser('eat', help='eat some food.')
 
     @patch('sina.launcher.import_json', return_value=True)
     def test_ingest_json_sql(self, mock_import):
@@ -246,3 +254,30 @@ class TestCLI(unittest.TestCase):
             sys.stdout = sys.__stdout__
         self.assertEqual(mock_model_print.call_count, 0)
         self.assertEqual(std_output, error_msg)
+
+    def test_add_common_args_with_group(self):
+        """Given a parser and a group, we add common args to it."""
+        # Add a requirement group to a different parser that we pass in to make sure we will use
+        # the required group passed in.
+        temp_subparser_2 = self.subparsers.add_parser('eat2', help='eat some food again.')
+        required_group = temp_subparser_2.add_argument_group("required arguments")
+        launcher._add_common_args(parser=self.temp_subparser, required_group=required_group)
+        actions = self.temp_subparser.__dict__['_option_string_actions']
+        temp_subparser_2_actions = temp_subparser_2.__dict__['_option_string_actions']
+        self.assertIn('--database', temp_subparser_2_actions.keys())
+        self.assertIn('-d', temp_subparser_2_actions.keys())
+
+        self.assertIn('--database-type', actions.keys())
+        self.assertIn('--keyspace', actions.keys())
+        self.assertTrue(len(actions), 2)
+
+    def test_add_common_args_no_group(self):
+        """Given a parser and no group, we add common args to it."""
+        # If not given a required group, we create one.
+        launcher._add_common_args(parser=self.temp_subparser)
+        actions = self.temp_subparser.__dict__['_option_string_actions']
+        self.assertIn('--database', actions.keys())
+        self.assertIn('--database-type', actions.keys())
+        self.assertIn('--keyspace', actions.keys())
+        self.assertIn('-d', actions.keys())
+        self.assertTrue(len(actions), 3)
