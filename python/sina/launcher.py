@@ -300,8 +300,7 @@ def _validate_cassandra_args(args):
         error_message.append("{} not provided. In "
                              "the future, it will be possible to "
                              "set a default. For now, please "
-                             "specify it to continue!"
-                             .format(COMMON_OPTION_CASSANDRA_DEST))
+                             "specify it to continue!".format(COMMON_OPTION_CASSANDRA_DEST))
     return error_message
 
 
@@ -356,8 +355,8 @@ def ingest(args):
 
     :raises ValueError: if there's an issue with flags (bad filetype, etc)
     """
-    LOGGER.info('Ingesting source_list={} into database={}, database_type={}.'
-                .format(args.source, args.database, args.database_type))
+    LOGGER.info('Ingesting source_list=%s into database=%s, database_type=%s.',
+                args.source, args.database, args.database_type)
     error_message = []
     source_list = args.source.split(",")
     if not args.source_type:
@@ -386,8 +385,7 @@ def ingest(args):
                                  "to guess type from source. Please "
                                  "specify {flag}. Currently, "
                                  "only cass and sql are supported for "
-                                 "ingesting."
-                                 .format(flag=COMMON_OPTION_DATABASE_TYPE))
+                                 "ingesting.".format(flag=COMMON_OPTION_DATABASE_TYPE))
         elif args.database_type not in ('cass', 'sql'):
             error_message.append("Currently, ingesting is only supported when "
                                  "using sql files or Cassandra as the "
@@ -414,11 +412,8 @@ def export(args):
 
     :raises ValueError: if there's an issue with flags (bad filetype, etc)
     """
-    LOGGER.info('Exporting ids={} and scalars={} from database_type={} '
-                'to target={}.'.format(args.ids,
-                                       args.scalars,
-                                       args.database_type,
-                                       args.target))
+    LOGGER.info('Exporting ids=%s and scalars=%s from database_type=%s '
+                'to target=%s.', args.ids, args.scalars, args.database_type, args.target)
     error_message = []
     if not args.database_type:
         args.database_type = _get_guessed_database_type(args.database)
@@ -427,8 +422,7 @@ def export(args):
                                  "to guess type from source. Please "
                                  "specify {flag}. Currently, "
                                  "only cass and sql are supported for "
-                                 "exporting from."
-                                 .format(flag=COMMON_OPTION_DATABASE_TYPE))
+                                 "exporting from.".format(flag=COMMON_OPTION_DATABASE_TYPE))
     args.database_type = args.database_type.lower()
     if args.database_type not in ('cass', 'sql'):
         error_message.append("Currently, exporting is only supported when "
@@ -459,7 +453,7 @@ def query(args):
 
     :raises ValueError: if there's an issue with flags (bad filetype, etc)
     """
-    LOGGER.info('Querying {}.'.format(args.database_type))
+    LOGGER.info('Querying %s.', args.database_type)
     error_message = []
     if not args.database_type:
         args.database_type = _get_guessed_database_type(args.database)
@@ -468,8 +462,7 @@ def query(args):
                                  "to guess type from source. Please "
                                  "specify {flag}. Currently, "
                                  "only cass and sql are supported for "
-                                 "querying."
-                                 .format(flag=COMMON_OPTION_DATABASE_TYPE))
+                                 "querying.".format(flag=COMMON_OPTION_DATABASE_TYPE))
         elif args.database_type not in ('cass', 'sql'):
             error_message.append("Currently, querying is only supported when "
                                  "querying sql files or Cassandra.")
@@ -488,13 +481,13 @@ def query(args):
     # Raw queries are a special case that completely bypasses the DAO.
     if args.raw:
         if args.database_type == "cass":
-            LOGGER.debug('Executing raw query on cassandra: {}'.format(args.raw))
+            LOGGER.debug('Executing raw query on cassandra: %s', args.raw)
             print([str(x) for x in
                   Cluster(args.database)
                   .connect(args.cass_keyspace)
                   .execute(args.raw)])
         elif args.database_type == "sql":
-            LOGGER.debug('Executing raw query on sql: {}'.format(args.raw))
+            LOGGER.debug('Executing raw query on sql: %s', args.raw)
             print([str(x) for x in
                    connect(args.database)
                    .cursor()
@@ -529,7 +522,7 @@ def compare_records(args):
 
     :raises ValueError: if there's an issue with flags (bad record id)
     """
-    LOGGER.info('Comparing {} to {}.'.format(args.id_one, args.id_two))
+    LOGGER.info('Comparing %s to %s.', args.id_one, args.id_two)
     error_message = []
     if not args.database_type:
         args.database_type = _get_guessed_database_type(args.database)
@@ -538,8 +531,7 @@ def compare_records(args):
                                  "to guess type from source. Please "
                                  "specify {flag}. Currently, "
                                  "only cass and sql are supported for "
-                                 "comparing."
-                                 .format(flag=COMMON_OPTION_DATABASE_TYPE))
+                                 "comparing.".format(flag=COMMON_OPTION_DATABASE_TYPE))
         elif args.database_type not in ('cass', 'sql'):
             error_message.append("Currently, comparing is only supported when "
                                  "querying sql files or Cassandra.")
@@ -582,8 +574,7 @@ def _get_guessed_database_type(database_name):
 
     :returns: A string representing database type, None if it can't be guessed
     """
-    LOGGER.debug('Attempting to guess the backend type based on name: {}'
-                 .format(database_name))
+    LOGGER.debug('Attempting to guess the backend type based on name: %s', database_name)
     filetype_check = database_name.split('.')
     # First we check if it contains a period. Both IPs and files with
     # extensions should have periods--if we don't have either, we can't guess.
@@ -612,7 +603,7 @@ def _make_factory(args):
 
     :returns: a factory satisfying the provided arguments
     """
-    LOGGER.debug('Making {} factory.'.format(args.database_type))
+    LOGGER.debug('Making %s factory.', args.database_type)
     if args.database_type == "cass":
         return cass.DAOFactory(node_ip_list=[args.database],
                                keyspace=args.cass_keyspace)
@@ -643,7 +634,7 @@ def main():
     args = parser.parse_args()
     setup_logging(args)
     LOGGER.debug('Logging successfully set up.')
-    LOGGER.debug('About to execute with args: {}'.format(args))
+    LOGGER.debug('About to execute with args: %s', args)
     # Execute based on our CLI args
     try:
         if args.subparser_name == 'ingest':
@@ -659,9 +650,7 @@ def main():
             LOGGER.error(msg)
             raise ValueError(msg)
     except (IOError, ValueError, TypeError) as e:
-        msg = ('Problem with CLI command: {}, full stacktrace written to log'
-               .format(e))
-        LOGGER.exception(msg)
+        LOGGER.exception('Problem with CLI command: %s, full stacktrace written to log', e)
     LOGGER.info('Exiting program.')
 
 
