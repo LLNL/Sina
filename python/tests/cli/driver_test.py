@@ -9,7 +9,7 @@ from six.moves import cStringIO as StringIO
 from sqlalchemy.orm.exc import NoResultFound
 import argparse
 
-from sina import launcher
+from sina.cli import driver
 from sina.datastores import sql as sina_sql
 from sina.utils import DataRange, import_json, _process_relationship_entry
 
@@ -29,7 +29,7 @@ class TestCLI(unittest.TestCase):
 
     def setUp(self):
         """Prepare for each test by initializing parser and preparing args."""
-        self.parser = launcher.setup_arg_parser()
+        self.parser = driver.setup_arg_parser()
         # We need to provide initial minimal args, but will change per test
         self.args = self.parser.parse_args(['ingest', '-d', 'null.sqlite',
                                             'null.json'])
@@ -42,13 +42,13 @@ class TestCLI(unittest.TestCase):
             title='subcommands', help='Available sub-commands.', dest='subparser_name')
         self.temp_subparser = self.subparsers.add_parser('eat', help='eat some food.')
 
-    @patch('sina.launcher.import_json', return_value=True)
+    @patch('sina.cli.driver.import_json', return_value=True)
     def test_ingest_json_sql(self, mock_import):
         """Verify CLI fetches and feeds json to the importer (sql)."""
         self.args.source = "fake.json"
         self.args.database_type = 'sql'
         self.args.database = self.created_db
-        launcher.ingest(self.args)
+        driver.ingest(self.args)
         mock_import.assert_called_once()
         mock_args = mock_import.call_args[1]  # Named args
         self.assertIsInstance(mock_args['factory'], sina_sql.DAOFactory)
@@ -56,7 +56,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(mock_args['json_path'], self.args.source)
 
     @attr('cassandra')
-    @patch('sina.launcher.import_json', return_value=True)
+    @patch('sina.driver.import_json', return_value=True)
     @patch('sina.datastores.cass.schema.form_connection', return_value=True)
     def test_ingest_json_cass(self, mock_connect, mock_import):
         """Verify CLI fetches and feeds json to the importer (cass)."""
@@ -64,7 +64,7 @@ class TestCLI(unittest.TestCase):
         self.args.database_type = 'cass'
         self.args.cass_keyspace = 'fake'
         self.args.database = 'not.a.i.p'
-        launcher.ingest(self.args)
+        driver.ingest(self.args)
         mock_import.assert_called_once()
         mock_args = mock_import.call_args[1]  # Named args
         self.assertIsInstance(mock_args['factory'], sina_cass.DAOFactory)
@@ -74,14 +74,14 @@ class TestCLI(unittest.TestCase):
         self.args.cass_keyspace = None
         # Ingesting without keyspace shouldn't result in another call
         with self.assertRaises(ValueError) as context:
-            launcher.ingest(self.args)
+            driver.ingest(self.args)
         self.assertIn("not provided. In the future", str(context.exception))
         mock_import.assert_called_once()
 
     def test_ingest_local_ids(self):
         """Verify importer is correctly substituting local IDs for globals."""
         test_json = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                 "test_files/mnoda_1.json")
+                                 "../test_files/mnoda_1.json")
         factory = sina_sql.DAOFactory()
         import_json(factory=factory, json_path=test_json)
         local_rec = list(factory.createRecordDAO().get_all_of_type("eggs"))
@@ -117,27 +117,27 @@ class TestCLI(unittest.TestCase):
         self.assertIn("Local_subject and/or local_object must be",
                       str(context.exception))
 
-    @patch('sina.launcher.import_json', return_value=True)
+    @patch('sina.cli.driver.import_json', return_value=True)
     def test_ingest_error_messages(self, mock_import):
         """Verify that the ingest subcommand prints the right errors."""
         self.args.source = "fake.null"
         self.args.database = "also_fake.null"
         with self.assertRaises(ValueError) as context:
-            launcher.ingest(self.args)
+            driver.ingest(self.args)
         self.assertIn("--source-type not provided", str(context.exception))
         self.assertIn("not provided and unable", str(context.exception))
         self.args.source = "fake.cass"
         self.args.database = "also_fake.cass"
         with self.assertRaises(ValueError) as context:
-            launcher.ingest(self.args)
+            driver.ingest(self.args)
         self.assertIn("only json is supported", str(context.exception))
         self.assertIn("only cass and sql are supported for ingesting",
                       str(context.exception))
         mock_import.assert_not_called()
 
-    @patch('sina.launcher.sql.RecordDAO.get_given_document_uri',
+    @patch('sina.cli.driver.sql.RecordDAO.get_given_document_uri',
            return_value=[MagicMock(raw='hello')])
-    @patch('sina.launcher.sql.RecordDAO.get_given_data',
+    @patch('sina.cli.driver.sql.RecordDAO.get_given_data',
            return_value=[MagicMock(raw='hello', id='general')])
     def test_query_sql(self, mock_get_given_data, mock_uri):
         """Verify CLI fetches and feeds query info to the DAO (sql)."""
@@ -147,14 +147,14 @@ class TestCLI(unittest.TestCase):
         self.args.id = False
         self.args.database = 'fake.sqlite'
         self.args.scalar = 'somescalar=[1,2]'
-        launcher.query(self.args)
+        driver.query(self.args)
         # As long as this is called, we know we correctly used sql
         mock_get_given_data.assert_called_once()
         mock_args = mock_get_given_data.call_args[1]  # Named args
         self.assertIsInstance(mock_args['somescalar'], DataRange)
         self.assertEqual(len(mock_args), 1)
         self.args.uri = 'somedoc.png'
-        launcher.query(self.args)
+        driver.query(self.args)
         mock_uri.assert_called_once()
         mock_uri_args = mock_uri.call_args[1]  # Named args
         self.assertEqual(mock_uri_args['uri'], self.args.uri)
@@ -162,9 +162,9 @@ class TestCLI(unittest.TestCase):
                          mock_get_given_data.return_value[0])
 
     @attr('cassandra')
-    @patch('sina.launcher.cass.RecordDAO.get_given_document_uri',
+    @patch('sina.cli.driver.cass.RecordDAO.get_given_document_uri',
            return_value=[MagicMock(raw='hello')])
-    @patch('sina.launcher.cass.RecordDAO.get_given_data',
+    @patch('sina.cli.driver.cass.RecordDAO.get_given_data',
            return_value=[MagicMock(raw='hello', id='general')])
     @patch('sina.datastores.cass.schema.form_connection', return_value=True)
     def test_query_cass(self, mock_connect, mock_data, mock_uri):
@@ -176,7 +176,7 @@ class TestCLI(unittest.TestCase):
         self.args.database = 'not.an.i.p'
         self.args.cass_keyspace = 'fake'
         self.args.scalar = 'somescalar=[1,2]'
-        launcher.query(self.args)
+        driver.query(self.args)
         # As long as these are called, we know we correctly used cass
         mock_connect.assert_called_once()
         mock_data.assert_called_once()
@@ -184,7 +184,7 @@ class TestCLI(unittest.TestCase):
         self.assertIsInstance(mock_args['somescalar'], DataRange)
         self.assertEqual(len(mock_args.keys()), 1)
         self.args.uri = 'somedoc.png'
-        launcher.query(self.args)
+        driver.query(self.args)
         mock_uri.assert_called_once()
         mock_uri_args = mock_uri.call_args[1]  # Named args
         self.assertEqual(mock_uri_args['uri'], self.args.uri)
@@ -192,8 +192,8 @@ class TestCLI(unittest.TestCase):
                          mock_data.return_value[0])
 
     @attr('cassandra')
-    @patch('sina.launcher.cass.RecordDAO.get_given_document_uri')
-    @patch('sina.launcher.sql.RecordDAO.get_given_document_uri')
+    @patch('sina.cli.driver.cass.RecordDAO.get_given_document_uri')
+    @patch('sina.cli.driver.sql.RecordDAO.get_given_document_uri')
     def test_query_error_messages(self, mock_sql_query, mock_cass_query):
         """Verify that the query subcommand prints the right errors."""
         self.args.source = "fake.null"
@@ -203,7 +203,7 @@ class TestCLI(unittest.TestCase):
         self.args.id = False
         self.args.scalar = ""
         with self.assertRaises(ValueError) as context:
-            launcher.query(self.args)
+            driver.query(self.args)
         self.assertIn("not provided and unable", str(context.exception))
         self.assertIn("You must specify a query type!", str(context.exception))
         mock_sql_query.assert_not_called()
@@ -212,27 +212,27 @@ class TestCLI(unittest.TestCase):
         self.args.raw = "hello there"
         self.args.scalar = "somescalar=[1,2]"
         with self.assertRaises(ValueError) as context:
-            launcher.query(self.args)
+            driver.query(self.args)
         self.assertIn("Raw queries don't support additional query",
                       str(context.exception))
         mock_cass_query.assert_not_called()
 
-    @patch('sina.launcher.sql.RecordDAO.get')
-    @patch('sina.launcher.sina.cli.diff.print_diff_records')
+    @patch('sina.cli.driver.sql.RecordDAO.get')
+    @patch('sina.cli.driver.sina.cli.diff.print_diff_records')
     @attr('cli_tools')
     def test_compare_records_good(self, mock_model_print, mock_get):
         """Verify compare subcommand prints the correct output."""
         self.args.database = "fake.sqlite"
         self.args.id_one = "some_id"
         self.args.id_two = "another_id"
-        launcher.compare_records(self.args)
+        driver.compare_records(self.args)
 
         self.assertEqual(mock_get.call_count, 2)
 
         mock_model_print.assert_called_once()
 
-    @patch('sina.launcher.sql.RecordDAO.get')
-    @patch('sina.launcher.sina.cli.diff.print_diff_records')
+    @patch('sina.cli.driver.sql.RecordDAO.get')
+    @patch('sina.cli.driver.sina.cli.diff.print_diff_records')
     @attr('cli_tools')
     def test_compare_records_bad(self, mock_model_print, mock_get):
         """Verify compare subcommand prints useful error if given a bad id."""
@@ -246,7 +246,7 @@ class TestCLI(unittest.TestCase):
         try:
             # Grab stdout and send to string io
             sys.stdout = StringIO()
-            launcher.compare_records(self.args)
+            driver.compare_records(self.args)
             std_output = sys.stdout.getvalue().strip()
 
         finally:
@@ -261,7 +261,7 @@ class TestCLI(unittest.TestCase):
         # the required group passed in.
         temp_subparser_2 = self.subparsers.add_parser('eat2', help='eat some food again.')
         required_group = temp_subparser_2.add_argument_group("required arguments")
-        launcher._add_common_args(parser=self.temp_subparser, required_group=required_group)
+        driver._add_common_args(parser=self.temp_subparser, required_group=required_group)
         actions = self.temp_subparser.__dict__['_option_string_actions']
         temp_subparser_2_actions = temp_subparser_2.__dict__['_option_string_actions']
         self.assertIn('--database', temp_subparser_2_actions.keys())
@@ -274,7 +274,7 @@ class TestCLI(unittest.TestCase):
     def test_add_common_args_no_group(self):
         """Given a parser and no group, we add common args to it."""
         # If not given a required group, we create one.
-        launcher._add_common_args(parser=self.temp_subparser)
+        driver._add_common_args(parser=self.temp_subparser)
         actions = self.temp_subparser.__dict__['_option_string_actions']
         self.assertIn('--database', actions.keys())
         self.assertIn('--database-type', actions.keys())

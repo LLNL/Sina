@@ -10,7 +10,7 @@ import jsonschema
 from nose.plugins.attrib import attr
 from six.moves import cStringIO as StringIO
 
-from sina import launcher
+from sina.cli import driver
 
 try:
     import cassandra.cqlengine.connection as connection
@@ -33,7 +33,7 @@ class TestSQLIntegration(unittest.TestCase):
 
     def setUp(self):
         """Prepare for each test by initializing parser and preparing args."""
-        self.parser = launcher.setup_arg_parser()
+        self.parser = driver.setup_arg_parser()
         # We need to provide initial minimal args, but will change per test
         self.args = self.parser.parse_args(['ingest', '-d', 'null.sqlite',
                                             'null.json'])
@@ -68,7 +68,7 @@ class TestSQLIntegration(unittest.TestCase):
         self.args.source = ",".join(self.test_files)
         self.args.subparser_name = 'ingest'
         self.args.database = self.created_db
-        launcher.ingest(self.args)
+        driver.ingest(self.args)
         self.args.subparser_name = 'query'
         self.args.scalar = 'scalar_1=387.6'
         self.args.uri = 'foo.png'
@@ -78,7 +78,7 @@ class TestSQLIntegration(unittest.TestCase):
         try:
             # Grab stdout and send to string io
             sys.stdout = StringIO()
-            launcher.query(self.args)
+            driver.query(self.args)
             std_output = sys.stdout.getvalue()
             matches = list(ast.literal_eval(std_output))
             self.assertEqual(len(matches), 2)
@@ -94,7 +94,7 @@ class TestSQLIntegration(unittest.TestCase):
             try:
                 sys.stdout = StringIO()
                 self.args.scalar = 'scalar-4=0'
-                launcher.query(self.args)
+                driver.query(self.args)
                 std_output = sys.stdout.getvalue()
                 matches = ast.literal_eval(std_output)
                 self.assertEqual(matches, [])
@@ -108,7 +108,7 @@ class TestCassIntegration(unittest.TestCase):
 
     def setUp(self):
         """Prepare for each test by initializing parser and preparing args."""
-        self.parser = launcher.setup_arg_parser()
+        self.parser = driver.setup_arg_parser()
         # We need to provide initial minimal args, but will change per test
         self.args = self.parser.parse_args(['ingest', '-d', '127.0.0.1',
                                             'null.json'])
@@ -135,7 +135,7 @@ class TestCassIntegration(unittest.TestCase):
         self.args.database = '127.0.0.1'
         self.args.database_type = 'cass'
         self.args.cass_keyspace = TEMP_KEYSPACE_NAME
-        launcher.ingest(self.args)
+        driver.ingest(self.args)
         self.args.subparser_name = 'query'
         self.args.scalar = 'scalar_1=387.6'
         self.args.uri = 'foo.png'
@@ -145,7 +145,7 @@ class TestCassIntegration(unittest.TestCase):
         try:
             # Grab stdout and send to string io
             sys.stdout = StringIO()
-            launcher.query(self.args)
+            driver.query(self.args)
             std_output = sys.stdout.getvalue()
             matches = ast.literal_eval(std_output)
             self.assertEqual(len(matches), 2)
@@ -159,7 +159,7 @@ class TestCassIntegration(unittest.TestCase):
         try:
             sys.stdout = StringIO()
             self.args.scalar = 'scalar-4=0'
-            launcher.query(self.args)
+            driver.query(self.args)
             std_output = sys.stdout.getvalue()
             matches = ast.literal_eval(std_output)
             self.assertEqual(matches, [])

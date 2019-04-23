@@ -14,7 +14,7 @@ setup(name='sina',
       long_description=open('README.md').read(),
       entry_points={
         'console_scripts': [
-            'sina = sina.launcher:main'
+            'sina = sina.cli.driver:main'
         ]
       },
       extras_require={
