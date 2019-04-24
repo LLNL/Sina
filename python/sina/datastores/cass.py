@@ -41,8 +41,8 @@ class RecordDAO(dao.RecordDAO):
         :raises LWTException: If force_overwrite is False and an entry with the
                               id exists.
         """
-        LOGGER.debug('Inserting {} into Cassandra with force_overwrite={}.'
-                     .format(record, force_overwrite))
+        LOGGER.debug('Inserting %s into Cassandra with force_overwrite=%s.',
+                     record, force_overwrite)
         is_valid, warnings = record.is_valid()
         if not is_valid:
             raise ValueError(warnings)
@@ -76,11 +76,9 @@ class RecordDAO(dao.RecordDAO):
                               special handling for this type. See Run's
                               insert_many()
         """
-        LOGGER.debug('Inserting {} records to Cassandra with'
-                     'force_overwrite={} and _type_managed={}.'
-                     .format(len(list_to_insert),
-                             force_overwrite,
-                             _type_managed))
+        LOGGER.debug('Inserting %i records to Cassandra with'
+                     'force_overwrite=%s and _type_managed=%s.',
+                     len(list_to_insert), force_overwrite, _type_managed)
         # Because batch is done by partition key, we'll need to store info for
         # tables whose full per-partition info isn't supplied by one Record
         from_scalar_batch = defaultdict(list)
@@ -204,8 +202,8 @@ class RecordDAO(dao.RecordDAO):
         :param force_overwrite: Whether to forcibly overwrite preexisting data.
                                 Currently only used by Cassandra DAOs.
         """
-        LOGGER.debug('Inserting {} data entries to Record ID {} and force_overwrite={}.'
-                     .format(len(data), id, force_overwrite))
+        LOGGER.debug('Inserting %i data entries to Record ID %s and force_overwrite=%s.',
+                     len(data), id, force_overwrite)
         for datum_name, datum in data.items():
             schema.cross_populate_data_tables(id=id,
                                               name=datum_name,
@@ -223,8 +221,8 @@ class RecordDAO(dao.RecordDAO):
         :param force_overwrite: Whether to forcibly overwrite preexisting files.
                                 Currently only used by Cassandra DAOs.
         """
-        LOGGER.debug('Inserting {} files to record id={} and force_overwrite={}.'
-                     .format(len(files), id, force_overwrite))
+        LOGGER.debug('Inserting %i files to record id=%s and force_overwrite=%s.',
+                     len(files), id, force_overwrite)
         create = (schema.DocumentFromRecord.create if force_overwrite
                   else schema.DocumentFromRecord.if_not_exists().create)
         for entry in files:
@@ -271,7 +269,7 @@ class RecordDAO(dao.RecordDAO):
         :param batch: the batch to add the deletions to
         :param record_id: the id of the record we're deleting
         """
-        LOGGER.debug("Generating batch deletion commands for {}".format(record_id))
+        LOGGER.debug("Generating batch deletion commands for %s", record_id)
         record = self.get(record_id)
         # Delete from the record table itself
         schema.Record.objects(id=record_id).batch(batch).delete()
@@ -328,8 +326,7 @@ class RecordDAO(dao.RecordDAO):
         :raises ValueError: if not supplied at least one criterion or given
                             a criterion it does not support.
         """
-        LOGGER.debug('Finding all records fulfilling criteria: {}'
-                     .format(kwargs.items()))
+        LOGGER.debug('Finding all records fulfilling criteria: %s', kwargs.items())
         # No kwargs is bad usage. Bad kwargs are caught in sort_and_standardize_criteria().
         # We will always have at least one entry in one of scalar, string, scalarlist, etc.
         if not kwargs.items():
@@ -529,8 +526,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: The query object with criteria-appropriate filters
                   applied.
         """
-        LOGGER.debug('Configuring <query={}> with <criteria={}>.'
-                     .format(query, criteria))
+        LOGGER.debug('Configuring <query=%s> with <criteria=%s>.', query, criteria)
         query = query.filter(name=name)
         if not isinstance(criteria, utils.DataRange):
             query = query.filter(value=criteria)
@@ -557,7 +553,7 @@ class RecordDAO(dao.RecordDAO):
 
         :returns: A record matching that id or None
         """
-        LOGGER.debug('Getting record with id={}'.format(id))
+        LOGGER.debug('Getting record with id=%s', id)
         query = schema.Record.objects.filter(id=id).get()
         return model.generate_record_from_json(
             json_input=json.loads(query.raw))
@@ -573,7 +569,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: A generator of Records of that type or (if ids_only) a
                   generator of their ids
         """
-        LOGGER.debug('Getting all records of type {}.'.format(type))
+        LOGGER.debug('Getting all records of type %s.', type)
         # Allow_filtering() is, as a rule, inadvisable; if speed becomes a
         # concern, an id - type query table should be easy to set up.
         query = (schema.Record.objects.filter(type=type)
@@ -606,9 +602,9 @@ class RecordDAO(dao.RecordDAO):
         :returns: A generator of unique found records or (if ids_only) a
                   generator of their ids.
         """
-        LOGGER.debug('Getting all records related to uri={}.'.format(uri))
+        LOGGER.debug('Getting all records related to uri=%s.', uri)
         if accepted_ids_list:
-            LOGGER.debug('Restricting to {} ids.'.format(len(accepted_ids_list)))
+            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
         LOGGER.warning('Temporary implementation of getting Records based on '
                        'Document URI. This is a very slow, brute-force '
                        'strategy.')
@@ -683,8 +679,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in {} for record ids in {}'
-                     .format(data_list, id_list))
+        LOGGER.debug('Getting data in %s for record ids in %s', data_list, id_list)
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarDataFromRecord,
                         schema.StringDataFromRecord]
@@ -731,8 +726,7 @@ class RecordDAO(dao.RecordDAO):
 
         :return: A dict of scalars matching the Mnoda data specification
         """
-        LOGGER.debug('Getting scalars={} for record id={}'
-                     .format(scalar_names, id))
+        LOGGER.debug('Getting scalars=%s for record id=%s', scalar_names, id)
         scalars = {}
         # Cassandra has special restrictions on list types that prevents us
         # from filtering on IN when they're present in a table. Hence this
@@ -760,7 +754,7 @@ class RecordDAO(dao.RecordDAO):
         :param id: The record id to find files for
         :return: A list of file JSON objects matching the Mnoda specification
         """
-        LOGGER.debug('Getting files for record id={}'.format(id))
+        LOGGER.debug('Getting files for record id=%s', id)
         files = (schema.DocumentFromRecord.objects
                  .filter(id=id)
                  .values_list('uri', 'mimetype', 'tags')).all()
@@ -792,11 +786,8 @@ class RelationshipDAO(dao.RelationshipDAO):
         :raises: A ValueError if neither Relationship nor the subject_id,
                  object_id, and predicate args are provided.
         """
-        LOGGER.debug('Inserting relationship={}, subject_id={}, object_id={}, '
-                     'and predicate={}.'.format(relationship,
-                                                subject_id,
-                                                object_id,
-                                                predicate))
+        LOGGER.debug('Inserting relationship=%s, subject_id=%s, object_id=%s, '
+                     'and predicate=%s.', relationship, subject_id, object_id, predicate)
         if relationship and subject_id and object_id and predicate:
             LOGGER.warning('Given relationship object and '
                            'subject_id/object_id/predicate objects. Using '
@@ -824,7 +815,7 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :param list_to_insert: A list of Relationships to insert
         """
-        LOGGER.debug('Inserting {} relationships.'.format(len(list_to_insert)))
+        LOGGER.debug('Inserting %i relationships.', len(list_to_insert))
         # Batching is done per partition key--we won't know per-partition
         # contents until we've gone through the full list of Relationships.
         from_subject_batch = defaultdict(list)
@@ -875,8 +866,8 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :returns: A list of Relationships fitting the criteria or None.
         """
-        LOGGER.debug('Getting relationships related to subject_id={} and '
-                     'predicate={}.'.format(subject_id, predicate))
+        LOGGER.debug('Getting relationships related to subject_id=%s and '
+                     'predicate=%s.', subject_id, predicate)
         query = (schema.ObjectFromSubject.objects
                  .filter(subject_id=subject_id))
         if predicate:
@@ -895,8 +886,8 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :returns: A list of Relationships fitting the criteria or None.
         """
-        LOGGER.debug('Getting relationships related to object_id={} and '
-                     'predicate={}.'.format(object_id, predicate))
+        LOGGER.debug('Getting relationships related to object_id=%s and '
+                     'predicate=%s.', object_id, predicate)
         query = schema.SubjectFromObject.objects.filter(object_id=object_id)
         if predicate:
             # TODO: If third query table (for predicates) implemented, change
@@ -911,8 +902,7 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :returns: A list of Relationships fitting the criteria
         """
-        LOGGER.debug('Getting relationships related to predicate={}.'
-                     .format(predicate))
+        LOGGER.debug('Getting relationships related to predicate=%s.', predicate)
         # TODO: If third query table (for predicates) implemented, change
         query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
         return self._build_relationships(query.allow_filtering().all())
@@ -923,7 +913,7 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :param query: The query results to build from.
         """
-        LOGGER.debug('Building relationships from query={}'.format(query))
+        LOGGER.debug('Building relationships from query=%s', query)
         relationships = []
         for relationship in query:
             rel_obj = model.Relationship(subject_id=relationship.subject_id,
@@ -944,8 +934,7 @@ class RunDAO(dao.RunDAO):
         :param force_overwrite: Whether to forcibly overwrite a preexisting
                                 run that shares this run's id.
         """
-        LOGGER.debug('Inserting {} into Cassandra with force_overwrite={}'
-                     .format(run, force_overwrite))
+        LOGGER.debug('Inserting %s into Cassandra with force_overwrite=%s', run, force_overwrite)
         create = (schema.Run.create if force_overwrite
                   else schema.Run.if_not_exists().create)
         create(id=run.id,
@@ -966,9 +955,8 @@ class RunDAO(dao.RunDAO):
         :param force_overwrite: Whether to forcibly overwrite a preexisting
                                 run that shares this run's id.
         """
-        LOGGER.debug('Inserting {} into Cassandra with force_overwrite={}. '
-                     'Run table only.'
-                     .format(run, force_overwrite))
+        LOGGER.debug('Inserting %s into Cassandra with force_overwrite=%s. '
+                     'Run table only.', run, force_overwrite)
         create = (schema.Run.create if force_overwrite
                   else schema.Run.if_not_exists().create)
         create(id=run.id,
@@ -989,9 +977,8 @@ class RunDAO(dao.RunDAO):
         :param force_overwrite: Whether to forcibly overwrite a preexisting run
                                 that shares this run's id.
         """
-        LOGGER.debug('Inserting {} runs into Cassandra with '
-                     'force_overwrite={}.'
-                     .format(len(list_to_insert), force_overwrite))
+        LOGGER.debug('Inserting %i runs into Cassandra with '
+                     'force_overwrite=%s.', len(list_to_insert), force_overwrite)
         self.record_DAO.insert_many(list_to_insert=list_to_insert,
                                     force_overwrite=force_overwrite,
                                     _type_managed=True)
@@ -1034,7 +1021,7 @@ class RunDAO(dao.RunDAO):
 
         :returns: A run matching that identifier or None
         """
-        LOGGER.debug('Getting run with id: {}'.format(id))
+        LOGGER.debug('Getting run with id: %s', id)
         record = schema.Record.filter(id=id).get()
         return model.generate_run_from_json(json_input=json.loads(record.raw))
     # Who should this belong to?
@@ -1053,7 +1040,7 @@ class RunDAO(dao.RunDAO):
         :returns: A Run representing the Record plus metadata. None if given
             a record that isn't a run as input.
         """
-        LOGGER.debug('Converting {} to run.'.format(record))
+        LOGGER.debug('Converting %s to run.', record)
         if record.type == 'run':
             return model.generate_run_from_json(record.raw)
         else:

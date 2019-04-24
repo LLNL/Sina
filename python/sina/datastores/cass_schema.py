@@ -212,8 +212,7 @@ def cross_populate_object_and_subject(subject_id,
     :param predicate: The relationship between the subject and the object
     :param object_id: The id of the object
     """
-    LOGGER.debug('Cross populating: {} {} {}.'
-                 .format(subject_id, predicate, object_id))
+    LOGGER.debug('Cross populating: %s %s %s.', subject_id, predicate, object_id)
     SubjectFromObject.create(subject_id=subject_id,
                              predicate=predicate,
                              object_id=object_id)
@@ -343,8 +342,8 @@ def form_connection(keyspace, node_ip_list=None):
     """
     if not node_ip_list:
         node_ip_list = ['127.0.0.1']
-    LOGGER.info('Forming cassandra connection to ip_list={} with keyspace={}.'
-                .format(node_ip_list, keyspace))
+    LOGGER.info('Forming cassandra connection to ip_list=%s with keyspace=%s.',
+                node_ip_list, keyspace)
     connection.setup(node_ip_list, keyspace)
 
     sync_table(Record)

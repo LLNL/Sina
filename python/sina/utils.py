@@ -43,7 +43,7 @@ def import_many_jsons(factory, json_list):
     :param factory: The factory used to perform the import.
     :param json_list: List of filepaths to import from.
     """
-    LOGGER.info('Importing json list: {}'.format(json_list))
+    LOGGER.info('Importing json list: %s', json_list)
     if factory.supports_parallel_ingestion:
         LOGGER.debug('Factory supports parallel ingest, building thread pool.')
         arg_tuples = [(factory, x) for x in json_list]
@@ -69,7 +69,7 @@ def import_json(factory, json_path):
     :param factory: The factory used to perform the import.
     :param json_path: The filepath to the json to import.
     """
-    LOGGER.debug('Importing {}'.format(json_path))
+    LOGGER.debug('Importing %s', json_path)
     with open(json_path) as file:
         data = json.load(file)
     runs = []
@@ -118,24 +118,21 @@ def _process_relationship_entry(entry, local_ids):
     :raises ValueError: if the relationship doesn't have the required
                         components, or a local_id has no paired global_id.
     """
-    LOGGER.debug('Processing relationship entry: {}'.format(entry))
+    LOGGER.debug('Processing relationship entry: %s', entry)
     try:
         subj = local_ids[entry['local_subject']] if 'subject' not in entry else entry['subject']
         obj = local_ids[entry['local_object']] if 'object' not in entry else entry['object']
     except KeyError:
         if not any(subj in ("local_subject", "subject") for subj in entry):
-            msg = ("Relationship requires one of: subject, "
-                   "local_subject: {}".format(entry))
+            msg = "Relationship requires one of: subject, local_subject: {}".format(entry)
             LOGGER.error(msg)
             raise ValueError(msg)
         if not any(obj in ("local_object", "object") for obj in entry):
-            msg = ("Relationship requires one of: object, "
-                   "local_object: {}".format(entry))
+            msg = "Relationship requires one of: object, local_object: {}".format(entry)
             LOGGER.error(msg)
             raise ValueError(msg)
         msg = ("Local_subject and/or local_object must be the "
-               "local_id of a Record within file: {}"
-               .format(entry))
+               "local_id of a Record within file: {}".format(entry))
         LOGGER.error(msg)
         raise ValueError(msg)
     return (subj, obj)
@@ -281,12 +278,12 @@ def export(factory, id_list, scalar_names, output_type, output_file=None):
     :param output_file: The file to output. If None, then default to a
                         timestamped output.
     """
-    LOGGER.info('Exporting to type {}.'.format(output_type))
-    LOGGER.debug('Exporting <id_list={}, scalar_names={}, output_file={}>.'
-                 .format(id_list, scalar_names, output_type, output_file))
+    LOGGER.info('Exporting to type %s.', output_type)
+    LOGGER.debug('Exporting <id_list=%s, scalar_names=%s, output_type=%s, output_file=%s>.',
+                 id_list, scalar_names, output_type, output_file)
     if not output_type == 'csv':
-        msg = 'Given "{}" for output_type and it must be one of the '\
-              'following: csv'.format(output_type)
+        msg = ('Given "{}" for output_type and it must be one of the '
+               'following: csv'.format(output_type))
         LOGGER.error(msg)
         raise ValueError(msg)
     if not output_file:
@@ -294,7 +291,7 @@ def export(factory, id_list, scalar_names, output_type, output_file=None):
                        (datetime.datetime.fromtimestamp(
                            time.time()).strftime('%Y-%m-%d_%H-%M-%S')) +
                        '.csv')
-        LOGGER.debug('Using default output file: {}.'.format(output_file))
+        LOGGER.debug('Using default output file: %s.', output_file)
     data_to_export = OrderedDict()
     record_dao = factory.createRecordDAO()
     for id in id_list:
@@ -314,7 +311,7 @@ def _export_csv(data, scalar_names, output_file):
     :param scalar_names: The list of scalars names to output. Used for header.
     :param output_file: The file to output.
     """
-    LOGGER.debug('About to write data to csv file: {}'.format(output_file))
+    LOGGER.debug('About to write data to csv file: %s', output_file)
     header = ['id'] + scalar_names
     with open(output_file, 'w') as csvfile:
         writer = csv.writer(csvfile)
@@ -351,8 +348,7 @@ def parse_data_string(data_string):
     # breaking things; further refinement should be tackled in another PR.
     # Notable issues are outlined above as "IMPORTANT CAVEATS".
 
-    LOGGER.debug('Parsing string <{}> into DataRange objects.'
-                 .format(data_string))
+    LOGGER.debug('Parsing string <%s> into DataRange objects.', data_string)
     raw_data = filter(None, data_string.split(" "))
     clean_data = {}
 
@@ -380,8 +376,7 @@ def parse_data_string(data_string):
             data_range.parse_max(val_range[1])
             clean_data[name] = data_range
         else:
-            raise ValueError('Bad specifier in range for {}'
-                             .format(name))
+            raise ValueError('Bad specifier in range for {}'.format(name))
 
     return clean_data
 
@@ -394,8 +389,7 @@ def is_grouped_as_range(range_string):
 
     :returns: True if the string has valid range-grouping, else False
     """
-    LOGGER.debug('Checking if the following has proper range characters: {}'
-                 .format(range_string))
+    LOGGER.debug('Checking if the following has proper range characters: %s', range_string)
     open_identifier = ["[", "("]
     close_identifier = ["]", ")"]
 
@@ -419,7 +413,7 @@ def sort_and_standardize_criteria(criteria_dict):
     :raises ValueError: if passed any criterion that isn't a valid number,
                         string, DataRange, or ListCriteria.
     """
-    LOGGER.debug('Sorting and standardizing criteria: {}'.format(criteria_dict))
+    LOGGER.debug('Sorting and standardizing criteria: %s', criteria_dict)
     scalar_criteria = []
     string_criteria = []
     scalar_list_criteria = []
@@ -453,8 +447,7 @@ def sort_and_standardize_criteria(criteria_dict):
             # Might also be a dict or something else strange.
             raise ValueError("criteria must be a number, string, numerical"
                              "or lexographic DataRange, or numerical or lexographic"
-                             "ListCriteria. Given {}:{}"
-                             .format(data_name, criterion))
+                             "ListCriteria. Given {}:{}".format(data_name, criterion))
     return (scalar_criteria, string_criteria, scalar_list_criteria, string_list_criteria)
 
 
@@ -471,16 +464,15 @@ def create_file(path):
         raised (we catch EEXist already).
 
     """
-    LOGGER.debug('Creating new file: {}'.format(path))
+    LOGGER.debug('Creating new file: %s', path)
     if not os.path.exists(path):
         # Make directory
         try:
             os.makedirs(os.path.dirname(path))
         except OSError as err:
             if err.errno == errno.EEXIST:
-                msg = ('Directory already created, or race condition? Check '
-                       'path: {}'.format(path))
-                LOGGER.error(msg)
+                LOGGER.error('Directory already created, or race condition? Check '
+                             'path: %s', path)
             else:
                 msg = 'Unexpected OSError: {}'.format(err)
                 LOGGER.error(msg)
@@ -514,8 +506,7 @@ def get_example_path(relpath, suffix="-new",
     :returns: The path to the appropriate example data store
     :raises ValueError: if an example data store file does not exist
     """
-    LOGGER.debug("Retrieving example data store path: {}, {}, {}".
-                 format(relpath, suffix, example_dirs))
+    LOGGER.debug("Retrieving example data store path: %s, %s, %s", relpath, suffix, example_dirs)
 
     dirs = [example_dirs] if isinstance(example_dirs, six.string_types) else example_dirs
 
@@ -867,7 +858,7 @@ class DataRange(object):
                                ex: '[4' or '(', that represents the min side
                                of a numerical range
         """
-        LOGGER.debug('Setting min of range: {}'.format(min_range))
+        LOGGER.debug('Setting min of range: %s', min_range)
         if not min_range[0] in ['(', '[']:
             raise ValueError("Bad inclusiveness specifier for range: {}",
                              format(min_range[0]))
@@ -899,7 +890,7 @@ class DataRange(object):
                                 ex: '4)' or ']', that represents the max side
                                 of a numerical range
         """
-        LOGGER.debug('Setting max of range: {}'.format(max_range))
+        LOGGER.debug('Setting max of range: %s', max_range)
         if not max_range[-1] in [')', ']']:
             raise ValueError("Bad inclusiveness specifier for range: {}",
                              format(max_range[-1]))
@@ -929,7 +920,7 @@ class DataRange(object):
 
         :param val: The value (string or number) to set the DataRange to.
         """
-        LOGGER.debug('Setting range equal to: {}'.format(val))
+        LOGGER.debug('Setting range equal to: %s', val)
         self.min = val
         self.max = val
         self.min_inclusive = True
@@ -948,7 +939,7 @@ class DataRange(object):
         """
         # This method defines the assumptions we make about DataRanges. If you
         # change this logic, methods like is_single_value() need changed as well
-        LOGGER.debug('Validating and standardizing range of: {}'.format(self))
+        LOGGER.debug('Validating and standardizing range of: %s', self)
         if (not self.min_is_finite()) and (not self.max_is_finite()):
             raise ValueError("Null DataRange; min or max must be defined")
         try:
@@ -963,7 +954,7 @@ class DataRange(object):
             # Note that both being None is a special case, since then we don't
             # know if what we're ultimately looking for is a number or string.
         except ValueError:
-            msg = ("Bad type for portion of range: {}".format(self))
+            msg = "Bad type for portion of range: {}".format(self)
             LOGGER.error(msg)
             raise TypeError(msg)  # TypeError, as ValueError is a bit broad
 
@@ -972,7 +963,6 @@ class DataRange(object):
             max_eq_min = self.max_is_finite() and self.min == self.max
             impossible_range = max_eq_min and not (self.min_inclusive and self.max_inclusive)
             if min_gt_max or impossible_range:
-                msg = ("Bad range for data, min must be <= max: {}"
-                       .format(self))
+                msg = "Bad range for data, min must be <= max: {}".format(self)
                 LOGGER.error(msg)
                 raise ValueError(msg)

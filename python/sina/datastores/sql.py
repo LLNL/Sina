@@ -44,7 +44,7 @@ class RecordDAO(dao.RecordDAO):
                                   calling this. Used to skip committing in
                                   order to preserve atomicity.
         """
-        LOGGER.debug('Inserting {} into SQL.'.format(record))
+        LOGGER.debug('Inserting %s into SQL.', record)
         is_valid, warnings = record.is_valid()
         if not is_valid:
             raise ValueError(warnings)
@@ -69,8 +69,7 @@ class RecordDAO(dao.RecordDAO):
         :param id: The Record ID to associate the data to.
         :param data: The dictionary of data to insert.
         """
-        LOGGER.debug('Inserting {} data entries to Record ID {}.'
-                     .format(len(data), id))
+        LOGGER.debug('Inserting %i data entries to Record ID %s.', len(data), id)
         for datum_name, datum in data.items():
             if isinstance(datum['value'], list):
                 # Store info such as units and tags in master table
@@ -127,8 +126,7 @@ class RecordDAO(dao.RecordDAO):
         :param id: The Record ID to associate the files to.
         :param files: The list of files to insert.
         """
-        LOGGER.debug('Inserting {} files to record id={}.'
-                     .format(len(files), id))
+        LOGGER.debug('Inserting %i files to record id=%s.', len(files), id)
         for entry in files:
             tags = (json.dumps(entry['tags']) if 'tags' in entry else None)
             self.session.add(schema.Document(id=id,
@@ -147,7 +145,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param id: The id of the Record to delete.
         """
-        LOGGER.debug('Deleting record with id: {}'.format(id))
+        LOGGER.debug('Deleting record with id: %s', id)
         self.session.query(schema.Record).filter(schema.Record.id == id).delete()
         self.session.commit()
 
@@ -157,7 +155,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param ids_to_delete: A list of the ids of Records to delete.
         """
-        LOGGER.debug('Deleting records with ids in: {}'.format(ids_to_delete))
+        LOGGER.debug('Deleting records with ids in: %s', ids_to_delete)
         (self.session.query(schema.Record).filter(schema.Record.id.in_(ids_to_delete))
          .delete(synchronize_session='fetch'))
         self.session.commit()
@@ -183,8 +181,7 @@ class RecordDAO(dao.RecordDAO):
         :raises ValueError: if not supplied at least one criterion or given
                             a criterion it does not support
         """
-        LOGGER.debug('Finding all records fulfilling criteria: {}'
-                     .format(kwargs.items()))
+        LOGGER.debug('Finding all records fulfilling criteria: %s', kwargs.items())
         # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
         if not kwargs.items():
             raise ValueError("You must supply at least one criterion.")
@@ -254,7 +251,7 @@ class RecordDAO(dao.RecordDAO):
 
         :returns: A Record matching id or None
         """
-        LOGGER.debug('Getting record with id={}'.format(id))
+        LOGGER.debug('Getting record with id=%s', id)
         query = (self.session.query(schema.Record)
                  .filter(schema.Record.id == id).one())
         return model.generate_record_from_json(
@@ -271,7 +268,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: A generator of Records of that type or (if ids_only) a
                   generator of their ids
         """
-        LOGGER.debug('Getting all records of type {}.'.format(type))
+        LOGGER.debug('Getting all records of type %s.', type)
         query = (self.session.query(schema.Record.id)
                  .filter(schema.Record.type == type))
         if ids_only:
@@ -308,10 +305,8 @@ class RecordDAO(dao.RecordDAO):
         :raises ValueError: if given an empty list_of_contents
         :raises TypeError: if given a list that isn't all strings xor scalars.
         """
-        LOGGER.info('Finding Records where datum {} contains {}: {}'
-                    .format(datum_name,
-                            operation.value.split('.')[0],
-                            list_of_contents))
+        LOGGER.info('Finding Records where datum %s contains %s: %s', datum_name,
+                    operation.value.split('.')[0], list_of_contents)
         if not list_of_contents:
             raise ValueError("Must supply at least one entry in "
                              "list_of_contents for {}".format(datum_name))
@@ -404,9 +399,9 @@ class RecordDAO(dao.RecordDAO):
         :returns: A generator of matching records or (if ids_only) a
                   generator of their ids. Returns distinct items.
         """
-        LOGGER.debug('Getting all records related to uri={}.'.format(uri))
+        LOGGER.debug('Getting all records related to uri=%s.', uri)
         if accepted_ids_list:
-            LOGGER.debug('Restricting to {} ids.'.format(len(accepted_ids_list)))
+            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
         # Note: Mixed results on whether SQLAlchemy's optimizer is smart enough
         # to have %-less LIKE operate on par with ==, hence this:
         if '%' in uri:
@@ -447,7 +442,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: <query>, now filtering on <data>
         :raises ValueError: If given an invalid table.
         """
-        LOGGER.debug('Filtering <query={}> with <data={}>.'.format(query, data))
+        LOGGER.debug('Filtering <query=%s> with <data=%s>.', query, data)
         if (table not in [schema.ScalarData,
                           schema.StringData,
                           schema.ListScalarDataEntry,
@@ -532,9 +527,8 @@ class RecordDAO(dao.RecordDAO):
 
         :raises ValueError: if given a bad table to query against.
         """
-        LOGGER.debug('Building TextClause filter for data "{}" with criteria'
-                     '<{}> and index={}.'
-                     .format(name, criteria, index))
+        LOGGER.debug('Building TextClause filter for data "%s" with criteria'
+                     '<%s> and index=%s.', name, criteria, index)
         offset = param_offsets[table]
         # SQLAlchemy's methods for substituting in table names are convoluted.
         # A much simpler, clearer method:
@@ -594,8 +588,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in {} for record ids in {}'
-                     .format(data_list, id_list))
+        LOGGER.debug('Getting data in %s for record ids in %s', data_list, id_list)
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarData, schema.StringData]
         for query_table in query_tables:
@@ -633,8 +626,7 @@ class RecordDAO(dao.RecordDAO):
         """
         # Not a strict subset of get_data_for_records() in that this will
         # never return stringdata
-        LOGGER.debug('Getting scalars={} for record id={}'
-                     .format(scalar_names, id))
+        LOGGER.debug('Getting scalars=%s for record id=%s', scalar_names, id)
         scalars = {}
         query = (self.session.query(schema.ScalarData.name, schema.ScalarData.value,
                                     schema.ScalarData.units, schema.ScalarData.tags)
@@ -659,7 +651,7 @@ class RecordDAO(dao.RecordDAO):
         :param id: The record id to find files for
         :return: A list of file JSON objects matching the Mnoda specification
         """
-        LOGGER.debug('Getting files for record id={}'.format(id))
+        LOGGER.debug('Getting files for record id=%s', id)
         query = (self.session.query(schema.Document.uri, schema.Document.mimetype,
                                     schema.Document.tags)
                  .filter(schema.Document.id == id)
@@ -697,11 +689,8 @@ class RelationshipDAO(dao.RelationshipDAO):
         :param predicate: A string describing the relationship.
         :param relationship: A Relationship object to build entry from.
         """
-        LOGGER.debug('Inserting relationship={}, subject_id={}, object_id={}, '
-                     'and predicate={}.'.format(relationship,
-                                                subject_id,
-                                                object_id,
-                                                predicate))
+        LOGGER.debug('Inserting relationship=%s, subject_id=%s, object_id=%s, '
+                     'and predicate=%s.', relationship, subject_id, object_id, predicate)
         if relationship and subject_id and object_id and predicate:
             LOGGER.warning('Given relationship object and '
                            'subject_id/object_id/predicate objects. Using '
@@ -736,8 +725,8 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :returns: A list of Relationships fitting the criteria or None.
         """
-        LOGGER.debug('Getting relationships related to subject_id={} and '
-                     'predicate={}.'.format(subject_id, predicate))
+        LOGGER.debug('Getting relationships related to subject_id=%s and '
+                     'predicate=%s.', subject_id, predicate)
         query = (self.session.query(schema.Relationship)
                  .filter(schema.Relationship.subject_id == subject_id))
         if predicate:
@@ -757,8 +746,8 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :returns: A list of Relationships fitting the criteria or None.
         """
-        LOGGER.debug('Getting relationships related to object_id={} and '
-                     'predicate={}.'.format(object_id, predicate))
+        LOGGER.debug('Getting relationships related to object_id=%s and '
+                     'predicate=%s.', object_id, predicate)
         query = (self.session.query(schema.Relationship)
                  .filter(schema.Relationship.object_id == object_id))
         if predicate:
@@ -774,8 +763,7 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :returns: A list of Relationships fitting the criteria
         """
-        LOGGER.debug('Getting relationships related to predicate={}.'
-                     .format(predicate))
+        LOGGER.debug('Getting relationships related to predicate=%s.', predicate)
         query = (self.session.query(schema.Relationship)
                  .filter(schema.Relationship.predicate == predicate))
 
@@ -787,7 +775,7 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :param query: The query results to build from.
         """
-        LOGGER.debug('Building relationships from query={}'.format(query))
+        LOGGER.debug('Building relationships from query=%s', query)
         relationships = []
         for relationship in query:
             rel_obj = model.Relationship(subject_id=relationship.subject_id,
@@ -827,7 +815,7 @@ class RunDAO(dao.RunDAO):
 
         :returns: A run matching that identifier or None
         """
-        LOGGER.debug('Getting run with id: {}'.format(id))
+        LOGGER.debug('Getting run with id: %s', id)
         record = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one())
         return model.generate_run_from_json(json.loads(record.raw))
@@ -865,7 +853,7 @@ class RunDAO(dao.RunDAO):
         :returns: A Run representing the Record plus metadata. None if given
             a record that isn't a run as input.
         """
-        LOGGER.debug('Converting {} to run.'.format(record))
+        LOGGER.debug('Converting %s to run.', record)
         if record.type == 'run':
             return model.generate_run_from_json(json_input=record.raw)
         else:

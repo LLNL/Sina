@@ -72,7 +72,7 @@ class RecordDAO(object):
 
         :returns: A generator of found records
         """
-        LOGGER.debug('Getting many records with iter: {}'.format(iter_of_ids))
+        LOGGER.debug('Getting many records with iter: %s', iter_of_ids)
         for id in iter_of_ids:
             record = self.get(id)
             yield record
@@ -95,7 +95,7 @@ class RecordDAO(object):
 
         :param list_to_insert: A list of Records to insert
         """
-        LOGGER.debug('Inserting {} records.'.format(len(list_to_insert)))
+        LOGGER.debug('Inserting %s records.', len(list_to_insert))
         for item in list_to_insert:
             self.insert(item)
 
@@ -120,7 +120,7 @@ class RecordDAO(object):
 
         :param ids_to_delete: A list of the ids of Records to delete.
         """
-        LOGGER.debug('Deleting {} records.'.format(len(ids_to_delete)))
+        LOGGER.debug('Deleting %i records.', len(ids_to_delete))
         for item in ids_to_delete:
             self.delete(item)
 
@@ -417,7 +417,7 @@ class RunDAO(object):
 
         :param ids_to_delete: A list of the ids of Runs to delete.
         """
-        LOGGER.debug('Deleting {} runs.'.format(len(ids_to_delete)))
+        LOGGER.debug('Deleting %i runs.', len(ids_to_delete))
         for item in ids_to_delete:
             self.delete(item)
 
