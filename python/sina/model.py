@@ -222,17 +222,14 @@ class Record(object):
                                     collections.Sequence))):
                     (warnings.append("At least one value entry belonging "
                                      "to Record {} has a malformed tag "
-                                     "list. Value: {}"
-                                     .format(self.id, entry)))
+                                     "list. Value: {}".format(self.id, entry)))
         try:
             json.dumps(self.raw)
         except ValueError:
-            (warnings.append("Record {}'s raw is invalid JSON.'"
-                             .format(self.id)))
+            (warnings.append("Record {}'s raw is invalid JSON.'".format(self.id)))
         if not isinstance(self.user_defined, dict):
             (warnings.append("Record {}'s user_defined section is not a "
-                             "dictionary. User_defined: {}"
-                             .format(self.id, self.user_defined)))
+                             "dictionary. User_defined: {}".format(self.id, self.user_defined)))
         if warnings:
             warnstring = "\n".join(warnings)
             if print_warnings:
@@ -345,8 +342,7 @@ def _is_valid_list(list_of_data):
     an index of a scalar and the second being a index of a string). If True
     they are None.
     """
-    LOGGER.debug('Checking if list of length {} is valid.'
-                 .format(len(list_of_data)))
+    LOGGER.debug('Checking if list of length %i is valid.', len(list_of_data))
     is_scalar = False
     is_string = False
     latest_scalar = None
@@ -376,7 +372,7 @@ def generate_record_from_json(json_input):
     :param json_input: A JSON representation of a Record.
     :raises: ValueError if given invalid json input.
     """
-    LOGGER.debug('Generating record from json input: {}'.format(json_input))
+    LOGGER.debug('Generating record from json input: %s', json_input)
     # Must create record first
     try:
         record = Record(id=json_input['id'],
@@ -386,7 +382,7 @@ def generate_record_from_json(json_input):
                         files=json_input.get('files'))
     except KeyError as e:
         msg = 'Missing required key <{}>.'.format(e)
-        LOGGER.warn(msg)
+        LOGGER.error(msg)
         raise ValueError(msg)
     # Then set raw to json_input to grab any additional information.
     record.raw.update({key: val for key, val in json_input.items()
@@ -402,7 +398,7 @@ def generate_run_from_json(json_input):
     :param json_input: A JSON representation of a Run.
     :raises: ValueError if given invalid json input.
     """
-    LOGGER.debug('Generating run from json input: {}'.format(json_input))
+    LOGGER.debug('Generating run from json input: %s', json_input)
     # Programatically-created Records
     try:
         run = Run(id=json_input['id'],
@@ -414,7 +410,7 @@ def generate_run_from_json(json_input):
                   files=json_input.get('files'))
     except KeyError as e:
         msg = 'Missing required key <{}>.'.format(e)
-        LOGGER.warn(msg)
+        LOGGER.error(msg)
         raise ValueError(msg)
     # Then set raw to json_input to grab any additional information.
     run.raw.update({key: val for key, val in json_input.items()
