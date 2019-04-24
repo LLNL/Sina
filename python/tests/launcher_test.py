@@ -86,8 +86,7 @@ class TestCLI(unittest.TestCase):
         import_json(factory=factory, json_path=test_json)
         local_rec = list(factory.createRecordDAO().get_all_of_type("eggs"))
         global_id = local_rec[0].id
-        relationship = (factory.createRelationshipDAO()
-                               ._get_given_object_id(global_id))
+        relationship = (factory.createRelationshipDAO()._get_given_object_id(global_id))
         self.assertEqual(len(relationship), 1)
         # Tested relationship: (local_id is local_id). makes sure local
         # subjects and objects are both replaced correctly

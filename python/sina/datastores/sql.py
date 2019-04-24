@@ -78,9 +78,7 @@ class RecordDAO(dao.RecordDAO):
                 # tags to a string (if they exist).
                 # Using json.dumps() instead of str() (or join()) gives
                 # valid JSON
-                tags = (json.dumps(datum['tags']) if 'tags' in datum
-
-                                                     else None)
+                tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
                 # Check if empty list
                 if datum:
                     kind_master = (schema.ListScalarDataMaster
@@ -109,11 +107,9 @@ class RecordDAO(dao.RecordDAO):
                                           value=entry))
             elif (isinstance(datum['value'], six.string_types) or
                   isinstance(datum['value'], numbers.Number)):
-                tags = (json.dumps(datum['tags']) if 'tags' in datum
-                                                     else None)
+                tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
                 # Check if it's a scalar
-                kind = (schema.ScalarData if isinstance(datum['value'],
-                                                        numbers.Real)
+                kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
                         else schema.StringData)
                 self.session.add(kind(id=id,
                                       name=datum_name,
@@ -163,7 +159,7 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Deleting records with ids in: {}'.format(ids_to_delete))
         (self.session.query(schema.Record).filter(schema.Record.id.in_(ids_to_delete))
-                                          .delete(synchronize_session='fetch'))
+         .delete(synchronize_session='fetch'))
         self.session.commit()
 
     def data_query(self, **kwargs):
@@ -224,14 +220,14 @@ class RecordDAO(dao.RecordDAO):
                 datum_name, list_criteria = criterion
                 # has_all queries are broken up and treated like a scalar or string
                 if (list_criteria.operation in
-                    [utils.ListQueryOperation.ALL,
-                     utils.ListQueryOperation.ANY,
-                     utils.ListQueryOperation.ONLY]):
-                    ids = self.get_list(datum_name=datum_name,
-                                        list_of_contents=list_criteria.entries,
-                                        ids_only=True,
-                                        operation=list_criteria.operation)
-                    result_ids.append(ids)
+                        [utils.ListQueryOperation.ALL,
+                         utils.ListQueryOperation.ANY,
+                         utils.ListQueryOperation.ONLY]):
+                        ids = self.get_list(datum_name=datum_name,
+                                            list_of_contents=list_criteria.entries,
+                                            ids_only=True,
+                                            operation=list_criteria.operation)
+                        result_ids.append(ids)
                 else:
                     raise ValueError("Currently, only [{}, {}, {}] list "
                                      "operations are supported. Given {}"
@@ -277,7 +273,7 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Getting all records of type {}.'.format(type))
         query = (self.session.query(schema.Record.id)
-                             .filter(schema.Record.type == type))
+                 .filter(schema.Record.type == type))
         if ids_only:
             for x in query.all():
                 yield str(x[0])
@@ -390,7 +386,7 @@ class RecordDAO(dao.RecordDAO):
                                                        table=table,
                                                        data=[criterion]).all()
             list_of_record_ids_sets.append(set(str(record_id[0])
-                                           for record_id in records_list))
+                                               for record_id in records_list))
         return list_of_record_ids_sets
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
@@ -502,9 +498,9 @@ class RecordDAO(dao.RecordDAO):
                 text = "{} = {}"
                 components_length = len(range_components)
             return (query.group_by(table.id)
-                         .having(sqlalchemy.text(text
-                                 .format(sqlalchemy.func.count(table.id),
-                                         components_length))))
+                    .having(sqlalchemy.text(text
+                                            .format(sqlalchemy.func.count(table.id),
+                                                    components_length))))
         if (table == schema.ListStringDataEntry or
                 table == schema.ListScalarDataEntry):
             query = _count_checker(is_list=True)
@@ -666,8 +662,8 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Getting files for record id={}'.format(id))
         query = (self.session.query(schema.Document.uri, schema.Document.mimetype,
                                     schema.Document.tags)
-                             .filter(schema.Document.id == id)
-                             .order_by(schema.Document.uri.asc()).all())
+                 .filter(schema.Document.id == id)
+                 .order_by(schema.Document.uri.asc()).all())
         files = []
         for entry in query:
             tags = json.loads(entry[2]) if entry[2] else None

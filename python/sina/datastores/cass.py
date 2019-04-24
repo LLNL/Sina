@@ -17,14 +17,14 @@ import sina.utils as utils
 LOGGER = logging.getLogger(__name__)
 
 table_lookup = {
-                "scalar": {"record_table": schema.RecordFromScalarData,
-                           "data_table": schema.ScalarDataFromRecord},
-                "string": {"record_table": schema.RecordFromStringData,
-                           "data_table": schema.StringDataFromRecord},
-                "stringlist": {"record_table": schema.RecordFromStringListData,
-                               "data_table": schema.StringListDataFromRecord},
-                "scalarlist": {"record_table": schema.RecordFromScalarListData,
-                               "data_table": schema.ScalarListDataFromRecord}
+    "scalar": {"record_table": schema.RecordFromScalarData,
+               "data_table": schema.ScalarDataFromRecord},
+    "string": {"record_table": schema.RecordFromStringData,
+               "data_table": schema.StringDataFromRecord},
+    "stringlist": {"record_table": schema.RecordFromStringListData,
+                   "data_table": schema.StringListDataFromRecord},
+    "scalarlist": {"record_table": schema.RecordFromScalarListData,
+                   "data_table": schema.ScalarListDataFromRecord}
 }
 
 
@@ -289,8 +289,7 @@ class RecordDAO(dao.RecordDAO):
         # manually discover all relationships. Because they are mirrored, we
         # can do this efficiently and without allow_filtering.
         obj_when_rec_is_subj = (schema.ObjectFromSubject.objects(subject_id=record_id)
-                                                        .values_list('object_id',
-                                                                     'predicate'))
+                                .values_list('object_id', 'predicate'))
         for obj, pred in obj_when_rec_is_subj:
             (schema.SubjectFromObject.objects(object_id=obj,
                                               predicate=pred,
@@ -300,8 +299,7 @@ class RecordDAO(dao.RecordDAO):
 
         # Now again with the other table.
         subj_when_rec_is_obj = (schema.SubjectFromObject.objects(object_id=record_id)
-                                                        .values_list('subject_id',
-                                                                     'predicate'))
+                                .values_list('subject_id', 'predicate'))
         for subj, pred in subj_when_rec_is_obj:
             (schema.ObjectFromSubject.objects(subject_id=subj,
                                               predicate=pred,
@@ -579,8 +577,7 @@ class RecordDAO(dao.RecordDAO):
         # Allow_filtering() is, as a rule, inadvisable; if speed becomes a
         # concern, an id - type query table should be easy to set up.
         query = (schema.Record.objects.filter(type=type)
-                                      .allow_filtering()
-                                      .values_list('id', flat=True))
+                 .allow_filtering().values_list('id', flat=True))
         if ids_only:
             for id in query:
                 yield str(id)
@@ -643,8 +640,8 @@ class RecordDAO(dao.RecordDAO):
                 # simulate a 'LIKE foo%' query.
                 alphabetical_end = uri[:-2]+chr(ord(uri[-2]) + 1)
                 match_ids = (base_query.filter(uri__gte=uri[:-1])
-                                       .filter(uri__lt=alphabetical_end)
-                                       .values_list('id', flat=True))
+                             .filter(uri__lt=alphabetical_end)
+                             .values_list('id', flat=True))
         # If there's no wildcard, we're looking for exact matches.
         else:
             match_ids = base_query.filter(uri=uri).values_list('id', flat=True)
