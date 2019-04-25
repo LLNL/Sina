@@ -31,8 +31,7 @@ class TestFukushima(unittest.TestCase):
         subprocess.check_call(args)
 
         mnoda_output_file = os.path.join(
-                                self.temp_mnoda_output,
-                                'files/AMS_C12_SeaData.json')
+            self.temp_mnoda_output, 'files/AMS_C12_SeaData.json')
         try:
             _test_file_against_schema(file=mnoda_output_file)
         except jsonschema.exceptions.ValidationError:
@@ -74,8 +73,7 @@ class TestNOAA(unittest.TestCase):
                 self.temp_mnoda_output]
         subprocess.check_call(args)
         mnoda_output_file = os.path.join(
-                                self.temp_mnoda_output,
-                                'files/WCOA11-01-06-2015.json')
+            self.temp_mnoda_output, 'files/WCOA11-01-06-2015.json')
         try:
             _test_file_against_schema(file=mnoda_output_file)
         except jsonschema.exceptions.ValidationError:

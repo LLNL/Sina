@@ -30,8 +30,7 @@ class TestModel(unittest.TestCase):
                                        "bar": {"value": "1",
                                                "tags": ["in"]}},
                                  files=[{"uri": "ham.png", "mimetype": "png"},
-                                        {"uri": "ham.curve", "tags":
-                                        ["hammy"]}],
+                                        {"uri": "ham.curve", "tags": ["hammy"]}],
                                  user_defined={})
 
     # Record
@@ -63,8 +62,7 @@ class TestModel(unittest.TestCase):
         spam.files = [{"uri": "spam.log", "tags": "output"}]
         self.assertFalse(spam.is_valid()[0])
 
-        spam.files = [{"uri": "spam.log", "mimetype": "text/plain", "tags":
-                      ["output"]}]
+        spam.files = [{"uri": "spam.log", "mimetype": "text/plain", "tags": ["output"]}]
 
         spam.type = "recipe"
 
@@ -99,11 +97,9 @@ class TestModel(unittest.TestCase):
         If the list contains some mixture of strings and scalars, we should
         return False with the corresponding bad indices.
         """
-        (validated,
-            scalar_index,
-            string_index) = model._is_valid_list(
+        is_valid, scalar_index, string_index = model._is_valid_list(
             self.record_two.data['bad_list']['value'])
-        self.assertFalse(validated)
+        self.assertFalse(is_valid)
         self.assertEqual(scalar_index, 1)
         self.assertEqual(string_index, 0)
 
@@ -152,21 +148,15 @@ class TestModel(unittest.TestCase):
 
     def test_generate_record_from_json_good(self):
         """Ensure we can generate a Record from valid json input."""
-        json_input = {
-                         "id": "spam",
-                         "type": "eggs",
-                         "user_defined": {"water": "bread"},
-                         "data": {"eggs": {"value": 12,
-                                           "units": "cm",
-                                           "tags": ["runny"]
-                                           }},
-                         "files": [{
-                                     "uri": "eggs.brek",
-                                     "mimetype": "egg",
-                                     "tags": ["fried"]
-                                   }
-                                   ]
-                     }
+        json_input = {"id": "spam",
+                      "type": "eggs",
+                      "user_defined": {"water": "bread"},
+                      "data": {"eggs": {"value": 12,
+                                        "units": "cm",
+                                        "tags": ["runny"]}},
+                      "files": [{"uri": "eggs.brek",
+                                 "mimetype": "egg",
+                                 "tags": ["fried"]}]}
         record = model.generate_record_from_json(json_input=json_input)
         self.assertEqual(json_input['id'], record.id)
         self.assertEqual(json_input['type'], record.type)
@@ -181,46 +171,32 @@ class TestModel(unittest.TestCase):
         This is because we do not want to allow creation of Records that do not
         adhere to the Mnoda schema.
         """
-        json_input = {
-                         "type": "eggs",
-                         "user_defined": {"water": "bread"},
-                         "data": {"eggs": {"value": 12,
-                                           "units": "cm",
-                                           "tags": ["runny"]
-                                           }
-                                  },
-                         "files": [{
-                                     "uri": "eggs.brek",
-                                     "mimetype": "egg",
-                                     "tags": ["fried"]
-                                   }
-                                   ]
-                     }
+        json_input = {"type": "eggs",
+                      "user_defined": {"water": "bread"},
+                      "data": {"eggs": {"value": 12,
+                                        "units": "cm",
+                                        "tags": ["runny"]}},
+                      "files": [{"uri": "eggs.brek",
+                                 "mimetype": "egg",
+                                 "tags": ["fried"]}]}
         with self.assertRaises(ValueError) as context:
             model.generate_record_from_json(json_input=json_input)
         self.assertIn("Missing required key <'id'>.", str(context.exception))
 
     def test_generate_run_from_json_good(self):
         """Ensure we can generate a Run from valid json input."""
-        json_input = {
-                         "id": "spam",
-                         "type": "run",
-                         "user": "cook",
-                         "application": "skillet",
-                         "version": "1.2",
-                         "user_defined": {"water": "bread"},
-                         "data": {"eggs": {"value": 12,
-                                           "units": "cm",
-                                           "tags": ["runny"]
-                                           }
-                                  },
-                         "files": [{
-                                     "uri": "eggs.brek",
-                                     "mimetype": "egg",
-                                     "tags": ["fried"]
-                                   }
-                                   ]
-                     }
+        json_input = {"id": "spam",
+                      "type": "run",
+                      "user": "cook",
+                      "application": "skillet",
+                      "version": "1.2",
+                      "user_defined": {"water": "bread"},
+                      "data": {"eggs": {"value": 12,
+                                        "units": "cm",
+                                        "tags": ["runny"]}},
+                      "files": [{"uri": "eggs.brek",
+                                 "mimetype": "egg",
+                                 "tags": ["fried"]}]}
         run = model.generate_run_from_json(json_input=json_input)
         self.assertEqual(json_input['id'], run.id)
         self.assertEqual(json_input['type'], run.type)
@@ -238,22 +214,15 @@ class TestModel(unittest.TestCase):
         This is because we do not want to allow creation of Runs that do not
         adhere to the Mnoda schema.
         """
-        json_input = {
-                         "id": "spam",
-                         "type": "eggs",
-                         "user_defined": {"water": "bread"},
-                         "data": {"eggs": {"value": 12,
-                                           "units": "cm",
-                                           "tags": ["runny"]
-                                           }
-                                  },
-                         "files": [{
-                                     "uri": "eggs.brek",
-                                     "mimetype": "egg",
-                                     "tags": ["fried"]
-                                   }
-                                   ]
-                     }
+        json_input = {"id": "spam",
+                      "type": "eggs",
+                      "user_defined": {"water": "bread"},
+                      "data": {"eggs": {"value": 12,
+                                        "units": "cm",
+                                        "tags": ["runny"]}},
+                      "files": [{"uri": "eggs.brek",
+                                 "mimetype": "egg",
+                                 "tags": ["fried"]}]}
         with self.assertRaises(ValueError) as context:
             model.generate_run_from_json(json_input=json_input)
         self.assertIn("Missing required key <'application'>.",

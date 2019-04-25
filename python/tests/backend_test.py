@@ -70,8 +70,8 @@ def populate_database_with_data(record_dao):
     egg_record.data["eggs_scal"] = {"value": 0}
 
     record_dao.insert_many([spam_record, spam_record_2, spam_record_3,
-                           spam_record_4, spam_record_5, spam_record_6,
-                           egg_record])
+                            spam_record_4, spam_record_5, spam_record_6,
+                            egg_record])
 
 
 class TestSetup(unittest.TestCase):

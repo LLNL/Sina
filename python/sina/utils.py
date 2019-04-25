@@ -289,7 +289,7 @@ def export(factory, id_list, scalar_names, output_type, output_file=None):
     if not output_file:
         output_file = ('output_' +
                        (datetime.datetime.fromtimestamp(
-                        time.time()).strftime('%Y-%m-%d_%H-%M-%S')) +
+                           time.time()).strftime('%Y-%m-%d_%H-%M-%S')) +
                        '.csv')
         LOGGER.debug('Using default output file: %s.', output_file)
     data_to_export = OrderedDict()
@@ -485,7 +485,7 @@ def create_file(path):
 def get_example_path(relpath, suffix="-new",
                      example_dirs=["/collab/usr/gapps/wf/examples/",
                                    os.path.realpath(os.path.join(os.path.dirname(__file__),
-                                                    "../../examples/"))]):
+                                                                 "../../examples/"))]):
     """
     Return the fully qualified path name for an example data store, raise exception if none.
 
@@ -948,8 +948,8 @@ class DataRange(object):
                 self.min = float(self.min) if self.min_is_finite() else None
                 self.max = float(self.max) if self.max_is_finite() else None
             # Case 2: neither min nor max is number. Both must be None or string
-            elif (not isinstance(self.min, (six.string_types, type(None)) or
-                  not isinstance(self.max, (six.string_types, type(None))))):
+            elif (not isinstance(self.min, (six.string_types, type(None))) or
+                  not isinstance(self.max, (six.string_types, type(None)))):
                 raise ValueError
             # Note that both being None is a special case, since then we don't
             # know if what we're ultimately looking for is a number or string.

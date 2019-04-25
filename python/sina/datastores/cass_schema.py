@@ -215,12 +215,10 @@ def cross_populate_object_and_subject(subject_id,
     LOGGER.debug('Cross populating: %s %s %s.', subject_id, predicate, object_id)
     SubjectFromObject.create(subject_id=subject_id,
                              predicate=predicate,
-                             object_id=object_id,
-                             )
+                             object_id=object_id)
     ObjectFromSubject.create(subject_id=subject_id,
                              predicate=predicate,
-                             object_id=object_id,
-                             )
+                             object_id=object_id)
 
 
 def _discover_tables_from_value(value):

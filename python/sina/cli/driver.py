@@ -396,9 +396,9 @@ def query(args):
         if args.database_type == "cass":
             LOGGER.debug('Executing raw query on cassandra: %s', args.raw)
             print([str(x) for x in
-                  Cluster(args.database)
-                  .connect(args.cass_keyspace)
-                  .execute(args.raw)])
+                   Cluster(args.database)
+                   .connect(args.cass_keyspace)
+                   .execute(args.raw)])
         elif args.database_type == "sql":
             LOGGER.debug('Executing raw query on sql: %s', args.raw)
             print([str(x) for x in
@@ -415,7 +415,7 @@ def query(args):
     if args.uri:
         accepted_ids_list = matches if args.scalar else None
         matches = record_dao.get_given_document_uri(
-                             uri=args.uri, accepted_ids_list=accepted_ids_list)
+            uri=args.uri, accepted_ids_list=accepted_ids_list)
     # TODO: Not ideal, if we only need the ids we're doing an unnecessary query
     # against the records table, as both scalar and uri queries find ids
     # (but then call get_many()). Easily solved with optargs. But is that

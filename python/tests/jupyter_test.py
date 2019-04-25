@@ -103,7 +103,7 @@ def _execute_notebook(path):
         notebook = _read_notebook(path)
     except Exception as _exception:
         return ['{}: {}: Reading {}: {}'.format(_exception.__class__.__name__,
-                SINA_KERNEL, path, str(_exception))]
+                                                SINA_KERNEL, path, str(_exception))]
 
     try:
         # Does the notebook conform to the current format schema?
@@ -168,7 +168,7 @@ def _find_notebooks():
 
     # Skip checkpoint notebooks in generated subdirectories
     return sorted([filename for filename in _stdoutdata.split("\n")[:-1]
-                  if filename.find(".ipynb_checkpoints") < 0])
+                   if filename.find(".ipynb_checkpoints") < 0])
 
 
 def _check_notebook_style(path):
@@ -311,7 +311,7 @@ class TestJupyterNotebooks(type):
         if len(files) > 0:
             for filename in files:
                 test_name = "test_{}".format(os.path.splitext(
-                                             os.path.basename(filename))[0])
+                    os.path.basename(filename))[0])
                 _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
                 _dict["{}_flake8".format(test_name)] = gen_test_flake8(filename)
 

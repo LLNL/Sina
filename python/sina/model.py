@@ -178,11 +178,11 @@ class Record(object):
             # Python2 and 3 compatible way of checking if the tags are
             # a list, tuple, etc (but not a string)
             if (entry.get("tags") and
-                (isinstance(entry.get("tags"), six.string_types) or
-                 not isinstance(entry.get("tags"), collections.Sequence))):
-                (warnings.append("At least one file entry belonging to "
-                                 "Record {} has a malformed tag list. File: {}"
-                                 .format(self.id, entry)))
+                    (isinstance(entry.get("tags"), six.string_types) or
+                     not isinstance(entry.get("tags"), collections.Sequence))):
+                    (warnings.append("At least one file entry belonging to "
+                                     "Record {} has a malformed tag list. File: {}"
+                                     .format(self.id, entry)))
 
         if not isinstance(self.data, dict):
             (warnings.append("Record {}'s data field must be a dictionary!"
@@ -203,9 +203,9 @@ class Record(object):
                 if isinstance(self.data[entry]['value'], list):
                     try:
                         (validated_list,
-                            scalar_index,
-                            string_index) = _is_valid_list(
-                                list_of_data=self.data[entry]["value"])
+                         scalar_index,
+                         string_index) = _is_valid_list(
+                             list_of_data=self.data[entry]["value"])
                     except ValueError as e:
                         warnings.append(str(e))
                         break
@@ -216,10 +216,10 @@ class Record(object):
                             "indicies: {}, {}".format(scalar_index, string_index)))
                         break
                 if (self.data[entry].get("tags") and
-                    (isinstance(self.data[entry].get("tags"),
-                     six.string_types) or
-                     not isinstance(self.data[entry].get("tags"),
-                                    collections.Sequence))):
+                        (isinstance(self.data[entry].get("tags"),
+                                    six.string_types) or
+                         not isinstance(self.data[entry].get("tags"),
+                                        collections.Sequence))):
                     (warnings.append("At least one value entry belonging "
                                      "to Record {} has a malformed tag "
                                      "list. Value: {}".format(self.id, entry)))
@@ -386,8 +386,8 @@ def generate_record_from_json(json_input):
         raise ValueError(msg)
     # Then set raw to json_input to grab any additional information.
     record.raw.update({key: val for key, val in json_input.items()
-                      if key not in ['id', 'type', 'user_defined', 'data',
-                                     'files']})
+                       if key not in ['id', 'type', 'user_defined', 'data',
+                                      'files']})
     return record
 
 
