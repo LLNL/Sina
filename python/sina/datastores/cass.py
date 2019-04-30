@@ -16,7 +16,7 @@ import sina.utils as utils
 
 LOGGER = logging.getLogger(__name__)
 
-table_lookup = {
+TABLE_LOOKUP = {
     "scalar": {"record_table": schema.RecordFromScalarData,
                "data_table": schema.ScalarDataFromRecord},
     "string": {"record_table": schema.RecordFromStringData,
@@ -136,9 +136,9 @@ class RecordDAO(dao.RecordDAO):
                                           scalar_list_from_rec_batch),
                                          (schema.StringListDataFromRecord,
                                           string_list_from_rec_batch)):
-                    with BatchQuery() as b:
-                        create = (table.batch(b).create if force_overwrite
-                                  else table.batch(b).if_not_exists().create)
+                    with BatchQuery() as batch_query:
+                        create = (table.batch(batch_query).create if force_overwrite
+                                  else table.batch(batch_query).if_not_exists().create)
                         for entry in data_list:
                             create(id=record.id,
                                    name=entry[0],
@@ -153,9 +153,9 @@ class RecordDAO(dao.RecordDAO):
                                            entry.get('mimetype'),
                                            entry.get('tags')))
                 table = schema.DocumentFromRecord
-                with BatchQuery() as b:
-                    create = (table.batch(b).create if force_overwrite
-                              else table.batch(b).if_not_exists().create)
+                with BatchQuery() as batch_query:
+                    create = (table.batch(batch_query).create if force_overwrite
+                              else table.batch(batch_query).if_not_exists().create)
                     for doc in document_batch:
                         create(id=record.id,
                                uri=doc[0],
@@ -167,9 +167,9 @@ class RecordDAO(dao.RecordDAO):
         for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
                                       (schema.RecordFromStringData, from_string_batch)):
             for partition, data_list in six.iteritems(partition_data):
-                with BatchQuery() as b:
-                    create = (table.batch(b).create if force_overwrite
-                              else table.batch(b).if_not_exists().create)
+                with BatchQuery() as batch_query:
+                    create = (table.batch(batch_query).create if force_overwrite
+                              else table.batch(batch_query).if_not_exists().create)
                     for entry in data_list:
                         create(name=partition,
                                value=entry[0],
@@ -181,14 +181,14 @@ class RecordDAO(dao.RecordDAO):
         for table, partition_data in ((schema.RecordFromScalarListData, from_scalar_list_batch),
                                       (schema.RecordFromStringListData, from_string_list_batch)):
             for partition, data_list in six.iteritems(partition_data):
-                with BatchQuery() as b:
+                with BatchQuery() as batch_query:
                     # We no longer worry about overriding, trusting the partner
                     # table to catch it if necessary.
                     for entry in data_list:
                         for value in entry[0]:
-                            table.batch(b).create(name=partition,
-                                                  value=value,
-                                                  id=entry[1])
+                            table.batch(batch_query).create(name=partition,
+                                                            value=value,
+                                                            id=entry[1])
 
     def _insert_data(self, data, id, force_overwrite=False):
         """
@@ -384,7 +384,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param datum_name: The name of the datum the has_all is performed against.
         :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in table_lookup (module-level var).
+        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
 
         :returns: a generator of ids fitting the criteria
         """
@@ -392,7 +392,7 @@ class RecordDAO(dao.RecordDAO):
         # needed here, but there's an important caveat: _apply_ranges relies on
         # both the DataFromRecord and RecordFromData tables, and the former
         # looks much different for list data. And so:
-        rec_table = table_lookup[table]["record_table"]
+        rec_table = TABLE_LOOKUP[table]["record_table"]
         result_sets = []
         for criterion in datum_criteria:
             result_sets.append(set(self._configure_query_for_criteria(rec_table.objects,
@@ -410,11 +410,11 @@ class RecordDAO(dao.RecordDAO):
 
         :param datum_name: The name of the datum the has_any is performed against.
         :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in table_lookup (module-level var).
+        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
 
         :returns: a set of ids fitting the criteria
         """
-        rec_table = table_lookup[table]["record_table"]
+        rec_table = TABLE_LOOKUP[table]["record_table"]
         # Cassandra has no OR operator. Ordinarily we'd chain queries as generators,
         # but it's possible to get duplicate ids, so we do need to store all results
         # in memory to filter dupes.
@@ -443,7 +443,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param datum_name: The name of the datum the has_only is performed against.
         :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in table_lookup (module-level var).
+        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
 
         :returns: a set of ids fitting the criteria
         """
@@ -482,12 +482,12 @@ class RecordDAO(dao.RecordDAO):
         probably network/query overhead.
 
         :param data: A list of (name, criteria) pairs to apply to the query object
-        :param table: The name of the table, to look up in table_lookup (module-level var)
+        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var)
 
         :returns: a generator of ids fitting the criteria
         """
-        rec_table = table_lookup[table]["record_table"]
-        data_table = table_lookup[table]["data_table"]
+        rec_table = TABLE_LOOKUP[table]["record_table"]
+        data_table = TABLE_LOOKUP[table]["data_table"]
         query = rec_table.objects
         # Cassandra requires a list for the in-predicate
         filtered_ids = list(self._configure_query_for_criteria(query,
@@ -834,23 +834,23 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                          object_id=object_id,
                                                          predicate=insert_info[0][0])
             else:
-                with BatchQuery() as b:
+                with BatchQuery() as batch_query:
                     for entry in insert_info:
                         (schema.SubjectFromObject
-                         .batch(b).create(object_id=object_id,
-                                          predicate=entry[0],
-                                          subject_id=entry[1]))
+                         .batch(batch_query).create(object_id=object_id,
+                                                    predicate=entry[0],
+                                                    subject_id=entry[1]))
         for subject_id, insert_info in six.iteritems(from_subject_batch):
             # We already handled this use case with the cross_populate above
             if len(insert_info) == 1:
                 pass
             else:
-                with BatchQuery() as b:
+                with BatchQuery() as batch_query:
                     for entry in insert_info:
                         (schema.ObjectFromSubject
-                         .batch(b).create(subject_id=subject_id,
-                                          predicate=entry[0],
-                                          object_id=entry[1]))
+                         .batch(batch_query).create(subject_id=subject_id,
+                                                    predicate=entry[0],
+                                                    object_id=entry[1]))
 
     # TODO: Ongoing question of whether these should return generators.
 
@@ -941,13 +941,13 @@ class RunDAO(dao.RunDAO):
                application=run.application,
                user=run.user,
                version=run.version)
-        self.record_DAO.insert(record=run, force_overwrite=force_overwrite)
+        self.record_dao.insert(record=run, force_overwrite=force_overwrite)
 
     def _insert_sans_rec(self, run, force_overwrite=False):
         """
         Given a Run, import it into the Run table only.
 
-        Skips the call to record_DAO's insert--this is intended to be called
+        Skips the call to record_dao's insert--this is intended to be called
         from within insert_many()s, which implement special logic that Run
         metadata doesn't benefit from.
 
@@ -979,7 +979,7 @@ class RunDAO(dao.RunDAO):
         """
         LOGGER.debug('Inserting %i runs into Cassandra with '
                      'force_overwrite=%s.', len(list_to_insert), force_overwrite)
-        self.record_DAO.insert_many(list_to_insert=list_to_insert,
+        self.record_dao.insert_many(list_to_insert=list_to_insert,
                                     force_overwrite=force_overwrite,
                                     _type_managed=True)
         for item in list_to_insert:
@@ -996,7 +996,7 @@ class RunDAO(dao.RunDAO):
         """
         with BatchQuery() as batch:
             schema.Run.objects(id=id).batch(batch).delete()
-            self.record_DAO._setup_batch_delete(batch, id)
+            self.record_dao._setup_batch_delete(batch, id)
 
     def delete_many(self, ids_to_delete):
         """
@@ -1011,7 +1011,7 @@ class RunDAO(dao.RunDAO):
         with BatchQuery() as batch:
             for id in ids_to_delete:
                 schema.Run.objects(id=id).batch(batch).delete()
-                self.record_DAO._setup_batch_delete(batch, id)
+                self.record_dao._setup_batch_delete(batch, id)
 
     def get(self, id):
         """
@@ -1071,7 +1071,7 @@ class DAOFactory(dao.DAOFactory):
         self.node_ip_list = node_ip_list
         schema.form_connection(keyspace, node_ip_list=self.node_ip_list)
 
-    def createRecordDAO(self):
+    def create_record_dao(self):
         """
         Create a DAO for interacting with records.
 
@@ -1079,7 +1079,7 @@ class DAOFactory(dao.DAOFactory):
         """
         return RecordDAO()
 
-    def createRelationshipDAO(self):
+    def create_relationship_dao(self):
         """
         Create a DAO for interacting with relationships.
 
@@ -1087,13 +1087,13 @@ class DAOFactory(dao.DAOFactory):
         """
         return RelationshipDAO()
 
-    def createRunDAO(self):
+    def create_run_dao(self):
         """
         Create a DAO for interacting with runs.
 
         :returns: a RunDAO
         """
-        return RunDAO(record_DAO=self.createRecordDAO())
+        return RunDAO(record_dao=self.create_record_dao())
 
     def __repr__(self):
         """Return a string representation of a Cassandra DAOFactory."""

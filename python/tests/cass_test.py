@@ -55,7 +55,7 @@ class CassandraMixin():
     # These have to be classmethods because they're called before instantiation
     # (See TestQuery)
     @classmethod
-    def create_DAOFactory(cls, keyspace=TEMP_KEYSPACE_NAME, test_db_dest=TESTING_IPS):
+    def create_dao_factory(cls, keyspace=TEMP_KEYSPACE_NAME, test_db_dest=TESTING_IPS):
         """Create a DAO for the Cassandra backend."""
         return backend.DAOFactory(keyspace=keyspace, node_ip_list=test_db_dest)
 
@@ -105,7 +105,7 @@ class TestSetup(CassandraMixin, tests.backend_test.TestSetup):
     def test_factory_production(self, mock_form_conn):
         """Test to ensure Cassandra DAO can connect to non-local IPs."""
         ip_list = ['192.168.1.2:9042']
-        factory = self.create_DAOFactory(test_db_dest=ip_list)
+        factory = self.create_dao_factory(test_db_dest=ip_list)
         args, kwargs = mock_form_conn.call_args
         self.assertEqual(args[0], TEMP_KEYSPACE_NAME)
         self.assertEqual(kwargs['node_ip_list'], ip_list)
@@ -147,16 +147,16 @@ class TestQuery(CassandraMixin, tests.backend_test.TestQuery):
     def setUpClass(cls):
         """Create the connection and populate it."""
         cls.create_cass_keyspace()
-        cls.factory = cls.create_DAOFactory()
-        cls.record_dao = cls.factory.createRecordDAO()
-        cls.run_dao = cls.factory.createRunDAO()
-        cls.relationship_dao = cls.factory.createRelationshipDAO()
+        cls.factory = cls.create_dao_factory()
+        cls.record_dao = cls.factory.create_record_dao()
+        cls.run_dao = cls.factory.create_run_dao()
+        cls.relationship_dao = cls.factory.create_relationship_dao()
         tests.backend_test.populate_database_with_data(cls.record_dao)
 
     @classmethod
-    def tearDownClass(self):
+    def tearDownClass(cls):
         """Remove connections and keyspaces as needed."""
-        self.teardown_cass_keyspace()
+        cls.teardown_cass_keyspace()
 
 
 @attr('cassandra')

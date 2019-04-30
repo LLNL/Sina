@@ -194,10 +194,10 @@ class TestSinaUtils(unittest.TestCase):
 
     def test_invert_ranges_one_range(self):
         """Test that we correctly invert a single DataRange."""
-        range = DataRange(min=2, max=4)
+        data_range = DataRange(min=2, max=4)
         opposite_ranges = [DataRange(max=2, max_inclusive=False),
                            DataRange(min=4, min_inclusive=True)]
-        self.assertEqual(sina.utils.invert_ranges([range]), opposite_ranges)
+        self.assertEqual(sina.utils.invert_ranges([data_range]), opposite_ranges)
 
     def test_invert_ranges_one_range_zeroes(self):
         """
@@ -205,10 +205,10 @@ class TestSinaUtils(unittest.TestCase):
 
         Checks for correct behavior on range bounds that are "Falsey" (ex: zero).
         """
-        range = DataRange(min=0, max=0, max_inclusive=True)
+        data_range = DataRange(min=0, max=0, max_inclusive=True)
         opposite_ranges = [DataRange(max=0),
                            DataRange(min=0, min_inclusive=False)]
-        self.assertEqual(sina.utils.invert_ranges([range]), opposite_ranges)
+        self.assertEqual(sina.utils.invert_ranges([data_range]), opposite_ranges)
 
     def test_invert_ranges_many_ranges(self):
         """Test that we correctly invert multiple DataRanges."""

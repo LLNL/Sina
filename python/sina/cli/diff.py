@@ -53,12 +53,12 @@ def print_diff_records(record_one, record_two, significant_digits=None):
             attribute_removed +
             repetition_change)
     data_list = []
-    for d in data:
-        key = d[0].path().strip('root')
+    for datum in data:
+        key = datum[0].path().strip('root')
         if key == "['id']":
             continue
-        id_one_output = d[0].t1
-        id_two_output = d[0].t2
+        id_one_output = datum[0].t1
+        id_two_output = datum[0].t2
         data_list.append([key, id_one_output, id_two_output])
     data_list.sort()
     data_list = [titles] + data_list

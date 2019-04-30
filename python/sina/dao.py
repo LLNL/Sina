@@ -18,7 +18,7 @@ class DAOFactory(object):
     supports_parallel_ingestion = False
 
     @abstractmethod
-    def createRecordDAO():
+    def create_record_dao():
         """
         Create a DAO for interacting with Records.
 
@@ -27,7 +27,7 @@ class DAOFactory(object):
         raise NotImplementedError
 
     @abstractmethod
-    def createRelationshipDAO():
+    def create_relationship_dao():
         """
         Create a DAO for interacting with Relationships.
 
@@ -36,7 +36,7 @@ class DAOFactory(object):
         raise NotImplementedError
 
     @abstractmethod
-    def createRunDAO():
+    def create_run_dao():
         """
         Create a DAO for interacting with Runs.
 
@@ -341,14 +341,14 @@ class RunDAO(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, record_DAO):
+    def __init__(self, record_dao):
         """
         Initialize RunDAO with contained RecordDAO and backend.
 
-        :param record_DAO: A RecordDAO used to interact with the Record table
+        :param record_dao: A RecordDAO used to interact with the Record table
         :param backend: The DAO's backend (ex: filepath, SQLite session)
         """
-        self.record_DAO = record_DAO
+        self.record_dao = record_dao
 
     @abstractmethod
     def get(self, id):
@@ -431,7 +431,7 @@ class RunDAO(object):
         """
         # Collapsed TODO down, we can reindex on type
         # NYI in Cassandra
-        return self.record_DAO.get_all_of_type('run', ids_only)
+        return self.record_dao.get_all_of_type('run', ids_only)
 
     def data_query(self, **kwargs):
         """
@@ -444,7 +444,7 @@ class RunDAO(object):
         run_gen = self.get_all(ids_only=True)
         if run_gen is None:
             return
-        matched_records = set(self.record_DAO.data_query(**kwargs))
+        matched_records = set(self.record_dao.data_query(**kwargs))
         if matched_records:
             for run in run_gen:
                 if run in matched_records:
@@ -464,7 +464,7 @@ class RunDAO(object):
 
         :returns: A generator of Runs fitting the criteria
         """
-        records = self.record_DAO.get_given_document_uri(uri)
+        records = self.record_dao.get_given_document_uri(uri)
         if records:
             for record in records:
                 if record.type == "run":

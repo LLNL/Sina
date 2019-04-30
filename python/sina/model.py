@@ -180,9 +180,9 @@ class Record(object):
             if (entry.get("tags") and
                     (isinstance(entry.get("tags"), six.string_types) or
                      not isinstance(entry.get("tags"), collections.Sequence))):
-                    (warnings.append("At least one file entry belonging to "
-                                     "Record {} has a malformed tag list. File: {}"
-                                     .format(self.id, entry)))
+                (warnings.append("At least one file entry belonging to "
+                                 "Record {} has a malformed tag list. File: {}"
+                                 .format(self.id, entry)))
 
         if not isinstance(self.data, dict):
             (warnings.append("Record {}'s data field must be a dictionary!"
@@ -206,8 +206,8 @@ class Record(object):
                          scalar_index,
                          string_index) = _is_valid_list(
                              list_of_data=self.data[entry]["value"])
-                    except ValueError as e:
-                        warnings.append(str(e))
+                    except ValueError as context:
+                        warnings.append(str(context))
                         break
                     if not validated_list:
                         (warnings.append(
@@ -380,8 +380,8 @@ def generate_record_from_json(json_input):
                         user_defined=json_input.get('user_defined'),
                         data=json_input.get('data'),
                         files=json_input.get('files'))
-    except KeyError as e:
-        msg = 'Missing required key <{}>.'.format(e)
+    except KeyError as context:
+        msg = 'Missing required key <{}>.'.format(context)
         LOGGER.error(msg)
         raise ValueError(msg)
     # Then set raw to json_input to grab any additional information.
@@ -408,8 +408,8 @@ def generate_run_from_json(json_input):
                   application=json_input['application'],
                   data=json_input.get('data'),
                   files=json_input.get('files'))
-    except KeyError as e:
-        msg = 'Missing required key <{}>.'.format(e)
+    except KeyError as context:
+        msg = 'Missing required key <{}>.'.format(context)
         LOGGER.error(msg)
         raise ValueError(msg)
     # Then set raw to json_input to grab any additional information.

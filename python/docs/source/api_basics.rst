@@ -32,7 +32,7 @@ special Record types, and Relationships. For a simple demonstration::
   import sina.datastores.sql as sina_sql
 
   factory = sina_sql.DAOFactory(db_path="somefile.sqlite")
-  record_dao = factory.createRecordDAO()
+  record_dao = factory.create_record_dao()
   all_sruns = record_dao.get_all_of_type("srun")
 
 This would set :code:`all_sruns` to a list of all the records contained in
@@ -45,7 +45,7 @@ between supported backends::
   import sina.datastores.cass as sina_cass
 
   factory=sina_cass.DAOFactory(keyspace="sruns_only")
-  record_dao = factory.createRecordDAO()
+  record_dao = factory.create_record_dao()
   record_dao.insert_many(all_sruns)
 
 This would result in a keyspace (essentially a Cassandra database)
@@ -253,7 +253,7 @@ Inserting objects is otherwise straightforward::
                                    "units": "ms"}
 
   my_other_record = Record("another_id", "some_type")
-  record_dao = factory.createRecordDAO()
+  record_dao = factory.create_record_dao()
   record_dao.insert_many([my_record, my_other_record])
 
   my_run = Run(id="some_run_id",
@@ -262,7 +262,7 @@ Inserting objects is otherwise straightforward::
                data={"oof": {"value": 21}},
                files=[{"uri":"bar/baz.qux"}])
 
-  run_dao = factory.createRunDAO()
+  run_dao = factory.create_run_dao()
   run_dao.insert(my_run)
 
 Note that the (sub)type of Record is important--use the right constructor and

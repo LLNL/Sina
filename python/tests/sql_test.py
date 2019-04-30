@@ -19,7 +19,7 @@ class SQLMixin():
     # This has to be a classmethod because it's called before instantiation
     # (See TestQuery)
     @classmethod
-    def create_DAOFactory(cls, test_db_dest=None):
+    def create_dao_factory(cls, test_db_dest=None):
         """Create a DAO for the SQL backend."""
         return backend.DAOFactory(test_db_dest)
 
@@ -46,7 +46,7 @@ class TestSetup(SQLMixin, tests.backend_test.TestSetup):
 
     def test_factory_instantiate_file(self):
         """Test to ensure SQL DAOFactory is able to create files."""
-        self.create_DAOFactory(self.test_db_dest)
+        self.create_dao_factory(self.test_db_dest)
         self.assertTrue(os.path.isfile(self.test_db_dest))
 
 
@@ -85,10 +85,10 @@ class TestQuery(SQLMixin, tests.backend_test.TestQuery):
     @classmethod
     def setUpClass(cls):
         """Create the connection and populate it."""
-        cls.factory = cls.create_DAOFactory()
-        cls.record_dao = cls.factory.createRecordDAO()
-        cls.run_dao = cls.factory.createRunDAO()
-        cls.relationship_dao = cls.factory.createRelationshipDAO()
+        cls.factory = cls.create_dao_factory()
+        cls.record_dao = cls.factory.create_record_dao()
+        cls.run_dao = cls.factory.create_run_dao()
+        cls.relationship_dao = cls.factory.create_relationship_dao()
         tests.backend_test.populate_database_with_data(cls.record_dao)
 
 

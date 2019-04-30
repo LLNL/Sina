@@ -86,21 +86,20 @@ def import_json(factory, json_path):
                 # Save the UUID to be used for record generation
                 entry['id'] = id
             except KeyError:
-                raise ValueError("Record requires one of: local_id, id: {}"
-                                 .format(entry))
+                raise ValueError("Record requires one of: local_id, id: {}".format(entry))
         if type == 'run':
             runs.append(model.generate_run_from_json(json_input=entry))
         else:
             records.append(model.generate_record_from_json(json_input=entry))
-    factory.createRunDAO().insert_many(runs)
-    factory.createRecordDAO().insert_many(records)
+    factory.create_run_dao().insert_many(runs)
+    factory.create_record_dao().insert_many(records)
     relationships = []
     for entry in data.get('relationships', []):
         subj, obj = _process_relationship_entry(entry=entry, local_ids=local)
         relationships.append(model.Relationship(subject_id=subj,
                                                 object_id=obj,
                                                 predicate=entry['predicate']))
-    factory.createRelationshipDAO().insert_many(relationships)
+    factory.create_relationship_dao().insert_many(relationships)
 
 
 def _process_relationship_entry(entry, local_ids):
@@ -293,7 +292,7 @@ def export(factory, id_list, scalar_names, output_type, output_file=None):
                        '.csv')
         LOGGER.debug('Using default output file: %s.', output_file)
     data_to_export = OrderedDict()
-    record_dao = factory.createRecordDAO()
+    record_dao = factory.create_record_dao()
     for id in id_list:
         data_to_export[id] = record_dao.get_scalars(id=id,
                                                     scalar_names=scalar_names)
@@ -478,8 +477,8 @@ def create_file(path):
                 LOGGER.error(msg)
                 raise OSError(msg)
         # Make file
-        with open(path, 'a+') as f:
-            f.close()
+        with open(path, 'a+') as output_file:
+            output_file.close()
 
 
 def get_example_path(relpath, suffix="-new",
@@ -860,7 +859,7 @@ class DataRange(object):
         """
         LOGGER.debug('Setting min of range: %s', min_range)
         if not min_range[0] in ['(', '[']:
-            raise ValueError("Bad inclusiveness specifier for range: {}",
+            raise ValueError("Bad inclusiveness specifier for range: {}".
                              format(min_range[0]))
         if len(min_range) > 1:
             self.min_inclusive = min_range[0] == '['
@@ -892,8 +891,7 @@ class DataRange(object):
         """
         LOGGER.debug('Setting max of range: %s', max_range)
         if not max_range[-1] in [')', ']']:
-            raise ValueError("Bad inclusiveness specifier for range: {}",
-                             format(max_range[-1]))
+            raise ValueError("Bad inclusiveness specifier for range: {}".format(max_range[-1]))
         if len(max_range) > 1:
             self.max_inclusive = max_range[-1] == ']'
             # We can take strings, but here we're already taking a string.

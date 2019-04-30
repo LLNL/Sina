@@ -13,7 +13,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
     def setUp(self):
         """Set up data for testing get_list."""
         factory = sina_sql.DAOFactory()
-        self.record_dao = factory.createRecordDAO()
+        self.record_dao = factory.create_record_dao()
         data = {"eggs": {"value": [0, 1, 2, 3]}}
         data_2 = {"eggs": {"value": [1, 2, 3, 4, 5]}}
         data_3 = {"eggs": {"value": [4, 5, 6, 7]}}

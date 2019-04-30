@@ -22,7 +22,7 @@ SQLITE = "sqlite:///"
 
 # Parameter offsets used when combining queries across tables
 # see _apply_ranges_to_query() for usage
-param_offsets = {schema.ScalarData: "",
+PARAM_OFFSETS = {schema.ScalarData: "",
                  schema.StringData: "_1",
                  schema.ListScalarDataEntry: "_2",
                  schema.ListStringDataEntry: "_3"}
@@ -210,8 +210,8 @@ class RecordDAO(dao.RecordDAO):
             result_ids.append(str(x[0]) for x in scalar_query.all())
         elif string_criteria:
             result_ids.append(str(x[0]) for x in string_query.all())
-        for criteria, table_type in ((scalarlist, "scalarlist"),
-                                     (stringlist, "stringlist")):
+        for criteria, _ in ((scalarlist, "scalarlist"),
+                            (stringlist, "stringlist")):
             for criterion in criteria:
                 # Unpack the criterion
                 datum_name, list_criteria = criterion
@@ -220,11 +220,11 @@ class RecordDAO(dao.RecordDAO):
                         [utils.ListQueryOperation.ALL,
                          utils.ListQueryOperation.ANY,
                          utils.ListQueryOperation.ONLY]):
-                        ids = self.get_list(datum_name=datum_name,
-                                            list_of_contents=list_criteria.entries,
-                                            ids_only=True,
-                                            operation=list_criteria.operation)
-                        result_ids.append(ids)
+                    ids = self.get_list(datum_name=datum_name,
+                                        list_of_contents=list_criteria.entries,
+                                        ids_only=True,
+                                        operation=list_criteria.operation)
+                    result_ids.append(ids)
                 else:
                     raise ValueError("Currently, only [{}, {}, {}] list "
                                      "operations are supported. Given {}"
@@ -272,8 +272,8 @@ class RecordDAO(dao.RecordDAO):
         query = (self.session.query(schema.Record.id)
                  .filter(schema.Record.type == type))
         if ids_only:
-            for x in query.all():
-                yield str(x[0])
+            for record_id in query.all():
+                yield str(record_id[0])
         else:
             filtered_ids = (str(x[0]) for x in query.all())
             for record in self.get_many(filtered_ids):
@@ -414,8 +414,8 @@ class RecordDAO(dao.RecordDAO):
             query = query.filter(schema.Document
                                  .id.in_(accepted_ids_list))
         if ids_only:
-            for x in query.all():
-                yield x[0]
+            for record_id in query.all():
+                yield record_id[0]
         else:
             filtered_ids = (x[0] for x in query.all())
             for record in self.get_many(filtered_ids):
@@ -456,7 +456,7 @@ class RecordDAO(dao.RecordDAO):
         # Performing an intersection on two SQLAlchemy queries, as in data_query(),
         # causes their parameters to merge and overwrite any shared names.
         # Here, we guarantee our params will have unique names per table.
-        offset = param_offsets[table]
+        offset = PARAM_OFFSETS[table]
         for index, (name, criteria) in enumerate(data):
             range_components.append((name, criteria, index))
             search_args["name{}{}".format(index, offset)] = name
@@ -529,7 +529,7 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Building TextClause filter for data "%s" with criteria'
                      '<%s> and index=%s.', name, criteria, index)
-        offset = param_offsets[table]
+        offset = PARAM_OFFSETS[table]
         # SQLAlchemy's methods for substituting in table names are convoluted.
         # A much simpler, clearer method:
         if table == schema.ScalarData:
@@ -788,11 +788,11 @@ class RelationshipDAO(dao.RelationshipDAO):
 class RunDAO(dao.RunDAO):
     """DAO responsible for handling Runs, (Record subtype), in SQL."""
 
-    def __init__(self, session, recordDAO):
+    def __init__(self, session, record_dao):
         """Initialize RunDAO and assign a contained RecordDAO."""
-        super(RunDAO, self).__init__(recordDAO)
+        super(RunDAO, self).__init__(record_dao)
         self.session = session
-        self.record_DAO = recordDAO
+        self.record_dao = record_dao
 
     def insert(self, run):
         """
@@ -800,7 +800,7 @@ class RunDAO(dao.RunDAO):
 
         :param run: A Run to import
         """
-        self.record_DAO.insert(run, called_from_child=True)
+        self.record_dao.insert(run, called_from_child=True)
         self.session.add(schema.Run(id=run.id,
                                     application=run.application,
                                     user=run.user,
@@ -829,7 +829,7 @@ class RunDAO(dao.RunDAO):
 
         :param id: The id of the Run to delete.
         """
-        self.record_DAO.delete(id)
+        self.record_dao.delete(id)
 
     def delete_many(self, ids_to_delete):
         """
@@ -837,7 +837,7 @@ class RunDAO(dao.RunDAO):
 
         :param ids_to_delete: A list of the ids of Runs to delete.
         """
-        self.record_DAO.delete_many(ids_to_delete)
+        self.record_dao.delete_many(ids_to_delete)
 
     def _convert_record_to_run(self, record):
         """
@@ -896,7 +896,7 @@ class DAOFactory(dao.DAOFactory):
         session = sqlalchemy.orm.sessionmaker(bind=engine)
         self.session = session()
 
-    def createRecordDAO(self):
+    def create_record_dao(self):
         """
         Create a DAO for interacting with records.
 
@@ -904,7 +904,7 @@ class DAOFactory(dao.DAOFactory):
         """
         return RecordDAO(session=self.session)
 
-    def createRelationshipDAO(self):
+    def create_relationship_dao(self):
         """
         Create a DAO for interacting with relationships.
 
@@ -912,14 +912,14 @@ class DAOFactory(dao.DAOFactory):
         """
         return RelationshipDAO(session=self.session)
 
-    def createRunDAO(self):
+    def create_run_dao(self):
         """
         Create a DAO for interacting with runs.
 
         :returns: a RunDAO
         """
         return RunDAO(session=self.session,
-                      recordDAO=self.createRecordDAO())
+                      record_dao=self.create_record_dao())
 
     def __repr__(self):
         """Return a string representation of a SQL DAOFactory."""

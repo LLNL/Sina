@@ -27,15 +27,15 @@ import sina.datastores.sql as sql
 try:
     from cassandra.cluster import Cluster
     import sina.datastores.cass as cass
-    cassandra_present = True
+    CASSANDRA_PRESENT = True
 except ImportError:
-    cassandra_present = False
+    CASSANDRA_PRESENT = False
 
 try:
     import sina.cli.diff
-    cli_tools_present = True
+    CLI_TOOLS_PRESENT = True
 except ImportError:
-    cli_tools_present = False
+    CLI_TOOLS_PRESENT = False
 
 ROOTLOGGER = logging.getLogger(inspect.getmodule(__name__))
 LOGGER = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ def setup_arg_parser():
     add_ingest_subparser(subparsers)
     add_export_subparser(subparsers)
     add_query_subparser(subparsers)
-    if cli_tools_present:
+    if CLI_TOOLS_PRESENT:
         add_compare_subparser(subparsers)
     return parser
 
@@ -243,7 +243,7 @@ def _validate_cassandra_args(args):
     :returns: A list of any issues encountered.
     """
     error_message = []
-    if not cassandra_present:
+    if not CASSANDRA_PRESENT:
         error_message.append("The Cassandra driver has not been installed; "
                              "no Cassandra functionality is available.")
     if not args.cass_keyspace:
@@ -277,17 +277,17 @@ def setup_logging(args):
     ROOTLOGGER.setLevel(loglevel)
 
     # Setup file handler
-    fh = logging.FileHandler(logpath)
-    fh.setLevel(loglevel)
-    fh.setFormatter(formatter)
-    ROOTLOGGER.addHandler(fh)
+    file_handler = logging.FileHandler(logpath)
+    file_handler.setLevel(loglevel)
+    file_handler.setFormatter(formatter)
+    ROOTLOGGER.addHandler(file_handler)
 
     if args.stdout:
         # Add the StreamHandler
-        sh = logging.StreamHandler()
-        sh.setLevel(loglevel)
-        sh.setFormatter(formatter)
-        ROOTLOGGER.addHandler(sh)
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(loglevel)
+        stream_handler.setFormatter(formatter)
+        ROOTLOGGER.addHandler(stream_handler)
 
     LOGGER.info("-------------------------STARTING-------------------------")
     LOGGER.info("INFO Logging Level -- Enabled")
@@ -407,7 +407,7 @@ def query(args):
                    .execute(args.raw)])
 
     # For all non-raw queries, we go through the DAO.
-    record_dao = _make_factory(args=args).createRecordDAO()
+    record_dao = _make_factory(args=args).create_record_dao()
     matches = []
     if args.scalar:
         data_args = parse_data_string(args.scalar)
@@ -442,7 +442,7 @@ def compare_records(args):
         msg = "\n".join(error_message)
         LOGGER.error(msg)
         raise ValueError(msg)
-    record_dao = _make_factory(args=args).createRecordDAO()
+    record_dao = _make_factory(args=args).create_record_dao()
     try:
         record_one = record_dao.get(args.id_one)
         try:
@@ -575,8 +575,8 @@ def main():
             msg = 'No supported args given: {}'.format(args)
             LOGGER.error(msg)
             raise ValueError(msg)
-    except (IOError, ValueError, TypeError) as e:
-        LOGGER.exception('Problem with CLI command: %s, full stacktrace written to log', e)
+    except (IOError, ValueError, TypeError) as context:
+        LOGGER.exception('Problem with CLI command: %s, full stacktrace written to log', context)
     LOGGER.info('Exiting program.')
 
 

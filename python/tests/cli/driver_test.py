@@ -56,7 +56,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(mock_args['json_path'], self.args.source)
 
     @attr('cassandra')
-    @patch('sina.driver.import_json', return_value=True)
+    @patch('sina.cli.driver.import_json', return_value=True)
     @patch('sina.datastores.cass.schema.form_connection', return_value=True)
     def test_ingest_json_cass(self, mock_connect, mock_import):
         """Verify CLI fetches and feeds json to the importer (cass)."""
@@ -84,9 +84,9 @@ class TestCLI(unittest.TestCase):
                                  "../test_files/mnoda_1.json")
         factory = sina_sql.DAOFactory()
         import_json(factory=factory, json_path=test_json)
-        local_rec = list(factory.createRecordDAO().get_all_of_type("eggs"))
+        local_rec = list(factory.create_record_dao().get_all_of_type("eggs"))
         global_id = local_rec[0].id
-        relationship = (factory.createRelationshipDAO()._get_given_object_id(global_id))
+        relationship = (factory.create_relationship_dao()._get_given_object_id(global_id))
         self.assertEqual(len(relationship), 1)
         # Tested relationship: (local_id is local_id). makes sure local
         # subjects and objects are both replaced correctly

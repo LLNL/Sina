@@ -3,10 +3,10 @@
 
 from setuptools import setup, find_packages
 
-version = __import__('sina').get_version()
+VERSION = __import__('sina').get_version()
 
 setup(name='sina',
-      version=version,
+      version=VERSION,
       author='Siboka Team',
       author_email='siboka@llnl.gov',
       packages=find_packages(),
