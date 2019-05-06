@@ -32,7 +32,7 @@ INITIAL_KEYSPACE_NAME = "system_traces"
 TEMP_KEYSPACE_NAME = "temp_keyspace_testing_sina"
 
 # Provided in case tests need to be run on a specific machine. Normally localhost is used.
-TESTING_IPS = ['127.0.0.1']
+TESTING_IPS = ('127.0.0.1',)
 
 
 if TERSIFY_CASSANDRA_LOGGER:
@@ -40,10 +40,12 @@ if TERSIFY_CASSANDRA_LOGGER:
 
 
 @attr('cassandra')
-class CassandraMixin():
+# Mixin class, has no use for an __init__.
+# pylint: disable=no-init
+class CassandraMixin(object):
     """Contains the methods shared between all test classes."""
 
-    _test__ = False
+    __test__ = False
     # Ensure the selected backend is passed to child tests.
     try:
         # Nose will still hit this line even when not running Cassandra tests. If

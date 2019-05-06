@@ -86,6 +86,17 @@ class TestSetup(unittest.TestCase):
     # The runnable versions of the tests are provided in backend_specific files (sql_test.py, etc)
     __test__ = False
 
+    def setUp(self):
+        """
+        Set up info needed for each Setup test.
+
+        Attributes must be set to appropriate (backend-specific) values by
+        child.
+        """
+        self.backend = None
+        self.test_db_dest = None
+        raise NotImplementedError
+
     # DAOFactory
     def test_factory_instantiate(self):
         """Test to ensure DAOFactories can be created.
@@ -96,6 +107,10 @@ class TestSetup(unittest.TestCase):
         factory = self.create_dao_factory()
         self.assertIsInstance(factory, self.backend.DAOFactory)
         self.assertFalse(os.path.isfile(self.test_db_dest))
+
+    def create_dao_factory(self):
+        """Create the DAO to run Setup tests. Must be implemented by child."""
+        raise NotImplementedError
 
 
 class TestModify(unittest.TestCase):
@@ -109,6 +124,28 @@ class TestModify(unittest.TestCase):
 
     __test__ = False
 
+    def setUp(self):
+        """
+        Set up info needed for each Modify test.
+
+        Attributes must be set to appropriate (backend-specific) values by
+        child.
+
+        param test_db_dest: The database tests will target for modification.
+        """
+        self.test_db_dest = None
+        raise NotImplementedError
+
+    def create_dao_factory(self, test_db_dest=None):
+        """
+        Create the DAO to run Modify tests.
+
+        Must be implemented by child, likely via its mixin class (ex: SQLMixin).
+
+        param test_db_dest: The database that the DAOFactory should target.
+        """
+        raise NotImplementedError
+
     def test_recorddao_insert_retrieve(self):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = self.create_dao_factory().create_record_dao()
@@ -120,18 +157,18 @@ class TestModify(unittest.TestCase):
         returned_record = record_dao.get("spam")
         # TODO: Done in place of Record equivalence, which hasn't been implemented.
         # Done instead of __dict__ to make it clearer what part fails (if any)
-        self.assertEquals(returned_record.id, rec.id)
-        self.assertEquals(returned_record.type, rec.type)
-        self.assertEquals(returned_record.data, rec.data)
-        self.assertEquals(returned_record.files, rec.files)
-        self.assertEquals(returned_record.user_defined, rec.user_defined)
+        self.assertEqual(returned_record.id, rec.id)
+        self.assertEqual(returned_record.type, rec.type)
+        self.assertEqual(returned_record.data, rec.data)
+        self.assertEqual(returned_record.files, rec.files)
+        self.assertEqual(returned_record.user_defined, rec.user_defined)
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
         record_dao = self.create_dao_factory(test_db_dest=self.test_db_dest).create_record_dao()
         record_dao.insert(Record(id="rec_1", type="sample"))
         record_dao.delete("rec_1")
-        self.assertEquals(list(record_dao.get_all_of_type("sample")), [])
+        self.assertEqual(list(record_dao.get_all_of_type("sample")), [])
 
     def test_recorddao_delete_data_cascade(self):
         """Test that deletion of a Record correctly cascades to data and files."""
@@ -145,10 +182,10 @@ class TestModify(unittest.TestCase):
         # Make sure the data, raw, files, and relationships were deleted as well
         dead_data = record_dao.get_data_for_records(id_list=["rec_1"],
                                                     data_list=["eggs", "flavor"])
-        self.assertEquals(dead_data, {})
+        self.assertEqual(dead_data, {})
         dead_files = list(record_dao.get_given_document_uri("justheretoexist.png",
                                                             ids_only=True))
-        self.assertEquals(dead_files, [])
+        self.assertEqual(dead_files, [])
 
     def test_recorddao_delete_one_with_relationship(self):
         """Test that RecordDAO deletions include relationships."""
@@ -164,7 +201,7 @@ class TestModify(unittest.TestCase):
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
         # rec_2 should not be deleted
         remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
-        self.assertEquals(remaining_records, ["rec_2"])
+        self.assertEqual(remaining_records, ["rec_2"])
 
     def test_recorddao_delete_many(self):
         """Test that RecordDAO can delete many at once."""
@@ -184,19 +221,19 @@ class TestModify(unittest.TestCase):
         # Delete several
         record_dao.delete_many(["rec_1", "rec_2", "rec_3"])
         remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
-        self.assertEquals(remaining_records, ["rec_4"])
+        self.assertEqual(remaining_records, ["rec_4"])
 
         # Make sure expected data entries were deleted as well (acts as cascade test)
         for_all = record_dao.get_data_for_records(id_list=all_ids,
                                                   data_list=["eggs", "flavor"])
         for_one = record_dao.get_data_for_records(id_list=["rec_4"],
                                                   data_list=["eggs", "flavor"])
-        self.assertEquals(for_all, for_one)
+        self.assertEqual(for_all, for_one)
 
         # Make sure expected Relationships were deleted
         self.assertFalse(relationship_dao.get(object_id="rec_2"))
         self.assertFalse(relationship_dao.get(subject_id="rec_3"))
-        self.assertEquals(len(relationship_dao.get(object_id="rec_4")), 1)
+        self.assertEqual(len(relationship_dao.get(object_id="rec_4")), 1)
 
     # RelationshipDAO
     # TODO: There's no delete method for Relationships.
@@ -210,9 +247,9 @@ class TestModify(unittest.TestCase):
         for relationship_list in (subj, pred):
             result = relationship_list[0]
             # TODO: Used in place of Relationship equality.
-            self.assertEquals(result.subject_id, relationship.subject_id)
-            self.assertEquals(result.object_id, relationship.object_id)
-            self.assertEquals(result.predicate, relationship.predicate)
+            self.assertEqual(result.subject_id, relationship.subject_id)
+            self.assertEqual(result.object_id, relationship.object_id)
+            self.assertEqual(result.predicate, relationship.predicate)
 
     def test_relationshipdao_insert_compound_retrieve(self):
         """Test that RelationshipDAO's multi-criteria getter is working correctly."""
@@ -226,9 +263,9 @@ class TestModify(unittest.TestCase):
                                     predicate=relationship.predicate)
         for relationship_list in (obj_pred, full):
             result = relationship_list[0]
-            self.assertEquals(result.subject_id, relationship.subject_id)
-            self.assertEquals(result.object_id, relationship.object_id)
-            self.assertEquals(result.predicate, relationship.predicate)
+            self.assertEqual(result.subject_id, relationship.subject_id)
+            self.assertEqual(result.object_id, relationship.object_id)
+            self.assertEqual(result.predicate, relationship.predicate)
 
     def test_relationshipdao_bad_insert(self):
         """Test that the RelationshipDAO refuses to insert malformed relationships."""
@@ -251,13 +288,13 @@ class TestModify(unittest.TestCase):
         run_dao.insert(run)
         returned_run = run_dao.get("spam")
         # TODO: Used in place of Run equality
-        self.assertEquals(returned_run.id, run.id)
-        self.assertEquals(returned_run.raw, run.raw)
-        self.assertEquals(returned_run.application, run.application)
-        self.assertEquals(returned_run.user, run.user)
-        self.assertEquals(returned_run.user_defined, run.user_defined)
-        self.assertEquals(returned_run.version, run.version)
-        self.assertEquals(returned_run.data, run.data)
+        self.assertEqual(returned_run.id, run.id)
+        self.assertEqual(returned_run.raw, run.raw)
+        self.assertEqual(returned_run.application, run.application)
+        self.assertEqual(returned_run.user, run.user)
+        self.assertEqual(returned_run.user_defined, run.user_defined)
+        self.assertEqual(returned_run.version, run.version)
+        self.assertEqual(returned_run.data, run.data)
 
     def test_rundao_delete(self):
         """Test that RunDAO is deleting correctly."""
@@ -269,11 +306,11 @@ class TestModify(unittest.TestCase):
         run_dao.insert_many([run_1, run_2])
         relationship_dao.insert(subject_id="run_1", object_id="run_2", predicate="dupes")
         # Ensure there's two entries in the Run table
-        self.assertEquals(len(list(run_dao.get_all(ids_only=True))), 2)
+        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 2)
         # Delete one
         run_dao.delete("run_1")
         # Now there should only be one Run left
-        self.assertEquals(len(list(run_dao.get_all(ids_only=True))), 1)
+        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
         # The Relationship should be removed as well
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
 
@@ -286,6 +323,21 @@ class TestQuery(unittest.TestCase):
     """
 
     __test__ = False
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Initialize variables shared between Query tests.
+
+        Class method to avoid it being re-run per test. Attributes must be set
+        to appropriate (backend-specific) values by child.
+
+        :param record_dao: A RecordDAO to perform queries.
+        :param run_dao: A RunDAO to perform queries.
+        """
+        cls.record_dao = None
+        cls.run_dao = None
+        raise NotImplementedError
 
     # Due to the length of this section of tests, tests dealing with specific
     # methods are separated by headers.
@@ -640,6 +692,26 @@ class TestImportExport(unittest.TestCase):
 
     __test__ = False
 
+    def create_dao_factory(self):
+        """
+        Create the DAO to run Import/Export tests.
+
+        Must be implemented by child, likely via its mixin class (ex: SQLMixin).
+        """
+        raise NotImplementedError
+
+    def setUp(self):
+        """
+        Set up info needed for each Import/Export test.
+
+        Attributes must be set to appropriate (backend-specific) values by
+        child.
+
+        :param test_file_path: The path to a test file.
+        """
+        self.test_file_path = None
+        raise NotImplementedError
+
     # Importing
     def test_full_import(self):
         """
@@ -656,18 +728,18 @@ class TestImportExport(unittest.TestCase):
         run_factory = factory.create_run_dao()
         child = run_factory.get("child_1")
         canonical = json.load(open(json_path))
-        self.assertEquals(canonical['records'][0]['type'], parent.type)
-        self.assertEquals(canonical['records'][1]['application'],
-                          child.application)
+        self.assertEqual(canonical['records'][0]['type'], parent.type)
+        self.assertEqual(canonical['records'][1]['application'],
+                         child.application)
         child_from_uri = list(run_factory.get_given_document_uri("foo.png"))
         child_from_scalar_id = list(run_factory.data_query(scalar_1=387.6))
         full_record = run_factory.get(child_from_scalar_id[0])
-        self.assertEquals(canonical['records'][1]['application'],
-                          full_record.application)
-        self.assertEquals(child.id, child_from_uri[0].id)
-        self.assertEquals(child.id, full_record.id)
-        self.assertEquals(canonical['relationships'][0]['predicate'],
-                          relation[0].predicate)
+        self.assertEqual(canonical['records'][1]['application'],
+                         full_record.application)
+        self.assertEqual(child.id, child_from_uri[0].id)
+        self.assertEqual(child.id, full_record.id)
+        self.assertEqual(canonical['relationships'][0]['predicate'],
+                         relation[0].predicate)
 
     # Exporting
     @patch('sina.utils._export_csv')

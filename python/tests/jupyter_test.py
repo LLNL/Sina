@@ -1,5 +1,7 @@
-"""
-Tests for example Jupyter Notebooks, which include:
+r"""
+Tests for example Jupyter Notebooks.
+
+Testing notebooks includes:
 - executing them on the default or, if relevant, a test database; and
 - performing flake8 checks on them.
 
@@ -131,7 +133,6 @@ def _execute_notebook(path):
             errors.append('{}: {}: Writing {}: {}'.
                           format(_exception.__class__.__name__, SINA_KERNEL,
                                  execname, str(_exception)))
-            return errors
 
         if os.path.isfile(execname):
             try:
@@ -271,11 +272,11 @@ def _write_magics_template():
 class TestJupyterNotebooks(type):
     """Jupyter Notebook metaclass."""
 
-    def __new__(meta, name, bases, _dict):
+    def __new__(mcs, name, bases, _dict):
         """
         Class constructor (i.e., allocates memory).
 
-        :param meta: meta class
+        :param mcs: meta class
         :param name: unittest class name
         :param bases: base class(es) (i.e., unittest.case.TestCase)
         :param _dict: class attributes dictionary
@@ -287,6 +288,7 @@ class TestJupyterNotebooks(type):
             :param filename: fully qualifed notebook path
             """
             def test_exec(self):
+                """Execute a notebook and format any errors."""
                 errors = _execute_notebook(filename)
                 # Indent output of each error (if any)
                 self.assertEqual(errors, [], "Execution errors detected in "
@@ -301,6 +303,7 @@ class TestJupyterNotebooks(type):
             :param filename: fully qualifed notebook path
             """
             def test_style(self):
+                """Check the notebook for flake8 issues."""
                 errors = _check_notebook_style(filename)
                 # Indent output of each error (if any)
                 self.assertEqual(errors, [], "Flake8 errors detected in {}:\n  "
@@ -308,14 +311,13 @@ class TestJupyterNotebooks(type):
             return test_style
 
         files = _find_notebooks()
-        if len(files) > 0:
-            for filename in files:
-                test_name = "test_{}".format(os.path.splitext(
-                    os.path.basename(filename))[0])
-                _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
-                _dict["{}_flake8".format(test_name)] = gen_test_flake8(filename)
+        for filename in files:
+            test_name = "test_{}".format(os.path.splitext(
+                os.path.basename(filename))[0])
+            _dict["{}_exec".format(test_name)] = gen_test_exec(filename)
+            _dict["{}_flake8".format(test_name)] = gen_test_flake8(filename)
 
-        return type.__new__(meta, name, bases, _dict)
+        return type.__new__(mcs, name, bases, _dict)
 
 
 class TestNotebooks(with_metaclass(TestJupyterNotebooks, unittest.TestCase)):
