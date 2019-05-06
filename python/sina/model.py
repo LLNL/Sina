@@ -1,5 +1,5 @@
 """Contains toplevel, abstract objects mirroring the Mnoda schema."""
-
+from __future__ import print_function
 import json
 import logging
 import collections

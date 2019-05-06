@@ -356,7 +356,7 @@ def parse_data_string(data_string):
         name = components[0]
 
         # Make sure scalar's of the form <foo>=<bar>
-        if len(components) < 2 or len(components[1]) == 0:
+        if len(components) < 2 or components[1] == "":
             raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
         val_range = components[1].split(",")
         # Dummy DataRange as we can't have an empty range, will be set below.
@@ -481,10 +481,11 @@ def create_file(path):
             output_file.close()
 
 
-def get_example_path(relpath, suffix="-new",
-                     example_dirs=["/collab/usr/gapps/wf/examples/",
+def get_example_path(relpath,
+                     suffix="-new",
+                     example_dirs=("/collab/usr/gapps/wf/examples/",
                                    os.path.realpath(os.path.join(os.path.dirname(__file__),
-                                                                 "../../examples/"))]):
+                                                                 "../../examples/")))):
     """
     Return the fully qualified path name for an example data store, raise exception if none.
 
@@ -773,7 +774,7 @@ class DataRange(object):
 
         :param other: The object to compare against.
         """
-        return(isinstance(other, DataRange) and self.__dict__ == other.__dict__)
+        return isinstance(other, DataRange) and self.__dict__ == other.__dict__
 
     def is_numeric_range(self):
         """
@@ -784,7 +785,7 @@ class DataRange(object):
         None, it's still a numeric range, albeit open on one side
         (x<4 vs 3<x<4).
         """
-        return (isinstance(self.min, Real) or isinstance(self.max, Real))
+        return isinstance(self.min, Real) or isinstance(self.max, Real)
 
     def is_single_value(self):
         """Return whether the DataRange represents simple equivalence (foo=5)."""
@@ -821,7 +822,7 @@ class DataRange(object):
         None, it's still a lexographic range, albeit open on one side
         (x<"dog" vs "cat"<x<"dog").
         """
-        return (isinstance(self.min, six.string_types) or isinstance(self.max, six.string_types))
+        return isinstance(self.min, six.string_types) or isinstance(self.max, six.string_types)
 
     def overlaps(self, other):
         """
@@ -832,7 +833,7 @@ class DataRange(object):
 
         :raises TypeError: If trying to check DataRanges of mismatched type for overlap.
         """
-        if not (self.is_numeric_range() == other.is_numeric_range()):
+        if not self.is_numeric_range() == other.is_numeric_range():
             # Comparing numbers and strings may give unexpected behavior. Conceptually
             # they *don't* overlap, but in Python they do; better to leave it to the user.
             raise TypeError("Only DataRanges of the same type (numeric or lexicographic)"

@@ -1,5 +1,5 @@
 """Contains additional tools for use from the command line."""
-
+from __future__ import print_function
 import logging
 
 import deepdiff
@@ -26,6 +26,7 @@ def print_diff_records(record_one, record_two, significant_digits=None):
                                   view='tree')
 
     def get_diff_attribute(name):
+        """Get an attribute from the diff object."""
         return (list(zip(deep_diff[name]))
                 if name in deep_diff else [])
 

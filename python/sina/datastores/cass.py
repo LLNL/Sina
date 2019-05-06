@@ -6,8 +6,8 @@ import fnmatch
 from collections import defaultdict
 import json
 
-from cassandra.cqlengine.query import DoesNotExist, BatchQuery
 import six
+from cassandra.cqlengine.query import DoesNotExist, BatchQuery
 
 import sina.dao as dao
 import sina.model as model
@@ -1024,30 +1024,6 @@ class RunDAO(dao.RunDAO):
         LOGGER.debug('Getting run with id: %s', id)
         record = schema.Record.filter(id=id).get()
         return model.generate_run_from_json(json_input=json.loads(record.raw))
-    # Who should this belong to?
-
-    def _convert_record_to_run(self, record):
-        """
-        Build a Run using a Record and run metadata.
-
-        A variant of get() for internal use which allows us to recycle some of
-        Record's functionality. Given a Record, pulls in its information from
-        Run and folds it into a new Run object. Allows us to skip an extra read
-        of the record table.
-
-        :param record: A Record object to build the Run from.
-
-        :returns: A Run representing the Record plus metadata. None if given
-            a record that isn't a run as input.
-        """
-        LOGGER.debug('Converting %s to run.', record)
-        if record.type == 'run':
-            return model.generate_run_from_json(record.raw)
-        else:
-            msg = ('Record must be of subtype Run to convert to Run. Given '
-                   '{}.'.format(record.id))
-            LOGGER.warn(msg)
-            raise ValueError(msg)
 
 
 class DAOFactory(dao.DAOFactory):
