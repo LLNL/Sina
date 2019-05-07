@@ -417,3 +417,25 @@ def generate_run_from_json(json_input):
                     if key not in ['id', 'user', 'user_defined', 'version',
                                    'type', 'application', 'data', 'files']})
     return run
+
+
+def convert_record_to_run(record):
+    """
+    Build a Run using a Record and run metadata found in the Record's raw.
+
+    Given a Record with all the characteristics of a Run (type is "run",
+    "application" field set, etc.), use the Record's raw data to build a
+    Run object instead.
+
+    :param record: A Record object to build the Run from.
+    :returns: A Run representing the Record plus metadata.
+    :raises ValueError: if given a Record that can't be converted to a Run.
+    """
+    LOGGER.debug('Converting %s to run.', record)
+    if record.type == 'run':
+        return generate_run_from_json(json_input=record.raw)
+    else:
+        msg = ('Record must be of subtype Run to convert to Run. Given '
+               '{}.'.format(record.id))
+        LOGGER.warn(msg)
+        raise ValueError(msg)

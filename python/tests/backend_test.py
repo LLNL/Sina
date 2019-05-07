@@ -571,7 +571,7 @@ class TestQuery(unittest.TestCase):
         Test ability to find Runs by scalars.
 
         The current version inherits from RecordDAO and does only a little
-        extra processing, and most of that in _convert_record_to_run. We're
+        extra processing, and most of that via convert_record_to_run(). We're
         mostly making sure nothing gets lost between those two.
         """
         multi_scalar = list(self.run_dao.data_query(spam_scal=DataRange(-500, 500)))
@@ -665,22 +665,6 @@ class TestQuery(unittest.TestCase):
         get_norec = self.record_dao.get_scalars(id="wheeee",
                                                 scalar_names=["value-1"])
         self.assertFalse(get_norec)
-
-    # ###################### convert_record_to_run ########################
-    def test_convert_record_to_run_good(self):
-        """Test we return a Run when given a Record with valid input."""
-        rec = self.record_dao.get("spam")
-        converted_run = self.run_dao._convert_record_to_run(record=rec)
-        self.assertEqual(converted_run.raw, rec.raw)
-        self.assertEqual(type(converted_run), Run)
-
-    def test_convert_record_to_run_bad(self):
-        """Test we raise a ValueError when given a Record with bad input."""
-        rec = self.record_dao.get("spam3")
-        with self.assertRaises(ValueError) as context:
-            self.run_dao._convert_record_to_run(record=rec)
-        self.assertIn('Record must be of subtype Run to convert to Run. Given',
-                      str(context.exception))
 
 
 class TestImportExport(unittest.TestCase):
