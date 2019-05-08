@@ -104,8 +104,7 @@ class RecordDAO(dao.RecordDAO):
                                           name=datum_name,
                                           index=index,
                                           value=entry))
-            elif (isinstance(datum['value'], six.string_types) or
-                  isinstance(datum['value'], numbers.Number)):
+            elif isinstance(datum['value'], (numbers.Number, six.string_types)):
                 tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
                 # Check if it's a scalar
                 kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
@@ -838,29 +837,6 @@ class RunDAO(dao.RunDAO):
         :param ids_to_delete: A list of the ids of Runs to delete.
         """
         self.record_dao.delete_many(ids_to_delete)
-
-    def _convert_record_to_run(self, record):
-        """
-        Build a Run using a Record and run metadata.
-
-        A variant of get() for internal use which allows us to recycle some of
-        Record's functionality. Given a Record, pulls in its information from
-        Run and folds it into a new Run object. Allows us to skip an extra read
-        of the record table.
-
-        :param record: A Record object to build the Run from.
-
-        :returns: A Run representing the Record plus metadata. None if given
-            a record that isn't a run as input.
-        """
-        LOGGER.debug('Converting %s to run.', record)
-        if record.type == 'run':
-            return model.generate_run_from_json(json_input=record.raw)
-        else:
-            msg = ('Record must be of subtype Run to convert to Run. Given '
-                   '{}.'.format(record.id))
-            LOGGER.warn(msg)
-            raise ValueError(msg)
 
 
 class DAOFactory(dao.DAOFactory):

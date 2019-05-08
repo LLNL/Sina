@@ -3,7 +3,7 @@
 import unittest
 import json
 
-from sina.model import Record
+from sina.model import Record, Run
 import sina.model as model
 
 
@@ -226,4 +226,31 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             model.generate_run_from_json(json_input=json_input)
         self.assertIn("Missing required key <'application'>.",
+                      str(context.exception))
+
+    def test_convert_record_to_run_good(self):
+        """Test we return a Run when given a Record with valid input."""
+        raw_record = {"id": "run1",
+                      "type": "run",
+                      "application": "foo",
+                      "user": "John Doe",
+                      "data": {}, "user_defined": {},
+                      "files": [], "version": None}
+        rec = model.generate_record_from_json(json_input=raw_record)
+        converted_run = model.convert_record_to_run(record=rec)
+        self.assertEqual(converted_run.raw, raw_record)
+        self.assertEqual(type(converted_run), Run)
+
+    def test_convert_record_to_run_bad(self):
+        """Test we raise a ValueError when given a Record with bad input."""
+        raw_record = {"id": "sub1",
+                      "type": "not_a_run",
+                      "application": "foo",
+                      "user": "John Doe",
+                      "data": {}, "user_defined": {},
+                      "files": [], "version": None}
+        rec = model.generate_record_from_json(json_input=raw_record)
+        with self.assertRaises(ValueError) as context:
+            model.convert_record_to_run(record=rec)
+        self.assertIn('Record must be of subtype Run to convert to Run. Given',
                       str(context.exception))

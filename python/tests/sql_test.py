@@ -9,10 +9,12 @@ import tests.backend_test
 import sina.datastores.sql as backend
 
 
-class SQLMixin():
+# Mixin class, has no use for an __init__.
+# pylint: disable=no-init
+class SQLMixin(object):
     """Contains the methods shared between all test classes."""
 
-    _test__ = False
+    __test__ = False
     # Ensure the selected backend is passed to child tests.
     backend = backend
 
@@ -20,7 +22,14 @@ class SQLMixin():
     # (See TestQuery)
     @classmethod
     def create_dao_factory(cls, test_db_dest=None):
-        """Create a DAO for the SQL backend."""
+        """
+        Create a DAO for the SQL backend.
+
+        This is None (in-memory db) by default, but due to issues cascading
+        deletes on in-memory dbs, a filepath can be provided.
+
+        :param test_db_dest: The database that the DAOFactory should target.
+        """
         return backend.DAOFactory(test_db_dest)
 
 

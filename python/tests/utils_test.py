@@ -91,8 +91,8 @@ class TestSinaUtils(unittest.TestCase):
         """Test that the intersection of a single iterator is the contents of that iterator."""
         alone_list = [1, 2, 3, 4]
         gen_alone = (i for i in alone_list)
-        self.assertEquals(list(sina.utils.intersect_ordered([gen_alone])),
-                          alone_list)
+        self.assertEqual(list(sina.utils.intersect_ordered([gen_alone])),
+                         alone_list)
 
     def test_intersect_ordered_empty_nonempty(self):
         """Test that the intersection of an empty and non-empty iterator is empty."""

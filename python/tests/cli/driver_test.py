@@ -3,11 +3,12 @@ import unittest
 import os
 import sys
 import json
+import argparse
+
 from mock import patch, MagicMock
 from nose.plugins.attrib import attr
 from six.moves import cStringIO as StringIO
 from sqlalchemy.orm.exc import NoResultFound
-import argparse
 
 from sina.cli import driver
 from sina.datastores import sql as sina_sql
@@ -66,6 +67,7 @@ class TestCLI(unittest.TestCase):
         self.args.database = 'not.a.i.p'
         driver.ingest(self.args)
         mock_import.assert_called_once()
+        mock_connect.assert_called_once()
         mock_args = mock_import.call_args[1]  # Named args
         self.assertIsInstance(mock_args['factory'], sina_cass.DAOFactory)
         self.assertEqual(mock_args['factory'].keyspace,

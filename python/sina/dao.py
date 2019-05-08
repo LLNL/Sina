@@ -8,6 +8,8 @@ and Relationships, it will not differ between backends, ex: Cassandra and sql.
 from abc import ABCMeta, abstractmethod
 import logging
 
+import sina.model
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -291,8 +293,7 @@ class RelationshipDAO(object):
             return self._get_given_subject_id(subject_id, predicate)
         elif object_id:
             return self._get_given_object_id(object_id, predicate)
-        else:
-            return self._get_given_predicate(predicate)
+        return self._get_given_predicate(predicate)
 
     @abstractmethod
     def _get_given_subject_id(self, subject_id, predicate=None):
@@ -468,4 +469,4 @@ class RunDAO(object):
         if records:
             for record in records:
                 if record.type == "run":
-                    yield self._convert_record_to_run(record)
+                    yield sina.model.convert_record_to_run(record)

@@ -1,5 +1,5 @@
 """SQLAlchemy implementations of Mnoda objects."""
-
+from __future__ import print_function
 from sqlalchemy import (Column, ForeignKey, String, Text, Float, Integer)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import Index

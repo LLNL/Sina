@@ -11,6 +11,7 @@ Example::
 Returns a list of filepaths from some_db containing some_string.
 
 """
+from __future__ import print_function
 import logging
 import inspect
 import sys
@@ -19,17 +20,17 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 
 from sqlite3 import connect
 from sqlalchemy.orm.exc import NoResultFound
+try:
+    from cassandra.cluster import Cluster
+    CASSANDRA_PRESENT = True
+except ImportError:
+    CASSANDRA_PRESENT = False
 
 from sina import utils
 from sina.utils import import_many_jsons, import_json, parse_data_string, create_file
 import sina.datastores.sql as sql
-
-try:
-    from cassandra.cluster import Cluster
+if CASSANDRA_PRESENT:
     import sina.datastores.cass as cass
-    CASSANDRA_PRESENT = True
-except ImportError:
-    CASSANDRA_PRESENT = False
 
 try:
     import sina.cli.diff
@@ -325,7 +326,7 @@ def ingest(args):
 
         # Probably a clever way to get argparse's list of choices rather than
         # hardcoding it, might be worth revisiting.
-        elif args.source_type not in ('json'):
+        elif args.source_type not in ['json']:
             error_message.append("Currently, ingesting is only supported when "
                                  "using json files as the source.")
     error_message.extend(_check_common_args(args=args))
@@ -511,10 +512,10 @@ def _get_guessed_database_type(database_name):
         if file_extension in ("sqlite", "sql", "sqlite3"):
             LOGGER.debug('Found sql.')
             return "sql"
-        if file_extension in ("json"):
+        if file_extension in ["json"]:
             LOGGER.debug('Found json.')
             return "json"
-        if file_extension in ("csv"):
+        if file_extension in ["csv"]:
             LOGGER.debug('Found csv.')
             return "csv"
     LOGGER.debug('Unable to guess database type.')
