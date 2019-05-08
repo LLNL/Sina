@@ -5,10 +5,10 @@ import sys
 import unittest
 import warnings
 import json
-import jsonschema
 
-from nose.plugins.attrib import attr
 from six.moves import cStringIO as StringIO
+from nose.plugins.attrib import attr
+import jsonschema
 
 from sina.cli import driver
 

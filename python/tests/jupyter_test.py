@@ -25,8 +25,8 @@ import shutil
 import subprocess
 import unittest
 
-from nose.plugins.attrib import attr
 from six import with_metaclass
+from nose.plugins.attrib import attr
 
 # Assumed root directory for examples, etc.
 #

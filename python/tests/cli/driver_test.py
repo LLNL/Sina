@@ -5,9 +5,9 @@ import sys
 import json
 import argparse
 
+from six.moves import cStringIO as StringIO
 from mock import patch, MagicMock
 from nose.plugins.attrib import attr
-from six.moves import cStringIO as StringIO
 from sqlalchemy.orm.exc import NoResultFound
 
 from sina.cli import driver

@@ -9,8 +9,8 @@ import logging
 from collections import OrderedDict
 import types
 
-from mock import patch
 import six
+from mock import patch
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, has_only)
