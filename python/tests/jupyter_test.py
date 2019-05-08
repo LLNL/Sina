@@ -26,7 +26,7 @@ import subprocess
 import unittest
 
 from six import with_metaclass
-from nose.plugins.attrib import attr
+from nose.plugins.attrib import attr  # pylint: disable=E0401
 
 # Assumed root directory for examples, etc.
 #

@@ -7,7 +7,7 @@ from collections import defaultdict
 import json
 
 import six
-from cassandra.cqlengine.query import DoesNotExist, BatchQuery
+from cassandra.cqlengine.query import DoesNotExist, BatchQuery  # pylint: disable=E0401
 
 import sina.dao as dao
 import sina.model as model

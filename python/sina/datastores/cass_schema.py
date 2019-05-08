@@ -6,7 +6,7 @@ Based on Mnoda
 import numbers
 import logging
 
-from cassandra.cqlengine.management import sync_table
+from cassandra.cqlengine.management import sync_table  # pylint: disable=E0401
 
 try:
     from cassandra.cqlengine.models import Model

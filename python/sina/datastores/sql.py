@@ -7,7 +7,7 @@ from collections import defaultdict
 from functools import reduce
 
 import six
-import sqlalchemy
+import sqlalchemy  # pylint: disable=E0401
 
 import sina.dao as dao
 import sina.model as model

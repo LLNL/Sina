@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import os
 import json
-import jsonschema
+import jsonschema  # pylint: disable=E0401
 
 
 class TestFukushima(unittest.TestCase):
@@ -81,11 +81,11 @@ class TestNOAA(unittest.TestCase):
                       'Invalid mnoda file.')
 
 
-def _test_file_against_schema(file, schema=None):
+def _test_file_against_schema(file_, schema=None):
     """
     Take a schema and check it against the json file.
 
-    :param file: The json file to test with the schema.
+    :param file_: The json file to test with the schema.
     :param schema: The json schema to check the file against. Defaults to the
                    mnoda schema.
     :raises ValidationError: If the file is invalid, a ValidationError
@@ -94,7 +94,7 @@ def _test_file_against_schema(file, schema=None):
     if not schema:
         schema = os.path.join(
             os.path.dirname(os.path.realpath(__file__)), '../../mnoda.json')
-    with open(file) as file_loaded:
+    with open(file_) as file_loaded:
         file_json = json.load(file_loaded)
         with open(schema) as schema_loaded:
             schema = json.load(schema_loaded)

@@ -19,7 +19,7 @@ import os
 from argparse import ArgumentParser, RawTextHelpFormatter
 
 from sqlite3 import connect
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.orm.exc import NoResultFound  # pylint: disable=E0401
 try:
     from cassandra.cluster import Cluster
     CASSANDRA_PRESENT = True

@@ -2,8 +2,8 @@
 from __future__ import print_function
 import logging
 
-import deepdiff
-from texttable import Texttable
+import deepdiff  # pylint: disable=E0401
+from texttable import Texttable  # pylint: disable=E0401
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)

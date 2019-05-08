@@ -6,7 +6,7 @@ import unittest
 import logging
 
 from six.moves import cStringIO
-from nose.plugins.attrib import attr
+from nose.plugins.attrib import attr  # pylint: disable=E0401
 
 from sina.model import Record
 try:
