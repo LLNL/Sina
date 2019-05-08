@@ -159,7 +159,7 @@ class RecordDAO(dao.RecordDAO):
          .delete(synchronize_session='fetch'))
         self.session.commit()
 
-    def data_query(self, **kwargs):
+    def data_query(self, **kwargs):  # pylint: disable=R0912,R0914
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -278,7 +278,7 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
-    def get_list(self,
+    def get_list(self,  # pylint: disable=R0912
                  datum_name,
                  list_of_contents,
                  operation,

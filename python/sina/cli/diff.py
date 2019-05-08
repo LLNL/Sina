@@ -9,7 +9,8 @@ logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
 
 
-def print_diff_records(record_one, record_two, significant_digits=None):
+def print_diff_records(record_one, record_two,  # pylint: disable=R0914
+                       significant_digits=None):
     """
     Print a table showing the difference between two Records.
 

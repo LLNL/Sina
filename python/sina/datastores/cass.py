@@ -60,7 +60,8 @@ class RecordDAO(dao.RecordDAO):
                                files=record.files,
                                force_overwrite=force_overwrite)
 
-    def insert_many(self, list_to_insert, force_overwrite=False, _type_managed=False):
+    def insert_many(self, list_to_insert,  # pylint: disable=R0912,R0914
+                    force_overwrite=False, _type_managed=False):
         """
         Given a list of Records, insert each into Cassandra.
 
@@ -305,7 +306,7 @@ class RecordDAO(dao.RecordDAO):
              .batch(batch).delete())
         schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
-    def data_query(self, **kwargs):
+    def data_query(self, **kwargs):  # pylint: disable=R0904,R0912,R0914
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -683,7 +684,7 @@ class RecordDAO(dao.RecordDAO):
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarDataFromRecord,
                         schema.StringDataFromRecord]
-        for query_table in query_tables:
+        for query_table in query_tables:  # pylint: disable=R0101
             query = (query_table.objects
                      .filter(query_table.id.in_(id_list))
                      .filter(query_table.name.in_(data_list))

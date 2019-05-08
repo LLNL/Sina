@@ -7,7 +7,7 @@ from sqlalchemy.schema import Index
 Base = declarative_base()
 
 
-class Record(Base):
+class Record(Base):  # pylint: disable=R0903
     """
     Implementation of Record table.
 
@@ -31,7 +31,7 @@ class Record(Base):
                 .format(self.id, self.type))
 
 
-class Relationship(Base):
+class Relationship(Base):  # pylint: disable=R0903
     """
     Implementation of Relationship table.
 
@@ -63,7 +63,7 @@ class Relationship(Base):
                                        self.predicate))
 
 
-class ScalarData(Base):
+class ScalarData(Base):  # pylint: disable=R0903
     """
     Implementation of a table to store scalar-type data.
 
@@ -88,7 +88,7 @@ class ScalarData(Base):
     units = Column(String(255), nullable=True)
     Index('record_scalar_idx', id, name)
 
-    def __init__(self, id, name, value, tags=None, units=None):
+    def __init__(self, id, name, value, tags=None, units=None):  # pylint: disable=R0913
         """Create entry from id, name, and value, and optionally tags/units."""
         self.id = id
         self.name = name
@@ -107,7 +107,7 @@ class ScalarData(Base):
                         self.units))
 
 
-class ListScalarDataMaster(Base):
+class ListScalarDataMaster(Base):  # pylint: disable=R0903
     """
     Implementation of a table to store info about lists of scalar-type data.
 
@@ -158,7 +158,7 @@ class ListScalarDataMaster(Base):
                         self.units))
 
 
-class ListScalarDataEntry(Base):
+class ListScalarDataEntry(Base):  # pylint: disable=R0903
     """
     Implementation of a table to store list entries of scalar-type data.
 
@@ -204,7 +204,7 @@ class ListScalarDataEntry(Base):
                         self.value))
 
 
-class StringData(Base):
+class StringData(Base):  # pylint: disable=R0903
     """
     Implementation of a table to store string-type data.
 
@@ -230,7 +230,7 @@ class StringData(Base):
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
 
-    def __init__(self, id, name, value, tags=None, units=None):
+    def __init__(self, id, name, value, tags=None, units=None):  # pylint: disable=R0913
         """Create entry from id, name, and value, and optionally tags/units."""
         self.id = id
         self.name = name
@@ -252,7 +252,7 @@ class StringData(Base):
                         self.units))
 
 
-class ListStringDataMaster(Base):
+class ListStringDataMaster(Base):  # pylint: disable=R0903
     """
     Implementation of a table to store info about lists of string-type data.
 
@@ -308,7 +308,7 @@ class ListStringDataMaster(Base):
                         self.units))
 
 
-class ListStringDataEntry(Base):
+class ListStringDataEntry(Base):  # pylint: disable=R0903,R0904
     """
     Implementation of a table to store list entries of string-type data.
 
@@ -353,7 +353,7 @@ class ListStringDataEntry(Base):
                         self.value))
 
 
-class Document(Base):
+class Document(Base):  # pylint: disable=R0903
     """
     Implementation of document table.
 
@@ -375,7 +375,7 @@ class Document(Base):
     mimetype = Column(String(255), nullable=True)
     tags = Column(Text(), nullable=True)
 
-    def __init__(self, id, uri, contents=None, mimetype=None, tags=None):
+    def __init__(self, id, uri, contents=None, mimetype=None, tags=None):  # pylint: disable=R0913
         """Create from id, uri, and optionally contents and mimetype."""
         self.id = id
         self.uri = uri
@@ -389,7 +389,7 @@ class Document(Base):
                 .format(self.id, self.uri, self.mimetype, self.tags))
 
 
-class Run(Base):
+class Run(Base):  # pylint: disable=R0903
     """
     Implementation of Run table.
 

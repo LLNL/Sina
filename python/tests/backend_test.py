@@ -315,7 +315,7 @@ class TestModify(unittest.TestCase):
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
 
 
-class TestQuery(unittest.TestCase):
+class TestQuery(unittest.TestCase):  # pylint: disable=R0904
     """
     Unit tests that specifically deal with queries.
 

@@ -27,7 +27,8 @@ class Record(object):
     of that child.
     """
 
-    def __init__(self, id, type, data=None, files=None, user_defined=None):
+    def __init__(self, id, type, data=None, files=None,  # pylint: disable=R0913
+                 user_defined=None):
         """
         Create Record with its id, type, and optional args.
 
@@ -143,7 +144,7 @@ class Record(object):
         """
         return json.dumps(self.raw)
 
-    def is_valid(self, print_warnings=None):
+    def is_valid(self, print_warnings=None):  # pylint: disable=R0912
         """Test whether a Record's members are formatted correctly.
 
         The ingester expects certain types to be reserved, and for data
@@ -239,7 +240,7 @@ class Record(object):
         return True, warnings
 
 
-class Relationship(object):
+class Relationship(object):  # pylint: disable=R0903
     """
     A Relationship is a triple describing the relationship between two objects.
 
@@ -276,7 +277,7 @@ class Run(Record):
     'user_defined'.
     """
 
-    def __init__(self, id, application,
+    def __init__(self, id, application,  # pylint: disable=R0913
                  user=None, version=None, user_defined=None,
                  data=None, files=None):
         """Create Run from Record info plus metadata."""

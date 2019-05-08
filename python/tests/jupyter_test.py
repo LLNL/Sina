@@ -89,7 +89,7 @@ def _build_pep8_output(result):
             sorted(_dict.keys())]
 
 
-def _execute_notebook(path):
+def _execute_notebook(path):  # pylint: disable=R0912
     """
     Execute a notebook and collect any output errors.
 
@@ -103,23 +103,23 @@ def _execute_notebook(path):
 
     try:
         notebook = _read_notebook(path)
-    except Exception as _exception:
+    except Exception as _exception:  # pylint: disable=W0703
         return ['{}: {}: Reading {}: {}'.format(_exception.__class__.__name__,
                                                 SINA_KERNEL, path, str(_exception))]
 
     try:
         # Does the notebook conform to the current format schema?
         nbformat.validate(notebook)
-    except Exception as _exception:
+    except Exception as _exception:  # pylint: disable=W0703
         errors.append('{}: {}: Validating {}: {}'.
                       format(_exception.__class__.__name__, SINA_KERNEL, path,
                              str(_exception)))
 
-    try:
+    try:  # pylint: disable=R0101
         exec_preprocessor = ExecutePreprocessor(timeout=-1,
                                                 kernel_name=SINA_KERNEL)
         exec_preprocessor.preprocess(notebook, {'metadata': {'path': RUN_PATH}})
-    except Exception as _exception:
+    except Exception as _exception:  # pylint: disable=W0703
         errors.append('{}: {}: Running {} in {}: {}'.
                       format(_exception.__class__.__name__, SINA_KERNEL, path,
                              RUN_PATH, str(_exception)))
@@ -129,7 +129,7 @@ def _execute_notebook(path):
         try:
             with io.open(execname, mode='wt', encoding='utf-8') as fout:
                 nbformat.write(notebook, fout)
-        except Exception as _exception:
+        except Exception as _exception:  # pylint: disable=W0703
             errors.append('{}: {}: Writing {}: {}'.
                           format(_exception.__class__.__name__, SINA_KERNEL,
                                  execname, str(_exception)))
@@ -145,7 +145,7 @@ def _execute_notebook(path):
                                               format(SINA_TEST_KERNEL,
                                                      output.ename,
                                                      output.evalue))
-            except Exception as _exception:
+            except Exception as _exception:  # pylint: disable=W0703
                 errors.append('{}: {}: Checking for errors in {}: {}'.
                               format(_exception.__class__.__name__,
                                      SINA_KERNEL, execname, str(_exception)))

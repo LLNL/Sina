@@ -23,7 +23,7 @@ except ImportError:
     # includes more flexible mocking.
     Model = object
 
-    class _AutodocFakeColumn(object):
+    class _AutodocFakeColumn(object):  # pylint: disable=R0903
         """Mock column members that can't be mocked by Sphinx's autodoc."""
 
         def __init__(self, **kwargs):
@@ -44,7 +44,7 @@ except ImportError:
 LOGGER = logging.getLogger(__name__)
 
 
-class Record(Model):
+class Record(Model):  # pylint: disable=R0903
     """
     Toplevel object in the Mnoda schema.
 
@@ -56,7 +56,7 @@ class Record(Model):
     raw = columns.Text()
 
 
-class DocumentFromRecord(Model):
+class DocumentFromRecord(Model):  # pylint: disable=R0903
     """Query table for finding documents given records."""
 
     id = columns.Text(primary_key=True)
@@ -65,7 +65,7 @@ class DocumentFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class RecordFromScalarData(Model):
+class RecordFromScalarData(Model):  # pylint: disable=R0903
     """Query table for finding records given scalar criteria."""
 
     name = columns.Text(primary_key=True)
@@ -75,7 +75,7 @@ class RecordFromScalarData(Model):
     tags = columns.Set(columns.Text())
 
 
-class ScalarDataFromRecord(Model):
+class ScalarDataFromRecord(Model):  # pylint: disable=R0903
     """Query table for finding a scalar-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
@@ -85,7 +85,7 @@ class ScalarDataFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class RecordFromScalarListData(Model):
+class RecordFromScalarListData(Model):  # pylint: disable=R0903
     """
     Query table for finding records given scalar list criteria.
 
@@ -106,7 +106,7 @@ class RecordFromScalarListData(Model):
     id = columns.Text(primary_key=True)
 
 
-class ScalarListDataFromRecord(Model):
+class ScalarListDataFromRecord(Model):  # pylint: disable=R0903
     """Query table for finding a scalar list-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
@@ -119,7 +119,7 @@ class ScalarListDataFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class RecordFromStringData(Model):
+class RecordFromStringData(Model):  # pylint: disable=R0903
     """
     Query table for finding records given string criteria (ex, "version"="1.2.3").
 
@@ -134,7 +134,7 @@ class RecordFromStringData(Model):
     tags = columns.Set(columns.Text())
 
 
-class StringDataFromRecord(Model):
+class StringDataFromRecord(Model):  # pylint: disable=R0903
     """Query table for finding a string-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
@@ -144,7 +144,7 @@ class StringDataFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class RecordFromStringListData(Model):
+class RecordFromStringListData(Model):  # pylint: disable=R0903
     """
     Query table for finding records given string list criteria.
 
@@ -156,7 +156,7 @@ class RecordFromStringListData(Model):
     id = columns.Text(primary_key=True)
 
 
-class StringListDataFromRecord(Model):
+class StringListDataFromRecord(Model):  # pylint: disable=R0903
     """Query table for finding a scalar list-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
@@ -167,7 +167,7 @@ class StringListDataFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class Run(Model):
+class Run(Model):  # pylint: disable=R0903
     """Query table for finding runs based on special, supported metadata."""
 
     id = columns.Text(primary_key=True)
@@ -176,7 +176,7 @@ class Run(Model):
     version = columns.Text()
 
 
-class ObjectFromSubject(Model):
+class ObjectFromSubject(Model):  # pylint: disable=R0903
     """
     Query table for finding object given subject (plus optionally predicate).
 
@@ -193,7 +193,7 @@ class ObjectFromSubject(Model):
     object_id = columns.Text(primary_key=True)
 
 
-class SubjectFromObject(Model):
+class SubjectFromObject(Model):  # pylint: disable=R0903
     """Query table for finding subject given object (plus optionally predicate)."""
 
     object_id = columns.Text(primary_key=True)
@@ -244,7 +244,7 @@ def _discover_tables_from_value(value):
     return (x_from_rec, rec_from_x)
 
 
-def cross_populate_data_tables(name,
+def cross_populate_data_tables(name,  # pylint: disable=R0913
                                value,
                                id,
                                tags=None,

@@ -20,7 +20,7 @@ RUN_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
                                         "tests", "run_tests", "sina_utils"))
 
 
-class TestSinaUtils(unittest.TestCase):
+class TestSinaUtils(unittest.TestCase):  # pylint: disable=R0904
     """Tests for Sina Utilities functions."""
 
     def setUp(self):
