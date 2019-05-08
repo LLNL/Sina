@@ -209,6 +209,19 @@ test-cli-tools: links
 
 
 # Recursively call make if it is necessary to create the test virtual environment.
+flake8: export PATH=$(TEST_PATH)
+flake8: links
+	@if test ! -d $(TEST_VENV); then \
+	  echo "Making the test virtual environment in $(TEST_VENV)"; \
+	  make --no-print-directory install VENV=$(TEST_VENV); \
+	else \
+	  echo "You already have the test virtual environment $(TEST_VENV)"; \
+	fi; \
+	echo "Running flake8 tests using $(TEST_VENV)"; \
+	$(TEST_VENV)/bin/tox -e flake8
+
+# Recursively call make to ensure the work is done in the specified order
+# Recursively call make if it is necessary to create the test virtual environment.
 test-jupyter: export PATH=$(TEST_PATH)
 test-jupyter: links
 	@if test ! -d $(TEST_VENV); then \
