@@ -1,10 +1,11 @@
 # The following environment variables can be used to change the behavior of
 # building the virtual environment:
 #
+#   PYTHON           = Specify non-default python (e.g., python3)
 #   SINA_PIP_OPTIONS = Additional options to pip (e.g., '--no-index')
-#   VENV         = Name of the Sina virtual environment (default 'venv')
-#   VENV_OPTIONS = Additional options when the venv is created (e.g.,
-#                  '--system-site-packages' to inherit system packages
+#   VENV             = Name of the Sina virtual environment (default 'venv')
+#   VENV_OPTIONS     = Additional options when the venv is created (e.g.,
+#                      '--system-site-packages' to inherit system packages
 
 # Determine if we are on an LC system based on the presence of the wheelhouse
 # Using curl (versus 'wget --spider') despite being slower since former
@@ -29,6 +30,17 @@ else
   SINA_PIP_OPTIONS:=$(SINA_PIP_OPTIONS)
 endif
 export SINA_PIP_OPTIONS
+
+# Determine whether being run for Python 2 or Python 3 since it affects virtual
+# virtual environment commands.
+PYTHON?=python
+export PYTHON
+PYVERSION=$(shell $(PYTHON) -c 'import sys; print(sys.version_info[0])')
+ifeq ($(PYVERSION),2)
+  PYTHON_VENV_OPTION:=virtualenv
+else
+  PYTHON_VENV_OPTION:=venv
+endif
 
 # TODO: Pylint issues must be addressed before including it in the normal CI
 # process.
@@ -86,14 +98,18 @@ TEST_VENV=tests/test_venv
 install: links
 	@if test ! -d $(VENV); then \
 	  echo "Making virtual environment in $(VENV)"; \
-	  python -m virtualenv $(VENV_OPTIONS) $(VENV); \
+	  $(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) $(VENV); \
 	  set -e; \
 	else \
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
-	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip setuptools; \
-	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/development.txt; \
-	echo $(PR_ACT)
+	if test -d $(VENV); then \
+	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip setuptools; \
+	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/development.txt; \
+	    echo $(PR_ACT); \
+	else \
+	  echo "Failed to create the virtual environment $(VENV)"; \
+	fi
 
 all: clean docs tests
 
@@ -167,7 +183,7 @@ pylint: export PATH=$(PYLINT_PATH)
 pylint:
 	@echo "Creating $(PYLINT_VENV)"; \
 	rm -rf $(PYLINT_VENV); \
-	python -m virtualenv $(VENV_OPTIONS) $(PYLINT_VENV); \
+	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) $(PYLINT_VENV); \
 	set -e; \
 	$(PYLINT_VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip tox; \
 	$(PYLINT_VENV)/bin/tox -e pylint
