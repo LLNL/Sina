@@ -24,7 +24,6 @@ import os
 import shutil
 import subprocess
 import unittest
-import logging
 
 from nose.plugins.attrib import attr
 from six import with_metaclass
