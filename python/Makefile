@@ -88,14 +88,13 @@ TEST_VENV=tests/test_venv
 .PHONY: docs
 .PHONY: install
 .PHONY: jupyter
-.PHONY: links
 .PHONY: pep8
 .PHONY: pylint
 .PHONY: tests
 .PHONY: test-cli-tools
 .PHONY: test-jupyter
 
-install: links
+install: $(LINKS_FILE)
 	@if test ! -d $(VENV); then \
 	  echo "Making virtual environment in $(VENV)"; \
 	  $(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) $(VENV); \
@@ -136,7 +135,7 @@ docs: install
 
 # Create the virtual environment if it does not already exist.  This process
 # recursively calls make.
-jupyter: links
+jupyter: $(LINKS_FILE)
 	@if test ! -d $(VENV); then \
 	  echo "Installing sina core in $(VENV)"; \
 	  make --no-print-directory install VENV=$(VENV); \
@@ -148,7 +147,7 @@ jupyter: links
 
 # Ensure the appropriate requirement links are established.  This is important
 # for building and testing purposes.
-links:
+$(LINKS_FILE):
 	@if [ $(HAVE_WHEELHOUSE) == 0 ]; then \
 	  echo "No LC wheelhouse URL access: using $(NO_LINKS_FILE)"; \
 	  ln -sf $(NO_LINKS_FILE) $(LINKS_FILE); \
@@ -192,14 +191,14 @@ pylint:
 
 # Recursively call make to ensure the work is done in the specified order
 tests: export PATH=$(TEST_PATH)
-tests: links
+tests: $(LINKS_FILE)
 	@make --no-print-directory clean-tests-venv; \
 	make --no-print-directory install VENV=$(TEST_VENV); \
 	$(TEST_VENV)/bin/tox
 
 # Recursive call to make in case test venv doesn't exist
 test-cli-tools: export PATH=$(TEST_PATH)
-test-cli-tools: links
+test-cli-tools: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
           echo "Making the test virtual environment in $(TEST_VENV)"; \
           make --no-print-directory install VENV=$(TEST_VENV); \
@@ -210,7 +209,7 @@ test-cli-tools: links
 
 # Recursively call make if it is necessary to create the test virtual environment.
 test-jupyter: export PATH=$(TEST_PATH)
-test-jupyter: links
+test-jupyter: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
 	  echo "Making the test virtual environment in $(TEST_VENV)"; \
 	  make --no-print-directory install VENV=$(TEST_VENV); \
@@ -230,7 +229,7 @@ clean:
 clean-files:  clean-tests
 	@echo "Cleaning build files.."; \
 	rm -rf build; \
-	rm -f requirements/links.txt; \
+	rm -f $(LINKS_FILE); \
 	echo "Cleaning egg and $(VENV).."; \
 	rm -rf sina.egg-info $(VENV); \
 	echo "Cleaning python bytecode.."; \
