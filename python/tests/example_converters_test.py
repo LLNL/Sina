@@ -33,7 +33,7 @@ class TestFukushima(unittest.TestCase):
         mnoda_output_file = os.path.join(
             self.temp_mnoda_output, 'files/AMS_C12_SeaData.json')
         try:
-            _test_file_against_schema(file=mnoda_output_file)
+            _test_file_against_schema(file_=mnoda_output_file)
         except jsonschema.exceptions.ValidationError:
             self.fail('jsonschema.validate() raised ValidationError. '
                       'Invalid mnoda file.')
@@ -75,7 +75,7 @@ class TestNOAA(unittest.TestCase):
         mnoda_output_file = os.path.join(
             self.temp_mnoda_output, 'files/WCOA11-01-06-2015.json')
         try:
-            _test_file_against_schema(file=mnoda_output_file)
+            _test_file_against_schema(file_=mnoda_output_file)
         except jsonschema.exceptions.ValidationError:
             self.fail('jsonschema.validate() raised ValidationError. '
                       'Invalid mnoda file.')

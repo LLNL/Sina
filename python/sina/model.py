@@ -12,6 +12,9 @@ LOGGER = logging.getLogger(__name__)
 RESERVED_TYPES = ["run"]  # Types reserved by Record's children
 
 
+# Disable redefined-builtin, invalid-name due to ubiquitous use of id and type
+# pylint: disable=C0103,W0622
+
 class Record(object):
     """
     A record is any arbitrary object we've chosen to store.

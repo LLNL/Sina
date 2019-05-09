@@ -6,6 +6,11 @@ Based on Mnoda
 import numbers
 import logging
 
+# Disable redefined-builtin, invalid-name due to ubiquitous use of id,
+#   cross_populate_object_and_subject, and attributes associated with
+#   _AutodocFakeColumn
+# pylint: disable=C0103,W0622
+
 from cassandra.cqlengine.management import sync_table  # pylint: disable=E0401
 
 try:

@@ -4,6 +4,10 @@ from sqlalchemy import (Column, ForeignKey, String, Text, Float, Integer)  # pyl
 from sqlalchemy.ext.declarative import declarative_base  # pylint: disable=E0401
 from sqlalchemy.schema import Index  # pylint: disable=E0401
 
+
+# Disable redefined-builtin, invalid-name due to ubiquitous use of id, type
+# pylint: disable=C0103,W0622
+
 Base = declarative_base()
 
 

@@ -4,7 +4,7 @@ import numbers
 import logging
 import json
 from collections import defaultdict
-from functools import reduce
+from functools import reduce   # pylint: disable=W0622
 
 import six
 import sqlalchemy  # pylint: disable=E0401
@@ -14,6 +14,9 @@ import sina.model as model
 import sina.datastores.sql_schema as schema
 from sina.utils import sort_and_standardize_criteria
 from sina import utils
+
+# Disable redefined-builtin, invalid-name due to ubiquitous use of id
+# pylint: disable=C0103,W0622
 
 LOGGER = logging.getLogger(__name__)
 

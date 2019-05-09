@@ -20,6 +20,10 @@ LOGGER = logging.getLogger(__name__)
 TARGET = None
 
 
+# Disable pylint invalid-name due to significant number of tests with names
+# exceeding the 30 character limit
+# pylint: disable=C0103
+
 def populate_database_with_data(record_dao):
     """
     Add test data to a database in a backend-independent way.

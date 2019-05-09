@@ -14,6 +14,9 @@ import sina.model as model
 import sina.datastores.cass_schema as schema
 import sina.utils as utils
 
+# Disable redefined-builtin, invalid-name due to ubiquitous use of id
+# pylint: disable=C0103,W0622
+
 LOGGER = logging.getLogger(__name__)
 
 TABLE_LOOKUP = {
