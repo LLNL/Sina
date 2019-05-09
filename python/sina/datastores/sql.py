@@ -506,7 +506,7 @@ class RecordDAO(dao.RecordDAO):
         query = query.params(search_args)
         return query
 
-    def _build_range_filter(self, name, criteria, table, index=0):
+    def _build_range_filter(self, name, criteria, table, index=0):  # pylint: disable=R0201
         """
         Build a TextClause to filter a SQL query using range parameters.
 
@@ -770,21 +770,6 @@ class RelationshipDAO(dao.RelationshipDAO):
                  .filter(schema.Relationship.predicate == predicate))
 
         return self._build_relationships(query.all())
-
-    def _build_relationships(self, query):
-        """
-        Given query results, build a list of Relationships.
-
-        :param query: The query results to build from.
-        """
-        LOGGER.debug('Building relationships from query=%s', query)
-        relationships = []
-        for relationship in query:
-            rel_obj = model.Relationship(subject_id=relationship.subject_id,
-                                         object_id=relationship.object_id,
-                                         predicate=relationship.predicate)
-            relationships.append(rel_obj)
-        return relationships
 
 
 class RunDAO(dao.RunDAO):

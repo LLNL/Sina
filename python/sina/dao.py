@@ -240,6 +240,21 @@ class RelationshipDAO(object):
 
     __metaclass__ = ABCMeta
 
+    def _build_relationships(self, query):  # pylint: disable=R0201
+        """
+        Given query results, build a list of Relationships.
+
+        :param query: The query results to build from.
+        """
+        LOGGER.debug('Building relationships from query=%s', query)
+        relationships = []
+        for relationship in query:
+            rel_obj = sina.model.Relationship(subject_id=relationship.subject_id,
+                                              object_id=relationship.object_id,
+                                              predicate=relationship.predicate)
+            relationships.append(rel_obj)
+        return relationships
+
     @abstractmethod
     def insert(self, subject_id=None, object_id=None,
                predicate=None, relationship=None):

@@ -194,7 +194,7 @@ class RecordDAO(dao.RecordDAO):
                                                             value=value,
                                                             id=entry[1])
 
-    def _insert_data(self, data, id, force_overwrite=False):
+    def _insert_data(self, data, id, force_overwrite=False):  # pylint: disable=R0201
         """
         Insert data into two of the four query tables depending on value.
 
@@ -216,7 +216,7 @@ class RecordDAO(dao.RecordDAO):
                                               tags=datum.get('tags'),
                                               force_overwrite=force_overwrite)
 
-    def _insert_files(self, id, files, force_overwrite=False):
+    def _insert_files(self, id, files, force_overwrite=False):  # pylint: disable=R0201
         """
         Insert files into the DocumentFromRecord table.
 
@@ -516,7 +516,7 @@ class RecordDAO(dao.RecordDAO):
         for id in filtered_ids:
             yield id
 
-    def _configure_query_for_criteria(self, query, name, criteria):
+    def _configure_query_for_criteria(self, query, name, criteria):  # pylint: disable=R0201
         """
         Use criteria to build a query.
 
@@ -911,21 +911,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
         return self._build_relationships(query.allow_filtering().all())
 
-    def _build_relationships(self, query):
-        """
-        Given query results, built a list of Relationships.
-
-        :param query: The query results to build from.
-        """
-        LOGGER.debug('Building relationships from query=%s', query)
-        relationships = []
-        for relationship in query:
-            rel_obj = model.Relationship(subject_id=relationship.subject_id,
-                                         object_id=relationship.object_id,
-                                         predicate=relationship.predicate)
-            relationships.append(rel_obj)
-        return relationships
-
 
 class RunDAO(dao.RunDAO):
     """DAO responsible for handling Runs, (Record subtype), in Cassandra."""
@@ -947,7 +932,7 @@ class RunDAO(dao.RunDAO):
                version=run.version)
         self.record_dao.insert(record=run, force_overwrite=force_overwrite)
 
-    def _insert_sans_rec(self, run, force_overwrite=False):
+    def _insert_sans_rec(self, run, force_overwrite=False):  # pylint: disable=R0201
         """
         Given a Run, import it into the Run table only.
 
