@@ -6,9 +6,11 @@ import json
 import argparse
 
 from six.moves import cStringIO as StringIO
-from mock import patch, MagicMock  # pylint: disable=E0401
-from nose.plugins.attrib import attr  # pylint: disable=E0401
-from sqlalchemy.orm.exc import NoResultFound  # pylint: disable=E0401
+
+# Disable pylint checks due to its issue with virtual environments
+from mock import patch, MagicMock  # pylint: disable=import-error
+from nose.plugins.attrib import attr  # pylint: disable=import-error
+from sqlalchemy.orm.exc import NoResultFound  # pylint: disable=import-error
 
 from sina.cli import driver
 from sina.datastores import sql as sina_sql

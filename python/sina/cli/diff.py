@@ -2,8 +2,9 @@
 from __future__ import print_function
 import logging
 
-import deepdiff  # pylint: disable=E0401
-from texttable import Texttable  # pylint: disable=E0401
+# Disable pylint checks for optional modules
+import deepdiff  # pylint: disable=import-error
+from texttable import Texttable  # pylint: disable=import-error
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)

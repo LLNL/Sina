@@ -21,10 +21,11 @@ RUN_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 # Disable pylint invalid-name due to significant number of tests with names
 # exceeding the 30 character limit
-# pylint: disable=C0103
+# pylint: disable=invalid-name
 
 
-class TestSinaUtils(unittest.TestCase):  # pylint: disable=R0904
+# Disable pylint public methods to if and until the team decides to refactor the code
+class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """Tests for Sina Utilities functions."""
 
     def setUp(self):

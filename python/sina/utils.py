@@ -21,9 +21,8 @@ LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
 
 
-# Disable redefined-builtin, invalid-name due to ubiquitous use of id, type,
-# max, and min
-# pylint: disable=C0103,W0622
+# Disable pylint checks due to ubiquitous use of id, type, max, and min
+# pylint: disable=invalid-name,redefined-builtin
 
 class ListQueryOperation(Enum):
     """

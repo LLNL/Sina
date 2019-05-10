@@ -10,7 +10,9 @@ from collections import OrderedDict
 import types
 
 import six
-from mock import patch  # pylint: disable=E0401
+
+# Disable pylint check due to its issue with virtual environments
+from mock import patch  # pylint: disable=import-error
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, has_only)
@@ -22,7 +24,7 @@ TARGET = None
 
 # Disable pylint invalid-name due to significant number of tests with names
 # exceeding the 30 character limit
-# pylint: disable=C0103
+# pylint: disable=invalid-name
 
 def populate_database_with_data(record_dao):
     """
@@ -319,7 +321,8 @@ class TestModify(unittest.TestCase):
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
 
 
-class TestQuery(unittest.TestCase):  # pylint: disable=R0904
+# Disable the pylint check if and until the team decides to refactor the code
+class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """
     Unit tests that specifically deal with queries.
 

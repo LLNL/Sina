@@ -1,17 +1,20 @@
 """SQLAlchemy implementations of Mnoda objects."""
 from __future__ import print_function
-from sqlalchemy import (Column, ForeignKey, String, Text, Float, Integer)  # pylint: disable=E0401
-from sqlalchemy.ext.declarative import declarative_base  # pylint: disable=E0401
-from sqlalchemy.schema import Index  # pylint: disable=E0401
+
+# Disable pylint checks due to its issue with virtual environments
+from sqlalchemy import (Column, ForeignKey, String, Text, Float,  # pylint: disable=import-error
+                        Integer)
+from sqlalchemy.ext.declarative import declarative_base  # pylint: disable=import-error
+from sqlalchemy.schema import Index  # pylint: disable=import-error
 
 
-# Disable redefined-builtin, invalid-name due to ubiquitous use of id, type
-# pylint: disable=C0103,W0622
+# Disable pylint checks due to ubiquitous use of id, type and the nature of these classes
+# pylint: disable=invalid-name,redefined-builtin,too-few-public-methods
 
 Base = declarative_base()
 
 
-class Record(Base):  # pylint: disable=R0903
+class Record(Base):
     """
     Implementation of Record table.
 
@@ -35,7 +38,7 @@ class Record(Base):  # pylint: disable=R0903
                 .format(self.id, self.type))
 
 
-class Relationship(Base):  # pylint: disable=R0903
+class Relationship(Base):
     """
     Implementation of Relationship table.
 
@@ -67,7 +70,7 @@ class Relationship(Base):  # pylint: disable=R0903
                                        self.predicate))
 
 
-class ScalarData(Base):  # pylint: disable=R0903
+class ScalarData(Base):
     """
     Implementation of a table to store scalar-type data.
 
@@ -92,7 +95,9 @@ class ScalarData(Base):  # pylint: disable=R0903
     units = Column(String(255), nullable=True)
     Index('record_scalar_idx', id, name)
 
-    def __init__(self, id, name, value, tags=None, units=None):  # pylint: disable=R0913
+    # Disable the pylint check if and until the team decides to refactor the code
+    def __init__(self, id, name, value,   # pylint: disable=too-many-arguments
+                 tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
         self.id = id
         self.name = name
@@ -111,7 +116,7 @@ class ScalarData(Base):  # pylint: disable=R0903
                         self.units))
 
 
-class ListScalarDataMaster(Base):  # pylint: disable=R0903
+class ListScalarDataMaster(Base):
     """
     Implementation of a table to store info about lists of scalar-type data.
 
@@ -162,7 +167,7 @@ class ListScalarDataMaster(Base):  # pylint: disable=R0903
                         self.units))
 
 
-class ListScalarDataEntry(Base):  # pylint: disable=R0903
+class ListScalarDataEntry(Base):
     """
     Implementation of a table to store list entries of scalar-type data.
 
@@ -208,7 +213,7 @@ class ListScalarDataEntry(Base):  # pylint: disable=R0903
                         self.value))
 
 
-class StringData(Base):  # pylint: disable=R0903
+class StringData(Base):
     """
     Implementation of a table to store string-type data.
 
@@ -234,7 +239,9 @@ class StringData(Base):  # pylint: disable=R0903
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
 
-    def __init__(self, id, name, value, tags=None, units=None):  # pylint: disable=R0913
+    # Disable the pylint check if and until the team decides to refactor the code
+    def __init__(self, id, name, value,  # pylint: disable=too-many-arguments
+                 tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
         self.id = id
         self.name = name
@@ -256,7 +263,7 @@ class StringData(Base):  # pylint: disable=R0903
                         self.units))
 
 
-class ListStringDataMaster(Base):  # pylint: disable=R0903
+class ListStringDataMaster(Base):
     """
     Implementation of a table to store info about lists of string-type data.
 
@@ -312,7 +319,7 @@ class ListStringDataMaster(Base):  # pylint: disable=R0903
                         self.units))
 
 
-class ListStringDataEntry(Base):  # pylint: disable=R0903,R0904
+class ListStringDataEntry(Base):
     """
     Implementation of a table to store list entries of string-type data.
 
@@ -357,7 +364,7 @@ class ListStringDataEntry(Base):  # pylint: disable=R0903,R0904
                         self.value))
 
 
-class Document(Base):  # pylint: disable=R0903
+class Document(Base):
     """
     Implementation of document table.
 
@@ -379,7 +386,9 @@ class Document(Base):  # pylint: disable=R0903
     mimetype = Column(String(255), nullable=True)
     tags = Column(Text(), nullable=True)
 
-    def __init__(self, id, uri, contents=None, mimetype=None, tags=None):  # pylint: disable=R0913
+    # Disable the pylint check if and until the team decides to refactor the code
+    def __init__(self, id, uri,  # pylint: disable=too-many-arguments
+                 contents=None, mimetype=None, tags=None):
         """Create from id, uri, and optionally contents and mimetype."""
         self.id = id
         self.uri = uri
@@ -393,7 +402,7 @@ class Document(Base):  # pylint: disable=R0903
                 .format(self.id, self.uri, self.mimetype, self.tags))
 
 
-class Run(Base):  # pylint: disable=R0903
+class Run(Base):
     """
     Implementation of Run table.
 

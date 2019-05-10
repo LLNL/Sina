@@ -6,12 +6,12 @@ Based on Mnoda
 import numbers
 import logging
 
-# Disable redefined-builtin, invalid-name due to ubiquitous use of id,
-#   cross_populate_object_and_subject, and attributes associated with
-#   _AutodocFakeColumn
-# pylint: disable=C0103,W0622
+# Disable pylint checks due to ubiquitous use of id,
+#   cross_populate_object_and_subject, and the nature of the classes
+# pylint: disable=invalid-name,redefined-builtin,too-few-public-methods
 
-from cassandra.cqlengine.management import sync_table  # pylint: disable=E0401
+# Disable pylint check due to cassandra being optional
+from cassandra.cqlengine.management import sync_table  # pylint: disable=import-error
 
 try:
     from cassandra.cqlengine.models import Model
@@ -28,7 +28,7 @@ except ImportError:
     # includes more flexible mocking.
     Model = object
 
-    class _AutodocFakeColumn(object):  # pylint: disable=R0903
+    class _AutodocFakeColumn(object):
         """Mock column members that can't be mocked by Sphinx's autodoc."""
 
         def __init__(self, **kwargs):
@@ -49,7 +49,7 @@ except ImportError:
 LOGGER = logging.getLogger(__name__)
 
 
-class Record(Model):  # pylint: disable=R0903
+class Record(Model):
     """
     Toplevel object in the Mnoda schema.
 
@@ -61,7 +61,7 @@ class Record(Model):  # pylint: disable=R0903
     raw = columns.Text()
 
 
-class DocumentFromRecord(Model):  # pylint: disable=R0903
+class DocumentFromRecord(Model):
     """Query table for finding documents given records."""
 
     id = columns.Text(primary_key=True)
@@ -70,7 +70,7 @@ class DocumentFromRecord(Model):  # pylint: disable=R0903
     tags = columns.Set(columns.Text())
 
 
-class RecordFromScalarData(Model):  # pylint: disable=R0903
+class RecordFromScalarData(Model):
     """Query table for finding records given scalar criteria."""
 
     name = columns.Text(primary_key=True)
@@ -80,7 +80,7 @@ class RecordFromScalarData(Model):  # pylint: disable=R0903
     tags = columns.Set(columns.Text())
 
 
-class ScalarDataFromRecord(Model):  # pylint: disable=R0903
+class ScalarDataFromRecord(Model):
     """Query table for finding a scalar-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
@@ -90,7 +90,7 @@ class ScalarDataFromRecord(Model):  # pylint: disable=R0903
     tags = columns.Set(columns.Text())
 
 
-class RecordFromScalarListData(Model):  # pylint: disable=R0903
+class RecordFromScalarListData(Model):
     """
     Query table for finding records given scalar list criteria.
 
@@ -111,7 +111,7 @@ class RecordFromScalarListData(Model):  # pylint: disable=R0903
     id = columns.Text(primary_key=True)
 
 
-class ScalarListDataFromRecord(Model):  # pylint: disable=R0903
+class ScalarListDataFromRecord(Model):
     """Query table for finding a scalar list-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
@@ -125,7 +125,7 @@ class ScalarListDataFromRecord(Model):  # pylint: disable=R0903
     tags = columns.Set(columns.Text())
 
 
-class RecordFromStringData(Model):  # pylint: disable=R0903
+class RecordFromStringData(Model):
     """
     Query table for finding records given string criteria (ex, "version"="1.2.3").
 
@@ -140,7 +140,7 @@ class RecordFromStringData(Model):  # pylint: disable=R0903
     tags = columns.Set(columns.Text())
 
 
-class StringDataFromRecord(Model):  # pylint: disable=R0903
+class StringDataFromRecord(Model):
     """Query table for finding a string-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
@@ -150,7 +150,7 @@ class StringDataFromRecord(Model):  # pylint: disable=R0903
     tags = columns.Set(columns.Text())
 
 
-class RecordFromStringListData(Model):  # pylint: disable=R0903
+class RecordFromStringListData(Model):
     """
     Query table for finding records given string list criteria.
 
@@ -162,7 +162,7 @@ class RecordFromStringListData(Model):  # pylint: disable=R0903
     id = columns.Text(primary_key=True)
 
 
-class StringListDataFromRecord(Model):  # pylint: disable=R0903
+class StringListDataFromRecord(Model):
     """Query table for finding a scalar list-valued Record.data entry given record ID."""
 
     id = columns.Text(primary_key=True)
@@ -175,7 +175,7 @@ class StringListDataFromRecord(Model):  # pylint: disable=R0903
     tags = columns.Set(columns.Text())
 
 
-class Run(Model):  # pylint: disable=R0903
+class Run(Model):
     """Query table for finding runs based on special, supported metadata."""
 
     id = columns.Text(primary_key=True)
@@ -184,7 +184,7 @@ class Run(Model):  # pylint: disable=R0903
     version = columns.Text()
 
 
-class ObjectFromSubject(Model):  # pylint: disable=R0903
+class ObjectFromSubject(Model):
     """
     Query table for finding object given subject (plus optionally predicate).
 
@@ -201,7 +201,7 @@ class ObjectFromSubject(Model):  # pylint: disable=R0903
     object_id = columns.Text(primary_key=True)
 
 
-class SubjectFromObject(Model):  # pylint: disable=R0903
+class SubjectFromObject(Model):
     """Query table for finding subject given object (plus optionally predicate)."""
 
     object_id = columns.Text(primary_key=True)
@@ -252,7 +252,9 @@ def _discover_tables_from_value(value):
     return (x_from_rec, rec_from_x)
 
 
-def cross_populate_data_tables(name,  # pylint: disable=R0913
+# Disable pylint check until the team decides to increase configuration limits or
+# refactor the code.
+def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
                                value,
                                id,
                                tags=None,

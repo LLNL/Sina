@@ -13,8 +13,8 @@ import sina.model
 LOGGER = logging.getLogger(__name__)
 
 
-# Disable redefined-builtin, invalid-name due to ubiquitous use of id and type
-# pylint: disable=C0103,W0622
+# Disable pylint checks due to ubiquitous use of id and type
+# pylint: disable=invalid-name,redefined-builtin
 
 class DAOFactory(object):
     """Builds DAOs used for interacting with Mnoda-based data objects."""

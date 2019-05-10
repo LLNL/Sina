@@ -7,15 +7,17 @@ from collections import defaultdict
 import json
 
 import six
-from cassandra.cqlengine.query import DoesNotExist, BatchQuery  # pylint: disable=E0401
+
+# Disable pylint check due to its issue with virtual environments
+from cassandra.cqlengine.query import DoesNotExist, BatchQuery  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.cass_schema as schema
 import sina.utils as utils
 
-# Disable redefined-builtin, invalid-name due to ubiquitous use of id
-# pylint: disable=C0103,W0622
+# Disable pylint checks due to ubiquitous use of id
+# pylint: disable=invalid-name,redefined-builtin
 
 LOGGER = logging.getLogger(__name__)
 
@@ -63,7 +65,8 @@ class RecordDAO(dao.RecordDAO):
                                files=record.files,
                                force_overwrite=force_overwrite)
 
-    def insert_many(self, list_to_insert,  # pylint: disable=R0912,R0914
+    # Disable pylint checks to if and until the team decides to refactor the code
+    def insert_many(self, list_to_insert,  # pylint: disable=too-many-branches,too-many-locals
                     force_overwrite=False, _type_managed=False):
         """
         Given a list of Records, insert each into Cassandra.
@@ -195,12 +198,8 @@ class RecordDAO(dao.RecordDAO):
                                                             value=value,
                                                             id=entry[1])
 
-<<<<<<< HEAD
-    def _insert_data(self, data, id, force_overwrite=False):  # pylint: disable=R0201
-=======
     @staticmethod
     def _insert_data(data, id, force_overwrite=False):
->>>>>>> develop
         """
         Insert data into two of the Cassandra query tables depending on value.
 
@@ -223,12 +222,8 @@ class RecordDAO(dao.RecordDAO):
                                               tags=datum.get('tags'),
                                               force_overwrite=force_overwrite)
 
-<<<<<<< HEAD
-    def _insert_files(self, id, files, force_overwrite=False):  # pylint: disable=R0201
-=======
     @staticmethod
     def _insert_files(id, files, force_overwrite=False):
->>>>>>> develop
         """
         Insert files into the DocumentFromRecord table.
 
@@ -323,7 +318,10 @@ class RecordDAO(dao.RecordDAO):
              .batch(batch).delete())
         schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
-    def data_query(self, **kwargs):  # pylint: disable=R0904,R0912,R0914
+    # Disable pylint checks -- including R0914=too-many-locals -- to if and
+    # until the team decides to refactor the code
+    def data_query(self,  # pylint: disable=too-many-branches,too-many-branches,R0914
+                   **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -530,12 +528,8 @@ class RecordDAO(dao.RecordDAO):
         for id in filtered_ids:
             yield id
 
-<<<<<<< HEAD
-    def _configure_query_for_criteria(self, query, name, criteria):  # pylint: disable=R0201
-=======
     @staticmethod
     def _configure_query_for_criteria(query, name, criteria):
->>>>>>> develop
         """
         Use criteria to build a query.
 
@@ -706,7 +700,9 @@ class RecordDAO(dao.RecordDAO):
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarDataFromRecord,
                         schema.StringDataFromRecord]
-        for query_table in query_tables:  # pylint: disable=R0101
+
+        # Disable pylint check until team decides to refactor the code
+        for query_table in query_tables:  # pylint: disable=too-many-nested-blocks
             query = (query_table.objects
                      .filter(query_table.id.in_(id_list))
                      .filter(query_table.name.in_(data_list))
@@ -930,27 +926,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
         return self._build_relationships(query.allow_filtering().all())
 
-<<<<<<< HEAD
-=======
-    @staticmethod
-    def _build_relationships(query):
-        """
-        Given Cassandra query results, built a list of Relationships.
-
-        Helper method to turn Cassandra query results into Relationship objects.
-
-        :param query: The query results to build from.
-        """
-        LOGGER.debug('Building relationships from query=%s', query)
-        relationships = []
-        for relationship in query:
-            rel_obj = model.Relationship(subject_id=relationship.subject_id,
-                                         object_id=relationship.object_id,
-                                         predicate=relationship.predicate)
-            relationships.append(rel_obj)
-        return relationships
-
->>>>>>> develop
 
 class RunDAO(dao.RunDAO):
     """DAO responsible for handling Runs, (Record subtype), in Cassandra."""
@@ -972,12 +947,8 @@ class RunDAO(dao.RunDAO):
                version=run.version)
         self.record_dao.insert(record=run, force_overwrite=force_overwrite)
 
-<<<<<<< HEAD
-    def _insert_sans_rec(self, run, force_overwrite=False):  # pylint: disable=R0201
-=======
     @staticmethod
     def _insert_sans_rec(run, force_overwrite=False):
->>>>>>> develop
         """
         Given a Run, import it into the Run table only.
 

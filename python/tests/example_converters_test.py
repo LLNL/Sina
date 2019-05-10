@@ -5,7 +5,9 @@ import shutil
 import subprocess
 import os
 import json
-import jsonschema  # pylint: disable=E0401
+
+# Disable pylint check due to its issue with virtual environments
+import jsonschema  # pylint: disable=import-error
 
 
 class TestFukushima(unittest.TestCase):

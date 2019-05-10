@@ -6,8 +6,9 @@ import os
 import tempfile
 import time
 
-from nose.plugins.attrib import attr  # pylint: disable=E0401
-from mock import patch  # pylint: disable=E0401
+# Disable pylint checks due to its issue with virtual environments
+from nose.plugins.attrib import attr  # pylint: disable=import-error
+from mock import patch  # pylint: disable=import-error
 
 try:
     import cassandra.cqlengine.connection as connection

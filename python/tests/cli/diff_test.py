@@ -6,7 +6,9 @@ import unittest
 import logging
 
 from six.moves import cStringIO
-from nose.plugins.attrib import attr  # pylint: disable=E0401
+
+# Disable pylint check due to its issue with virtual environments
+from nose.plugins.attrib import attr  # pylint: disable=import-error
 
 from sina.model import Record
 try:

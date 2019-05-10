@@ -26,7 +26,9 @@ import subprocess
 import unittest
 
 from six import with_metaclass
-from nose.plugins.attrib import attr  # pylint: disable=E0401
+
+# Disable pylint checks due to its issue with virtual environments
+from nose.plugins.attrib import attr  # pylint: disable=import-error
 
 # Assumed root directory for examples, etc.
 #
@@ -89,7 +91,8 @@ def _build_pep8_output(result):
             sorted(_dict.keys())]
 
 
-def _execute_notebook(path):  # pylint: disable=R0912
+# Disable pylint checks to if and until the team decides to refactor the code
+def _execute_notebook(path):  # pylint: disable=too-many-branches
     """
     Execute a notebook and collect any output errors.
 
@@ -103,37 +106,24 @@ def _execute_notebook(path):  # pylint: disable=R0912
 
     try:
         notebook = _read_notebook(path)
-<<<<<<< HEAD
-    except Exception as _exception:  # pylint: disable=W0703
-        return ['{}: {}: Reading {}: {}'.format(_exception.__class__.__name__,
-                                                SINA_KERNEL, path, str(_exception))]
-=======
     except (IOError, nbformat.reader.NotJSONError) as exception:
         return ['{}: {}: Reading {}: {}'.format(exception.__class__.__name__,
                                                 SINA_KERNEL, path, str(exception))]
->>>>>>> develop
 
     try:
         # Does the notebook conform to the current format schema?
         nbformat.validate(notebook)
-<<<<<<< HEAD
-    except Exception as _exception:  # pylint: disable=W0703
-=======
     except nbformat.ValidationError as exception:
->>>>>>> develop
         errors.append('{}: {}: Validating {}: {}'.
                       format(exception.__class__.__name__, SINA_KERNEL, path,
                              str(exception)))
 
-    try:  # pylint: disable=R0101
+    # Disable the check to if and until the team decides to refactor the code
+    try:  # pylint: disable=too-many-nested-blocks
         exec_preprocessor = ExecutePreprocessor(timeout=-1,
                                                 kernel_name=SINA_KERNEL)
         exec_preprocessor.preprocess(notebook, {'metadata': {'path': RUN_PATH}})
-<<<<<<< HEAD
-    except Exception as _exception:  # pylint: disable=W0703
-=======
     except CellExecutionError as exception:
->>>>>>> develop
         errors.append('{}: {}: Running {} in {}: {}'.
                       format(exception.__class__.__name__, SINA_KERNEL, path,
                              RUN_PATH, str(exception)))
@@ -143,11 +133,7 @@ def _execute_notebook(path):  # pylint: disable=R0912
         try:
             with io.open(execname, mode='wt', encoding='utf-8') as fout:
                 nbformat.write(notebook, fout)
-<<<<<<< HEAD
-        except Exception as _exception:  # pylint: disable=W0703
-=======
         except IOError as exception:
->>>>>>> develop
             errors.append('{}: {}: Writing {}: {}'.
                           format(exception.__class__.__name__, SINA_KERNEL,
                                  execname, str(exception)))
@@ -163,11 +149,7 @@ def _execute_notebook(path):  # pylint: disable=R0912
                                               format(SINA_TEST_KERNEL,
                                                      output.ename,
                                                      output.evalue))
-<<<<<<< HEAD
-            except Exception as _exception:  # pylint: disable=W0703
-=======
             except (IOError, nbformat.reader.NotJSONError) as exception:
->>>>>>> develop
                 errors.append('{}: {}: Checking for errors in {}: {}'.
                               format(exception.__class__.__name__,
                                      SINA_KERNEL, execname, str(exception)))

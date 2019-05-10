@@ -10,9 +10,8 @@ import sina.datastores.sql as backend
 
 
 # Disable pylint no-init check just on the Mixin class, since it has no use
-# for an __init__, and too-few-public-methods.
-# Also disable pylint
-class SQLMixin(object):  # pylint: disable=W0232,R0903
+# for an __init__ and there is no expectation of adding more public methods.
+class SQLMixin(object):  # pylint: disable=no-init,too-few-public-methods
     """Contains the methods shared between all test classes."""
 
     __test__ = False

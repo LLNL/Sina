@@ -7,8 +7,10 @@ import warnings
 import json
 
 from six.moves import cStringIO as StringIO
-from nose.plugins.attrib import attr  # pylint: disable=E0401
-import jsonschema  # pylint: disable=E0401
+
+# Disable pylint checks due to its issue with virtual environments
+from nose.plugins.attrib import attr  # pylint: disable=import-error
+import jsonschema  # pylint: disable=import-error
 
 from sina.cli import driver
 
