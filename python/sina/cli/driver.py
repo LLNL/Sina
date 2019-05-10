@@ -89,21 +89,23 @@ def add_ingest_subparser(subparsers):
                        ' a specified database. See "sina ingest -h" for more '
                        'information.')
     _add_common_args(parser=parser_ingest)
+    # pylint: disable=fixme
     # TODO: If use case is Localhost and/or RZSonar, might make sense to have
     # keyspace be the database arg and provide IP/port the special way.
     # This isn't out of line with cql, which will start fine without an
-    # ip/port provided (assumes Localhost) and can take a keyspace.
+    # ip/port provided (assumes Localhost) and can take a keyspace. SIBO-780
 
     parser_ingest.add_argument('source', type=str,
                                help='The URI or list of URIs to ingest from. '
                                'Data must be compliant with the Mnoda schema, '
                                'and can be in any of the supported backends. '
                                'Comma-separated.')
+    # pylint: disable=fixme
     # TODO: What if they supply a folder? We'll probably want to support that.
     # I think they should only be able to provide one source-type. They can
     # pipe `find` in if they want to do something fancy--if we try to parse
     # something from a folder and fail because it's the wrong backend, it's
-    # time to fail and complain.
+    # time to fail and complain. SIBO-780
     parser_ingest.add_argument('--source-type', type=str,
                                help='The type of the URIs being ingested. Sina '
                                'will try to infer this from --source if '
@@ -145,10 +147,11 @@ def add_query_subparser(subparsers):
         'query', help='perform a query against a Mnoda-compliant backend. '
                       'See "sina query -h" for more information.')
     _add_common_args(parser=parser_query)
+    # pylint: disable=fixme
     # TODO: This is the prior formatting. But if do comma-separated and hit
     # something that doesn't look like an entire scalar, it's either a range
     # or an error, and it should be easy enough to tell the difference. Given
-    # that comma-separated is the standard, might be worth changing.
+    # that comma-separated is the standard, might be worth changing. SIBO-780
     parser_query.add_argument('-s', '--scalar', type=str,
                               help='Specify space-separated scalars to search '
                               'on. Sina will return ids for all records '
@@ -162,7 +165,6 @@ def add_query_subparser(subparsers):
                               'is exactly 3, tilt is between 2 and 3 '
                               '(inclusive), height is greater than or equal to '
                               '2.05, *and* foo is greater than or equal to 2.')
-    # TODO: Escaping %
     parser_query.add_argument('-u', '--uri', type=str,
                               help='Specify a uri to search on. %% can be used '
                               'as a wildcard, but incurs a performance hit '
@@ -416,15 +418,11 @@ def query(args):
     if args.uri:
         accepted_ids_list = matches if args.scalar else None
         matches = record_dao.get_given_document_uri(
-            uri=args.uri, accepted_ids_list=accepted_ids_list)
-    # TODO: Not ideal, if we only need the ids we're doing an unnecessary query
-    # against the records table, as both scalar and uri queries find ids
-    # (but then call get_many()). Easily solved with optargs. But is that
-    # against "good sense" for the DAO?
+            uri=args.uri, accepted_ids_list=accepted_ids_list, ids_only=True)
     if args.id:
-        print([x.id for x in matches])
+        print([x for x in matches])
     else:
-        print([x.raw for x in matches])
+        print([x.raw for x in record_dao.get_many(matches)])
 
 
 def compare_records(args):

@@ -155,16 +155,19 @@ class RecordDAO(object):
         return self.data_query(**kwargs)
 
     @abstractmethod
-    def get_all_of_type(self, type):
+    def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of Record, return all Records of that type.
 
         :param type: The type of Record to return
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of matching Records.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def get_given_document_uri(self, uri):
+    def get_given_document_uri(self, uri, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
@@ -172,8 +175,9 @@ class RecordDAO(object):
         not get duplicates depending on the backend.
 
         :param uri: The uri to use as a search term, such as "foo.png"
+        :param ids_only: whether to return only the ids of matching Records
 
-        :returns: A generator of matching records
+        :returns: A generator of matching Records
         """
         raise NotImplementedError
 
@@ -238,8 +242,8 @@ class RelationshipDAO(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def insert(self, subject_id=None, object_id=None,
-               predicate=None, relationship=None):
+    def insert(self, relationship=None, subject_id=None,
+               object_id=None, predicate=None):
         """
         Given a Relationship, insert it into the DAO's backend.
 
@@ -455,13 +459,17 @@ class RunDAO(object):
         """Alias data_query()."""
         return self.data_query(**kwargs)
 
-    def get_given_document_uri(self, uri):
+    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return runs associated with a document uri.
 
         Really just calls Record's implementation.
 
         :param uri: The uri to match.
+        :param accepted_ids_list: A list of ids to restrict the search to.
+                                  If not provided, all ids will be used.
+        :param ids_only: whether to return only the ids of matching Runs
+                         (used for further filtering)
 
         :returns: A generator of Runs fitting the criteria
         """

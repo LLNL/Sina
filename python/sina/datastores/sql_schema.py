@@ -369,9 +369,6 @@ class Document(Base):
                 nullable=False,
                 primary_key=True)
     uri = Column(String(255), nullable=False, primary_key=True)
-    # TODO: What does a file that doesn't have a mimetype look like? Should
-    # this be required? Should we fallback to getting file extension
-    # from the uri if a mimetype isn't provided?
     mimetype = Column(String(255), nullable=True)
     tags = Column(Text(), nullable=True)
 

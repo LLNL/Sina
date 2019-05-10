@@ -31,6 +31,10 @@ TABLE_LOOKUP = {
 class RecordDAO(dao.RecordDAO):
     """The DAO specifically responsible for handling Records in Cassandra."""
 
+    # pylint: disable=arguments-differ
+    # Args differ because SQL doesn't support force_overwrite yet, also because
+    # its insert() is functionally a helper to its insert_many, so it needs
+    # extra logic. SIBO-661 and SIBO-307
     def insert(self, record, force_overwrite=False):
         """
         Given a Record, insert it into the current Cassandra database.
@@ -60,6 +64,8 @@ class RecordDAO(dao.RecordDAO):
                                files=record.files,
                                force_overwrite=force_overwrite)
 
+    # pylint: disable=arguments-differ
+    # This method is going away in SIBO-661
     def insert_many(self, list_to_insert, force_overwrite=False, _type_managed=False):
         """
         Given a list of Records, insert each into Cassandra.
@@ -852,8 +858,8 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                     predicate=entry[0],
                                                     object_id=entry[1]))
 
-    # TODO: Ongoing question of whether these should return generators.
-
+    # pylint: disable=fixme
+    # TODO: Should these return generators? SIBO-541
     def _get_given_subject_id(self, subject_id, predicate=None):
         """
         Given record id, return all Relationships with that id as subject.
@@ -890,7 +896,8 @@ class RelationshipDAO(dao.RelationshipDAO):
                      'predicate=%s.', object_id, predicate)
         query = schema.SubjectFromObject.objects.filter(object_id=object_id)
         if predicate:
-            # TODO: If third query table (for predicates) implemented, change
+            # pylint: disable=fixme
+            # TODO: If predicate query table implemented, change. SIBO-145
             query = query.filter(predicate=predicate)
         return self._build_relationships(query.allow_filtering().all())
 
@@ -903,7 +910,8 @@ class RelationshipDAO(dao.RelationshipDAO):
         :returns: A list of Relationships fitting the criteria
         """
         LOGGER.debug('Getting relationships related to predicate=%s.', predicate)
-        # TODO: If third query table (for predicates) implemented, change
+        # pylint: disable=fixme
+        # TODO: If predicate query table implemented, change. SIBO-145
         query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
         return self._build_relationships(query.allow_filtering().all())
 
@@ -926,6 +934,8 @@ class RelationshipDAO(dao.RelationshipDAO):
 class RunDAO(dao.RunDAO):
     """DAO responsible for handling Runs, (Record subtype), in Cassandra."""
 
+    # pylint: disable=arguments-differ
+    # Args differ because SQL doesn't support force_overwrite yet, SIBO-307
     def insert(self, run, force_overwrite=False):
         """
         Given a Run, import it into the current Cassandra database.
@@ -964,6 +974,9 @@ class RunDAO(dao.RunDAO):
                user=run.user,
                version=run.version)
 
+    # pylint: disable=arguments-differ
+    # Args differ because SQL doesn't support force_overwrite yet, SIBO-307.
+    # This method will be going away in SIBO-661
     def insert_many(self, list_to_insert, force_overwrite=False):
         """
         Given a list of Runs, insert each into Cassandra.
