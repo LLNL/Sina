@@ -6,6 +6,9 @@ import json
 from sina.model import Record, Run
 import sina.model as model
 
+# Accessing "private" methods is necessary for testing them.
+# pylint: disable=protected-access
+
 
 class TestModel(unittest.TestCase):
     """Unit tests for the model utility methods."""
