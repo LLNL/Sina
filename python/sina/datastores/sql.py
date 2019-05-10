@@ -503,7 +503,8 @@ class RecordDAO(dao.RecordDAO):
         query = query.params(search_args)
         return query
 
-    def _build_range_filter(self, name, criteria, table, index=0):
+    @staticmethod
+    def _build_range_filter(name, criteria, table, index=0):
         """
         Build a TextClause to filter a SQL query using range parameters.
 
@@ -768,9 +769,10 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         return self._build_relationships(query.all())
 
-    def _build_relationships(self, query):
+    @staticmethod
+    def _build_relationships(query):
         """
-        Given query results, build a list of Relationships.
+        Given SQL query results, build a list of Relationships.
 
         :param query: The query results to build from.
         """

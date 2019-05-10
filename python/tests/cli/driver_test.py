@@ -24,6 +24,9 @@ except ImportError:
 
 TEMP_DB_NAME = "temp_sqlite_testfile.sqlite"
 
+# Accessing "private" methods is necessary for testing them.
+# pylint: disable=protected-access
+
 
 class TestCLI(unittest.TestCase):
     """Tests for the CLI correctly interpreting args."""

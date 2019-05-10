@@ -85,6 +85,12 @@ class RecordDAO(dao.RecordDAO):
         from_string_batch = defaultdict(list)
         from_scalar_list_batch = defaultdict(list)
         from_string_list_batch = defaultdict(list)
+
+        def _cross_populate_batch(batch_dict, batch_list):
+            """Insert data into a batch dict and list."""
+            batch_dict[datum_name].append((value, id, units, tags))
+            batch_list.append((datum_name, value, units, tags))
+
         for record in list_to_insert:
             # Insert the Record itself
             is_valid, warnings = record.is_valid()
@@ -101,11 +107,6 @@ class RecordDAO(dao.RecordDAO):
                 string_list_from_rec_batch = []
                 scalar_list_from_rec_batch = []
                 tags, units, value, datum_name, id = [None]*5
-
-                def _cross_populate_batch(batch_dict, batch_list):
-                    """Insert data into a batch dict and list."""
-                    batch_dict[datum_name].append((value, id, units, tags))
-                    batch_list.append((datum_name, value, units, tags))
 
                 for datum_name, datum in record.data.items():
                     tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
@@ -190,12 +191,14 @@ class RecordDAO(dao.RecordDAO):
                                                             value=value,
                                                             id=entry[1])
 
-    def _insert_data(self, data, id, force_overwrite=False):
+    @staticmethod
+    def _insert_data(data, id, force_overwrite=False):
         """
-        Insert data into two of the four query tables depending on value.
+        Insert data into two of the Cassandra query tables depending on value.
 
         Data entries that are numbers (12.0) go in the ScalarData tables. Any that
-        aren't ("Tuesday","12.0") go in the StringData tables.
+        aren't ("Tuesday","12.0") go in the StringData tables. Helper method to
+        simplify insertion.
 
         :param data: The dictionary of data to insert.
         :param id: The Record ID to associate the data to.
@@ -212,9 +215,12 @@ class RecordDAO(dao.RecordDAO):
                                               tags=datum.get('tags'),
                                               force_overwrite=force_overwrite)
 
-    def _insert_files(self, id, files, force_overwrite=False):
+    @staticmethod
+    def _insert_files(id, files, force_overwrite=False):
         """
         Insert files into the DocumentFromRecord table.
+
+        Helper method to simplify insertion, bound to Cassandra.
 
         :param id: The Record ID to associate the files to.
         :param files: The list of files to insert.
@@ -512,12 +518,13 @@ class RecordDAO(dao.RecordDAO):
         for id in filtered_ids:
             yield id
 
-    def _configure_query_for_criteria(self, query, name, criteria):
+    @staticmethod
+    def _configure_query_for_criteria(query, name, criteria):
         """
         Use criteria to build a query.
 
         Note that this returns a query object, not a completed query. It's
-        used by the data query methods to build the queries they execute.
+        a helper for data query methods to build the queries they execute.
 
         :param query: The query object to consider
         :param name: The name of the data being queries
@@ -907,9 +914,12 @@ class RelationshipDAO(dao.RelationshipDAO):
         query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
         return self._build_relationships(query.allow_filtering().all())
 
-    def _build_relationships(self, query):
+    @staticmethod
+    def _build_relationships(query):
         """
-        Given query results, built a list of Relationships.
+        Given Cassandra query results, built a list of Relationships.
+
+        Helper method to turn Cassandra query results into Relationship objects.
 
         :param query: The query results to build from.
         """
@@ -943,13 +953,14 @@ class RunDAO(dao.RunDAO):
                version=run.version)
         self.record_dao.insert(record=run, force_overwrite=force_overwrite)
 
-    def _insert_sans_rec(self, run, force_overwrite=False):
+    @staticmethod
+    def _insert_sans_rec(run, force_overwrite=False):
         """
         Given a Run, import it into the Run table only.
 
-        Skips the call to record_dao's insert--this is intended to be called
+        Skips the call to record_dao's insert--this is a helper to be called
         from within insert_many()s, which implement special logic that Run
-        metadata doesn't benefit from.
+        metadata doesn't benefit from. Relies on Cassandra table schema.
 
         :param run: A Run to import
         :param force_overwrite: Whether to forcibly overwrite a preexisting
@@ -996,6 +1007,11 @@ class RunDAO(dao.RunDAO):
         """
         with BatchQuery() as batch:
             schema.Run.objects(id=id).batch(batch).delete()
+            # In order to accomplish everything within one batch, we hand it off
+            # to a record_dao. However, we do not want to expose this part of
+            # Record deletion to users; it's wrapped by two friendlier functions instead.
+            # The method's "private" status is to avoid confusion with them.
+            # pylint: disable=protected-access
             self.record_dao._setup_batch_delete(batch, id)
 
     def delete_many(self, ids_to_delete):
@@ -1011,6 +1027,8 @@ class RunDAO(dao.RunDAO):
         with BatchQuery() as batch:
             for id in ids_to_delete:
                 schema.Run.objects(id=id).batch(batch).delete()
+                # See delete() above for explanation of this:
+                # pylint: disable=protected-access
                 self.record_dao._setup_batch_delete(batch, id)
 
     def get(self, id):
