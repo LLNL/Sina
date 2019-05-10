@@ -10,7 +10,8 @@ logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
 
 
-def print_diff_records(record_one, record_two,  # pylint: disable=R0914
+# Disable pylint check to if and when the team decides to refactor the code
+def print_diff_records(record_one, record_two,  # pylint: disable=too-many-locals
                        significant_digits=None):
     """
     Print a table showing the difference between two Records.
