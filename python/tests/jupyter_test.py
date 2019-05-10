@@ -13,7 +13,7 @@ Sources:
     https://nbconvert.readthedocs.io/en/latest/execute_api.html
 """
 try:
-    from nbconvert.preprocessors import ExecutePreprocessor
+    from nbconvert.preprocessors import ExecutePreprocessor, CellExecutionError
     import nbformat
 except ImportError:
     pass
@@ -103,36 +103,54 @@ def _execute_notebook(path):  # pylint: disable=R0912
 
     try:
         notebook = _read_notebook(path)
+<<<<<<< HEAD
     except Exception as _exception:  # pylint: disable=W0703
         return ['{}: {}: Reading {}: {}'.format(_exception.__class__.__name__,
                                                 SINA_KERNEL, path, str(_exception))]
+=======
+    except (IOError, nbformat.reader.NotJSONError) as exception:
+        return ['{}: {}: Reading {}: {}'.format(exception.__class__.__name__,
+                                                SINA_KERNEL, path, str(exception))]
+>>>>>>> develop
 
     try:
         # Does the notebook conform to the current format schema?
         nbformat.validate(notebook)
+<<<<<<< HEAD
     except Exception as _exception:  # pylint: disable=W0703
+=======
+    except nbformat.ValidationError as exception:
+>>>>>>> develop
         errors.append('{}: {}: Validating {}: {}'.
-                      format(_exception.__class__.__name__, SINA_KERNEL, path,
-                             str(_exception)))
+                      format(exception.__class__.__name__, SINA_KERNEL, path,
+                             str(exception)))
 
     try:  # pylint: disable=R0101
         exec_preprocessor = ExecutePreprocessor(timeout=-1,
                                                 kernel_name=SINA_KERNEL)
         exec_preprocessor.preprocess(notebook, {'metadata': {'path': RUN_PATH}})
+<<<<<<< HEAD
     except Exception as _exception:  # pylint: disable=W0703
+=======
+    except CellExecutionError as exception:
+>>>>>>> develop
         errors.append('{}: {}: Running {} in {}: {}'.
-                      format(_exception.__class__.__name__, SINA_KERNEL, path,
-                             RUN_PATH, str(_exception)))
+                      format(exception.__class__.__name__, SINA_KERNEL, path,
+                             RUN_PATH, str(exception)))
     finally:
         _, basename = os.path.split(path)
         execname = os.path.join(RUN_PATH, "execute_{}".format(basename))
         try:
             with io.open(execname, mode='wt', encoding='utf-8') as fout:
                 nbformat.write(notebook, fout)
+<<<<<<< HEAD
         except Exception as _exception:  # pylint: disable=W0703
+=======
+        except IOError as exception:
+>>>>>>> develop
             errors.append('{}: {}: Writing {}: {}'.
-                          format(_exception.__class__.__name__, SINA_KERNEL,
-                                 execname, str(_exception)))
+                          format(exception.__class__.__name__, SINA_KERNEL,
+                                 execname, str(exception)))
 
         if os.path.isfile(execname):
             try:
@@ -145,10 +163,14 @@ def _execute_notebook(path):  # pylint: disable=R0912
                                               format(SINA_TEST_KERNEL,
                                                      output.ename,
                                                      output.evalue))
+<<<<<<< HEAD
             except Exception as _exception:  # pylint: disable=W0703
+=======
+            except (IOError, nbformat.reader.NotJSONError) as exception:
+>>>>>>> develop
                 errors.append('{}: {}: Checking for errors in {}: {}'.
-                              format(_exception.__class__.__name__,
-                                     SINA_KERNEL, execname, str(_exception)))
+                              format(exception.__class__.__name__,
+                                     SINA_KERNEL, execname, str(exception)))
             if len(errors) <= 0:
                 os.remove(execname)
 
@@ -233,16 +255,18 @@ def _check_notebook_style(path):
 
 def _read_notebook(path):
     """
-    Read the noteook from the specified file path.
+    Read the notebook from the specified file path.
 
     :param path: fully qualified path to the notebook
     :returns: the notebook
+    :raises IOError: on failing to open a file (normal IOError condition),
+                     attaches additional information.
     """
     try:
         with open(path) as fout:
             notebook = nbformat.read(fout, nbformat.current_nbformat)
-    except Exception as _exception:
-        _exception.args += ("reading {}".format(path),)
+    except IOError as exception:
+        exception.args += ("reading {}".format(path),)
         raise
 
     return notebook

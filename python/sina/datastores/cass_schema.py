@@ -118,6 +118,7 @@ class ScalarListDataFromRecord(Model):  # pylint: disable=R0903
     name = columns.Text(primary_key=True)
     # CQLEngine support for frozen collections isn't part of their API.
     # Currently, _freeze_db_type() *is* the least hacky option.
+    # pylint: disable=protected-access
     value = columns.List(columns.Double(), primary_key=True)
     value._freeze_db_type()
     units = columns.Text()
@@ -166,6 +167,8 @@ class StringListDataFromRecord(Model):  # pylint: disable=R0903
 
     id = columns.Text(primary_key=True)
     name = columns.Text(primary_key=True)
+    # Until freeze support is public-facing, this is the cleanest option
+    # pylint: disable=protected-access
     value = columns.List(columns.Text(), primary_key=True)
     value._freeze_db_type()
     units = columns.Text()

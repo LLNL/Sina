@@ -240,7 +240,8 @@ class RelationshipDAO(object):
 
     __metaclass__ = ABCMeta
 
-    def _build_relationships(self, query):  # pylint: disable=R0201
+    @staticmethod
+    def _build_relationships(query):
         """
         Given query results, build a list of Relationships.
 

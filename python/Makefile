@@ -220,7 +220,6 @@ flake8: links
 	echo "Running flake8 tests using $(TEST_VENV)"; \
 	$(TEST_VENV)/bin/tox -e flake8
 
-# Recursively call make to ensure the work is done in the specified order
 # Recursively call make if it is necessary to create the test virtual environment.
 test-jupyter: export PATH=$(TEST_PATH)
 test-jupyter: links
