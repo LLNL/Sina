@@ -5,7 +5,7 @@ Sina allows codes to store, query, and visualize their data through an easy-to-u
 API. Data that fits its recognized schema can be ingested into one or more supported backends;
 Sina's API is independent of backend and gives users the benefits of a database without
 requiring knowledge of one, allowing queries to be expressed in pure Python. Visualizations
-are also provided through Python--see the python/examples folder for demo Jupyter notebooks.  
+are also provided through Python--see the examples folder for demo Jupyter notebooks.  
 
 Sina is intended especially for use with run metadata, allowing users to easily and efficiently
 find simulation runs that match some criteria.
