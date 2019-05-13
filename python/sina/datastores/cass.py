@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Contains Cassandra-specific implementations of our DAOs."""
 import numbers
 import logging
@@ -7,12 +8,17 @@ from collections import defaultdict
 import json
 
 import six
-from cassandra.cqlengine.query import DoesNotExist, BatchQuery
+
+# Disable pylint check due to its issue with virtual environments
+from cassandra.cqlengine.query import DoesNotExist, BatchQuery  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.cass_schema as schema
 import sina.utils as utils
+
+# Disable pylint checks due to ubiquitous use of id
+# pylint: disable=invalid-name,redefined-builtin
 
 LOGGER = logging.getLogger(__name__)
 
@@ -60,7 +66,9 @@ class RecordDAO(dao.RecordDAO):
                                files=record.files,
                                force_overwrite=force_overwrite)
 
-    def insert_many(self, list_to_insert, force_overwrite=False, _type_managed=False):
+    # Disable pylint checks to if and until the team decides to refactor the code
+    def insert_many(self, list_to_insert,  # pylint: disable=too-many-branches,too-many-locals
+                    force_overwrite=False, _type_managed=False):
         """
         Given a list of Records, insert each into Cassandra.
 
@@ -311,7 +319,10 @@ class RecordDAO(dao.RecordDAO):
              .batch(batch).delete())
         schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
-    def data_query(self, **kwargs):
+    # Disable pylint checks -- including R0914=too-many-locals -- to if and
+    # until the team decides to refactor the code
+    def data_query(self,  # pylint: disable=too-many-branches,too-many-branches,R0914
+                   **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -690,7 +701,9 @@ class RecordDAO(dao.RecordDAO):
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarDataFromRecord,
                         schema.StringDataFromRecord]
-        for query_table in query_tables:
+
+        # Disable pylint check until team decides to refactor the code
+        for query_table in query_tables:  # pylint: disable=too-many-nested-blocks
             query = (query_table.objects
                      .filter(query_table.id.in_(id_list))
                      .filter(query_table.name.in_(data_list))
@@ -913,24 +926,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         # TODO: If third query table (for predicates) implemented, change
         query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
         return self._build_relationships(query.allow_filtering().all())
-
-    @staticmethod
-    def _build_relationships(query):
-        """
-        Given Cassandra query results, built a list of Relationships.
-
-        Helper method to turn Cassandra query results into Relationship objects.
-
-        :param query: The query results to build from.
-        """
-        LOGGER.debug('Building relationships from query=%s', query)
-        relationships = []
-        for relationship in query:
-            rel_obj = model.Relationship(subject_id=relationship.subject_id,
-                                         object_id=relationship.object_id,
-                                         predicate=relationship.predicate)
-            relationships.append(rel_obj)
-        return relationships
 
 
 class RunDAO(dao.RunDAO):

@@ -2,14 +2,17 @@
 from __future__ import print_function
 import logging
 
-import deepdiff
-from texttable import Texttable
+# Disable pylint checks for optional modules
+import deepdiff  # pylint: disable=import-error
+from texttable import Texttable  # pylint: disable=import-error
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
 
 
-def print_diff_records(record_one, record_two, significant_digits=None):
+# Disable pylint check to if and when the team decides to refactor the code
+def print_diff_records(record_one, record_two,  # pylint: disable=too-many-locals
+                       significant_digits=None):
     """
     Print a table showing the difference between two Records.
 
