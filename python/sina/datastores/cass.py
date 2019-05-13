@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Contains Cassandra-specific implementations of our DAOs."""
 import numbers
 import logging

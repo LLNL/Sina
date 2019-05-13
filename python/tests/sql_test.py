@@ -48,10 +48,7 @@ class TestSetup(SQLMixin, tests.backend_test.TestSetup):
 
     def tearDown(self):
         """Remove any temp files created during test."""
-        try:
-            os.remove(self.test_db_dest)
-        except OSError:
-            pass
+        tests.backend_test.remove_file(self.test_db_dest)
 
     def test_factory_instantiate_file(self):
         """Test to ensure SQL DAOFactory is able to create files."""
@@ -76,10 +73,7 @@ class TestModify(SQLMixin, tests.backend_test.TestModify):
 
     def tearDown(self):
         """Remove any temp files created during test."""
-        try:
-            os.remove(self.test_db_dest)
-        except OSError:
-            pass
+        tests.backend_test.remove_file(self.test_db_dest)
 
 
 class TestQuery(SQLMixin, tests.backend_test.TestQuery):
@@ -94,10 +88,7 @@ class TestQuery(SQLMixin, tests.backend_test.TestQuery):
     @classmethod
     def setUpClass(cls):
         """Create the connection and populate it."""
-        cls.factory = cls.create_dao_factory()
-        cls.record_dao = cls.factory.create_record_dao()
-        cls.run_dao = cls.factory.create_run_dao()
-        cls.relationship_dao = cls.factory.create_relationship_dao()
+        tests.backend_test.create_daos(cls)
         tests.backend_test.populate_database_with_data(cls.record_dao)
 
 
@@ -118,7 +109,4 @@ class TestImportExport(SQLMixin, tests.backend_test.TestImportExport):
 
     def tearDown(self):
         """Remove any temp files created during test."""
-        try:
-            os.remove(self.test_file_path.name)
-        except OSError:
-            pass
+        tests.backend_test.remove_file(self.test_file_path.name)

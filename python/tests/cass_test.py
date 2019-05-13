@@ -2,7 +2,6 @@
 """Test a Sina backend."""
 
 import logging
-import os
 import tempfile
 import time
 
@@ -98,10 +97,7 @@ class TestSetup(CassandraMixin, tests.backend_test.TestSetup):
 
     def tearDown(self):
         """Remove any temp files created during test and tears down the keyspace."""
-        try:
-            os.remove(self.test_db_dest)
-        except OSError:
-            pass
+        tests.backend_test.remove_file(self.test_db_dest)
         self.teardown_cass_keyspace()
 
     @patch('sina.datastores.cass_schema.form_connection', autospec=True)
@@ -150,10 +146,7 @@ class TestQuery(CassandraMixin, tests.backend_test.TestQuery):
     def setUpClass(cls):
         """Create the connection and populate it."""
         cls.create_cass_keyspace()
-        cls.factory = cls.create_dao_factory()
-        cls.record_dao = cls.factory.create_record_dao()
-        cls.run_dao = cls.factory.create_run_dao()
-        cls.relationship_dao = cls.factory.create_relationship_dao()
+        tests.backend_test.create_daos(cls)
         tests.backend_test.populate_database_with_data(cls.record_dao)
 
     @classmethod
@@ -182,8 +175,5 @@ class TestImportExport(CassandraMixin, tests.backend_test.TestImportExport):
 
     def tearDown(self):
         """Remove any temp files or keyspaces created during test."""
-        try:
-            os.remove(self.test_file_path.name)
-        except OSError:
-            pass
+        tests.backend_test.remove_file(self.test_file_path.name)
         self.teardown_cass_keyspace()
