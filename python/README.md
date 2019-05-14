@@ -14,7 +14,6 @@ Contents
 - Using the Example Notebooks
 - Testing
 - Supported Environments
-- Contact Us
 
 
 Overview
@@ -203,13 +202,3 @@ Sina is regularly tested in the following environments:
 - **TOSS 3, RedHat 7.5 (catalyst, rztopaz)**: Secondary development environment
 
 Absence is not an indication that Sina will not work; please consider expanding this list!
-
-
-Contact Us
-==========
-
-Feel free to contact us at siboka@llnl.gov if you have questions or want to
-add to our list of supported environments.
-
-
-Updated: 2/5/2019

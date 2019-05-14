@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Contains Cassandra-specific implementations of our DAOs."""
 import numbers
 import logging
@@ -7,12 +8,17 @@ from collections import defaultdict
 import json
 
 import six
-from cassandra.cqlengine.query import DoesNotExist, BatchQuery
+
+# Disable pylint check due to its issue with virtual environments
+from cassandra.cqlengine.query import DoesNotExist, BatchQuery  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.cass_schema as schema
 import sina.utils as utils
+
+# Disable pylint checks due to ubiquitous use of id
+# pylint: disable=invalid-name,redefined-builtin
 
 LOGGER = logging.getLogger(__name__)
 
@@ -64,7 +70,7 @@ class RecordDAO(dao.RecordDAO):
                                files=record.files,
                                force_overwrite=force_overwrite)
 
-    # pylint: disable=arguments-differ
+    # pylint: disable=arguments-differ,too-many-branches,too-many-locals
     # This method is going away in SIBO-661
     def insert_many(self, list_to_insert, force_overwrite=False, _type_managed=False):
         """
@@ -91,6 +97,12 @@ class RecordDAO(dao.RecordDAO):
         from_string_batch = defaultdict(list)
         from_scalar_list_batch = defaultdict(list)
         from_string_list_batch = defaultdict(list)
+
+        def _cross_populate_batch(batch_dict, batch_list):
+            """Insert data into a batch dict and list."""
+            batch_dict[datum_name].append((value, id, units, tags))
+            batch_list.append((datum_name, value, units, tags))
+
         for record in list_to_insert:
             # Insert the Record itself
             is_valid, warnings = record.is_valid()
@@ -107,11 +119,6 @@ class RecordDAO(dao.RecordDAO):
                 string_list_from_rec_batch = []
                 scalar_list_from_rec_batch = []
                 tags, units, value, datum_name, id = [None]*5
-
-                def _cross_populate_batch(batch_dict, batch_list):
-                    """Insert data into a batch dict and list."""
-                    batch_dict[datum_name].append((value, id, units, tags))
-                    batch_list.append((datum_name, value, units, tags))
 
                 for datum_name, datum in record.data.items():
                     tags = [str(x) for x in datum['tags']] if 'tags' in datum else None
@@ -196,12 +203,14 @@ class RecordDAO(dao.RecordDAO):
                                                             value=value,
                                                             id=entry[1])
 
-    def _insert_data(self, data, id, force_overwrite=False):
+    @staticmethod
+    def _insert_data(data, id, force_overwrite=False):
         """
-        Insert data into two of the four query tables depending on value.
+        Insert data into two of the Cassandra query tables depending on value.
 
         Data entries that are numbers (12.0) go in the ScalarData tables. Any that
-        aren't ("Tuesday","12.0") go in the StringData tables.
+        aren't ("Tuesday","12.0") go in the StringData tables. Helper method to
+        simplify insertion.
 
         :param data: The dictionary of data to insert.
         :param id: The Record ID to associate the data to.
@@ -218,9 +227,12 @@ class RecordDAO(dao.RecordDAO):
                                               tags=datum.get('tags'),
                                               force_overwrite=force_overwrite)
 
-    def _insert_files(self, id, files, force_overwrite=False):
+    @staticmethod
+    def _insert_files(id, files, force_overwrite=False):
         """
         Insert files into the DocumentFromRecord table.
+
+        Helper method to simplify insertion, bound to Cassandra.
 
         :param id: The Record ID to associate the files to.
         :param files: The list of files to insert.
@@ -311,7 +323,10 @@ class RecordDAO(dao.RecordDAO):
              .batch(batch).delete())
         schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
-    def data_query(self, **kwargs):
+    # Disable pylint checks -- including R0914=too-many-locals -- to if and
+    # until the team decides to refactor the code
+    def data_query(self,  # pylint: disable=too-many-branches,too-many-branches,R0914
+                   **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -518,12 +533,13 @@ class RecordDAO(dao.RecordDAO):
         for id in filtered_ids:
             yield id
 
-    def _configure_query_for_criteria(self, query, name, criteria):
+    @staticmethod
+    def _configure_query_for_criteria(query, name, criteria):
         """
         Use criteria to build a query.
 
         Note that this returns a query object, not a completed query. It's
-        used by the data query methods to build the queries they execute.
+        a helper for data query methods to build the queries they execute.
 
         :param query: The query object to consider
         :param name: The name of the data being queries
@@ -689,7 +705,9 @@ class RecordDAO(dao.RecordDAO):
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarDataFromRecord,
                         schema.StringDataFromRecord]
-        for query_table in query_tables:
+
+        # Disable pylint check until team decides to refactor the code
+        for query_table in query_tables:  # pylint: disable=too-many-nested-blocks
             query = (query_table.objects
                      .filter(query_table.id.in_(id_list))
                      .filter(query_table.name.in_(data_list))
@@ -915,21 +933,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
         return self._build_relationships(query.allow_filtering().all())
 
-    def _build_relationships(self, query):
-        """
-        Given query results, built a list of Relationships.
-
-        :param query: The query results to build from.
-        """
-        LOGGER.debug('Building relationships from query=%s', query)
-        relationships = []
-        for relationship in query:
-            rel_obj = model.Relationship(subject_id=relationship.subject_id,
-                                         object_id=relationship.object_id,
-                                         predicate=relationship.predicate)
-            relationships.append(rel_obj)
-        return relationships
-
 
 class RunDAO(dao.RunDAO):
     """DAO responsible for handling Runs, (Record subtype), in Cassandra."""
@@ -953,13 +956,14 @@ class RunDAO(dao.RunDAO):
                version=run.version)
         self.record_dao.insert(record=run, force_overwrite=force_overwrite)
 
-    def _insert_sans_rec(self, run, force_overwrite=False):
+    @staticmethod
+    def _insert_sans_rec(run, force_overwrite=False):
         """
         Given a Run, import it into the Run table only.
 
-        Skips the call to record_dao's insert--this is intended to be called
+        Skips the call to record_dao's insert--this is a helper to be called
         from within insert_many()s, which implement special logic that Run
-        metadata doesn't benefit from.
+        metadata doesn't benefit from. Relies on Cassandra table schema.
 
         :param run: A Run to import
         :param force_overwrite: Whether to forcibly overwrite a preexisting
@@ -1009,6 +1013,11 @@ class RunDAO(dao.RunDAO):
         """
         with BatchQuery() as batch:
             schema.Run.objects(id=id).batch(batch).delete()
+            # In order to accomplish everything within one batch, we hand it off
+            # to a record_dao. However, we do not want to expose this part of
+            # Record deletion to users; it's wrapped by two friendlier functions instead.
+            # The method's "private" status is to avoid confusion with them.
+            # pylint: disable=protected-access
             self.record_dao._setup_batch_delete(batch, id)
 
     def delete_many(self, ids_to_delete):
@@ -1024,6 +1033,8 @@ class RunDAO(dao.RunDAO):
         with BatchQuery() as batch:
             for id in ids_to_delete:
                 schema.Run.objects(id=id).batch(batch).delete()
+                # See delete() above for explanation of this:
+                # pylint: disable=protected-access
                 self.record_dao._setup_batch_delete(batch, id)
 
     def get(self, id):

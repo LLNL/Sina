@@ -5,10 +5,12 @@ import sys
 import json
 import argparse
 
-from mock import patch, MagicMock
-from nose.plugins.attrib import attr
 from six.moves import cStringIO as StringIO
-from sqlalchemy.orm.exc import NoResultFound
+
+# Disable pylint checks due to its issue with virtual environments
+from mock import patch, MagicMock  # pylint: disable=import-error
+from nose.plugins.attrib import attr  # pylint: disable=import-error
+from sqlalchemy.orm.exc import NoResultFound  # pylint: disable=import-error
 
 from sina.cli import driver
 from sina.datastores import sql as sina_sql
@@ -23,6 +25,9 @@ except ImportError:
     pass
 
 TEMP_DB_NAME = "temp_sqlite_testfile.sqlite"
+
+# Accessing "private" methods is necessary for testing them.
+# pylint: disable=protected-access
 
 
 class TestCLI(unittest.TestCase):

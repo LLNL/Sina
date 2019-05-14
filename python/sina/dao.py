@@ -2,8 +2,8 @@
 Contains toplevel, abstract DAOs used for accessing each type of object.
 
 This module describes the DAOs available, as well as the functions available to
-each DAO. While function availabiliy may differ between objects, ex: Records
-and Relationships, it will not differ between backends, ex: Cassandra and sql.
+each DAO. While function availabiliy may differ between objects, e.g., Records
+and Relationships, it will not differ between backends, e.g., Cassandra and sql.
 """
 from abc import ABCMeta, abstractmethod
 import logging
@@ -13,6 +13,9 @@ import sina.model
 LOGGER = logging.getLogger(__name__)
 
 
+# Disable pylint checks due to ubiquitous use of id and type
+# pylint: disable=invalid-name,redefined-builtin
+
 class DAOFactory(object):
     """Builds DAOs used for interacting with Mnoda-based data objects."""
 
@@ -20,7 +23,7 @@ class DAOFactory(object):
     supports_parallel_ingestion = False
 
     @abstractmethod
-    def create_record_dao():
+    def create_record_dao(self):
         """
         Create a DAO for interacting with Records.
 
@@ -29,7 +32,7 @@ class DAOFactory(object):
         raise NotImplementedError
 
     @abstractmethod
-    def create_relationship_dao():
+    def create_relationship_dao(self):
         """
         Create a DAO for interacting with Relationships.
 
@@ -38,7 +41,7 @@ class DAOFactory(object):
         raise NotImplementedError
 
     @abstractmethod
-    def create_run_dao():
+    def create_run_dao(self):
         """
         Create a DAO for interacting with Runs.
 
@@ -240,6 +243,22 @@ class RelationshipDAO(object):
     """The DAO responsible for handling Relationships."""
 
     __metaclass__ = ABCMeta
+
+    @staticmethod
+    def _build_relationships(query):
+        """
+        Given query results, build a list of Relationships.
+
+        :param query: The query results to build from.
+        """
+        LOGGER.debug('Building relationships from query=%s', query)
+        relationships = []
+        for relationship in query:
+            rel_obj = sina.model.Relationship(subject_id=relationship.subject_id,
+                                              object_id=relationship.object_id,
+                                              predicate=relationship.predicate)
+            relationships.append(rel_obj)
+        return relationships
 
     @abstractmethod
     def insert(self, relationship=None, subject_id=None,

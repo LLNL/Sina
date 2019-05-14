@@ -5,10 +5,12 @@ import sys
 import unittest
 import warnings
 import json
-import jsonschema
 
-from nose.plugins.attrib import attr
 from six.moves import cStringIO as StringIO
+
+# Disable pylint checks due to its issue with virtual environments
+from nose.plugins.attrib import attr  # pylint: disable=import-error
+import jsonschema  # pylint: disable=import-error
 
 from sina.cli import driver
 

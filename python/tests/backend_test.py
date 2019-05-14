@@ -9,8 +9,10 @@ import logging
 from collections import OrderedDict
 import types
 
-from mock import patch
 import six
+
+# Disable pylint check due to its issue with virtual environments
+from mock import patch  # pylint: disable=import-error
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, has_only)
@@ -18,6 +20,22 @@ from sina.model import Run, Record, Relationship
 
 LOGGER = logging.getLogger(__name__)
 TARGET = None
+
+
+# Disable pylint invalid-name due to significant number of tests with names
+# exceeding the 30 character limit
+# pylint: disable=invalid-name
+
+def create_daos(class_):
+    """
+    Create DAOs for the specified class.
+
+    :param class_: Backend class
+    """
+    class_.factory = class_.create_dao_factory()
+    class_.record_dao = class_.factory.create_record_dao()
+    class_.run_dao = class_.factory.create_run_dao()
+    class_.relationship_dao = class_.factory.create_relationship_dao()
 
 
 def populate_database_with_data(record_dao):
@@ -72,6 +90,18 @@ def populate_database_with_data(record_dao):
     record_dao.insert_many([spam_record, spam_record_2, spam_record_3,
                             spam_record_4, spam_record_5, spam_record_6,
                             egg_record])
+
+
+def remove_file(filename):
+    """
+    Remove the specified file if it exists.
+
+    :param filename: Name of the file to be removed
+    """
+    try:
+        os.remove(filename)
+    except OSError:
+        pass
 
 
 class TestSetup(unittest.TestCase):
@@ -317,7 +347,8 @@ class TestModify(unittest.TestCase):
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
 
 
-class TestQuery(unittest.TestCase):
+# Disable the pylint check if and until the team decides to refactor the code
+class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """
     Unit tests that specifically deal with queries.
 

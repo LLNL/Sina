@@ -12,6 +12,9 @@ LOGGER = logging.getLogger(__name__)
 RESERVED_TYPES = ["run"]  # Types reserved by Record's children
 
 
+# Disable redefined-builtin, invalid-name due to ubiquitous use of id and type
+# pylint: disable=invalid-name,redefined-builtin
+
 class Record(object):
     """
     A record is any arbitrary object we've chosen to store.
@@ -27,7 +30,9 @@ class Record(object):
     of that child.
     """
 
-    def __init__(self, id, type, data=None, files=None, user_defined=None):
+    # Disable the pylint check if and until the team decides to refactor the code
+    def __init__(self, id, type, data=None,  # pylint: disable=too-many-arguments
+                 files=None, user_defined=None):
         """
         Create Record with its id, type, and optional args.
 
@@ -143,7 +148,8 @@ class Record(object):
         """
         return json.dumps(self.raw)
 
-    def is_valid(self, print_warnings=None):
+    # Disable the pylint check if and until the team decides to refactor the code
+    def is_valid(self, print_warnings=None):  # pylint: disable=too-many-branches
         """Test whether a Record's members are formatted correctly.
 
         The ingester expects certain types to be reserved, and for data
@@ -239,7 +245,8 @@ class Record(object):
         return True, warnings
 
 
-class Relationship(object):
+# Disable pylint check to if and until the team decides to address the issue
+class Relationship(object):  # pylint: disable=too-few-public-methods
     """
     A Relationship is a triple describing the relationship between two objects.
 
@@ -276,7 +283,7 @@ class Run(Record):
     'user_defined'.
     """
 
-    def __init__(self, id, application,
+    def __init__(self, id, application,  # pylint: disable=too-many-arguments
                  user=None, version=None, user_defined=None,
                  data=None, files=None):
         """Create Run from Record info plus metadata."""

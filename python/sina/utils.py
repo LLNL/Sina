@@ -21,6 +21,9 @@ LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
 
 
+# Disable pylint checks due to ubiquitous use of id, type, max, and min
+# pylint: disable=invalid-name,redefined-builtin
+
 class ListQueryOperation(Enum):
     """
     Describe operations possible on ListCriteria.
@@ -70,8 +73,8 @@ def import_json(factory, json_path):
     :param json_path: The filepath to the json to import.
     """
     LOGGER.debug('Importing %s', json_path)
-    with open(json_path) as file:
-        data = json.load(file)
+    with open(json_path) as file_:
+        data = json.load(file_)
     runs = []
     records = []
     local = {}
@@ -240,8 +243,8 @@ def intersect_ordered(iterables):
 
     # Standardize all iterators to generators
     gen_list = []
-    for iter in iterables:
-        gen_list.append(x for x in iter)
+    for iter_ in iterables:
+        gen_list.append(x for x in iter_)
 
     # Get our first set
     most_recents = []
