@@ -8,13 +8,14 @@ else
 fi
 echo "Building noaa database from source directory $SOURCE_DIR..."
 
-rm -rf files && rm -f data.sqlite
+rm -rf files data.sqlite
 
 set -e
 
 tar -xzf $SOURCE_DIR/../raw_data/noaa.tar.gz
+
 python $SOURCE_DIR/noaa_csv2mnoda.py --show-status \
-  data/0123467/2.2/data/1-data/WCOA11-01-06-2015_data.csv .
+  0123467/2.2/data/1-data/WCOA11-01-06-2015_data.csv .
 sina ingest files/WCOA11-01-06-2015.json -d data.sqlite
 
-rm -rf data
+rm -rf 0123467

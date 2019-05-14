@@ -31,7 +31,7 @@ if [ ! -d cpp/build/docs/html ]; then
 fi
 
 cd python
-./deploy.sh $DEPLOY_DIR $DOC_DIR $EXAMPLE_DIR
+./deploy.sh --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_DIR
 
 cd ../cpp
 CREATED_TAR=$(sh create_spack_package.sh)

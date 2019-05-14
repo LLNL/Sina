@@ -8,7 +8,7 @@ else
 fi
 echo "Building fukushima database from source directory $SOURCE_DIR..."
 
-rm -rf files && rm -f data.sqlite
+rm -rf files data.sqlite
 
 set -e
 

@@ -116,7 +116,7 @@ def _execute_notebook(path):
                              str(exception)))
 
     try:
-        exec_preprocessor = ExecutePreprocessor(timeout=-1, allow_stdin=True,
+        exec_preprocessor = ExecutePreprocessor(timeout=-1,
                                                 kernel_name=SINA_KERNEL)
         exec_preprocessor.preprocess(notebook, {'metadata': {'path': RUN_PATH}})
     except CellExecutionError as exception:
