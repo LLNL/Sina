@@ -146,7 +146,6 @@ deployExamples() {
 # deployWheel:  Don't bother creating a shortcut or link to the latest wheel as
 # it appears python will complain that it's not a valid wheel name.
 deployWheel() {
-  WHEEL_DEST=$DEPLOY_DIR/wheels
   echo "Deploying the wheel into $WHEEL_DEST..."
 
   mv -f ./dist/$WHEEL_FILENAME $WHEEL_DEST/$WHEEL_FILENAME
@@ -174,18 +173,21 @@ deployVenv() {
   ln -sf $VENV_PATH $DEPLOY_DIR/$VENV_SYM_NAME
 }
 
-# TODO: SIBO-231: Remove skipping cassandra tests once have server available
-# perform those tests.
 executeTests() {
   num_extras=${#BUILD_OPTIONS[@]}
+
   if [ $num_extras -le 0 ]; then
+    # Run _all_ of the standard tests, including flake8, etc.
     echo; echo "Running the core tests and building docs..."
     make tests
   else
     make test-core
+    make flake8
     for opt in $BUILD_OPTIONS; do
       echo
       if echo "$VALID_MAKE_TARGETS" | grep -q "$opt"; then
+        # TODO: SIBO-231: Remove skipping cassandra tests once have server 
+        # available perform those tests.
         if [ "$opt" != "cassandra" ]; then
           echo "Running optional tests: test-$opt..."
           make test-$opt
@@ -200,7 +202,7 @@ executeTests() {
 }
 
 # Provide command line options for deployment directories and optional features
-OPTIONS='[--build=<buld-options>] [--deploy-dir=<deploy-dir>] [--docs-dir=<docs-dir>] [--examples-link=<examples-link>] [--group=<group>] [--help] [--skip=<skip-steps>]'
+OPTIONS='[--build-with=<buld-options>] [--deploy-dir=<deploy-dir>] [--docs-dir=<docs-dir>] [--examples-link=<examples-link>] [--group=<group>] [--help] [--skip=<skip-steps>]'
 
 printUsage() {
   echo; echo "USAGE: `basename $0` $OPTIONS"
@@ -236,7 +238,7 @@ for arg in "$@"; do
   option=${arg%%=*}
   value=${arg##*=}
   case "$option" in
-  --option) BUILD_OPTIONS=$(echo $value | tr "," "\n");;
+  --build-with) BUILD_OPTIONS=$(echo $value | tr "," "\n");;
   --deploy-dir) DEPLOY_DIR=$value;;
   --docs-dir) DOCS_DIR=$value;;
   --examples-link) EXAMPLES_LINK=$value;;
@@ -254,15 +256,25 @@ DEPLOY_DIR=`readlink -f $DEPLOY_DIR`
 checkDirectory documentation $DOCS_DIR
 DOCS_DIR=`readlink -f $DOCS_DIR`
 
-# Don't check the EXAMPLES_LINK for existence since it is [to be] a symlink
-EXAMPLES_LINK=`readlink -f $EXAMPLES_LINK`
-
 HAVE_GROUP=`grep "^$PERM_GROUP:" /etc/group`
 if [ "$HAVE_GROUP" == "" ]; then
   echo "ERROR: Group '$PERM_GROUP' does not exist.  Provide a valid group."
   printUsage
   exit 1
 fi
+
+# Set up some globals to ensure they are available across deployment steps.
+
+# Ensure wheel destination is available across deployment steps
+WHEEL_DEST=$DEPLOY_DIR/wheels
+
+# The path for the latest docs and examples is "sina-<version>" in order to
+# continue to allow "sina" to be used as a symlink to the latest version.
+#
+# This is also needed to derive the name of a wheel should building it be
+# skipped in a subsequent run, where the assumption is the appropriate wheel
+# filename will start with the same prefix.
+VERSION_SUBDIR=sina-`grep VERSION ./sina/__init__.py | sed 's/[^0-9.]//g'`
 
 
 # ----------------------------  DEPLOYMENT PROCESSING --------------------------
@@ -283,9 +295,6 @@ if [[ ! "${SKIP_STEPS[@]}" =~ "git" ]]; then
 fi
 
 # tests: Ensure tests are successful before proceeding (also build docs)
-#
-# TODO: SIBO-783: Uncomment the following and resume testing once the jupyter
-#  "raw_input was called ... StdinNotImplementedError...".
 if [[ ! "${SKIP_STEPS[@]}" =~ "tests" ]]; then
   executeTests
 else
@@ -301,24 +310,30 @@ if [[ ! "${SKIP_STEPS[@]}" =~ "wheel" ]]; then
   WHEEL_FILENAME=`ls ./dist/*.whl | cut -d / -f3`
   deployWheel
 else
-  WHEEL_FILENAME=
+  # Need the wheel filename for building the venv and or deploying examples
+  # even when the wheel is not created on this deployment pass.  There is
+  # an assumption that the filename structure conforms to:
+  #     sina-<sina-version>-py<pyversion>-*.whl
+  PY_VERSION=`python -c 'import sys; print(sys.version_info[0])'`
+  echo "PY_VERSION=$PY_VERSION"
+  DEPLOYED_WHEEL=$WHEEL_DEST/$VERSION_SUBDIR-py$PY_VERSION-*.whl
+  echo "DEPLOYED_WHEEL=$DEPLOYED_WHEEL"
+  WHEEL_FILENAME=`ls $DEPLOYED_WHEEL | rev | cut -d / -f1 | rev`
 fi
 
 # venv: Build and deploy the virtual environment using the wheel name as the 
 #       basis for the directory name.
-if [[ ! "${SKIP_STEPS[@]}" =~ "venv" ]]; then
-  if [ "$WHEEL_FILENAME" != "" ]; then
-    VENV_PATH=$DEPLOY_DIR/`basename $WHEEL_FILENAME .whl`
-    deployVenv
-  else
-    echo "ERROR: The wheel file is required to derive the venv pathname"
-    exit 1
+if [ "$WHEEL_FILENAME" != "" ]; then
+  # Need the virtual environment path for deploying examples even when the
+  # wheel is not created on this deployment pass.
+  VENV_PATH=$DEPLOY_DIR/`basename $WHEEL_FILENAME .whl`
+  if [[ ! "${SKIP_STEPS[@]}" =~ "venv" ]]; then
+      deployVenv
   fi
+else
+  echo "ERROR: The wheel file is required to derive the venv pathname"
+  exit 1
 fi
-
-# The path for the latest docs and examples is "sina-<version>" in order to
-# continue to allow "sina" to be used as a symlink to the latest version.
-VERSION_SUBDIR=sina-`grep VERSION ./sina/__init__.py | sed 's/[^0-9.]//g'`
 
 # docs: Deploy the generated documentation
 if [[ ! "${SKIP_STEPS[@]}" =~ "docs" ]]; then

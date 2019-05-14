@@ -86,6 +86,7 @@ TEST_VENV=tests/test_venv
 .PHONY: clean-tests
 .PHONY: clean-tests-venv
 .PHONY: docs
+.PHONY: flake8
 .PHONY: install
 .PHONY: jupyter
 .PHONY: pep8
@@ -115,31 +116,51 @@ install: $(LINKS_FILE)
 
 all: clean docs tests
 
-# Add cassandra to an existing virtual environment since it is optional.
-cassandra:
+# Add cassandra dependencies to an existing virtual environment, where one is
+# created through a recursive call to make if it does not exist.
+cassandra: $(LINKS_FILE)
 	@if test ! -d $(VENV); then \
-	  echo "You must create $(VENV) first. Run 'make install'"; \
+	  echo "Making the test virtual environment in $(VENV)"; \
+	  make --no-print-directory install VENV=$(VENV); \
 	else \
-	  echo "Installing cassandra in $(VENV)"; \
-	  $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/cassandra.txt; \
-	fi
+	  echo "You already have the test virtual environment $(VENV)"; \
+	fi; \
+	echo "Installing cassandra in $(VENV)"; \
+	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/cassandra.txt
 
-# Add command line tools to an existing virtual environment since it is optional.
+# Add command line tool dependencies to an existing virtual environment, where 
+# one is created through a recursive call to make if it does not exist.
+#
 # Note: Use of underscore in the target name ensures deploy.sh can readily 
 # process options.
-cli_tools:
+cli_tools: $(LINKS_FILE)
 	@if test ! -d $(VENV); then \
-	  echo "You must create $(VENV) first. Run 'make install'"; \
+	  echo "Installing sina core in $(VENV)"; \
+	  make --no-print-directory install VENV=$(VENV); \
 	else \
-	  echo "Installing Sina's commandline tool dependencies in $(VENV)"; \
-	  $(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/cli_tools.txt; \
-	fi
+	  echo "You already have the virtual environment $(VENV)"; \
+	fi; \
+	echo "Installing Sina's commandline tool dependencies in $(VENV)"; \
+	$(VENV)/bin/pip install $(PIP_OPTIONS) -r requirements/cli_tools.txt
 
 docs: install
 	@$(VENV)/bin/tox -e docs
 
-# Create the virtual environment if it does not already exist.  This process
-# recursively calls make.
+# Add flake8 dependencies to an existing test virtual environment, where 
+# one is created through a recursive call to make if it does not exist.
+flake8: export PATH=$(TEST_PATH)
+flake8: $(LINKS_FILE)
+	@if test ! -d $(TEST_VENV); then \
+	  echo "Making the test virtual environment in $(TEST_VENV)"; \
+	  make --no-print-directory install VENV=$(TEST_VENV); \
+	else \
+	  echo "You already have the test virtual environment $(TEST_VENV)"; \
+	fi; \
+	echo "Running flake8 tests using $(TEST_VENV)"; \
+	$(TEST_VENV)/bin/tox -e flake8
+
+# Add jupyter dependencies to an existing virtual environment, where one is
+# created through a recursive call to make if it does not exist.
 jupyter: $(LINKS_FILE)
 	@if test ! -d $(VENV); then \
 	  echo "Installing sina core in $(VENV)"; \
@@ -148,7 +169,7 @@ jupyter: $(LINKS_FILE)
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
 	echo "Installing jupyter in $(VENV)"; \
-	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/jupyter.txt; \
+	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/jupyter.txt
 
 # Ensure the appropriate requirement links are established.  This is important
 # for building and testing purposes.
@@ -171,10 +192,13 @@ $(LINKS_FILE):
 	  fi; \
 	fi
 
+# Add pep8 dependencies to an existing test virtual environment, where one is
+# created through a recursive call to make if it does not exist.
+#
 # PEP8 is an optional check until we discuss which flake8 plugins we want to
 # add (see SIBO-675).
 pep8: export PATH=$(TEST_PATH)
-pep8:
+pep8: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
 	  echo "Making test virtual environment in $(TEST_VENV)"; \
 	  make --no-print-directory install VENV=$(TEST_VENV); \
@@ -192,44 +216,41 @@ pylint:
 	$(PYLINT_VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip tox; \
 	$(PYLINT_VENV)/bin/tox -e pylint
 
-# Set up a clean test virtual environment before running tests.
-
-# Recursively call make to ensure the work is done in the specified order
+# Set up a clean test virtual environment before running tests by making
+# recursive calls to make to ensure the work is done in the specified order.
 tests: export PATH=$(TEST_PATH)
 tests: $(LINKS_FILE)
 	@make --no-print-directory clean-tests-venv; \
 	make --no-print-directory install VENV=$(TEST_VENV); \
 	$(TEST_VENV)/bin/tox
 
-# Recursively call make if it is necessary to create the test virtual environment.
+# Run cassandra tests, which depend on a suitably configured test virtual
+# environment.
 test-cassandra: export PATH=$(TEST_PATH)
-test-cassandra: $(LINKS_FILE)
+test-cassandra:
 	@if test ! -d $(TEST_VENV); then \
-	  echo "Making the test virtual environment in $(TEST_VENV)"; \
-	  make --no-print-directory install VENV=$(TEST_VENV); \
+	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add Cassandra if it is to be included."; \
 	else \
-	  echo "You already have the test virtual environment $(TEST_VENV)"; \
-	fi; \
-	echo "Running cassandra tests using $(TEST_VENV)"; \
-	$(TEST_VENV)/bin/tox -e cassandra
+	  echo "Running cassandra tests using $(TEST_VENV)"; \
+	  $(TEST_VENV)/bin/tox -e cassandra; \
+	fi
 
-# Recursive call to make in case test venv doesn't exist
+# Run command line tools tests, which depend on a suitably configured test 
+# virtual environment.
+#
 # Note: Use of underscore in the target name ensures deploy.sh can readily 
 # process options.
 test-cli_tools: export PATH=$(TEST_PATH)
 test-cli_tools: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
-          echo "Making the test virtual environment in $(TEST_VENV)"; \
-          make --no-print-directory install VENV=$(TEST_VENV); \
-	fi; \
-	echo "Running cli_tools tests $(TEST_VENV)"; \
-        $(TEST_VENV)/bin/tox -e cli_tools
+	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add cli_tools if they are to be included."; \
+	else \
+	  echo "Running cli_tools tests $(TEST_VENV)"; \
+          $(TEST_VENV)/bin/tox -e cli_tools; \
+	fi
 
-
-<<<<<<< HEAD
-# Recursive call to make in case test venv doesn't exist
-# Note: Use of underscore in the target name ensures deploy.sh can readily 
-# process options.
+# Run the core Sina tests, which depend on the basic virtual environment so
+# it can be created if necessary using a recursive call to make.
 test-core: export PATH=$(TEST_PATH)
 test-core: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
@@ -240,32 +261,16 @@ test-core: $(LINKS_FILE)
         $(TEST_VENV)/bin/tox -e core
 
 
-# Recursive call to make in case test venv doesn't exist
-=======
-# Recursively call make if it is necessary to create the test virtual environment.
-flake8: export PATH=$(TEST_PATH)
-flake8: links
-	@if test ! -d $(TEST_VENV); then \
-	  echo "Making the test virtual environment in $(TEST_VENV)"; \
-	  make --no-print-directory install VENV=$(TEST_VENV); \
-	else \
-	  echo "You already have the test virtual environment $(TEST_VENV)"; \
-	fi; \
-	echo "Running flake8 tests using $(TEST_VENV)"; \
-	$(TEST_VENV)/bin/tox -e flake8
-
-# Recursively call make if it is necessary to create the test virtual environment.
->>>>>>> develop
+# Run jupyter tests, which depend on a suitably configured test virtual 
+# environment.
 test-jupyter: export PATH=$(TEST_PATH)
 test-jupyter: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
-	  echo "Making the test virtual environment in $(TEST_VENV)"; \
-	  make --no-print-directory install VENV=$(TEST_VENV); \
+	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add jupyter if it is to be included."; \
 	else \
-	  echo "You already have the test virtual environment $(TEST_VENV)"; \
-	fi; \
-	echo "Running jupyter tests using $(TEST_VENV)"; \
-	$(TEST_VENV)/bin/tox -e jupyter
+	  echo "Running jupyter tests using $(TEST_VENV)"; \
+	  $(TEST_VENV)/bin/tox -e jupyter; \
+	fi
 
 # Create the Sina wheel 
 wheel:
@@ -276,12 +281,18 @@ wheel:
 	wheel/bin/python setup.py bdist_wheel; \
 	rm -rf ./wheel
 
-# Recursively call make to ensure the work is done in the specified order
+# Set up a clean branch, recursively calling make to clean up notebooks and 
+# files as needed.
 clean:
 	@make --no-print-directory clean-notebooks; \
-	make --no-print-directory clean-files
+	make --no-print-directory clean-tests; \
+	make --no-print-directory clean-build
 
-clean-files:  clean-tests
+clean-docs:
+	@echo "Cleaning tox-generated docs directories.."; \
+	rm -rf docs/build docs/source/generated_docs
+
+clean-build:
 	@echo "Cleaning build and distribution files.."; \
 	rm -rf build dist wheel; \
 	rm -f $(LINKS_FILE); \
@@ -303,15 +314,13 @@ clean-notebooks:
 	elif test -n "$$JUPYTER_EXE" && test -f $$JUPYTER_EXE; then \
 	  $$JUPYTER_EXE nbconvert $$NBCONVERT $$NOTEBOOKS; \
 	else \
-	  echo "Sina must be installed to clean notebooks.  Run 'make'."; \
+	  echo "Sina must be installed with Jupyter to clean notebooks."; \
 	fi
 
 # The tests target currently builds the docs so remove them too.
-clean-tests: clean-tests-venv
+clean-tests: clean-docs clean-tests-venv
 	@echo "Cleaning files generated by test targets.."; \
 	rm -rf .tox fake.sqlite nosetests*.xml* $(PYLINT_VENV); \
-	echo "Cleaning tox-generated docs directories.."; \
-	rm -rf docs/build docs/source/generated_docs; \
 	echo "Cleaning example tests.."; \
 	rm -rf tests/run_tests
 
