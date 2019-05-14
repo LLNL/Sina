@@ -19,8 +19,13 @@ from sina.utils import DataRange, ListCriteria, sort_and_standardize_criteria
 RUN_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
                                         "tests", "run_tests", "sina_utils"))
 
+# Disable pylint invalid-name due to significant number of tests with names
+# exceeding the 30 character limit
+# pylint: disable=invalid-name
 
-class TestSinaUtils(unittest.TestCase):
+
+# Disable pylint public methods to if and until the team decides to refactor the code
+class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """Tests for Sina Utilities functions."""
 
     def setUp(self):

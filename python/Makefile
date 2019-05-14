@@ -226,6 +226,7 @@ test-cli_tools: $(LINKS_FILE)
         $(TEST_VENV)/bin/tox -e cli_tools
 
 
+<<<<<<< HEAD
 # Recursive call to make in case test venv doesn't exist
 # Note: Use of underscore in the target name ensures deploy.sh can readily 
 # process options.
@@ -240,6 +241,21 @@ test-core: $(LINKS_FILE)
 
 
 # Recursive call to make in case test venv doesn't exist
+=======
+# Recursively call make if it is necessary to create the test virtual environment.
+flake8: export PATH=$(TEST_PATH)
+flake8: links
+	@if test ! -d $(TEST_VENV); then \
+	  echo "Making the test virtual environment in $(TEST_VENV)"; \
+	  make --no-print-directory install VENV=$(TEST_VENV); \
+	else \
+	  echo "You already have the test virtual environment $(TEST_VENV)"; \
+	fi; \
+	echo "Running flake8 tests using $(TEST_VENV)"; \
+	$(TEST_VENV)/bin/tox -e flake8
+
+# Recursively call make if it is necessary to create the test virtual environment.
+>>>>>>> develop
 test-jupyter: export PATH=$(TEST_PATH)
 test-jupyter: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \

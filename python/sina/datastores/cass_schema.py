@@ -6,7 +6,12 @@ Based on Mnoda
 import numbers
 import logging
 
-from cassandra.cqlengine.management import sync_table
+# Disable pylint checks due to ubiquitous use of id,
+#   cross_populate_object_and_subject, and the nature of the classes
+# pylint: disable=invalid-name,redefined-builtin,too-few-public-methods
+
+# Disable pylint check due to cassandra being optional
+from cassandra.cqlengine.management import sync_table  # pylint: disable=import-error
 
 try:
     from cassandra.cqlengine.models import Model
@@ -247,7 +252,9 @@ def _discover_tables_from_value(value):
     return (x_from_rec, rec_from_x)
 
 
-def cross_populate_data_tables(name,
+# Disable pylint check until the team decides to increase configuration limits or
+# refactor the code.
+def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
                                value,
                                id,
                                tags=None,

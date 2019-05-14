@@ -4,16 +4,21 @@ import numbers
 import logging
 import json
 from collections import defaultdict
-from functools import reduce
+from functools import reduce   # pylint: disable=redefined-builtin
 
 import six
-import sqlalchemy
+
+# Disable pylint check due to its issue with virtual environments
+import sqlalchemy  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
 import sina.datastores.sql_schema as schema
 from sina.utils import sort_and_standardize_criteria
 from sina import utils
+
+# Disable redefined-builtin, invalid-name due to ubiquitous use of id
+# pylint: disable=invalid-name,redefined-builtin
 
 LOGGER = logging.getLogger(__name__)
 
@@ -159,7 +164,8 @@ class RecordDAO(dao.RecordDAO):
          .delete(synchronize_session='fetch'))
         self.session.commit()
 
-    def data_query(self, **kwargs):
+    # Disable pylint checks to if and until team decides to refactor the method
+    def data_query(self, **kwargs):  # pylint: disable=too-many-branches,too-many-locals
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -278,7 +284,8 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
-    def get_list(self,
+    # Disable the pylint check to if and until the team decides to refactor the method
+    def get_list(self,  # pylint: disable=too-many-branches
                  datum_name,
                  list_of_contents,
                  operation,
@@ -768,22 +775,6 @@ class RelationshipDAO(dao.RelationshipDAO):
                  .filter(schema.Relationship.predicate == predicate))
 
         return self._build_relationships(query.all())
-
-    @staticmethod
-    def _build_relationships(query):
-        """
-        Given SQL query results, build a list of Relationships.
-
-        :param query: The query results to build from.
-        """
-        LOGGER.debug('Building relationships from query=%s', query)
-        relationships = []
-        for relationship in query:
-            rel_obj = model.Relationship(subject_id=relationship.subject_id,
-                                         object_id=relationship.object_id,
-                                         predicate=relationship.predicate)
-            relationships.append(rel_obj)
-        return relationships
 
 
 class RunDAO(dao.RunDAO):

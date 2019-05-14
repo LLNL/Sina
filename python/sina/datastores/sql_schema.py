@@ -1,8 +1,15 @@
 """SQLAlchemy implementations of Mnoda objects."""
 from __future__ import print_function
-from sqlalchemy import (Column, ForeignKey, String, Text, Float, Integer)
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.schema import Index
+
+# Disable pylint checks due to its issue with virtual environments
+from sqlalchemy import (Column, ForeignKey, String, Text, Float,  # pylint: disable=import-error
+                        Integer)
+from sqlalchemy.ext.declarative import declarative_base  # pylint: disable=import-error
+from sqlalchemy.schema import Index  # pylint: disable=import-error
+
+
+# Disable pylint checks due to ubiquitous use of id, type and the nature of these classes
+# pylint: disable=invalid-name,redefined-builtin,too-few-public-methods
 
 Base = declarative_base()
 
@@ -88,7 +95,9 @@ class ScalarData(Base):
     units = Column(String(255), nullable=True)
     Index('record_scalar_idx', id, name)
 
-    def __init__(self, id, name, value, tags=None, units=None):
+    # Disable the pylint check if and until the team decides to refactor the code
+    def __init__(self, id, name, value,   # pylint: disable=too-many-arguments
+                 tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
         self.id = id
         self.name = name
@@ -230,7 +239,9 @@ class StringData(Base):
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
 
-    def __init__(self, id, name, value, tags=None, units=None):
+    # Disable the pylint check if and until the team decides to refactor the code
+    def __init__(self, id, name, value,  # pylint: disable=too-many-arguments
+                 tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
         self.id = id
         self.name = name
@@ -375,7 +386,9 @@ class Document(Base):
     mimetype = Column(String(255), nullable=True)
     tags = Column(Text(), nullable=True)
 
-    def __init__(self, id, uri, contents=None, mimetype=None, tags=None):
+    # Disable the pylint check if and until the team decides to refactor the code
+    def __init__(self, id, uri,  # pylint: disable=too-many-arguments
+                 contents=None, mimetype=None, tags=None):
         """Create from id, uri, and optionally contents and mimetype."""
         self.id = id
         self.uri = uri

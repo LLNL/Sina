@@ -149,7 +149,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(sorted(set(json.loads(target_json))),
                          sorted(set(json.loads(test_run.to_json()))))
 
-    def test_generate_record_from_json_good(self):
+    def test_gen_record_from_json_good(self):
         """Ensure we can generate a Record from valid json input."""
         json_input = {"id": "spam",
                       "type": "eggs",
@@ -167,7 +167,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(json_input['data'], record.data)
         self.assertEqual(json_input['files'], record.files)
 
-    def test_generate_record_from_json_bad(self):
+    def test_gen_record_from_json_bad(self):
         """
         Ensure we throw a ValueError when creating a Record from bad json.
 
@@ -186,7 +186,7 @@ class TestModel(unittest.TestCase):
             model.generate_record_from_json(json_input=json_input)
         self.assertIn("Missing required key <'id'>.", str(context.exception))
 
-    def test_generate_run_from_json_good(self):
+    def test_gen_run_from_json_good(self):
         """Ensure we can generate a Run from valid json input."""
         json_input = {"id": "spam",
                       "type": "run",
@@ -210,7 +210,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(json_input['data'], run.data)
         self.assertEqual(json_input['files'], run.files)
 
-    def test_generate_run_from_json_bad(self):
+    def test_gen_run_from_json_bad(self):
         """
         Ensure we throw a ValueError when creating a Run from bad json.
 

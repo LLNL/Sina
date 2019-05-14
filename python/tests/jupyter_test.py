@@ -25,8 +25,10 @@ import shutil
 import subprocess
 import unittest
 
-from nose.plugins.attrib import attr
 from six import with_metaclass
+
+# Disable pylint checks due to its issue with virtual environments
+from nose.plugins.attrib import attr  # pylint: disable=import-error
 
 # Assumed root directory for examples, etc.
 #
@@ -89,7 +91,8 @@ def _build_pep8_output(result):
             sorted(_dict.keys())]
 
 
-def _execute_notebook(path):
+# Disable pylint checks to if and until the team decides to refactor the code
+def _execute_notebook(path):  # pylint: disable=too-many-branches
     """
     Execute a notebook and collect any output errors.
 
@@ -115,7 +118,8 @@ def _execute_notebook(path):
                       format(exception.__class__.__name__, SINA_KERNEL, path,
                              str(exception)))
 
-    try:
+    # Disable the check to if and until the team decides to refactor the code
+    try:  # pylint: disable=too-many-nested-blocks
         exec_preprocessor = ExecutePreprocessor(timeout=-1,
                                                 kernel_name=SINA_KERNEL)
         exec_preprocessor.preprocess(notebook, {'metadata': {'path': RUN_PATH}})

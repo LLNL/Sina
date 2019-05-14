@@ -30,7 +30,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
             [self.record_1, self.record_2, self.record_3,
              self.record_4, self.record_5, self.record_6])
 
-    def test_get_list_all_scal_dr(self):
+    def test_all_scal_dr(self):
         """
         Given a list of scalar DataRanges and a datum name, we correctly get all Records.
 
@@ -56,7 +56,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(records_to_check[self.record_1.id].raw, self.record_1.raw)
         self.assertEqual(records_to_check[self.record_2.id].raw, self.record_2.raw)
 
-    def test_get_list_all_scalars_scal_dr(self):
+    def test_all_scalars_scal_dr(self):
         """
         Given a list of scalars/DataRanges and a datum name, we correctly get all Records.
 
@@ -78,7 +78,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
             operation=ListQueryOperation.ALL))
         self.assertEqual(records[0].raw, self.record_2.raw)
 
-    def test_get_list_all_string_dr(self):
+    def test_all_string_dr(self):
         """
         Given a list of string DataRanges and a datum name, we correctly get all Records.
 
@@ -100,7 +100,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
             operation=ListQueryOperation.ALL))
         self.assertEqual(records[0].raw, self.record_4.raw)
 
-    def test_get_list_all_string_str_dr_mixed(self):
+    def test_all_string_str_dr_mixed(self):
         """
         Given a list of strings/DataRanges and a datum name, we correctly get all Records.
 
@@ -126,7 +126,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(records_to_check[self.record_4.id].raw, self.record_4.raw)
         self.assertEqual(records_to_check[self.record_5.id].raw, self.record_5.raw)
 
-    def test_get_list_all_empty_list(self):
+    def test_all_empty_list(self):
         """Given an empty list, we should raise a ValueError."""
         list_to_check = []
         with self.assertRaises(ValueError) as context:
@@ -138,7 +138,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertIn('Must supply at least one entry in list_of_contents for',
                       str(context.exception))
 
-    def test_get_list_all_no_results_string(self):
+    def test_all_no_results_string(self):
         """Given a list of data that match no Records, we return no Records."""
         list_to_check = ["rhino"]
         records = list(self.record_dao.get_list(
@@ -148,7 +148,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
             operation=ListQueryOperation.ALL))
         self.assertEqual(len(records), 0)
 
-    def test_get_list_any_scal_dr(self):
+    def test_any_scal_dr(self):
         """
         Given a list of scalar DataRanges and a datum name, we correctly get any Records.
 
@@ -177,7 +177,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(records_to_check[self.record_2.id].raw, self.record_2.raw)
         self.assertEqual(records_to_check[self.record_3.id].raw, self.record_3.raw)
 
-    def test_get_list_any_scalars_scal_dr(self):
+    def test_any_scalars_scal_dr(self):
         """
         Given a list of scalars/DataRanges and a datum name, we correctly get any Records.
 
@@ -203,7 +203,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(records_to_check[self.record_2.id].raw, self.record_2.raw)
         self.assertEqual(records_to_check[self.record_3.id].raw, self.record_3.raw)
 
-    def test_get_list_any_string_dr(self):
+    def test_any_string_dr(self):
         """
         Given a list of string DataRanges and a datum name, we correctly get any Records.
 
@@ -230,7 +230,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(records_to_check[self.record_4.id].raw, self.record_4.raw)
         self.assertEqual(records_to_check[self.record_5.id].raw, self.record_5.raw)
 
-    def test_get_list_any_string_str_dr_mixed(self):
+    def test_any_string_str_dr_mixed(self):
         """
         Given a list of strings/DataRanges and a datum name, we correctly get any Records.
 
@@ -257,7 +257,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(records_to_check[self.record_4.id].raw, self.record_4.raw)
         self.assertEqual(records_to_check[self.record_6.id].raw, self.record_6.raw)
 
-    def test_get_list_any_empty_list(self):
+    def test_any_empty_list(self):
         """Given an empty list, we should raise a ValueError."""
         list_to_check = []
         with self.assertRaises(ValueError) as context:
@@ -269,7 +269,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertIn('Must supply at least one entry in list_of_contents for',
                       str(context.exception))
 
-    def test_get_list_any_no_results_string(self):
+    def test_any_no_results_string(self):
         """Given a list of data that match no Records, we return no Records."""
         list_to_check = ["rhino"]
         records = list(self.record_dao.get_list(
@@ -279,7 +279,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
             operation=ListQueryOperation.ANY))
         self.assertEqual(len(records), 0)
 
-    def test_get_list_only_scal_dr(self):
+    def test_only_scal_dr(self):
         """
         Given a list of scalar DataRanges and a datum name, we correctly get Records.
 
@@ -295,7 +295,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
             operation=ListQueryOperation.ONLY))
         self.assertEqual(len(records), 0)
 
-    def test_get_list_only_scalars_scal_dr(self):
+    def test_only_scalars_scal_dr(self):
         """
         Given a list of scalars/DataRanges and a datum name, we correctly get Records.
 
@@ -312,7 +312,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].raw, self.record_3.raw)
 
-    def test_get_list_only_string_dr(self):
+    def test_only_string_dr(self):
         """
         Given a list of string DataRanges and a datum name, we correctly get Records.
 
@@ -330,7 +330,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].raw, self.record_4.raw)
 
-    def test_get_list_only_string_str_dr_mixed(self):
+    def test_only_string_str_dr_mixed(self):
         """
         Given a list of strings/DataRanges and a datum name, we correctly get Records.
 
@@ -348,7 +348,7 @@ class TestSQLRecordDAOGetList(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].raw, self.record_6.raw)
 
-    def test_get_list_only_no_results_string(self):
+    def test_only_no_results_string(self):
         """Given a list of data that match no Records, we return no Records."""
         list_to_check = ["rhino"]
         records = list(self.record_dao.get_list(
