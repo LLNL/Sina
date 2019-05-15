@@ -185,7 +185,7 @@ class TestModify(unittest.TestCase):
                      user_defined={})
         record_dao.insert(rec)
         returned_record = record_dao.get("spam")
-        # TODO: Done in place of Record equivalence, which hasn't been implemented.
+        # Test one definition of Record equivalence.
         # Done instead of __dict__ to make it clearer what part fails (if any)
         self.assertEqual(returned_record.id, rec.id)
         self.assertEqual(returned_record.type, rec.type)
@@ -266,7 +266,8 @@ class TestModify(unittest.TestCase):
         self.assertEqual(len(relationship_dao.get(object_id="rec_4")), 1)
 
     # RelationshipDAO
-    # TODO: There's no delete method for Relationships.
+    # pylint: disable=fixme
+    # TODO: There's no delete method for Relationships. SIBO-781
     def test_relationshipdao_insert_simple_retrieve(self):
         """Test that RelationshipDAO is inserting and getting correctly."""
         relationship_dao = self.create_dao_factory().create_relationship_dao()
@@ -276,7 +277,7 @@ class TestModify(unittest.TestCase):
         pred = relationship_dao.get(predicate=relationship.predicate)
         for relationship_list in (subj, pred):
             result = relationship_list[0]
-            # TODO: Used in place of Relationship equality.
+            # Testing one definition of "equality" between Relationships.
             self.assertEqual(result.subject_id, relationship.subject_id)
             self.assertEqual(result.object_id, relationship.object_id)
             self.assertEqual(result.predicate, relationship.predicate)
@@ -317,7 +318,8 @@ class TestModify(unittest.TestCase):
                         "bar": {"value": "1", "units": None}},)
         run_dao.insert(run)
         returned_run = run_dao.get("spam")
-        # TODO: Used in place of Run equality
+        # Testing one definition of "equality" between Runs.
+        # Used instead of __dict__ to make it easier to tell what part(s) fail
         self.assertEqual(returned_run.id, run.id)
         self.assertEqual(returned_run.raw, run.raw)
         self.assertEqual(returned_run.application, run.application)

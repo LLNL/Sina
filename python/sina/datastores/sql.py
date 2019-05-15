@@ -40,6 +40,9 @@ class RecordDAO(dao.RecordDAO):
         """Initialize RecordDAO with session for its SQL database."""
         self.session = session
 
+    # pylint: disable=arguments-differ
+    # Args differ because called_from_child is analogous to Cassandra's
+    # insert_many() _type_managed; this will be revisited in SIBO-661
     def insert(self, record, called_from_child=False):
         """
         Given a Record, insert it into the current SQL database.
@@ -718,8 +721,8 @@ class RelationshipDAO(dao.RelationshipDAO):
 
     # Note that get() is implemented by its parent.
 
-    # TODO: Ongoing question of whether these should return generators.
-
+    # pylint: disable=fixme
+    # TODO: Should these return generators? SIBO-541
     def _get_given_subject_id(self, subject_id, predicate=None):
         """
         Given record id, return all Relationships with that id as subject.
