@@ -23,7 +23,10 @@ fi
 
 DEPLOY_DIR=`readlink -f $1`/
 DOC_DIR=`readlink -f $2`/
-EXAMPLE_DIR=`readlink -f $3`/
+
+# Do not read the link or python/deploy.sh will fail to create the example link to the latest
+# examples (since it will think EXAMPLE_LINK is a directory).
+EXAMPLE_LINK=$3
 
 if [ ! -d cpp/build/docs/html ]; then
     echo "You must have run the C++ tests and built the docs"
@@ -31,7 +34,8 @@ if [ ! -d cpp/build/docs/html ]; then
 fi
 
 cd python
-./deploy.sh --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_DIR
+# Build the Sina python deployment with all the known options
+./deploy.sh --build-with=cassandra,cli_tools,jupyter --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK 
 
 cd ../cpp
 CREATED_TAR=$(sh create_spack_package.sh)

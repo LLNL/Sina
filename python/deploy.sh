@@ -202,7 +202,7 @@ executeTests() {
 }
 
 # Provide command line options for deployment directories and optional features
-OPTIONS='[--build-with=<buld-options>] [--deploy-dir=<deploy-dir>] [--docs-dir=<docs-dir>] [--examples-link=<examples-link>] [--group=<group>] [--help] [--skip=<skip-steps>]'
+OPTIONS='[--build-with=<build-options>] [--deploy-dir=<deploy-dir>] [--docs-dir=<docs-dir>] [--examples-link=<examples-link>] [--group=<group>] [--help] [--skip=<skip-steps>]'
 
 printUsage() {
   echo; echo "USAGE: `basename $0` $OPTIONS"
@@ -219,7 +219,7 @@ printUsage() {
   echo "  <group>          Group permissions for deployment directories"
   echo "                     [default=$LC_GROUP]"
   echo "  <skip-steps>     Comma-separated list of deployment steps to skip from:"
-  echo "                 clean,git,tests,wheel,venv,docs,examples [default='']"
+  echo "                     clean,git,tests,wheel,venv,docs,examples [default='']"
   exit 1
 }
 
