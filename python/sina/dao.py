@@ -285,6 +285,42 @@ class RelationshipDAO(object):
         """
         raise NotImplementedError
 
+    def _validate_insert(self, relationship=None, subject_id=None,
+                         object_id=None, predicate=None):
+        """
+        Make sure that what we're trying to insert forms a valid Relationship.
+
+        A user can give us either the components for a Relationship or the
+        Relationship itself. This helper figures out which and arranges the
+        components so that the "real" Relationship insert() can insert cleanly.
+        It raises warnings/errors if anything's out of place.
+
+        :param subject_id: The id of the subject.
+        :param object_id: The id of the object.
+        :param predicate: A string describing the relationship.
+        :param relationship: A Relationship object to build entry from.
+        :returns: The subject_id, object_id, and predicate
+
+        :raises: A ValueError if neither Relationship nor the subject_id,
+                 object_id, and predicate args are provided.
+        """
+        LOGGER.debug('Inserting relationship=%s, subject_id=%s, object_id=%s, '
+                     'and predicate=%s.', relationship, subject_id, object_id, predicate)
+        if all([relationship, subject_id, object_id, predicate]):
+            LOGGER.warning('Given both relationship object and '
+                           'subject_id/object_id/predicate objects. Using '
+                           'relationship.')
+        if not (relationship or (subject_id and object_id and predicate)):
+            msg = ("Must supply either Relationship or subject_id, "
+                   "object_id, and predicate.")
+            LOGGER.error(msg)
+            raise ValueError(msg)
+        if relationship:
+            subject_id = relationship.subject_id
+            object_id = relationship.object_id
+            predicate = relationship.predicate
+        return subject_id, object_id, predicate
+
     def insert_many(self, list_to_insert):
         """
         Given a list of Relationships, insert each into the DAO's backend.
