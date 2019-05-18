@@ -170,7 +170,7 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def get_given_document_uri(self, uri, ids_only=False):
+    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
@@ -178,6 +178,8 @@ class RecordDAO(object):
         not get duplicates depending on the backend.
 
         :param uri: The uri to use as a search term, such as "foo.png"
+        :param accepted_ids_list: A list of ids to restrict the search to.
+                                  If not provided, all ids will be used.
         :param ids_only: whether to return only the ids of matching Records
 
         :returns: A generator of matching Records
@@ -285,7 +287,8 @@ class RelationshipDAO(object):
         """
         raise NotImplementedError
 
-    def _validate_insert(self, relationship=None, subject_id=None,
+    @staticmethod
+    def _validate_insert(relationship=None, subject_id=None,
                          object_id=None, predicate=None):
         """
         Make sure that what we're trying to insert forms a valid Relationship.
@@ -528,7 +531,9 @@ class RunDAO(object):
 
         :returns: A generator of Runs fitting the criteria
         """
-        records = self.record_dao.get_given_document_uri(uri)
+        records = self.record_dao.get_given_document_uri(uri,
+                                                         accepted_ids_list=accepted_ids_list,
+                                                         ids_only=ids_only)
         if records:
             for record in records:
                 if record.type == "run":

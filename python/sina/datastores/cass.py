@@ -712,8 +712,9 @@ class RecordDAO(dao.RecordDAO):
         # Disable pylint check until team decides to refactor the code
         for query_table in query_tables:  # pylint: disable=too-many-nested-blocks
             query = (query_table.objects
-                     .filter(query_table.id.in_(id_list))
-                     .filter(query_table.name.in_(data_list))
+                     # cqlengine's use of in_ seems to confuse Pylint
+                     .filter(query_table.id.in_(id_list))  # pylint: disable=no-member
+                     .filter(query_table.name.in_(data_list))  # pylint: disable=no-member
                      .values_list('id', 'name', 'value', 'units'))
             for result in query:
                 id, name, value, units = result
