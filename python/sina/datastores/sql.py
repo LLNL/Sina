@@ -241,18 +241,8 @@ class RecordDAO(dao.RecordDAO):
                                              utils.ListQueryOperation.ONLY,
                                              list_criteria.operation))
         # If we have more than one set of data, we need to find the intersect.
-        # pylint: disable=fixme
-        # TODO: This code is bulky because we're "casting" our intersect to a generator.
-        # it'll be revisited in SIBO-541.
-        if len(result_ids) > 1:
-            valid_sql_ids = set(result_ids[0])
-            for entry in result_ids[1:]:
-                valid_sql_ids = valid_sql_ids.intersection(entry)
-            for id in valid_sql_ids:
-                yield id
-        else:
-            for id in result_ids[0]:
-                yield id
+        for id in utils.intersect_lists(result_ids):
+            yield id
 
     def get(self, id):
         """

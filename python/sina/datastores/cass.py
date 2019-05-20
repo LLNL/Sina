@@ -384,20 +384,9 @@ class RecordDAO(dao.RecordDAO):
                 result_ids.append(query_func(table=table_type,
                                              datum_name=datum_name,
                                              datum_criteria=list_criteria.entries))
-
         # If we have more than one set of data, we need to find the intersect.
-        # pylint: disable=fixme
-        # TODO: This code is bulky because we're "casting" our intersect to a generator.
-        # it'll be revisited in SIBO-541. For now, it's identical between sql and cass.
-        if len(result_ids) > 1:
-            valid_cass_ids = set(result_ids[0])
-            for entry in result_ids[1:]:
-                valid_cass_ids = valid_cass_ids.intersection(entry)
-            for id in valid_cass_ids:
-                yield id
-        else:
-            for id in result_ids[0]:
-                yield id
+        for id in utils.intersect_lists(result_ids):
+            yield id
 
     def _apply_has_all_to_query(self, datum_name, datum_criteria, table):
         """
