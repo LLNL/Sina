@@ -85,6 +85,24 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
                          "Expected {}, not {}".format(filename, result))
         os.remove(filename)
 
+    def test_intersect_lists_empty(self):
+        """Test that the intersection of empty lists is empty."""
+        self.assertEqual(sina.utils.intersect_lists([]), set())
+
+    def test_intersect_lists_one(self):
+        """Test that the intersection of one list is the set of itself."""
+        test_list = ["spam", "eggs", 29]
+        self.assertEqual(sina.utils.intersect_lists([test_list]), set(test_list))
+
+    def test_intersect_lists_many(self):
+        """Test that the intersection of many lists represents their shared elements."""
+        first_list = ["spam", "eggs", "ham", 29, 4.14]
+        second_list = [4.14, "spam", "eggs", 29, "spam"]
+        third_list = [-20, 29, "spam", "eggs", "ham"]
+        all_lists = [first_list, second_list, third_list]
+        shared_elements = set(["spam", "eggs", 29])
+        self.assertEqual(sina.utils.intersect_lists(all_lists), shared_elements)
+
     def test_intersect_ordered_empty(self):
         """Test that the intersection of empty iterators is empty."""
         gen_none = (i for i in [])

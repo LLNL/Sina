@@ -241,15 +241,8 @@ class RecordDAO(dao.RecordDAO):
                                              utils.ListQueryOperation.ONLY,
                                              list_criteria.operation))
         # If we have more than one set of data, we need to find the intersect.
-        if len(result_ids) > 1:
-            valid_ids = set(result_ids[0])
-            for entry in result_ids[1:]:
-                valid_ids = valid_ids.intersection(entry)
-            for id in valid_ids:
-                yield id
-        else:
-            for id in result_ids[0]:
-                yield id
+        for id in utils.intersect_lists(result_ids):
+            yield id
 
     def get(self, id):
         """
@@ -683,40 +676,24 @@ class RelationshipDAO(dao.RelationshipDAO):
     def insert(self, relationship=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given some Relationship, import it into the SQL database.
+        Given some Relationship, import it into a SQL database.
 
         This can create an entry from either an existing relationship object
         or from its components (subject id, object id, predicate). If all four
         are provided, the Relationship will be used.
-
-        A Relationship describes the connection between two objects in the
-        form <subject_id> <predicate> <object_id>, ex:
-
-        Task44 contains Run2001
 
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
         :param predicate: A string describing the relationship.
         :param relationship: A Relationship object to build entry from.
         """
-        LOGGER.debug('Inserting relationship=%s, subject_id=%s, object_id=%s, '
-                     'and predicate=%s.', relationship, subject_id, object_id, predicate)
-        if relationship and subject_id and object_id and predicate:
-            LOGGER.warning('Given relationship object and '
-                           'subject_id/object_id/predicate objects. Using '
-                           'relationship.')
-        if not (relationship or (subject_id and object_id and predicate)):
-            msg = ("Must supply either Relationship or subject_id, "
-                   "object_id, and predicate.")
-            LOGGER.error(msg)
-            raise ValueError(msg)
-        if relationship:
-            subject_id = relationship.subject_id
-            object_id = relationship.object_id
-            predicate = relationship.predicate
-        self.session.add(schema.Relationship(subject_id=subject_id,
-                                             object_id=object_id,
-                                             predicate=predicate))
+        subj, obj, pred = self._validate_insert(relationship=relationship,
+                                                subject_id=subject_id,
+                                                object_id=object_id,
+                                                predicate=predicate)
+        self.session.add(schema.Relationship(subject_id=subj,
+                                             object_id=obj,
+                                             predicate=pred))
         self.session.commit()
 
     # Note that get() is implemented by its parent.

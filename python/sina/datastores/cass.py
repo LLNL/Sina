@@ -384,17 +384,9 @@ class RecordDAO(dao.RecordDAO):
                 result_ids.append(query_func(table=table_type,
                                              datum_name=datum_name,
                                              datum_criteria=list_criteria.entries))
-
         # If we have more than one set of data, we need to find the intersect.
-        if len(result_ids) > 1:
-            valid_ids = set(result_ids[0])
-            for entry in result_ids[1:]:
-                valid_ids = valid_ids.intersection(entry)
-            for id in valid_ids:
-                yield id
-        else:
-            for id in result_ids[0]:
-                yield id
+        for id in utils.intersect_lists(result_ids):
+            yield id
 
     def _apply_has_all_to_query(self, datum_name, datum_criteria, table):
         """
@@ -709,8 +701,9 @@ class RecordDAO(dao.RecordDAO):
         # Disable pylint check until team decides to refactor the code
         for query_table in query_tables:  # pylint: disable=too-many-nested-blocks
             query = (query_table.objects
-                     .filter(query_table.id.in_(id_list))
-                     .filter(query_table.name.in_(data_list))
+                     # cqlengine's use of in_ seems to confuse Pylint
+                     .filter(query_table.id.in_(id_list))  # pylint: disable=no-member
+                     .filter(query_table.name.in_(data_list))  # pylint: disable=no-member
                      .values_list('id', 'name', 'value', 'units'))
             for result in query:
                 id, name, value, units = result
@@ -791,43 +784,27 @@ class RelationshipDAO(dao.RelationshipDAO):
     def insert(self, relationship=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given some Relationship, import it into the Cassandra database.
+        Given some Relationship, import it into a Cassandra database.
 
         This can create an entry from either an existing relationship object
         or from its components (subject id, object id, predicate). If all four
         are provided, the Relationship will be used.
 
-        A Relationship describes the connection between two objects in the
-        form <subject_id> <predicate> <object_id>, ex:
+        This method doesn't make use of Cassandra's batching. See insert_many()
+        for inserting large sets of Relationships.
 
-        Task44 contains Run2001
-
+        :param relationship: A Relationship object to build entry from.
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
         :param predicate: A string describing the relationship.
-        :param relationship: A Relationship object to build entry from.
-
-        :raises: A ValueError if neither Relationship nor the subject_id,
-                 object_id, and predicate args are provided.
         """
-        LOGGER.debug('Inserting relationship=%s, subject_id=%s, object_id=%s, '
-                     'and predicate=%s.', relationship, subject_id, object_id, predicate)
-        if relationship and subject_id and object_id and predicate:
-            LOGGER.warning('Given relationship object and '
-                           'subject_id/object_id/predicate objects. Using '
-                           'relationship.')
-        if not (relationship or (subject_id and object_id and predicate)):
-            msg = ("Must supply either Relationship or subject_id, "
-                   "object_id, and predicate.")
-            LOGGER.error(msg)
-            raise ValueError(msg)
-        if relationship:
-            subject_id = relationship.subject_id
-            object_id = relationship.object_id
-            predicate = relationship.predicate
-        schema.cross_populate_object_and_subject(subject_id=subject_id,
-                                                 object_id=object_id,
-                                                 predicate=predicate)
+        subj, obj, pred = self._validate_insert(relationship=relationship,
+                                                subject_id=subject_id,
+                                                object_id=object_id,
+                                                predicate=predicate)
+        schema.cross_populate_object_and_subject(subject_id=subj,
+                                                 object_id=obj,
+                                                 predicate=pred)
 
     def insert_many(self, list_to_insert):
         """

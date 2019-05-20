@@ -140,6 +140,29 @@ def _process_relationship_entry(entry, local_ids):
     return (subj, obj)
 
 
+def intersect_lists(lists_to_intersect):
+    """
+    Given an iterator of lists, return a set representing their intersection.
+
+    While intersecting many sets is straightforward, intersecting many lists
+    requires a cast to set and then a series of intersects against it. To keep
+    things neat, this logic's been pulled into a helper. It's only meant for
+    lists, see intersect_ordered() for generator intersection.
+
+    :param lists_to_intersect: The lists to find the intersection of.
+
+    :returns: a set representing the intersection of all lists in lists_to_intersect.
+    """
+    if lists_to_intersect:
+        shared_ids = set(lists_to_intersect[0])
+        if len(lists_to_intersect) > 1:
+            for entry in lists_to_intersect[1:]:
+                shared_ids = shared_ids.intersection(entry)
+        return shared_ids
+    else:
+        return set()
+
+
 def merge_ranges(list_of_ranges):
     """
     Given a list of DataRanges, merge together any that overlap.

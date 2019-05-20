@@ -170,7 +170,7 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def get_given_document_uri(self, uri, ids_only=False):
+    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
@@ -178,6 +178,8 @@ class RecordDAO(object):
         not get duplicates depending on the backend.
 
         :param uri: The uri to use as a search term, such as "foo.png"
+        :param accepted_ids_list: A list of ids to restrict the search to.
+                                  If not provided, all ids will be used.
         :param ids_only: whether to return only the ids of matching Records
 
         :returns: A generator of matching Records
@@ -284,6 +286,43 @@ class RelationshipDAO(object):
                  object_id, and predicate args are provided.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _validate_insert(relationship=None, subject_id=None,
+                         object_id=None, predicate=None):
+        """
+        Make sure that what we're trying to insert forms a valid Relationship.
+
+        A user can give us either the components for a Relationship or the
+        Relationship itself. This helper figures out which and arranges the
+        components so that the "real" Relationship insert() can insert cleanly.
+        It raises warnings/errors if anything's out of place.
+
+        :param subject_id: The id of the subject.
+        :param object_id: The id of the object.
+        :param predicate: A string describing the relationship.
+        :param relationship: A Relationship object to build entry from.
+        :returns: The subject_id, object_id, and predicate
+
+        :raises: A ValueError if neither Relationship nor the subject_id,
+                 object_id, and predicate args are provided.
+        """
+        LOGGER.debug('Inserting relationship=%s, subject_id=%s, object_id=%s, '
+                     'and predicate=%s.', relationship, subject_id, object_id, predicate)
+        if all([relationship, subject_id, object_id, predicate]):
+            LOGGER.warning('Given both relationship object and '
+                           'subject_id/object_id/predicate objects. Using '
+                           'relationship.')
+        if not (relationship or (subject_id and object_id and predicate)):
+            msg = ("Must supply either Relationship or subject_id, "
+                   "object_id, and predicate.")
+            LOGGER.error(msg)
+            raise ValueError(msg)
+        if relationship:
+            subject_id = relationship.subject_id
+            object_id = relationship.object_id
+            predicate = relationship.predicate
+        return subject_id, object_id, predicate
 
     def insert_many(self, list_to_insert):
         """
@@ -492,7 +531,9 @@ class RunDAO(object):
 
         :returns: A generator of Runs fitting the criteria
         """
-        records = self.record_dao.get_given_document_uri(uri)
+        records = self.record_dao.get_given_document_uri(uri,
+                                                         accepted_ids_list=accepted_ids_list,
+                                                         ids_only=ids_only)
         if records:
             for record in records:
                 if record.type == "run":
