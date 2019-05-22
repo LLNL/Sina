@@ -9,11 +9,11 @@
 # The following environment variables can be used to affect the virtual
 # environment that is built by the invoked Makefile:
 #
-#   BASE_PYTHON       = The Python used to build the "main" virtual env
-#   EXTRA_VENV_PYTHON = The Python used to build the second virtual env
-#   SINA_PIP_OPTIONS  = Additional options to pip (e.g., '--no-index')
-#   VENV_OPTIONS      = Additional options when the venv is created (e.g.,
-#                         '--system-site-packages' to inherit system packages
+#   PYTHON_3         = The Python used to build the main (Python 3) virtual env
+#   PYTHON_2         = The Python used to build the Python 2 virtual env
+#   SINA_PIP_OPTIONS = Additional options to pip (e.g., '--no-index')
+#   VENV_OPTIONS     = Additional options when the venv is created (e.g.,
+#                      '--system-site-packages' to inherit system packages
 
 umask 027
 
@@ -32,9 +32,9 @@ LC_EXAMPLES_LINK=/collab/usr/gapps/wf/examples  # Backward-compatible link to la
 # Common names
 DOC_SYM_NAME=sina  # symlink for the documentation subdirectory
 VENV_SYM_NAME=sina  # symlink for venv
-BASE_PYTHON=${BASE_PYTHON:-`which python`}  # Python used for most operations
-EXTRA_VENV_PYTHON=${EXTRA_VENV_PYTHON:-`which python3`}  # Python used for secondary venv
-EXTRA_VENV_SUFFIX="-py3"  # Suffix added to venvs to indicate they're for the secondary version
+PYTHON_3=${PYTHON_3:-`which python3`}  # Python used for the Python 3 virtual env
+PYTHON_2=${PYTHON_2:-`which python`}  # Python used for the Python 2 virtual env
+PYTHON_2_SUFFIX="-py2"  # Suffix added to venvs to indicate they're for the Py2 venv
 
 # Ensure we're running from the correct directory
 if [ ! -f setup.py ]
@@ -349,8 +349,8 @@ if [ "$WHEEL_FILENAME" != "" ]; then
   # wheel is not created on this deployment pass.
   VENV_PATH=$DEPLOY_DIR/`basename $WHEEL_FILENAME .whl`
   if [[ ! "${SKIP_STEPS[@]}" =~ "venv" ]]; then
-      deployVenv $VENV_PATH $VENV_SYM_NAME $BASE_PYTHON
-      deployVenv $VENV_PATH$EXTRA_VENV_SUFFIX $VENV_SYM_NAME$EXTRA_VENV_SUFFIX $EXTRA_VENV_PYTHON
+      deployVenv $VENV_PATH $VENV_SYM_NAME $PYTHON_3
+      deployVenv $VENV_PATH$PYTHON_2_SUFFIX $VENV_SYM_NAME$PYTHON_2_SUFFIX $PYTHON_2
   fi
 else
   echo "ERROR: The wheel file is required to derive the venv pathname"
