@@ -1,14 +1,19 @@
 #!/bin/bash
 #
-# Sina deployment: wheel, virtual environment, documentation, and examples.
+# Sina deployment: wheel, 2 virtual environments, documentation, and examples.
+#
+# By default, the 2 virtual environments correspond to the system's python2 and
+# python3. If you want to change this behavior, consider changing
+# EXTRA_VENV_SUFFIX to fit the new behavior.
 #
 # The following environment variables can be used to affect the virtual
 # environment that is built by the invoked Makefile:
 #
-#   PYTHON           = Specify non-default python (e.g., python3)
+#   PYTHON_3         = The Python used to build the main (Python 3) virtual env
+#   PYTHON_2         = The Python used to build the Python 2 virtual env
 #   SINA_PIP_OPTIONS = Additional options to pip (e.g., '--no-index')
 #   VENV_OPTIONS     = Additional options when the venv is created (e.g.,
-#                        '--system-site-packages' to inherit system packages
+#                      '--system-site-packages' to inherit system packages
 
 umask 027
 
@@ -25,8 +30,11 @@ LC_DOCS_DIR=/usr/global/web-pages/lc/www/workflow/docs  # Workflow docs
 LC_EXAMPLES_LINK=/collab/usr/gapps/wf/examples  # Backward-compatible link to latest examples dir
 
 # Common names
-DOC_SYM_NAME=sina # symlink for the documentation subdirectory
-VENV_SYM_NAME=sina # symlink for venv
+DOC_SYM_NAME=sina  # symlink for the documentation subdirectory
+VENV_SYM_NAME=sina  # symlink for venv
+PYTHON_3=${PYTHON_3:-`which python3`}  # Python used for the Python 3 virtual env
+PYTHON_2=${PYTHON_2:-`which python`}  # Python used for the Python 2 virtual env
+PYTHON_2_SUFFIX="-py2"  # Suffix added to venvs to indicate they're for the Py2 venv
 
 # Ensure we're running from the correct directory
 if [ ! -f setup.py ]
@@ -42,6 +50,7 @@ set -e
 
 # ---------------------------------  FUNCTIONS ---------------------------------
 
+# Make sure directories given as args to deploy.sh exist.
 checkDirectory() {
   # $1=directory description, $2=directory path
   if [ ! -z "$2" ]; then
@@ -57,6 +66,7 @@ checkDirectory() {
   fi
 }
 
+# Deploy the documentation to $DOCS_DIR
 deployDocs() {
   DOC_PATH=$DOCS_DIR/$VERSION_SUBDIR
   echo; echo "Deploying documentation into $DOC_PATH..."
@@ -84,6 +94,8 @@ deployDocs() {
   ln -sf $DOC_PATH $DOCS_DIR/$DOC_SYM_NAME
 }
 
+# Deploy the examples. Rather than deploying them directly, build them wherever
+# the script is run and then link to them.
 deployExamples() {
   EXAMPLES_SOURCE_DIR=`dirname $SOURCE_DIR`/examples
   EXAMPLES_DEST_ROOT=$DEPLOY_DIR/examples/$VERSION_SUBDIR
@@ -109,7 +121,7 @@ deployExamples() {
     fi
 
     echo "Building $DATASET_NAME database in $EXAMPLE_DEST..."
-    cd $EXAMPLE_DEST 
+    cd $EXAMPLE_DEST
     bash $db_build_script $DATASET_SOURCE_DIR
     cd $SOURCE_DIR
   done
@@ -152,27 +164,35 @@ deployWheel() {
   chown :$PERM_GROUP $WHEEL_DEST/$WHEEL_FILENAME
 }
 
+# Usage: deployVenv <path to make venv at> <name for venv link> <python to use>
+# Links to created venvs are created in $DEPLOY_DIR, extras installed are
+# decided by $BUILD_OPTIONS
 deployVenv() {
-  echo; echo "Building and deploying the virtual environment into $VENV_PATH"
-  make install VENV=$VENV_PATH
+  VENV_DEST=$1
+  VENV_LINK_NAME=$2
+  PYTHON_EXEC=$3
+  echo; echo "Building and deploying the virtual environment into $VENV_DEST"
+  make install VENV=$VENV_DEST PYTHON=$PYTHON_EXEC
   for opt in $BUILD_OPTIONS; do
     if echo "$VALID_MAKE_TARGETS" | grep -q "$opt"; then
-        make $opt VENV=$VENV_PATH
+        make $opt VENV=$VENV_DEST PYTHON=$PYTHON_EXEC
     else
       echo "WARNING: Ignoring invalid build target since $opt not in $VALID_MAKE_TARGETS"
     fi
   done
 
   # Ensure permissions are set appropriately and the shortcut links to the latest
-  chown -R :$PERM_GROUP $VENV_PATH
+  chown -R :$PERM_GROUP $VENV_DEST
 
-  echo "Linking $DEPLOY_DIR to $VENV_PATH..."
+  echo "Linking $DEPLOY_DIR to $VENV_DEST..."
 
   # Explicitly remove the link to ensure it is replaced by the new symlink
-  rm -f $DEPLOY_DIR/$VENV_SYM_NAME
-  ln -sf $VENV_PATH $DEPLOY_DIR/$VENV_SYM_NAME
+  rm -f $DEPLOY_DIR/$VENV_LINK_NAME
+  ln -sf $VENV_DEST $DEPLOY_DIR/$VENV_LINK_NAME
 }
 
+# Run whatever tests are associated with this deployment. Decided by
+# BUILD_OPTIONS, which defaults to nothing (just run "make tests")
 executeTests() {
   num_extras=${#BUILD_OPTIONS[@]}
 
@@ -186,7 +206,7 @@ executeTests() {
     for opt in $BUILD_OPTIONS; do
       echo
       if echo "$VALID_MAKE_TARGETS" | grep -q "$opt"; then
-        # TODO: SIBO-231: Remove skipping cassandra tests once have server 
+        # TODO: SIBO-231: Remove skipping cassandra tests once have server
         # available perform those tests.
         if [ "$opt" != "cassandra" ]; then
           echo "Running optional tests: test-$opt..."
@@ -202,6 +222,7 @@ executeTests() {
 }
 
 # Provide command line options for deployment directories and optional features
+# Note the equals sign between flag and value.
 OPTIONS='[--build-with=<build-options>] [--deploy-dir=<deploy-dir>] [--docs-dir=<docs-dir>] [--examples-link=<examples-link>] [--group=<group>] [--help] [--skip=<skip-steps>]'
 
 printUsage() {
@@ -303,7 +324,7 @@ else
   fi
 fi
 
-# wheel: Build and deploy the wheel, making sure to expose the wheel filename 
+# wheel: Build and deploy the wheel, making sure to expose the wheel filename
 #        for virtual environment directory purposes.
 if [[ ! "${SKIP_STEPS[@]}" =~ "wheel" ]]; then
   make wheel
@@ -321,14 +342,15 @@ else
   WHEEL_FILENAME=`ls $DEPLOYED_WHEEL | rev | cut -d / -f1 | rev`
 fi
 
-# venv: Build and deploy the virtual environment using the wheel name as the 
+# venv: Build and deploy the virtual environment using the wheel name as the
 #       basis for the directory name.
 if [ "$WHEEL_FILENAME" != "" ]; then
   # Need the virtual environment path for deploying examples even when the
   # wheel is not created on this deployment pass.
   VENV_PATH=$DEPLOY_DIR/`basename $WHEEL_FILENAME .whl`
   if [[ ! "${SKIP_STEPS[@]}" =~ "venv" ]]; then
-      deployVenv
+      deployVenv $VENV_PATH $VENV_SYM_NAME $PYTHON_3
+      deployVenv $VENV_PATH$PYTHON_2_SUFFIX $VENV_SYM_NAME$PYTHON_2_SUFFIX $PYTHON_2
   fi
 else
   echo "ERROR: The wheel file is required to derive the venv pathname"

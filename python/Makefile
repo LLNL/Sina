@@ -128,10 +128,10 @@ cassandra: $(LINKS_FILE)
 	echo "Installing cassandra in $(VENV)"; \
 	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/cassandra.txt
 
-# Add command line tool dependencies to an existing virtual environment, where 
+# Add command line tool dependencies to an existing virtual environment, where
 # one is created through a recursive call to make if it does not exist.
 #
-# Note: Use of underscore in the target name ensures deploy.sh can readily 
+# Note: Use of underscore in the target name ensures deploy.sh can readily
 # process options.
 cli_tools: $(LINKS_FILE)
 	@if test ! -d $(VENV); then \
@@ -146,7 +146,7 @@ cli_tools: $(LINKS_FILE)
 docs: install
 	@$(VENV)/bin/tox -e docs
 
-# Add flake8 dependencies to an existing test virtual environment, where 
+# Add flake8 dependencies to an existing test virtual environment, where
 # one is created through a recursive call to make if it does not exist.
 flake8: export PATH=$(TEST_PATH)
 flake8: $(LINKS_FILE)
@@ -235,10 +235,10 @@ test-cassandra:
 	  $(TEST_VENV)/bin/tox -e cassandra; \
 	fi
 
-# Run command line tools tests, which depend on a suitably configured test 
+# Run command line tools tests, which depend on a suitably configured test
 # virtual environment.
 #
-# Note: Use of underscore in the target name ensures deploy.sh can readily 
+# Note: Use of underscore in the target name ensures deploy.sh can readily
 # process options.
 test-cli_tools: export PATH=$(TEST_PATH)
 test-cli_tools: $(LINKS_FILE)
@@ -261,7 +261,7 @@ test-core: $(LINKS_FILE)
         $(TEST_VENV)/bin/tox -e core
 
 
-# Run jupyter tests, which depend on a suitably configured test virtual 
+# Run jupyter tests, which depend on a suitably configured test virtual
 # environment.
 test-jupyter: export PATH=$(TEST_PATH)
 test-jupyter: $(LINKS_FILE)
@@ -272,16 +272,16 @@ test-jupyter: $(LINKS_FILE)
 	  $(TEST_VENV)/bin/tox -e jupyter; \
 	fi
 
-# Create the Sina wheel 
+# Create the Sina wheel
 wheel:
 	@echo "Creating the sina wheel"; \
 	rm -rf ./wheel; \
 	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) ./wheel; \
 	wheel/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip setuptools wheel; \
-	wheel/bin/python setup.py bdist_wheel; \
+	wheel/bin/python setup.py bdist_wheel --universal; \
 	rm -rf ./wheel
 
-# Set up a clean branch, recursively calling make to clean up notebooks and 
+# Set up a clean branch, recursively calling make to clean up notebooks and
 # files as needed.
 clean:
 	@make --no-print-directory clean-notebooks; \
