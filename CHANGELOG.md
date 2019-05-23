@@ -5,6 +5,14 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.5
+===
+- Made Cassandra, Jupyter, and some cli tools optional
+- Added license files
+- Added Pylint to tests, made project Pylint compliant
+- Made Python 3 the default for the deployed virtual env
+- Reorganized modules for usability (separated out CLI module, etc)
+
 1.4
 ===
 - Added list support to Record data
