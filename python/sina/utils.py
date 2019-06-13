@@ -257,8 +257,6 @@ def intersect_ordered(iterables):
 
     :returns: A generator that crawls through the iterators and returns
               values that all of them share.
-
-    :raises StopIteration: when it runs out of values
     """
     # Quit fast as we'll be assuming at least one generator.
     if not iterables:
@@ -269,18 +267,24 @@ def intersect_ordered(iterables):
     for iter_ in iterables:
         gen_list.append(x for x in iter_)
 
-    # Get our first set
+    # Get our first set, handle the StopIteration if any gen is empty.
     most_recents = []
     for gen in gen_list:
-        most_recents.append(six.next(gen))
+        try:
+            most_recents.append(six.next(gen))
+        except StopIteration:
+            return
 
     while True:
         if most_recents.count(most_recents[0]) == len(most_recents):
             # All our iterators agree
             yield most_recents[0]
-            # Get the next
+            # Get the next set to check, return if any generators run out.
             for index, gen in enumerate(gen_list):
-                most_recents[index] = six.next(gen)
+                try:
+                    most_recents[index] = six.next(gen)
+                except StopIteration:
+                    return
         # Once this "else" exits, everything is == or > than max:
         else:
             maxval = max(most_recents)
@@ -288,7 +292,10 @@ def intersect_ordered(iterables):
             # we know there are no more possible matches once one generator runs out.
             for index, gen in enumerate(gen_list):
                 while most_recents[index] < maxval:
-                    most_recents[index] = six.next(gen)
+                    try:
+                        most_recents[index] = six.next(gen)
+                    except StopIteration:
+                        return
 
 
 def export(factory, id_list, scalar_names, output_type, output_file=None):
