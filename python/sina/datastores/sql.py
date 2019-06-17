@@ -386,6 +386,15 @@ class RecordDAO(dao.RecordDAO):
                                                for record_id in records_list))
         return list_of_record_ids_sets
 
+    def get_available_types(self):
+        """
+        Return a list of all the Record types in the database.
+
+        :returns: A list of types present (ex: ["run", "experiment"])
+        """
+        results = self.session.query(schema.Record.type).distinct().all()
+        return [entry[0] for entry in results]
+
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.

@@ -170,6 +170,15 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
+    def get_available_types(self):
+        """
+        Return a list of all the Record types in the database.
+
+        :returns: A list of types present (ex: ["run", "experiment"])
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
