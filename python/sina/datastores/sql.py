@@ -567,9 +567,9 @@ class RecordDAO(dao.RecordDAO):
         conditions.append(")")
         return sqlalchemy.text(''.join(conditions))
 
-    def get_data_for_records(self, id_list, data_list):
+    def get_data_for_records(self, data_list, id_list=None):
         """
-        Retrieve a subset of data for Records in id_list.
+        Retrieve a subset of data for Records (or optionally a subset of Records).
 
         For example, it might get "debugger_version" and "volume" for the
         Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
@@ -585,13 +585,16 @@ class RecordDAO(dao.RecordDAO):
         if a Record ends up containing none of the requested data, it will be
         omitted.
 
-        :param id_list: A list of the record ids to find data for
         :param data_list: A list of the names of data fields to find
+        :param id_list: A list of the record ids to find data for, None if
+                        all Records should be considered.
 
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in %s for record ids in %s', data_list, id_list)
+        LOGGER.debug('Getting data in %s for %s',
+                     data_list,
+                     'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarData, schema.StringData]
         for query_table in query_tables:
@@ -600,8 +603,9 @@ class RecordDAO(dao.RecordDAO):
                                         query_table.value,
                                         query_table.units,
                                         query_table.tags)
-                     .filter(query_table.id.in_(id_list))
                      .filter(query_table.name.in_(data_list)))
+            if id_list is not None:
+                query = query.filter(query_table.id.in_(id_list))
             for result in query:
                 datapoint = {"value": result.value}
                 if result.units:

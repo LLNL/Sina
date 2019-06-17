@@ -663,9 +663,9 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(set(match_ids)):
                 yield record
 
-    def get_data_for_records(self, id_list, data_list, omit_tags=False):
+    def get_data_for_records(self, data_list, id_list=None, omit_tags=False):
         """
-        Retrieve a subset of data for Records in id_list.
+        Retrieve a subset of data for Records (or optionally a subset of Records).
 
         For example, it might get "debugger_version" and "volume" for the
         Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
@@ -681,8 +681,9 @@ class RecordDAO(dao.RecordDAO):
         if a Record ends up containing none of the requested data, it will be
         omitted.
 
-        :param id_list: A list of the record ids to find data for
         :param data_list: A list of the names of data fields to find
+        :param id_list: A list of the record ids to find data for, None if
+                        all Records should be considered.
         :param omit_tags: Whether to avoid returning tags. A Cassandra
                           limitation results in up to id_list*data_list+1
                           queries to include the tags, rather than the single
@@ -693,40 +694,69 @@ class RecordDAO(dao.RecordDAO):
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in %s for record ids in %s', data_list, id_list)
+        LOGGER.debug('Getting data in %s for %s',
+                     data_list,
+                     'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
-        query_tables = [schema.ScalarDataFromRecord,
-                        schema.StringDataFromRecord]
 
-        # Disable pylint check until team decides to refactor the code
-        for query_table in query_tables:  # pylint: disable=too-many-nested-blocks
+        # The query table changes based on whether we're restricting by ID.
+        query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
+                        if id_list is not None
+                        else [schema.RecordFromScalarData, schema.RecordFromStringData])
+
+        for query_table in query_tables:
             query = (query_table.objects
-                     # cqlengine's use of in_ seems to confuse Pylint
-                     .filter(query_table.id.in_(id_list))  # pylint: disable=no-member
-                     .filter(query_table.name.in_(data_list))  # pylint: disable=no-member
-                     .values_list('id', 'name', 'value', 'units'))
+                     .filter(query_table.name.in_(data_list)))  # pylint: disable=no-member
+            if id_list is not None:
+                query = query.filter(query_table.id.in_(id_list))  # pylint: disable=no-member
+            query = query.values_list('id', 'name', 'value', 'units')
             for result in query:
                 id, name, value, units = result
                 datapoint = {"value": value}
                 if units:
                     datapoint["units"] = units
                 data[id][name] = datapoint
-            # Cassandra has a limitation wherein any "IN" query stops working
-            # if one of the columns requested contains collections. 'tags' is a
-            # collection column. Unfortunately, there's a further limitation
-            # that a BatchQuery can't select (only create, update, or delete),
-            # so the best we can do (until they fix one of the above) is:
-            if not omit_tags:
-                for id in data:
-                    for name in data[id]:
-                        if "tags" not in data[id][name]:
-                            tags = (query_table.objects
-                                    .filter(query_table.id == id)
-                                    .filter(query_table.name == name)
-                                    .values_list('tags', flat=True)).all()
-                            if tags and tags[0] is not None:
-                                data[id][name]["tags"] = tags[0]
+
+        if not omit_tags:
+            for id in data:
+                for name in data[id]:
+                    tags = self._get_tags_for_datum(id, name)
+                    if tags is not None:
+                        data[id][name]["tags"] = tags
         return data
+
+    @staticmethod
+    def _get_tags_for_datum(id, name):
+        """
+        Given a specific datum for a specific Record, return its tags.
+
+        We'll go through our query tables until we find the data entry, so this
+        works for strings/scalars/lists thereof, but not non-data entries (files, etc).
+
+        Cassandra has a limitation wherein any "IN" query stops working
+        if one of the columns requested contains collections. 'tags' is a
+        collection column. Unfortunately, there's a further limitation
+        that a BatchQuery can't select (only create, update, or delete),
+        so the best we can do (until they fix one of the above) is to send a
+        flurry of tiny queries. If you're using this helper, consider
+        adding an optarg to disable returning tags.
+
+        :param id: The id the datum belongs to
+        :param name: The name of the datum
+
+        :returns: The corresponding tags, or None if none were found.
+
+        :raises ValueError: if given a name or id not found in the database.
+        """
+        query_tables = [TABLE_LOOKUP[x]["data_table"] for x in TABLE_LOOKUP]
+        for table in query_tables:
+            tags = (table.objects
+                    .filter(table.id == id)
+                    .filter(table.name == name)
+                    .values_list('tags', flat=True)).all()
+            if tags:
+                return tags[0]
+        raise ValueError('No data entry "{}" for record {}'.format(name, id))
 
     def get_scalars(self, id, scalar_names):
         """
