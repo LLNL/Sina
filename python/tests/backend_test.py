@@ -62,7 +62,7 @@ def populate_database_with_data(record_dao):
     spam_record_3 = Record(id="spam3", type="foo")
     spam_record_3.data["spam_scal"] = {"value": 10.5}
     spam_record_3.data["spam_scal_2"] = {"value": 10.5}
-    spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible"]}
+    spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
     spam_record_3.data["val_data_2"] = {"value": "double yolks"}
     spam_record_3.files = [{"uri": "beeq.png"}]
 
@@ -670,7 +670,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         six.assertCountEqual(self, for_many["spam3"].keys(), ["spam_scal",
                                                               "spam_scal_2",
                                                               "val_data"])
-        self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible"])
+        self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible", "simple"])
 
     def test_recorddao_get_no_data_for_nonexistant_records(self):
         """Test that we're not getting data for records that don't exist."""
