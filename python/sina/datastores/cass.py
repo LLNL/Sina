@@ -595,6 +595,15 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(query):
                 yield record
 
+    def get_available_types(self):
+        """
+        Return a list of all the Record types in the database.
+
+        :returns: A list of types present (ex: ["run", "experiment"])
+        """
+        # CQL's "distinct" is limited to partition columns (ID) and "static" columns only.
+        return list(set(schema.Record.objects.values_list('type', flat=True)))
+
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.

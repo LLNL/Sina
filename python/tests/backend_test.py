@@ -415,6 +415,12 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         all_wildcard = self.record_dao.get_given_document_uri(uri="%")
         self.assertEqual(len(list(all_wildcard)), 5)
 
+    # ####################### test_get_available_types ######################
+    def test_get_available_types(self):
+        """Make sure that we return a correct list of the types in a datebase."""
+        types_found = self.record_dao.get_available_types()
+        six.assertCountEqual(self, types_found, ["run", "spamrec", "bar", "foo", "eggrec"])
+
     # ########################### basic data_query ##########################
     def test_recorddao_scalar_datum_query(self):
         """Test that the RecordDAO data query is retrieving based on one scalar correctly."""
