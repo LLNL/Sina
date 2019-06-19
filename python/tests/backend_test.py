@@ -62,7 +62,7 @@ def populate_database_with_data(record_dao):
     spam_record_3 = Record(id="spam3", type="foo")
     spam_record_3.data["spam_scal"] = {"value": 10.5}
     spam_record_3.data["spam_scal_2"] = {"value": 10.5}
-    spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible"]}
+    spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
     spam_record_3.data["val_data_2"] = {"value": "double yolks"}
     spam_record_3.files = [{"uri": "beeq.png"}]
 
@@ -676,13 +676,19 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         six.assertCountEqual(self, for_many["spam3"].keys(), ["spam_scal",
                                                               "spam_scal_2",
                                                               "val_data"])
-        self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible"])
+        self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible", "simple"])
 
     def test_recorddao_get_no_data_for_nonexistant_records(self):
         """Test that we're not getting data for records that don't exist."""
         for_none = self.record_dao.get_data_for_records(id_list=["nope", "nada"],
                                                         data_list=["gone", "away"])
         self.assertFalse(for_none)
+
+    def test_recorddao_get_data_for_all_records(self):
+        """Test that we're getting data for all records when id_list isn't specified."""
+        for_all = self.record_dao.get_data_for_records(data_list=["val_data_3"])
+        six.assertCountEqual(self, for_all.keys(), ["spam5", "spam6"])
+        six.assertCountEqual(self, for_all["spam5"].keys(), ["val_data_3"])
 
     # ###################### get_scalars (legacy) ########################
     def test_recorddao_get_scalars(self):

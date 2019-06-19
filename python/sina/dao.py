@@ -210,9 +210,9 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def get_data_for_records(self, id_list, data_list):
+    def get_data_for_records(self, data_list, id_list=None):
         """
-        Retrieve a subset of data for Records in id_list.
+        Retrieve a subset of data for Records (or optionally a subset of Records).
 
         For example, it might get "debugger_version" and "volume" for the
         Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
@@ -228,8 +228,9 @@ class RecordDAO(object):
         if a Record ends up containing none of the requested data, it will be
         omitted.
 
-        :param id_list: A list of the record ids to find data for
         :param data_list: A list of the names of data fields to find
+        :param id_list: A list of the record ids to find data for, None if
+                        all Records should be considered.
 
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
