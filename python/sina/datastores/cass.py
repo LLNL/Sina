@@ -2,6 +2,7 @@
 """Contains Cassandra-specific implementations of our DAOs."""
 import numbers
 import logging
+import types
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
 from collections import defaultdict
@@ -11,6 +12,10 @@ import six
 
 # Disable pylint check due to its issue with virtual environments
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery  # pylint: disable=import-error
+# This is used to patch the default limit issue that will be fixed in cassandra-driver 4.0.0
+# The behavior of queries is changed in that the default limit (10,000) is disabled
+# This affects the object itself; if you inherit this module, you will see the effect.
+from cassandra.cqlengine.query import AbstractQuerySet  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
@@ -32,6 +37,38 @@ TABLE_LOOKUP = {
     "scalarlist": {"record_table": schema.RecordFromScalarListData,
                    "data_table": schema.ScalarListDataFromRecord}
 }
+
+# Here, we tweak the behavior of QuerySets to disable the default limit of 10,000 results.
+# Make a deep copy of the old init for AbstractQuerySet
+orig_init = AbstractQuerySet.__init__
+# Pylint raises issues with these methods not being callable, but they're used just fine.
+# pylint: disable=not-callable
+try:
+    queryset_original_init = types.FunctionType(orig_init.__code__,
+                                                orig_init.__globals__, orig_init.__name__,
+                                                orig_init.__defaults__, orig_init.__closure__)
+except AttributeError:
+    # This is caused by autodoc's primitive mocker. As in cass_schema, we mock by hand.
+    def queryset_original_intent():
+        """Cover for the mocker."""
+        raise AttributeError("Autodoc mockup method, should never be run.")
+
+
+def queryset_init_sans_default_limit(abstractqueryset, aqs_model):
+    """
+    Hack around QuerySets having an implicit limit of 10,000 results.
+
+    Note that this behavior will affect *all* QuerySets once this is loaded.
+    This is just an expansion on AbstractQuerySet's original init. See DAOFactory
+    for use.
+
+    :param <all>: inherited from the "real" init with meanings unchanged.
+    """
+    queryset_original_init(abstractqueryset, aqs_model)
+    # Currently the only way to tweak this.
+    # pylint: disable=protected-access
+    abstractqueryset._limit = 0
+# pylint: enable=not-callable
 
 
 class RecordDAO(dao.RecordDAO):
@@ -1074,6 +1111,9 @@ class DAOFactory(dao.DAOFactory):
     """
 
     supports_parallel_ingestion = True
+
+    # When class is loaded, disable Queryset limit
+    AbstractQuerySet.__init__ = queryset_init_sans_default_limit
 
     def __init__(self, keyspace, node_ip_list=None):
         """
