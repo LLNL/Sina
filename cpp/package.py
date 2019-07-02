@@ -14,6 +14,6 @@ class SinaCpp(CMakePackage):
             description='Allow generating documentation')
 
     # Higher versions of cmake require C++14 or newer
-    depends_on('cmake@3.8.0:3.9.4', type='build')
+    depends_on('cmake@3.8.0:', type='build')
     depends_on('doxygen', type='build', when='+docs')
     depends_on('nlohmann-json -test')
