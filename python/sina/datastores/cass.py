@@ -11,6 +11,10 @@ import six
 
 # Disable pylint check due to its issue with virtual environments
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery  # pylint: disable=import-error
+# This is used to patch the default limit issue that will be fixed in cassandra-driver 4.0.0
+# The behavior of queries is changed in that the default limit (10,000) is disabled
+# This affects the object itself; if you inherit this module, you will see the effect.
+from cassandra.cqlengine.query import AbstractQuerySet  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
@@ -32,6 +36,34 @@ TABLE_LOOKUP = {
     "scalarlist": {"record_table": schema.RecordFromScalarListData,
                    "data_table": schema.ScalarListDataFromRecord}
 }
+
+
+def _disable_cqlengine_implicit_query_limit():
+    """
+    Hack around QuerySets having an implicit limit of 10,000 results.
+
+    Note that this behavior will affect *all* QuerySets once this is loaded.
+    This is just an expansion on AbstractQuerySet's original init. See DAOFactory
+    for use.
+    """
+    orig_init = AbstractQuerySet.__init__
+
+    def queryset_init_sans_default_limit(abstractqueryset, aqs_model):
+        """
+        Initialize an abstractqueryset as usual, except with the limit disabled.
+
+        :param <all>: inherited from the "real" init with meanings unchanged.
+        """
+        orig_init(abstractqueryset, aqs_model)
+        # Currently the only way to tweak this.
+        # pylint: disable=protected-access
+        abstractqueryset._limit = 0
+
+    # Replace the old init with the patched one.
+    AbstractQuerySet.__init__ = queryset_init_sans_default_limit
+
+
+_disable_cqlengine_implicit_query_limit()
 
 
 class RecordDAO(dao.RecordDAO):
