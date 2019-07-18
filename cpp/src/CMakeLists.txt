@@ -14,9 +14,10 @@ blt_register_library(NAME libdl
         )
 
 blt_register_library(NAME adiak
-        TREAT_INCLUDES_AS_SYSTEM ON
-        INCLUDES "~/adiak/include" 
-        )
+       TREAT_INCLUDES_AS_SYSTEM ON
+       INCLUDES "/g/g14/haluska2/adiak/build/installed/include"
+       LIBRARIES "/g/g14/haluska2/adiak/build/installed/lib/libadiak.a" 
+       )
 
 blt_register_library(NAME nlohmann_json
         INCLUDES "${nlohmann_json_DIR}/../../../include"
@@ -36,6 +37,7 @@ blt_add_library(NAME sina
         ../include/sina/Run.hpp
         ../include/sina/Datum.hpp
         ../include/mnoda/adiak_mnoda_writer.hpp
+        ../include/mnoda/AdiakWriter.hpp
     SOURCES
         Document.cpp
         File.cpp
@@ -45,10 +47,20 @@ blt_add_library(NAME sina
         Relationship.cpp
         Run.cpp
         Datum.cpp
-        adiak_mnoda_writer.cpp
+        AdiakWriter.cpp
     DEPENDS_ON
         nlohmann_json
         adiak
+)
+
+blt_add_executable(
+ NAME testappcxx 
+ SOURCES
+    testapp.cpp
+ DEPENDS_ON
+     sina
+     libdl
+     adiak
 )
 
 install(TARGETS sina
