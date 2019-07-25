@@ -24,36 +24,33 @@ namespace mnoda{
 * NOTES:
 * Adiak doesn't have rec_id, rec_type, or rec_app analogues, but does have version
 **/
-std::unique_ptr<mnoda::Record> record_ptr;
-
-void initRecord(std::string id, std::string type){
-    mnoda::ID rec_id{id, mnoda::IDType::Local};
-    record_ptr.reset(new mnoda::Record{rec_id, type});
-}
-
-void flushRecord(std::string const &filename){
-    /**std::ofstream outfile(filename);
+void flushRecord(const std::string &filename, mnoda::Record *record){
+    std::ofstream outfile(filename);
     if (outfile.is_open()) {
-      outfile << record_ptr->toJson();
+      outfile << record->toJson();
       outfile.close();
-    }**/
+    }
     //In the future, we might want more than one record per document
-    mnoda::Document doc;
-    doc.add(record_ptr);
-    mnoda::saveDocument(doc, filename);
+    //mnoda::Document doc;
+    //doc.add(record_ptr);
+    //mnoda::saveDocument(doc, filename);
 }
 
 template <typename T>
-void addDatum(std::string name, T sina_safe_val, adiak_datatype_t* type){
+// TODO: Check how to pass the std::vector, since we'll be moving it
+void addDatum(const std::string &name, T sina_safe_val, std::vector<std::string> tags, mnoda::Record *record){
     mnoda::Datum datum{sina_safe_val};
-    datum.setTags({type->print_name});
-    record_ptr->add(name, datum);
+    datum.setTags(std::move(tags));
+    record->add(name, datum);
 }
 
-void addFile(std::string name, std::string uri){
+// We don't care about type here, there's only one adiak type that acts as a file
+void addFile(const std::string &name, const std::string &uri, mnoda::Record *record){
     mnoda::File file{uri};
-    file.setTags({name});
-    record_ptr->add(std::move(file));
+    // TODO: Isn't there a shortcut way of declaring vectors? combine 2 lines
+    std::vector<std::string> tags = {name}; 
+    file.setTags(std::move(tags));
+    record->add(std::move(file));
 }
 
 SinaType findSinaType(adiak_datatype_t *t){
@@ -145,25 +142,32 @@ std::vector<std::string> toStringList(adiak_value_t *subvals, adiak_datatype_t *
     return sina_safe_list;
 }
 
-void addToRecord(const char *name, adiak_value_t *val, adiak_datatype_t *t)
+void adiakSinaCallback(const char *name, adiak_category_t category, adiak_value_t *val, adiak_datatype_t *t, void *void_record)
 {
     if (!t)
         //TODO: something better for this when I understand what it "means"
         printf("ERROR");
     const SinaType sina_type = findSinaType(t);
+    mnoda::Record *record = static_cast<mnoda::Record *>(void_record);
+    // TODO: Somehow t->print_name is giving me segfaults, but t->subtype[0]->print_name isn't
     switch (sina_type) {
         case sina_unknown:
             // If we don't know what it is, we can't store it, so as above...
             printf("ERROR: type must be set for data to be added to a Sina record"); 
             break;
-        case sina_scalar:
-            addDatum(name, toScalar(val, t), t);
+        case sina_scalar: {
+            std::vector<std::string> tags = {t->print_name}; 
+            addDatum(name, toScalar(val, t), tags, record);
             break;
-        case sina_string:
-           addDatum(name, toString(val, t), t);
+        }
+        case sina_string: {
+           // TODO: Feel like this info isn't useful for strings, but maybe?
+           std::vector<std::string> tags = {t->print_name}; 
+           addDatum(name, toString(val, t), tags, record);
            break;
+        }
         case sina_file:
-           addFile(name, toString(val, t));
+           addFile(name, toString(val, t), record);
            break;
         case sina_list: {
          // Sina doesn't really know/care the difference between list, tuple, set
@@ -172,19 +176,20 @@ void addToRecord(const char *name, adiak_value_t *val, adiak_datatype_t *t)
          // should be sent to user_defined
          adiak_value_t *subvals = (adiak_value_t *) val->v_ptr;
          SinaType list_type = findSinaType(t->subtype[0]); 
+         std::vector<std::string> tags  = {t->subtype[0]->print_name};
          switch (list_type) {
              case sina_string:
-                 addDatum(name, toStringList(subvals, t), t->subtype[0]);
+                 addDatum(name, toStringList(subvals, t), tags, record);
                  break;
              // Weird case wherein we're given a list of filenames, which we can somewhat manage
              case sina_file:
                  int i;
                  for (i=0; i < t->num_elements; i++) {
-                     addFile(name, toString(subvals+i, t->subtype[0]));
+                     addFile(name, toString(subvals+i, t->subtype[0]), record);
                  }
                  break;
              case sina_scalar:
-                 addDatum(name, toScalarList(subvals, t), t->subtype[0]);
+                 addDatum(name, toScalarList(subvals, t), tags, record);
                  break;
              case sina_unknown:
                  printf("ERROR: type must not be unknown for list entries to be added to a Sina record");
@@ -196,12 +201,5 @@ void addToRecord(const char *name, adiak_value_t *val, adiak_datatype_t *t)
          break;
      }
    }
-}
-
-// What's "category" equivalent to for us?
-// Opaque_value is where we'll eventually pass a pointer to the Record object 
-void adiakSinaCallback(const char *name, adiak_category_t category, adiak_value_t *value, adiak_datatype_t *t, void *opaque_value)
-{
-   mnoda::addToRecord(name, value, t);
 }
 }

@@ -7,6 +7,8 @@
 #include <type_traits>
 
 #include "mnoda/JsonUtil.hpp"
+#include "mnoda/Record.hpp"
+#include "mnoda/Run.hpp"
 #include "nlohmann/json.hpp"
 
 extern "C" {
@@ -17,47 +19,23 @@ namespace mnoda {
 
 /**
 * POTENTIAL IMPROVEMENTS:
-* -Print to file instead of stdout
-* -Handle multiple Records (know what Documents are)
+* -Print to stdout if no file specified
 * -Store nested lists in UserDefined
-* -Stop using a pointer to a Record, start using opaque_value 
 **/ 
 
 /**
-* Create a brand-new Record, wiping out anything that might have been
-* stored in the previous one. flush_record() first if you've stored anything!
-*
-* @param id the global ID for the record (local ids not supported yet)
-* @param type the record's type (ex: run, reset, msub, john_doe_trialrun)
-**/
-void initRecord(std::string id, std::string type);
-
-/**
-* Print the current Record (set up by init_record()) to a file.
-* Technically Records aren't standalone (they live in a Document), but we
-* don't care about that for now, so it's just a Record alone in a Document.
-**/
-void flushRecord(std::string filename);
-
-/**
-* Add a mnoda::Datum object to our current Record. These are the sina equivalent
+* Add a mnoda::Datum object to a Record. These are the sina equivalent
 * of an Adiak datapoint. Since we track slightly different info, this function
 * harvests what it can and hands it off to the Record.
 **/
 template <typename T>
-void addDatum(std::string name, T sina_safe_val, adiak_datatype_t* type);
+void addDatum(const std::string &name, T sina_safe_val, adiak_datatype_t* type, mnoda::Record *record);
 
 /**
 * Add a mnoda::File object to our current Record. Adiak stores paths,
 * which are essentially the same as Mnoda files.
 **/
-void addFile(std::string name, std::string uri);
-
-/**
-* Take an adiak value, convert it to a form Sina recognizes, then hand it off
-* to our currently-live Record. This ends up calling addDatum or addFile.
-**/
-void addToRecord(const char *name, adiak_value_t *val, adiak_datatype_t *t);
+void addFile(const std::string &name, const std::string &uri, mnoda::Record *record);
 
 /**
 * Adiak has a much wider array of supported types than Sina. We will convert
