@@ -5,9 +5,9 @@
 
 #include "nlohmann/json.hpp"
 
-#include "mnoda/ID.hpp"
+#include "sina/ID.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 using ::testing::HasSubstr;
 
