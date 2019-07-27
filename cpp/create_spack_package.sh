@@ -10,7 +10,7 @@ version=${version_assignment:15}
 version=${version%?}
 
 # Assemble names
-versioned_dir=sina-"${version}"
+versioned_dir=sina-cpp-"${version}"
 versioned_tar=${versioned_dir}.tgz
 
 set -e
