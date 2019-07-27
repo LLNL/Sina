@@ -2,12 +2,12 @@
 
 /// @file
 
-#include "mnoda/ID.hpp"
+#include "sina/ID.hpp"
 
 #include <utility>
 #include <stdexcept>
 
-namespace mnoda {
+namespace sina {
 
 ID::ID(std::string id_, IDType type_) : id{std::move(id_)}, type{type_} {}
 
@@ -54,4 +54,4 @@ void IDField::addTo(nlohmann::json &object) const {
 }
 
 } // namespace internal
-} // namespace mnoda
+} // namespace sina

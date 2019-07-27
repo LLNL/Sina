@@ -1,6 +1,6 @@
 /// @file
 
-#include "mnoda/Datum.hpp"
+#include "sina/Datum.hpp"
 
 #include <utility>
 #include <sstream>
@@ -15,7 +15,7 @@ char const DATA_PARENT_TYPE[] = "data";
 
 }
 
-namespace mnoda {
+namespace sina {
 
 Datum::Datum(std::string value_) :
         stringValue{std::move(value_)}{

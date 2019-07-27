@@ -1,5 +1,5 @@
-#ifndef MNODA_JSONUTIL_HPP
-#define MNODA_JSONUTIL_HPP
+#ifndef SINA_JSONUTIL_HPP
+#define SINA_JSONUTIL_HPP
 
 /**
  * @file
@@ -13,7 +13,7 @@
 
 #include "nlohmann/json.hpp"
 
-namespace mnoda {
+namespace sina {
 
 /**
  * Get a required field from the a JSON value.
@@ -72,4 +72,4 @@ std::string getOptionalString(std::string const &fieldName,
         nlohmann::json const &parent, std::string const &parentType);
 }
 
-#endif //MNODA_JSONUTIL_HPP
+#endif //SINA_JSONUTIL_HPP

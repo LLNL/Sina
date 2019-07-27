@@ -49,8 +49,8 @@ value.
 
 # Supported Environments
 
-What follows is a list of environments mnoda-cpp is tested in.
-Absence is not an indication that mnoda-cpp will not work;
+What follows is a list of environments sina-cpp is tested in.
+Absence is not an indication that sina-cpp will not work;
 please consider expanding this list!
 
 - **OSX 10.13**: Primary development environment.

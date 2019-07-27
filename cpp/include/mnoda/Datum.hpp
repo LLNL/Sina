@@ -1,15 +1,15 @@
-#ifndef MNODA_DATUM_HPP
-#define MNODA_DATUM_HPP
+#ifndef SINA_DATUM_HPP
+#define SINA_DATUM_HPP
 
 /// @file
 
 #include <string>
 #include <type_traits>
 
-#include "mnoda/JsonUtil.hpp"
+#include "sina/JsonUtil.hpp"
 #include "nlohmann/json.hpp"
 
-namespace mnoda {
+namespace sina {
 
 /**
  * Represents whether a Datum is a String, Scalar (double), array of Strings,
@@ -25,7 +25,7 @@ enum class ValueType {
 /**
  * A Datum tracks the value and (optionally) tags and/or units of a
  * value associated with a Record, e.g. a scalar, a piece of metadata,
- * or an input parameter. In the Mnoda schema, a Datum always
+ * or an input parameter. In the Sina schema, a Datum always
  * belongs to a Record or one of Record's inheriting types.
  *
  * Every Datum must have a value; units and tags are optional.
@@ -34,17 +34,17 @@ enum class ValueType {
  * or an array of doubles.
  *
  * \code
- * mnoda::Datum myDatum{12.34};
+ * sina::Datum myDatum{12.34};
  * std::string value = "foobar";
- * mnoda::Datum myOtherDatum{value};
+ * sina::Datum myOtherDatum{value};
  * std::vector<double> scalars = {1, 2, 20.0};
- * mnoda::Datum myArrayDatum{scalars};
+ * sina::Datum myArrayDatum{scalars};
  * //prints 1, corresponding to Scalar
- * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myDatum.getType()) << std::endl;
+ * std::cout << static_cast<std::underlying_type<sina::ValueType>::type>(myDatum.getType()) << std::endl;
  * //prints 0, corresponding to String
- * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myOtherDatum.getType()) << std::endl;
+ * std::cout << static_cast<std::underlying_type<sina::ValueType>::type>(myOtherDatum.getType()) << std::endl;
  * //prints 3, corresponding to ScalarArray
- * std::cout << static_cast<std::underlying_type<mnoda::ValueType>::type>(myArrayDatum.getType()) << std::endl;
+ * std::cout << static_cast<std::underlying_type<sina::ValueType>::type>(myArrayDatum.getType()) << std::endl;
  * myRecord->add(myDatum);
  * myOtherDatum.setUnits("km/s");
  * myRecord->add(myOtherDatum);
@@ -187,4 +187,4 @@ private:
 
 }
 
-#endif //MNODA_DATUM_HPP
+#endif //SINA_DATUM_HPP

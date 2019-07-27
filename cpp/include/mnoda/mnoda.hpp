@@ -1,16 +1,16 @@
 /**
  * @file
  *
- * This file contains all headers end users need to use mnoda.
+ * This file contains all headers end users need to use sina-cpp.
  */
 
-#ifndef MNODA_HPP
-#define MNODA_HPP
+#ifndef SINA_HPP
+#define SINA_HPP
 
-#include "mnoda/Document.hpp"
-#include "mnoda/ID.hpp"
-#include "mnoda/Record.hpp"
-#include "mnoda/Run.hpp"
-#include "mnoda/Datum.hpp"
+#include "sina/Document.hpp"
+#include "sina/ID.hpp"
+#include "sina/Record.hpp"
+#include "sina/Run.hpp"
+#include "sina/Datum.hpp"
 
-#endif // MNODA_HPP
+#endif // SINA_HPP

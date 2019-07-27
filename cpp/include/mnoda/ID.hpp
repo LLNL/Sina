@@ -1,10 +1,10 @@
-#ifndef MNODA_ID_HPP
-#define MNODA_ID_HPP
+#ifndef SINA_ID_HPP
+#define SINA_ID_HPP
 
 /**
  * @file
  *
- * The Mnoda schema allows records to have either a local ID or a global ID.
+ * The Sina schema allows records to have either a local ID or a global ID.
  * When a global ID is specified, that will be used in the database. When a
  * local ID is specified, an ID will be automatically generated when inserting
  * the record into the database.
@@ -14,7 +14,7 @@
 
 #include "nlohmann/json.hpp"
 
-namespace mnoda {
+namespace sina {
 
 /**
  * Represents whether an ID is local or global.
@@ -132,6 +132,6 @@ private:
 
 } // namespace internal
 
-} // namespace mnoda
+} // namespace sina
 
-#endif //MNODA_ID_HPP
+#endif //SINA_ID_HPP

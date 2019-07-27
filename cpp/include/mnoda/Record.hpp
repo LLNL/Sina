@@ -1,5 +1,5 @@
-#ifndef MNODA_RECORD_HPP
-#define MNODA_RECORD_HPP
+#ifndef SINA_RECORD_HPP
+#define SINA_RECORD_HPP
 
 /// @file
 
@@ -11,11 +11,11 @@
 
 #include "nlohmann/json.hpp"
 
-#include "mnoda/ID.hpp"
-#include "mnoda/Datum.hpp"
-#include "mnoda/File.hpp"
+#include "sina/ID.hpp"
+#include "sina/Datum.hpp"
+#include "sina/File.hpp"
 
-namespace mnoda {
+namespace sina {
 
 /**
  * The Record class represents an entry in a Document's Record list. Records represent the data to be stored
@@ -27,10 +27,10 @@ namespace mnoda {
  * File objects and a map of Datum objects.
  *
  * \code
- * mnoda::ID myID{"my_record", mnoda::IDType::Local};
- * std::unique_ptr<mnoda::Record> myRecord{new mnoda::Record{myID, "my_type"}};
+ * sina::ID myID{"my_record", sina::IDType::Local};
+ * std::unique_ptr<sina::Record> myRecord{new sina::Record{myID, "my_type"}};
  * std::vector<std::string> myTags{"input"};
- * mnoda::Datum myDatum{12, myTags};
+ * sina::Datum myDatum{12, myTags};
  * myRecord->add("my_scalar",std::move(myDatum));
  * std::cout << myRecord->toJson() << std::endl;
  * \endcode
@@ -160,12 +160,12 @@ private:
 
 /**
  * A RecordLoader is used to convert Json::Value instances which represent
- * Mnoda Records into instances of their corresponding mnoda::Record
+ * Sina Records into instances of their corresponding sina::Record
  * subclasses. For convenience, a RecordLoader capable of handling Records of all known
  * types can be created using createRecordLoaderWithAllKnownTypes:
  *
  * \code
- * mnoda::Document myDocument = mnoda::Document(jObj, mnoda::createRecordLoaderWithAllKnownTypes());
+ * sina::Document myDocument = sina::Document(jObj, sina::createRecordLoaderWithAllKnownTypes());
  * \endcode
  */
 class RecordLoader {
@@ -186,7 +186,7 @@ public:
     void addTypeLoader(std::string const &type, TypeLoader loader);
 
     /**
-     * Load a mnoda::Record from its JSON representation.
+     * Load a sina::Record from its JSON representation.
      *
      * @param recordAsJson the Record in its JSON representation
      * @return the Record
@@ -214,4 +214,4 @@ RecordLoader createRecordLoaderWithAllKnownTypes();
 
 }
 
-#endif //MNODA_RECORD_HPP
+#endif //SINA_RECORD_HPP

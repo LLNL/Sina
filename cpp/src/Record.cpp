@@ -1,14 +1,14 @@
 /// @file
 
-#include "mnoda/Record.hpp"
+#include "sina/Record.hpp"
 
 #include <stdexcept>
 #include <utility>
 
-#include "mnoda/CppBridge.hpp"
-#include "mnoda/JsonUtil.hpp"
-#include "mnoda/Run.hpp"
-#include "mnoda/Datum.hpp"
+#include "sina/CppBridge.hpp"
+#include "sina/JsonUtil.hpp"
+#include "sina/Run.hpp"
+#include "sina/Datum.hpp"
 
 namespace {
 
@@ -21,7 +21,7 @@ char const USER_DEFINED_KEY[] = "user_defined";
 
 }
 
-namespace mnoda {
+namespace sina {
 
 Record::Record(ID id_, std::string type_) :
         id{std::move(id_), LOCAL_ID_FIELD, GLOBAL_ID_FIELD},

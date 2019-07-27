@@ -1,14 +1,14 @@
 /// @file
 
-#include "mnoda/File.hpp"
+#include "sina/File.hpp"
 
 #include <stdexcept>
 #include <utility>
 #include <sstream>
 
-#include "mnoda/JsonUtil.hpp"
+#include "sina/JsonUtil.hpp"
 
-namespace mnoda {
+namespace sina {
 
 namespace {
 char const URI_KEY[] = "uri";
