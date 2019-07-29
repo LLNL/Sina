@@ -142,27 +142,31 @@ std::vector<std::string> toStringList(adiak_value_t *subvals, adiak_datatype_t *
     return sina_safe_list;
 }
 
-void adiakSinaCallback(const char *name, adiak_category_t category, adiak_value_t *val, adiak_datatype_t *t, void *void_record)
+void adiakSinaCallback(const char *name, adiak_category_t category, const char *subcategory, adiak_value_t *val, adiak_datatype_t *t, void *void_record)
 {
-    if (!t)
-        //TODO: something better for this when I understand what it "means"
-        printf("ERROR");
+    if (!t){
+        printf("ERROR: type must be specified for Adiak data");
+        return;
+    }
     const SinaType sina_type = findSinaType(t);
     mnoda::Record *record = static_cast<mnoda::Record *>(void_record);
-    // TODO: Somehow t->print_name is giving me segfaults, but t->subtype[0]->print_name isn't
+    std::vector<std::string> tags {};
+    if(subcategory && subcategory[0]!=0){
+        tags.emplace_back(subcategory); 
+    }
     switch (sina_type) {
         case sina_unknown:
             // If we don't know what it is, we can't store it, so as above...
-            printf("ERROR: type must be set for data to be added to a Sina record"); 
+            printf("ERROR: unknown Adiak type cannot be added to Sina record."); 
             break;
         case sina_scalar: {
-            std::vector<std::string> tags = {t->print_name}; 
+            tags.emplace_back(t->print_name);
             addDatum(name, toScalar(val, t), tags, record);
             break;
         }
         case sina_string: {
            // TODO: Feel like this info isn't useful for strings, but maybe?
-           std::vector<std::string> tags = {t->print_name}; 
+           tags.emplace_back(t->print_name);  
            addDatum(name, toString(val, t), tags, record);
            break;
         }
@@ -176,7 +180,7 @@ void adiakSinaCallback(const char *name, adiak_category_t category, adiak_value_
          // should be sent to user_defined
          adiak_value_t *subvals = (adiak_value_t *) val->v_ptr;
          SinaType list_type = findSinaType(t->subtype[0]); 
-         std::vector<std::string> tags  = {t->subtype[0]->print_name};
+         tags.emplace_back(t->subtype[0]->print_name);
          switch (list_type) {
              case sina_string:
                  addDatum(name, toStringList(subvals, t), tags, record);

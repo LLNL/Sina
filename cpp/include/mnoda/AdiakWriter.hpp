@@ -76,7 +76,7 @@ std::vector<double> toScalarList(adiak_value_t *subvals, adiak_datatype_t *t);
 std::vector<std::string> toStringList(adiak_value_t *subvals, adiak_datatype_t *t); 
 
 // Register the sina callback with Adiak
-void adiakSinaCallback(const char *name, adiak_category_t category, adiak_value_t *value, adiak_datatype_t *t, void *opaque_value);
+void adiakSinaCallback(const char *name, adiak_category_t category, const char *subcategory, adiak_value_t *value, adiak_datatype_t *t, void *opaque_value);
 
 }
 #endif
