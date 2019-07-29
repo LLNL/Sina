@@ -3,9 +3,9 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "mnoda/Run.hpp"
+#include "sina/Run.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 using ::testing::HasSubstr;
 
@@ -16,7 +16,7 @@ char const EXPECTED_APPLICATION_KEY[] = "application";
 char const EXPECTED_VERSION_KEY[] = "version";
 char const EXPECTED_USER_KEY[] = "user";
 
-// Throughout, we have to use "mnoda::Run" instead of just "Run" due to
+// Throughout, we have to use "sina::Run" instead of just "Run" due to
 // a conflict with the Run() function in gtest
 
 TEST(Run, create_fromJson_valid) {
@@ -27,7 +27,7 @@ TEST(Run, create_fromJson_valid) {
             {EXPECTED_VERSION_KEY, "1.2.3"},
             {EXPECTED_USER_KEY, "jdoe"}
     };
-    mnoda::Run run{originJson};
+    sina::Run run{originJson};
     EXPECT_EQ("run", run.getType());
     EXPECT_EQ("the id", run.getId().getId());
     EXPECT_EQ(IDType::Global, run.getId().getType());
@@ -44,7 +44,7 @@ TEST(Run, create_fromJson_missingApplication) {
             {EXPECTED_USER_KEY, "jdoe"}
     };
     try {
-        mnoda::Run run{originJson};
+        sina::Run run{originJson};
         FAIL() << "Application should be missing, but is "
                << run.getApplication();
     } catch (std::invalid_argument const &expected) {
@@ -54,7 +54,7 @@ TEST(Run, create_fromJson_missingApplication) {
 
 TEST(Run, toJson) {
     ID id{"the id", IDType::Global};
-    mnoda::Run run{id, "the app", "1.2.3", "jdoe"};
+    sina::Run run{id, "the app", "1.2.3", "jdoe"};
     auto asJson = run.toJson();
     EXPECT_TRUE(asJson.is_object());
     EXPECT_EQ("run", asJson[EXPECTED_TYPE_KEY]);
@@ -78,7 +78,7 @@ TEST(Run, addRunLoader) {
     addRunLoader(loader);
 
     auto record = loader.load(originJson);
-    auto run = dynamic_cast<mnoda::Run *>(record.get());
+    auto run = dynamic_cast<sina::Run *>(record.get());
     ASSERT_NE(nullptr, run);
     EXPECT_EQ("run", run->getType());
     EXPECT_EQ("the id", run->getId().getId());

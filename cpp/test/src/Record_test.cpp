@@ -4,12 +4,12 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "mnoda/Record.hpp"
-#include "mnoda/CppBridge.hpp"
+#include "sina/Record.hpp"
+#include "sina/CppBridge.hpp"
 
-#include "mnoda/testing/TestRecord.hpp"
+#include "sina/testing/TestRecord.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 using ::testing::ElementsAre;
 using ::testing::HasSubstr;

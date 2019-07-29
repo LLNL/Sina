@@ -1,43 +1,43 @@
-namespace mnoda {
+namespace sina {
 /**
-\mainpage Mnoda C++ Library
+\mainpage Sina C++ Library
 
-The mnoda C++ library can read and write JSON files in the mnoda schema. It
+The Sina C++ library can read and write JSON files in the Sina schema. It
 can be used by simulation applications to summarize run data to be ingested
 into a database using the Sina tool suite.
 
-The top-level object in the mnoda schema is the Document. It contains lists
+The top-level object in the Sina schema is the Document. It contains lists
 of Record and Relationship objects.
 
 \code
 
-#include "mnoda/mnoda.hpp"
+#include "sina/sina.hpp"
 
 int main (void) {
     // Create a new document
-    mnoda::Document document;
+    sina::Document document;
 
     // Create a run of "My Sim Code" version "1.2.3", which was run by "jdoe".
     // The run has an ID of "run1", which has to be unique to this file.
     // There can be different types of records, so we allocate them dynamically.
-    mnoda::ID run1ID{"run1", mnoda::IDType::Local};
-    std::unique_ptr<mnoda::Record> run1{new mnoda::Run{run1ID, "My Sim Code", "1.2.3", "jdoe"}};
+    sina::ID run1ID{"run1", sina::IDType::Local};
+    std::unique_ptr<sina::Record> run1{new sina::Run{run1ID, "My Sim Code", "1.2.3", "jdoe"}};
 
     // Add the run to the document
     document.add(std::move(run1));
 
     // Create and add another run
-    mnoda::ID run2ID{"run2", mnoda::IDType::Local};
+    sina::ID run2ID{"run2", sina::IDType::Local};
     // std::unique_ptr is used with Record entries to avoid object slicing, as Records can be subclassed
-    std::unique_ptr<mnoda::Record> run2{new mnoda::Run{run2ID, "My Sim Code", "1.2.3", "jdoe"}};
+    std::unique_ptr<sina::Record> run2{new sina::Run{run2ID, "My Sim Code", "1.2.3", "jdoe"}};
     document.add(std::move(run2));
 
     // Add a relationship between the runs showing that 1 came before 2
-    mnoda::Relationship oneBeforeTwo{run1ID, "comes before", run2ID};
+    sina::Relationship oneBeforeTwo{run1ID, "comes before", run2ID};
     document.add(oneBeforeTwo);
 
     // Save everything
-    save(document, "MyMnodaData.json");
+    save(document, "MySinaData.json");
 
     // Pretty-print the document
     std::cout << document.toJson().dump(4) << std::endl;
@@ -45,7 +45,7 @@ int main (void) {
 
 \endcode
 
-After running the above, the file "MyMnodaData.json" will contain the
+After running the above, the file "MySinaData.json" will contain the
 following:
 
 \code{.json}
@@ -77,7 +77,7 @@ following:
 }
 \endcode
 
-For creating more complex objects with all the parts of the mnoda schema,
+For creating more complex objects with all the parts of the Sina schema,
 see the documentation for File, Datum, and the user-defined content of Record.
 An example of some more complex functionality can also be found below. When run,
 this will print out example JSON consisting of one task with a global id and ten
@@ -90,36 +90,36 @@ them.
 #include <iostream>
 #include <string>
 
-#include "mnoda/mnoda.hpp"
+#include "sina/sina.hpp"
 
 int main() {
     // Define some names for Data
     std::vector<std::string> datumNames{"length", "width", "height"};
     // Create the Document we'll be adding to
-    mnoda::Document exampleDocument;
+    sina::Document exampleDocument;
 
     // Create the Record (type: task) that will "contain" the Runs
-    mnoda::ID exampleTaskId{"example_task", mnoda::IDType::Global};
-    std::unique_ptr<mnoda::Record> exampleTask{new mnoda::Record{exampleTaskId, "task"}};
+    sina::ID exampleTaskId{"example_task", sina::IDType::Global};
+    std::unique_ptr<sina::Record> exampleTask{new sina::Record{exampleTaskId, "task"}};
 
     // Loop for creating Runs and Relationships
     for(int i = 0; i < 10; i++) {
         // Create the Run ID and the Run itself
-        mnoda::ID exampleRunId{"example_run_"+std::to_string(i), mnoda::IDType::Local};
-        std::unique_ptr<mnoda::Record> exampleRun{new mnoda::Run{exampleRunId, "example_app", "1.2", "jdoe"}};
+        sina::ID exampleRunId{"example_run_"+std::to_string(i), sina::IDType::Local};
+        std::unique_ptr<sina::Record> exampleRun{new sina::Run{exampleRunId, "example_app", "1.2", "jdoe"}};
 
         // Add a few Data to the Run
         for(auto &datumName : datumNames){
             double randomVal = std::rand();
-            mnoda::Datum exampleVal{datumName, randomVal};
+            sina::Datum exampleVal{datumName, randomVal};
             exampleRun->add(exampleVal);
         }   
         // Add a File to the Run
-        mnoda::File exampleFile{"/foo/bar/summary_"+std::to_string(i)+".txt","text/plain"};
+        sina::File exampleFile{"/foo/bar/summary_"+std::to_string(i)+".txt","text/plain"};
         exampleRun->add(exampleFile);
 
         // Make a Relationship linking the Run and its containing Record
-        mnoda::Relationship exampleRelationship{exampleTaskId, "contains", exampleRunId};
+        sina::Relationship exampleRelationship{exampleTaskId, "contains", exampleRunId};
 
         // Add the Relationship and Run to the Document
         exampleDocument.add(exampleRelationship);

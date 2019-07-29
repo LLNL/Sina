@@ -1,5 +1,5 @@
-#ifndef MNODA_FILE_HPP
-#define MNODA_FILE_HPP
+#ifndef SINA_FILE_HPP
+#define SINA_FILE_HPP
 
 /// @file
 
@@ -8,17 +8,17 @@
 
 #include "nlohmann/json.hpp"
 
-namespace mnoda {
+namespace sina {
 /**
- * A File tracks the location (URI) and mimetype of a file on the file system. In the Mnoda schema, a File always
+ * A File tracks the location (URI) and mimetype of a file on the file system. In the Sina schema, a File always
  * belongs to a Record or one of Record's inheriting types.
  *
  * Every File must have a URI, while mimetype and tags are optional.
  *
  * \code
- * mnoda::File myFile{"/path/to/file.png"};
+ * sina::File myFile{"/path/to/file.png"};
  * myFile.setMimeType("image/png");
- * mnoda::File myOtherFile{"/path/to/other/file.txt"};
+ * sina::File myOtherFile{"/path/to/other/file.txt"};
  * myOtherFile.setTags({"these","are","tags"});
  * myRecord->add(myFile);
  * myRecord->add(myOtherFile);
@@ -104,4 +104,4 @@ private:
 };
 }
 
-#endif //MNODA_FILE_HPP
+#endif //SINA_FILE_HPP

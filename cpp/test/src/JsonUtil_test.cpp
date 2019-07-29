@@ -3,9 +3,9 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "mnoda/JsonUtil.hpp"
+#include "sina/JsonUtil.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 using ::testing::HasSubstr;
 using ::testing::DoubleEq;

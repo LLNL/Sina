@@ -1,6 +1,6 @@
 /// @file
 
-#include "mnoda/Document.hpp"
+#include "sina/Document.hpp"
 
 #include <cstdio>
 #include <fstream>
@@ -10,12 +10,12 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace mnoda {
+namespace sina {
 
 namespace {
 char const RECORDS_KEY[] = "records";
 char const RELATIONSHIPS_KEY[] = "relationships";
-char const SAVE_TMP_FILE_EXTENSION[] = ".mnoda.tmp";
+char const SAVE_TMP_FILE_EXTENSION[] = ".sina.tmp";
 }
 
 void Document::add(std::unique_ptr<Record> record) {

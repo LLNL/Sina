@@ -1,8 +1,8 @@
 #include "gtest/gtest.h"
 
-#include "mnoda/File.hpp"
+#include "sina/File.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 char const EXPECTED_URI_KEY[] = "uri";
 char const EXPECTED_MIMETYPE_KEY[] = "mimetype";

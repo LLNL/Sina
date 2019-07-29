@@ -7,9 +7,9 @@
 
 #include "nlohmann/json.hpp"
 
-#include "mnoda/Datum.hpp"
+#include "sina/Datum.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 using ::testing::HasSubstr;
 using ::testing::DoubleEq;

@@ -3,9 +3,9 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "mnoda/Relationship.hpp"
+#include "sina/Relationship.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 char const EXPECTED_GLOBAL_OBJECT_ID_KEY[] = "object";
 char const EXPECTED_LOCAL_OBJECT_ID_KEY[] = "local_object";

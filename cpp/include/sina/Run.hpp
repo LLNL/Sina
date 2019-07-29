@@ -1,15 +1,15 @@
-#ifndef MNODA_RUN_HPP
-#define MNODA_RUN_HPP
+#ifndef SINA_RUN_HPP
+#define SINA_RUN_HPP
 
 /// @file
 
-#include "mnoda/Record.hpp"
+#include "sina/Record.hpp"
 
-namespace mnoda {
+namespace sina {
 
 /**
  * A Run is a subtype of Record corresponding to a single run of an application, as
- * specified in the Mnoda schema. A Run has a few additional fields required in addition
+ * specified in the Sina schema. A Run has a few additional fields required in addition
  * to the id required by a Record (type is automatically set to "run"):
  *
  *  - application: the application/code used to create the Run
@@ -18,8 +18,8 @@ namespace mnoda {
  *
  * To create a Run:
  * \code
- * mnoda::ID run1ID{"run1", mnoda::IDType::Local};
- * std::unique_ptr<mnoda::Record> run1{new mnoda::Run{run1ID, "My Sim Code", "1.2.3", "jdoe"}};
+ * sina::ID run1ID{"run1", sina::IDType::Local};
+ * std::unique_ptr<sina::Record> run1{new sina::Run{run1ID, "My Sim Code", "1.2.3", "jdoe"}};
  * \endcode
  *
  */
@@ -88,4 +88,4 @@ void addRunLoader(RecordLoader &loader);
 }
 
 
-#endif //MNODA_RUN_HPP
+#endif //SINA_RUN_HPP

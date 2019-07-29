@@ -1,6 +1,6 @@
-#include "mnoda/testing/TestRecord.hpp"
+#include "sina/testing/TestRecord.hpp"
 
-namespace mnoda { namespace testing {
+namespace sina { namespace testing {
 
 template<>
 TestRecord<std::string>::TestRecord(nlohmann::json const &asJson) :

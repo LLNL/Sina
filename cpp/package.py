@@ -1,8 +1,8 @@
 from spack import *
 
 
-class Mnoda(CMakePackage):
-    """Mnoda Library"""
+class SinaCpp(CMakePackage):
+    """Sina C++ Library"""
 
     homepage = 'https://lc.llnl.gov/confluence/display/SIBO'
     url = 'https://example.com/tarballs/dummy.tgz'

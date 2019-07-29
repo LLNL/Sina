@@ -1,12 +1,12 @@
 /// @file
 
-#include "mnoda/Relationship.hpp"
+#include "sina/Relationship.hpp"
 
 #include <utility>
 
-#include "mnoda/JsonUtil.hpp"
+#include "sina/JsonUtil.hpp"
 
-namespace mnoda {
+namespace sina {
 
 namespace {
 char const GLOBAL_SUBJECT_KEY[] = "subject";

@@ -1,10 +1,10 @@
-#ifndef MNODA_TESTRECORD_HPP
-#define MNODA_TESTRECORD_HPP
+#ifndef SINA_TESTRECORD_HPP
+#define SINA_TESTRECORD_HPP
 
-#include "mnoda/JsonUtil.hpp"
-#include "mnoda/Record.hpp"
+#include "sina/JsonUtil.hpp"
+#include "sina/Record.hpp"
 
-namespace mnoda { namespace testing {
+namespace sina { namespace testing {
 
 char constexpr TEST_RECORD_VALUE_KEY[] = "testKey";
 
@@ -71,4 +71,4 @@ nlohmann::json TestRecord<T>::toJson() const {
 
 }}
 
-#endif //MNODA_TESTRECORD_HPP
+#endif //SINA_TESTRECORD_HPP

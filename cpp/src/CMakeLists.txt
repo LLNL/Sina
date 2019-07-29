@@ -7,18 +7,18 @@ blt_register_library(NAME nlohmann_json
         TREAT_INCLUDES_AS_SYSTEM ON
         )
 
-blt_add_library(NAME mnoda
+blt_add_library(NAME sina
     HEADERS
-        ../include/mnoda/CppBridge.hpp
-        ../include/mnoda/Document.hpp
-        ../include/mnoda/File.hpp
-        ../include/mnoda/ID.hpp
-        ../include/mnoda/JsonUtil.hpp
-        ../include/mnoda/mnoda.hpp
-        ../include/mnoda/Record.hpp
-        ../include/mnoda/Relationship.hpp
-        ../include/mnoda/Run.hpp
-        ../include/mnoda/Datum.hpp
+        ../include/sina/CppBridge.hpp
+        ../include/sina/Document.hpp
+        ../include/sina/File.hpp
+        ../include/sina/ID.hpp
+        ../include/sina/JsonUtil.hpp
+        ../include/sina/sina.hpp
+        ../include/sina/Record.hpp
+        ../include/sina/Relationship.hpp
+        ../include/sina/Run.hpp
+        ../include/sina/Datum.hpp
     SOURCES
         Document.cpp
         File.cpp
@@ -31,7 +31,7 @@ blt_add_library(NAME mnoda
     DEPENDS_ON nlohmann_json
 )
 
-install(TARGETS mnoda
+install(TARGETS sina
     ARCHIVE DESTINATION "lib"
     LIBRARY DESTINATION "lib")
 

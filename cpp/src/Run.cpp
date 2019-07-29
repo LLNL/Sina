@@ -1,13 +1,13 @@
 /// @file
 
-#include "mnoda/Run.hpp"
+#include "sina/Run.hpp"
 
 #include <utility>
 
-#include "mnoda/CppBridge.hpp"
-#include "mnoda/JsonUtil.hpp"
+#include "sina/CppBridge.hpp"
+#include "sina/JsonUtil.hpp"
 
-namespace mnoda {
+namespace sina {
 
 namespace {
 char const RUN_TYPE[] = "run";
@@ -16,7 +16,7 @@ char const VERSION_FIELD[] = "version";
 char const USER_FIELD[] = "user";
 }
 
-Run::Run(mnoda::ID id, std::string application_, std::string version_,
+Run::Run(sina::ID id, std::string application_, std::string version_,
         std::string user_) : Record{std::move(id), RUN_TYPE},
                              application{std::move(application_)},
                              version{std::move(version_)},

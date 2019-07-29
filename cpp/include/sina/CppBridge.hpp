@@ -1,5 +1,5 @@
-#ifndef MNODA_CPPBRIDGE_HPP
-#define MNODA_CPPBRIDGE_HPP
+#ifndef SINA_CPPBRIDGE_HPP
+#define SINA_CPPBRIDGE_HPP
 
 /**
  * @file
@@ -11,7 +11,7 @@
 #include <memory>
 #include <utility>
 
-namespace mnoda { namespace internal {
+namespace sina { namespace internal {
 
 /**
  * Make a unique pointer pointing to a new object.
@@ -30,4 +30,4 @@ std::unique_ptr<T> make_unique(ParamTypes &&... params) {
 
 }} // namespaces
 
-#endif //MNODA_CPPBRIDGE_HPP
+#endif //SINA_CPPBRIDGE_HPP
