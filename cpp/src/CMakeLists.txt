@@ -36,8 +36,8 @@ blt_add_library(NAME sina
         ../include/sina/Relationship.hpp
         ../include/sina/Run.hpp
         ../include/sina/Datum.hpp
-        ../include/mnoda/adiak_mnoda_writer.hpp
-        ../include/mnoda/AdiakWriter.hpp
+        ../include/sina/adiak_sina_writer.hpp
+        ../include/sina/AdiakWriter.hpp
     SOURCES
         Document.cpp
         File.cpp

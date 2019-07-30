@@ -8,15 +8,15 @@ extern "C" {
 #include "adiak_tool.h"
 }
 
-#include "mnoda/CppBridge.hpp"
-#include "mnoda/JsonUtil.hpp"
-#include "mnoda/Record.hpp"
-#include "mnoda/Datum.hpp"
-#include "mnoda/Document.hpp"
-#include "mnoda/AdiakWriter.hpp"
+#include "sina/CppBridge.hpp"
+#include "sina/JsonUtil.hpp"
+#include "sina/Record.hpp"
+#include "sina/Datum.hpp"
+#include "sina/Document.hpp"
+#include "sina/AdiakWriter.hpp"
 
 
-namespace mnoda{
+namespace sina{
 /**
 * Initial draft is pretty bare-bones.
 * We'll dump a "Document" consisting of a single Record and nothing else.
@@ -24,29 +24,29 @@ namespace mnoda{
 * NOTES:
 * Adiak doesn't have rec_id, rec_type, or rec_app analogues, but does have version
 **/
-void flushRecord(const std::string &filename, mnoda::Record *record){
+void flushRecord(const std::string &filename, sina::Record *record){
     std::ofstream outfile(filename);
     if (outfile.is_open()) {
       outfile << record->toJson();
       outfile.close();
     }
     //In the future, we might want more than one record per document
-    //mnoda::Document doc;
+    //sina::Document doc;
     //doc.add(record_ptr);
-    //mnoda::saveDocument(doc, filename);
+    //sina::saveDocument(doc, filename);
 }
 
 template <typename T>
 // TODO: Check how to pass the std::vector, since we'll be moving it
-void addDatum(const std::string &name, T sina_safe_val, std::vector<std::string> tags, mnoda::Record *record){
-    mnoda::Datum datum{sina_safe_val};
+void addDatum(const std::string &name, T sina_safe_val, std::vector<std::string> tags, sina::Record *record){
+    sina::Datum datum{sina_safe_val};
     datum.setTags(std::move(tags));
     record->add(name, datum);
 }
 
 // We don't care about type here, there's only one adiak type that acts as a file
-void addFile(const std::string &name, const std::string &uri, mnoda::Record *record){
-    mnoda::File file{uri};
+void addFile(const std::string &name, const std::string &uri, sina::Record *record){
+    sina::File file{uri};
     // TODO: Isn't there a shortcut way of declaring vectors? combine 2 lines
     std::vector<std::string> tags = {name}; 
     file.setTags(std::move(tags));
@@ -149,7 +149,7 @@ void adiakSinaCallback(const char *name, adiak_category_t category, const char *
         return;
     }
     const SinaType sina_type = findSinaType(t);
-    mnoda::Record *record = static_cast<mnoda::Record *>(void_record);
+    sina::Record *record = static_cast<sina::Record *>(void_record);
     std::vector<std::string> tags {};
     if(subcategory && subcategory[0]!=0){
         tags.emplace_back(subcategory); 
