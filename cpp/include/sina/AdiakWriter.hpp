@@ -1,21 +1,21 @@
-#ifndef MNODA_ADIAK_HPP
-#define MNODA_ADIAK_HPP
+#ifndef SINA_ADIAK_HPP
+#define SINA_ADIAK_HPP
 
 /// @file
 
 #include <string>
 #include <type_traits>
 
-#include "mnoda/JsonUtil.hpp"
-#include "mnoda/Record.hpp"
-#include "mnoda/Run.hpp"
+#include "sina/JsonUtil.hpp"
+#include "sina/Record.hpp"
+#include "sina/Run.hpp"
 #include "nlohmann/json.hpp"
 
 extern "C" {
 #include "adiak_tool.h"
 }
 
-namespace mnoda {
+namespace sina {
 
 /**
 * POTENTIAL IMPROVEMENTS:
@@ -24,18 +24,18 @@ namespace mnoda {
 **/ 
 
 /**
-* Add a mnoda::Datum object to a Record. These are the sina equivalent
+* Add a sina::Datum object to a Record. These are the sina equivalent
 * of an Adiak datapoint. Since we track slightly different info, this function
 * harvests what it can and hands it off to the Record.
 **/
 template <typename T>
-void addDatum(const std::string &name, T sina_safe_val, adiak_datatype_t* type, mnoda::Record *record);
+void addDatum(const std::string &name, T sina_safe_val, adiak_datatype_t* type, sina::Record *record);
 
 /**
-* Add a mnoda::File object to our current Record. Adiak stores paths,
-* which are essentially the same as Mnoda files.
+* Add a sina::File object to our current Record. Adiak stores paths,
+* which are essentially the same as Sina's idea of storing files.
 **/
-void addFile(const std::string &name, const std::string &uri, mnoda::Record *record);
+void addFile(const std::string &name, const std::string &uri, sina::Record *record);
 
 /**
 * Adiak has a much wider array of supported types than Sina. We will convert
