@@ -36,7 +36,6 @@ blt_add_library(NAME sina
         ../include/sina/Relationship.hpp
         ../include/sina/Run.hpp
         ../include/sina/Datum.hpp
-        ../include/sina/adiak_sina_writer.hpp
         ../include/sina/AdiakWriter.hpp
     SOURCES
         Document.cpp
@@ -58,9 +57,9 @@ blt_add_executable(
  SOURCES
     testapp.cpp
  DEPENDS_ON
-     sina
-     libdl
-     adiak
+    sina
+    libdl
+    adiak
 )
 
 install(TARGETS sina
