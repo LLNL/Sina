@@ -140,6 +140,40 @@ class Record(object):
         return ('Model Record <id={}, type={}>'
                 .format(self.id, self.type))
 
+    def set_data(self, name, value, units=None, tags=None):
+        """
+        Set a datum for a Record.
+
+        :param name: The name describing the data (ex: "direction", "volume", "time")
+        :param value: The data's value (ex: "northwest", 12, [0, 1, 3, 6])
+        :param units: Units for the value. Optional (ex: "cm^3", "seconds")
+        :param tags: List of tags describing this data. Optional (ex: ["inputs", "opt"])
+        """
+        datum = {"value": value}
+        if units is not None:
+            datum["units"] = units
+        if tags is not None:
+            datum["tags"] = tags
+        self.data[name] = datum
+
+    def add_file(self, uri, mimetype=None, tags=None):
+        """
+        Add a file to a Record.
+
+        :param uri: The uri that uniquely describes the file. (ex: "/g/g10/doe/foo.txt")
+        :param mimetype: The mimetype of the file. Optional (ex: "text/html")
+        :param tags: List of tags describing this file. Optional (ex: ["post-processing"])
+        """
+        if uri in (x["uri"] for x in self.files):
+            raise ValueError('File "{}" already in Record "{}", cannot be added twice.'
+                             .format(uri, self.id))
+        file = {"uri": uri}
+        if mimetype is not None:
+            file["mimetype"] = mimetype
+        if tags is not None:
+            file["tags"] = tags
+        self.files.append(file)
+
     def to_json(self):
         """
         Create a JSON string from a Record.

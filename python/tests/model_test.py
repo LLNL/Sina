@@ -106,6 +106,33 @@ class TestModel(unittest.TestCase):
         self.assertEqual(scalar_index, 1)
         self.assertEqual(string_index, 0)
 
+    def test_set_data(self):
+        """Test to make sure we can set data correctly for a Record."""
+        complete_data = {"density": {"value": 12},
+                         "init_energy": {"value": 100, "units": "J", "tags": ["input"]}}
+        rec = model.Record(id="data_test", type="test")
+        rec.set_data("density", 12)
+        rec.set_data("init_energy", 100, tags=["input"], units="J")
+        self.assertEqual(complete_data, rec.data)
+
+    def test_add_file(self):
+        """Test to make sure we can add data correctly to a Record."""
+        complete_files = [{"uri": "/foo/bar.txt"},
+                          {"uri": "/foo/spam.txt", "mimetype": "text", "tags": ["doc"]}]
+        rec = model.Record(id="file_test", type="test")
+        rec.add_file("/foo/bar.txt")
+        rec.add_file("/foo/spam.txt", mimetype="text", tags=["doc"])
+        self.assertEqual(complete_files, rec.files)
+
+    def test_add_already_existing_file(self):
+        """Test to make sure that, when adding a file that already exists, an error is raised."""
+        rec = model.Record(id="file_test", type="test")
+        rec.add_file("/foo/bar.txt")
+        rec.add_file("/foo/spam.txt", mimetype="text", tags=["doc"])
+        with self.assertRaises(ValueError) as context:
+            rec.add_file("/foo/spam.txt", mimetype="not_text", tags=["not_doc"])
+        self.assertIn('cannot be added twice.', str(context.exception))
+
     def test_record_access(self):
         """Ensure accessing record attribs using rec["spam"]."""
         rec = model.Record(id="spam_test", type="test")
