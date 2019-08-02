@@ -106,6 +106,60 @@ class TestModel(unittest.TestCase):
         self.assertEqual(scalar_index, 1)
         self.assertEqual(string_index, 0)
 
+    def test_set_data(self):
+        """Test to make sure we can set data correctly for a Record."""
+        complete_data = {"density": {"value": 12},
+                         "init_energy": {"value": 100, "units": "J", "tags": ["input"]}}
+        rec = model.Record(id="data_test", type="test")
+        rec.set_data("density", 12)
+        rec.set_data("init_energy", 100, tags=["input"], units="J")
+        self.assertEqual(complete_data, rec.data)
+
+    def test_set_file(self):
+        """Test to make sure we can set files correctly for a Record."""
+        complete_files = [{"uri": "/foo/bar.txt"},
+                          {"uri": "/foo/spam.txt", "mimetype": "text", "tags": ["doc"]}]
+        rec = model.Record(id="file_test", type="test")
+        rec.set_file("/foo/bar.txt")
+        rec.set_file("/foo/spam.txt", mimetype="text", tags=["doc"])
+        self.assertEqual(complete_files, rec.files)
+
+    def test_set_data_update(self):
+        """Test to make sure we can update data for a Record."""
+        complete_data = {"init_energy": {"value": 100, "units": "J", "tags": ["input"]}}
+        rec = model.Record(id="data_test", type="test")
+        rec.set_data("init_energy", 250, tags=["output"], units="MJ")
+        rec.set_data("init_energy", 100, tags=["input"], units="J")
+        self.assertEqual(complete_data, rec.data)
+
+    def test_set_file_update(self):
+        """Test to make sure we can update files for a Record."""
+        complete_files = [{"uri": "/foo/spam.txt", "mimetype": "text", "tags": ["doc"]}]
+        rec = model.Record(id="file_test", type="test")
+        rec.set_file("/foo/spam.txt", mimetype="image", tags=["photo"])
+        rec.set_file("/foo/spam.txt", mimetype="text", tags=["doc"])
+        self.assertEqual(complete_files, rec.files)
+
+    def test_add_file(self):
+        """Test to make sure that, when adding a file that already exists, an error is raised."""
+        complete_files = [{"uri": "/foo/bar.txt"}]
+        rec = model.Record(id="file_test", type="test")
+        rec.add_file("/foo/bar.txt")
+        self.assertEqual(complete_files, rec.files)
+        with self.assertRaises(ValueError) as context:
+            rec.add_file("/foo/bar.txt", mimetype="text")
+        self.assertIn('Duplicate file', str(context.exception))
+
+    def test_add_data(self):
+        """Test to make sure that, when adding a datum that already exists, an error is raised."""
+        complete_data = {"density": {"value": 12}}
+        rec = model.Record(id="data_test", type="test")
+        rec.add_data("density", 12)
+        self.assertEqual(complete_data, rec.data)
+        with self.assertRaises(ValueError) as context:
+            rec.add_data("density", 40)
+        self.assertIn('Duplicate datum', str(context.exception))
+
     def test_record_access(self):
         """Ensure accessing record attribs using rec["spam"]."""
         rec = model.Record(id="spam_test", type="test")

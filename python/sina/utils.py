@@ -22,7 +22,8 @@ MAX_THREADS = 8
 
 
 # Disable pylint checks due to ubiquitous use of id, type, max, and min
-# pylint: disable=invalid-name,redefined-builtin
+# Also disable too-many-lines
+# pylint: disable=invalid-name,redefined-builtin,too-many-lines
 
 class ListQueryOperation(Enum):
     """
@@ -65,6 +66,40 @@ def _import_tuple_args(unpack_tuple):
     import_json(unpack_tuple[0], unpack_tuple[1])
 
 
+def convert_json_to_records_and_relationships(json_path):
+    """
+    Open a Sina json file at <json_path>, return its contents as Records and Relationships.
+
+    :param json_path: the path to the Sina JSON.
+    :returns: a tuple of lists, (list_of_records, list_of_relationships)
+    """
+    with open(json_path) as file_:
+        records = []
+        relationships = []
+        local = {}
+        data = json.load(file_)
+        for entry in data.get('records', []):
+            if 'id' not in entry:
+                id = str(uuid.uuid4())
+                try:
+                    local[entry['local_id']] = id
+                    # Save the UUID to be used for record generation
+                    entry['id'] = id
+                except KeyError:
+                    raise ValueError("Record requires one of: local_id, id: {}".format(entry))
+            if entry["type"] == 'run':
+                records.append(model.generate_run_from_json(json_input=entry))
+            else:
+                records.append(model.generate_record_from_json(json_input=entry))
+        relationships = []
+        for entry in data.get('relationships', []):
+            subj, obj = _process_relationship_entry(entry=entry, local_ids=local)
+            relationships.append(model.Relationship(subject_id=subj,
+                                                    object_id=obj,
+                                                    predicate=entry['predicate']))
+    return (records, relationships)
+
+
 def import_json(factory, json_path):
     """
     Import one JSON document into a supported backend.
@@ -73,35 +108,16 @@ def import_json(factory, json_path):
     :param json_path: The filepath to the json to import.
     """
     LOGGER.debug('Importing %s', json_path)
-    with open(json_path) as file_:
-        data = json.load(file_)
-    runs = []
-    records = []
-    local = {}
-    for entry in data.get('records', []):
-        type = entry['type']
-        if 'id' in entry:
-            id = entry['id']
+
+    records, relationships = convert_json_to_records_and_relationships(json_path)
+    generic_records, runs = ([], [])
+    for entry in records:
+        if entry.type == "run":
+            runs.append(entry)
         else:
-            id = str(uuid.uuid4())
-            try:
-                local[entry['local_id']] = id
-                # Save the UUID to be used for record generation
-                entry['id'] = id
-            except KeyError:
-                raise ValueError("Record requires one of: local_id, id: {}".format(entry))
-        if type == 'run':
-            runs.append(model.generate_run_from_json(json_input=entry))
-        else:
-            records.append(model.generate_record_from_json(json_input=entry))
+            generic_records.append(entry)
+    factory.create_record_dao().insert_many(generic_records)
     factory.create_run_dao().insert_many(runs)
-    factory.create_record_dao().insert_many(records)
-    relationships = []
-    for entry in data.get('relationships', []):
-        subj, obj = _process_relationship_entry(entry=entry, local_ids=local)
-        relationships.append(model.Relationship(subject_id=subj,
-                                                object_id=obj,
-                                                predicate=entry['predicate']))
     factory.create_relationship_dao().insert_many(relationships)
 
 
