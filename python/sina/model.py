@@ -140,9 +140,30 @@ class Record(object):
         return ('Model Record <id={}, type={}>'
                 .format(self.id, self.type))
 
+    def add_data(self, name, value, units=None, tags=None):
+        """
+        Add a data entry to a Record.
+
+        Will throw an error if that datum is already part of the Record.
+
+        :param name: The name describing the data (ex: "direction", "volume", "time")
+        :param value: The data's value (ex: "northwest", 12, [0, 1, 3, 6])
+        :param units: Units for the value. Optional (ex: "cm^3", "seconds")
+        :param tags: List of tags describing this data. Optional (ex: ["inputs", "opt"])
+
+        :raises ValueError: if a datum with that name is already part of the record.
+        """
+        if name in self.data:
+            raise ValueError('Duplicate datum: "{}" is already an entry in Record "{}".'
+                             .format(name, self.id))
+        else:
+            self.set_data(name, value, units, tags)
+
     def set_data(self, name, value, units=None, tags=None):
         """
-        Set a datum for a Record.
+        Set a data entry for a Record.
+
+        If that datum doesn't exist, add it. If it does, update it.
 
         :param name: The name describing the data (ex: "direction", "volume", "time")
         :param value: The data's value (ex: "northwest", 12, [0, 1, 3, 6])
@@ -158,21 +179,42 @@ class Record(object):
 
     def add_file(self, uri, mimetype=None, tags=None):
         """
-        Add a file to a Record.
+        Add file info to a Record.
+
+        Will throw an error if a file with that uri is already recorded in the Record.
+
+        :param uri: The uri that uniquely describes the file. (ex: "/g/g10/doe/foo.txt")
+        :param mimetype: The mimetype of the file. Optional (ex: "text/html")
+        :param tags: List of tags describing this file. Optional (ex: ["post-processing"])
+
+        :raises ValueError: if a file with that uri is already recorded in the Record.
+        """
+        if uri in (x["uri"] for x in self.files):
+            raise ValueError('Duplicate file: "{}" is already a file in Record "{}".'
+                             .format(uri, self.id))
+        else:
+            self.set_file(uri, mimetype, tags)
+
+    def set_file(self, uri, mimetype=None, tags=None):
+        """
+        Set a file's info for a Record.
+
+        If that file doesn't exist, add its info. If it does, update it.
 
         :param uri: The uri that uniquely describes the file. (ex: "/g/g10/doe/foo.txt")
         :param mimetype: The mimetype of the file. Optional (ex: "text/html")
         :param tags: List of tags describing this file. Optional (ex: ["post-processing"])
         """
-        if uri in (x["uri"] for x in self.files):
-            raise ValueError('File "{}" already in Record "{}", cannot be added twice.'
-                             .format(uri, self.id))
-        file = {"uri": uri}
+        file_entry = {"uri": uri}
         if mimetype is not None:
-            file["mimetype"] = mimetype
+            file_entry["mimetype"] = mimetype
         if tags is not None:
-            file["tags"] = tags
-        self.files.append(file)
+            file_entry["tags"] = tags
+        # This will be replaced when files are no longer stored in a list.
+        # Until then, we have to go through the entire list and make sure
+        # the file doesn't exist yet
+        self.files[:] = [file for file in self.files if file["uri"] is not uri]
+        self.files.append(file_entry)
 
     def to_json(self):
         """
