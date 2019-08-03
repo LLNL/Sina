@@ -192,11 +192,11 @@ class RecordDAO(dao.RecordDAO):
                                    tags=entry[3])
             if record.files:
                 document_batch = []
-                for entry in record.files:
+                for uri, file_info in six.iteritems(record.files):
                     # Mimetype and tags can be None, use get() for safety
-                    document_batch.append((entry['uri'],
-                                           entry.get('mimetype'),
-                                           entry.get('tags')))
+                    document_batch.append((uri,
+                                           file_info.get('mimetype'),
+                                           file_info.get('tags')))
                 table = schema.DocumentFromRecord
                 with BatchQuery() as batch_query:
                     create = (table.batch(batch_query).create if force_overwrite
@@ -275,11 +275,11 @@ class RecordDAO(dao.RecordDAO):
                      len(files), id, force_overwrite)
         create = (schema.DocumentFromRecord.create if force_overwrite
                   else schema.DocumentFromRecord.if_not_exists().create)
-        for entry in files:
+        for uri, file_info in six.iteritems(files):
             create(id=id,
-                   uri=entry['uri'],
-                   mimetype=entry.get('mimetype'),
-                   tags=entry.get('tags'))
+                   uri=uri,
+                   mimetype=file_info.get('mimetype'),
+                   tags=file_info.get('tags'))
 
     def delete(self, id):
         """
@@ -814,6 +814,8 @@ class RecordDAO(dao.RecordDAO):
 
         :return: A dict of scalars matching the Mnoda data specification
         """
+        LOGGER.warning("Using deprecated method get_scalars()."
+                       "Consider using Record.data instead.")
         LOGGER.debug('Getting scalars=%s for record id=%s', scalar_names, id)
         scalars = {}
         # Cassandra has special restrictions on list types that prevents us
@@ -835,18 +837,20 @@ class RecordDAO(dao.RecordDAO):
 
     def get_files(self, id):
         """
-        Retrieve files for a given record id.
+        LEGACY: retrieve files for a given record id.
 
-        Files are returned in the alphabetical order of their URIs
+        This is a legacy method. Consider accessing data from Records directly,
+        ex scalar_info = my_rec["data"][scalar_name]
 
         :param id: The record id to find files for
-        :return: A list of file JSON objects matching the Mnoda specification
+        :return: A dictionary of file JSON objects matching the Mnoda specification
         """
+        LOGGER.warning("Using deprecated method get_files(). Consider using Record.files instead.")
         LOGGER.debug('Getting files for record id=%s', id)
         files = (schema.DocumentFromRecord.objects
                  .filter(id=id)
                  .values_list('uri', 'mimetype', 'tags')).all()
-        return [{'uri': x[0], 'mimetype': x[1], 'tags': x[2]} for x in files]
+        return {x[0]: {'mimetype': x[1], 'tags': x[2]} for x in files}
 
 
 class RelationshipDAO(dao.RelationshipDAO):

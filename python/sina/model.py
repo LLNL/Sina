@@ -54,7 +54,7 @@ class Record(object):
         self.id = id
         self.type = type
         self.data = data if data else {}
-        self.files = files if files else []
+        self.files = files if files else {}
         self.user_defined = user_defined if user_defined else {}
 
     @property
@@ -189,7 +189,7 @@ class Record(object):
 
         :raises ValueError: if a file with that uri is already recorded in the Record.
         """
-        if uri in (x["uri"] for x in self.files):
+        if uri in self.files:
             raise ValueError('Duplicate file: "{}" is already a file in Record "{}".'
                              .format(uri, self.id))
         else:
@@ -205,16 +205,12 @@ class Record(object):
         :param mimetype: The mimetype of the file. Optional (ex: "text/html")
         :param tags: List of tags describing this file. Optional (ex: ["post-processing"])
         """
-        file_entry = {"uri": uri}
+        file_info = {}
         if mimetype is not None:
-            file_entry["mimetype"] = mimetype
+            file_info["mimetype"] = mimetype
         if tags is not None:
-            file_entry["tags"] = tags
-        # This will be replaced when files are no longer stored in a list.
-        # Until then, we have to go through the entire list and make sure
-        # the file doesn't exist yet
-        self.files[:] = [file for file in self.files if file["uri"] is not uri]
-        self.files.append(file_entry)
+            file_info["tags"] = tags
+        self.files[uri] = file_info
 
     def to_json(self):
         """
@@ -246,25 +242,20 @@ class Record(object):
         # practice these lists can be thousands of entries long, in which case
         # the error is probably in an importer script (and so present in all
         # files/data) and doesn't warrant spamming the logger.
-        for entry in self.files:
-            if not isinstance(entry, dict):
+        for file_info in self.files.values():
+            if not isinstance(file_info, dict):
                 (warnings.append("At least one file entry belonging to "
                                  "Record {} is not a dictionary. Value: {}"
-                                 .format(self.id, entry)))
-                break
-            if "uri" not in entry:
-                (warnings.append("At least one file entry belonging to "
-                                 "Record {} is missing a uri. File: {}"
-                                 .format(self.id, entry)))
+                                 .format(self.id, file_info)))
                 break
             # Python2 and 3 compatible way of checking if the tags are
             # a list, tuple, etc (but not a string)
-            if (entry.get("tags") and
-                    (isinstance(entry.get("tags"), six.string_types) or
-                     not isinstance(entry.get("tags"), collections.Sequence))):
+            if (file_info.get("tags") and
+                    (isinstance(file_info.get("tags"), six.string_types) or
+                     not isinstance(file_info.get("tags"), collections.Sequence))):
                 (warnings.append("At least one file entry belonging to "
                                  "Record {} has a malformed tag list. File: {}"
-                                 .format(self.id, entry)))
+                                 .format(self.id, file_info)))
 
         if not isinstance(self.data, dict):
             (warnings.append("Record {}'s data field must be a dictionary!"

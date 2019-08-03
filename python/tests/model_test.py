@@ -22,8 +22,8 @@ class TestModel(unittest.TestCase):
                                                                   'orange']},
                                        "bar": {"value": "1",
                                                "tags": ["in"]}},
-                                 files=[{"uri": "ham.png", "mimetype": "png"},
-                                        {"uri": "ham.curve", "tags": ["hammy"]}],
+                                 files={"ham.png": {"mimetype": "png"},
+                                        "ham.curve": {"tags": ["hammy"]}},
                                  user_defined={})
         self.record_two = Record(id="spam2",
                                  type="new_eggs",
@@ -32,8 +32,8 @@ class TestModel(unittest.TestCase):
                                                       [1, 2, {'not': 'allowed'}]},
                                        "bar": {"value": "1",
                                                "tags": ["in"]}},
-                                 files=[{"uri": "ham.png", "mimetype": "png"},
-                                        {"uri": "ham.curve", "tags": ["hammy"]}],
+                                 files={"ham.png": {"mimetype": "png"},
+                                        "ham.curve": {"tags": ["hammy"]}},
                                  user_defined={})
 
     # Record
@@ -58,14 +58,14 @@ class TestModel(unittest.TestCase):
         self.assertFalse(spam.is_valid()[0])
 
         spam.data = {"eggstate": {"value": "runny", "tags": ["tEGGxture"]}}
-        # File that's missing a uri
-        spam.files = [{"mimetype": "text/plain"}]
+        # Files as a list instead of a dict
+        spam.files = {"spam.txt": ["text/plain"]}
         self.assertFalse(spam.is_valid()[0])
         # Correct minimal file that has a bad tag list
-        spam.files = [{"uri": "spam.log", "tags": "output"}]
+        spam.files = {"spam.log": {"tags": "output"}}
         self.assertFalse(spam.is_valid()[0])
 
-        spam.files = [{"uri": "spam.log", "mimetype": "text/plain", "tags": ["output"]}]
+        spam.files = {"spam.log": {"mimetype": "text/plain", "tags": ["output"]}}
 
         spam.type = "recipe"
 
@@ -117,8 +117,8 @@ class TestModel(unittest.TestCase):
 
     def test_set_file(self):
         """Test to make sure we can set files correctly for a Record."""
-        complete_files = [{"uri": "/foo/bar.txt"},
-                          {"uri": "/foo/spam.txt", "mimetype": "text", "tags": ["doc"]}]
+        complete_files = {"/foo/bar.txt": {},
+                          "/foo/spam.txt": {"mimetype": "text", "tags": ["doc"]}}
         rec = model.Record(id="file_test", type="test")
         rec.set_file("/foo/bar.txt")
         rec.set_file("/foo/spam.txt", mimetype="text", tags=["doc"])
@@ -134,7 +134,7 @@ class TestModel(unittest.TestCase):
 
     def test_set_file_update(self):
         """Test to make sure we can update files for a Record."""
-        complete_files = [{"uri": "/foo/spam.txt", "mimetype": "text", "tags": ["doc"]}]
+        complete_files = {"/foo/spam.txt": {"mimetype": "text", "tags": ["doc"]}}
         rec = model.Record(id="file_test", type="test")
         rec.set_file("/foo/spam.txt", mimetype="image", tags=["photo"])
         rec.set_file("/foo/spam.txt", mimetype="text", tags=["doc"])
@@ -142,7 +142,7 @@ class TestModel(unittest.TestCase):
 
     def test_add_file(self):
         """Test to make sure that, when adding a file that already exists, an error is raised."""
-        complete_files = [{"uri": "/foo/bar.txt"}]
+        complete_files = {"/foo/bar.txt": {}}
         rec = model.Record(id="file_test", type="test")
         rec.add_file("/foo/bar.txt")
         self.assertEqual(complete_files, rec.files)
@@ -174,12 +174,12 @@ class TestModel(unittest.TestCase):
         target_json = ('{"id":"hello", "type":"greeting", '
                        '"data":{"language": {"value": "english"},'
                        '"mood": {"value": "friendly"}},'
-                       '"files":[{"uri": "pronounce.wav"}],'
+                       '"files":{"pronounce.wav": {}},'
                        '"user_defined":{"good": "morning"}}')
         test_record = model.Record("hello", "greeting")
         test_record.data = {"language": {"value": "english"},
                             "mood": {"value": "friendly"}}
-        test_record.files = [{"uri": "pronounce.wav"}]
+        test_record.files = {"pronounce.wav": {}}
         test_record.user_defined = {"good": "morning"}
         # Raw is explicitly not reproduced in to_json()
         self.assertTrue(test_record.is_valid())
@@ -192,12 +192,12 @@ class TestModel(unittest.TestCase):
                        '"application":"foo", "user":"JohnD", "version":0,'
                        '"data": {"language": {"value":"english"},'
                        '"mood": {"value":"friendly"}},'
-                       '"files":[{"uri":"pronounce.wav"}],'
+                       '"files":{"pronounce.wav": {}},'
                        '"user_defined":{"good": "morning"}}')
         test_run = model.Run("hello", "foo", user="JohnD", version=0)
         test_run.data = {"language": {"value": "english"},
                          "mood": {"value": "friendly"}}
-        test_run.files = [{"uri": "pronounce.wav"}]
+        test_run.files = {"pronounce.wav": {}}
         test_run.user_defined = {"good": "morning"}
         self.assertTrue(test_run.is_valid())
         self.assertEqual(sorted(set(json.loads(target_json))),
@@ -211,9 +211,8 @@ class TestModel(unittest.TestCase):
                       "data": {"eggs": {"value": 12,
                                         "units": "cm",
                                         "tags": ["runny"]}},
-                      "files": [{"uri": "eggs.brek",
-                                 "mimetype": "egg",
-                                 "tags": ["fried"]}]}
+                      "files": {"eggs.brek": {"mimetype": "egg",
+                                              "tags": ["fried"]}}}
         record = model.generate_record_from_json(json_input=json_input)
         self.assertEqual(json_input['id'], record.id)
         self.assertEqual(json_input['type'], record.type)
@@ -233,9 +232,8 @@ class TestModel(unittest.TestCase):
                       "data": {"eggs": {"value": 12,
                                         "units": "cm",
                                         "tags": ["runny"]}},
-                      "files": [{"uri": "eggs.brek",
-                                 "mimetype": "egg",
-                                 "tags": ["fried"]}]}
+                      "files": {"eggs.brek": {"mimetype": "egg",
+                                              "tags": ["fried"]}}}
         with self.assertRaises(ValueError) as context:
             model.generate_record_from_json(json_input=json_input)
         self.assertIn("Missing required key <'id'>.", str(context.exception))
@@ -251,9 +249,8 @@ class TestModel(unittest.TestCase):
                       "data": {"eggs": {"value": 12,
                                         "units": "cm",
                                         "tags": ["runny"]}},
-                      "files": [{"uri": "eggs.brek",
-                                 "mimetype": "egg",
-                                 "tags": ["fried"]}]}
+                      "files": {"eggs.brek": {"mimetype": "egg",
+                                              "tags": ["fried"]}}}
         run = model.generate_run_from_json(json_input=json_input)
         self.assertEqual(json_input['id'], run.id)
         self.assertEqual(json_input['type'], run.type)
@@ -277,9 +274,8 @@ class TestModel(unittest.TestCase):
                       "data": {"eggs": {"value": 12,
                                         "units": "cm",
                                         "tags": ["runny"]}},
-                      "files": [{"uri": "eggs.brek",
-                                 "mimetype": "egg",
-                                 "tags": ["fried"]}]}
+                      "files": {"eggs.brek": {"mimetype": "egg",
+                                              "tags": ["fried"]}}}
         with self.assertRaises(ValueError) as context:
             model.generate_run_from_json(json_input=json_input)
         self.assertIn("Missing required key <'application'>.",
@@ -292,7 +288,7 @@ class TestModel(unittest.TestCase):
                       "application": "foo",
                       "user": "John Doe",
                       "data": {}, "user_defined": {},
-                      "files": [], "version": None}
+                      "files": {}, "version": None}
         rec = model.generate_record_from_json(json_input=raw_record)
         converted_run = model.convert_record_to_run(record=rec)
         self.assertEqual(converted_run.raw, raw_record)
@@ -305,7 +301,7 @@ class TestModel(unittest.TestCase):
                       "application": "foo",
                       "user": "John Doe",
                       "data": {}, "user_defined": {},
-                      "files": [], "version": None}
+                      "files": {}, "version": None}
         rec = model.generate_record_from_json(json_input=raw_record)
         with self.assertRaises(ValueError) as context:
             model.convert_record_to_run(record=rec)

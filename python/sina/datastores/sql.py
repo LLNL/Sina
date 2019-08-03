@@ -131,14 +131,14 @@ class RecordDAO(dao.RecordDAO):
         Does not commit(), caller needs to do that.
 
         :param id: The Record ID to associate the files to.
-        :param files: The list of files to insert.
+        :param files: The dictionary of files to insert.
         """
         LOGGER.debug('Inserting %i files to record id=%s.', len(files), id)
-        for entry in files:
-            tags = (json.dumps(entry['tags']) if 'tags' in entry else None)
+        for uri, file_info in six.iteritems(files):
+            tags = (json.dumps(file_info['tags']) if 'tags' in file_info else None)
             self.session.add(schema.Document(id=id,
-                                             uri=entry['uri'],
-                                             mimetype=entry.get('mimetype'),
+                                             uri=uri,
+                                             mimetype=file_info.get('mimetype'),
                                              tags=tags))
 
     def delete(self, id):
@@ -640,6 +640,8 @@ class RecordDAO(dao.RecordDAO):
 
         :return: A dict of scalars matching the Mnoda data specification
         """
+        LOGGER.warning("Using deprecated method get_scalars()."
+                       "Consider using Record.data instead.")
         # Not a strict subset of get_data_for_records() in that this will
         # never return stringdata
         LOGGER.debug('Getting scalars=%s for record id=%s', scalar_names, id)
@@ -660,22 +662,21 @@ class RecordDAO(dao.RecordDAO):
 
     def get_files(self, id):
         """
-        Retrieve files for a given record id.
-
-        Files are returned in the alphabetical order of their URIs
+        LEGACY: retrieve files for a given record id.
 
         :param id: The record id to find files for
-        :return: A list of file JSON objects matching the Mnoda specification
+        :return: A dictionary of file JSON objects matching the Mnoda specification
         """
+        LOGGER.warning("Using deprecated method get_files(). Consider using Record.files instead.")
         LOGGER.debug('Getting files for record id=%s', id)
         query = (self.session.query(schema.Document.uri, schema.Document.mimetype,
                                     schema.Document.tags)
                  .filter(schema.Document.id == id)
                  .order_by(schema.Document.uri.asc()).all())
-        files = []
+        files = {}
         for entry in query:
             tags = json.loads(entry[2]) if entry[2] else None
-            files.append({'uri': entry[0], 'mimetype': entry[1], 'tags': tags})
+            files[entry[0]] = {'mimetype': entry[1], 'tags': tags}
         return files
 
 

@@ -242,11 +242,9 @@ class RecordDAO(object):
         """
         Retrieve files for a given record id.
 
-        Files are returned in the alphabetical order of their URIs
-
         :param id: The record id to find files for
 
-        :returns: A list of file JSON objects matching the Mnoda specification
+        :returns: A dict of file JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
 
