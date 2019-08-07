@@ -660,25 +660,6 @@ class RecordDAO(dao.RecordDAO):
                                  'tags': tags}
         return scalars
 
-    def get_files(self, id):
-        """
-        LEGACY: retrieve files for a given record id.
-
-        :param id: The record id to find files for
-        :return: A dictionary of file JSON objects matching the Mnoda specification
-        """
-        LOGGER.warning("Using deprecated method get_files(). Consider using Record.files instead.")
-        LOGGER.debug('Getting files for record id=%s', id)
-        query = (self.session.query(schema.Document.uri, schema.Document.mimetype,
-                                    schema.Document.tags)
-                 .filter(schema.Document.id == id)
-                 .order_by(schema.Document.uri.asc()).all())
-        files = {}
-        for entry in query:
-            tags = json.loads(entry[2]) if entry[2] else None
-            files[entry[0]] = {'mimetype': entry[1], 'tags': tags}
-        return files
-
 
 class RelationshipDAO(dao.RelationshipDAO):
     """The DAO responsible for handling Relationships in SQL."""

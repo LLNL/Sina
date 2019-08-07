@@ -835,23 +835,6 @@ class RecordDAO(dao.RecordDAO):
                 pass
         return scalars
 
-    def get_files(self, id):
-        """
-        LEGACY: retrieve files for a given record id.
-
-        This is a legacy method. Consider accessing data from Records directly,
-        ex scalar_info = my_rec["data"][scalar_name]
-
-        :param id: The record id to find files for
-        :return: A dictionary of file JSON objects matching the Mnoda specification
-        """
-        LOGGER.warning("Using deprecated method get_files(). Consider using Record.files instead.")
-        LOGGER.debug('Getting files for record id=%s', id)
-        files = (schema.DocumentFromRecord.objects
-                 .filter(id=id)
-                 .values_list('uri', 'mimetype', 'tags')).all()
-        return {x[0]: {'mimetype': x[1], 'tags': x[2]} for x in files}
-
 
 class RelationshipDAO(dao.RelationshipDAO):
     """The DAO responsible for handling Relationships in Cassandra."""

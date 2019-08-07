@@ -641,13 +641,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
 
-    # ########################### get_files #############################
-    def test_recorddao_get_files(self):
-        """Test that the RecordDAO is getting files for records correctly."""
-        get_one = self.record_dao.get_files(id="spam5")
-        files = self.record_dao.get("spam5").files
-        self.assertEqual(get_one, files)
-
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):
         """Test that we're getting a datum for one record correctly."""
