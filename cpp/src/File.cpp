@@ -21,8 +21,8 @@ File::File(std::string uri_) : uri{std::move(uri_)} {}
 
 File::File(char const *uri_) : uri{uri_} {}
 
-File::File(nlohmann::json const &asJson) :
-    uri{getRequiredString(URI_KEY, asJson, FILE_TYPE_NAME)},
+File::File(std::string const &uri, nlohmann::json const &asJson) :
+    uri{uri},
     mimeType{getOptionalString(MIMETYPE_KEY, asJson, FILE_TYPE_NAME)} {
         auto tagsIter = asJson.find(TAGS_KEY);
         if(tagsIter != asJson.end()){
@@ -50,9 +50,7 @@ void File::setTags(std::vector<std::string> tags_) {
 }
 
 nlohmann::json File::toJson() const {
-    nlohmann::json asJson{
-            {URI_KEY, uri},
-    };
+    nlohmann::json asJson;
     if (!mimeType.empty()) {
         asJson[MIMETYPE_KEY] = mimeType;
     }
