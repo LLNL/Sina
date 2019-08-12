@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
    MPI_Init(&argc, &argv);
    adiak::init(&world);
 #else
-   adiak::init();
+   adiak::init(NULL);
 #endif
 
    vector<double> grid;

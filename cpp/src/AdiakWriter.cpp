@@ -160,13 +160,13 @@ void adiakSinaCallback(const char *name, adiak_category_t category, const char *
             printf("ERROR: unknown Adiak type cannot be added to Sina record."); 
             break;
         case sina_scalar: {
-            tags.emplace_back(t->print_name);
+            tags.emplace_back(adiak_type_to_string(t, 1));
             addDatum(name, toScalar(val, t), tags, record);
             break;
         }
         case sina_string: {
            // TODO: Feel like this info isn't useful for strings, but maybe?
-           tags.emplace_back(t->print_name);  
+           tags.emplace_back(adiak_type_to_string(t, 1));  
            addDatum(name, toString(val, t), tags, record);
            break;
         }
@@ -180,7 +180,7 @@ void adiakSinaCallback(const char *name, adiak_category_t category, const char *
          // should be sent to user_defined
          adiak_value_t *subvals = (adiak_value_t *) val->v_ptr;
          SinaType list_type = findSinaType(t->subtype[0]); 
-         tags.emplace_back(t->subtype[0]->print_name);
+         tags.emplace_back(adiak_type_to_string(t->subtype[0], 1));
          switch (list_type) {
              case sina_string:
                  addDatum(name, toStringList(subvals, t), tags, record);
