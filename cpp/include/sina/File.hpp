@@ -46,9 +46,9 @@ public:
      * Construct a new File.
      *
      * @param uri the uri for a file
-     * @param fileDesc the JSON representation of the file's additional info
+     * @param asJson the JSON representation of the file's additional info
      */
-    explicit File(std::string const &uri, nlohmann::json const &asJson);
+    File(std::string uri, nlohmann::json const &asJson);
 
     /**
      * Get the File's URI.

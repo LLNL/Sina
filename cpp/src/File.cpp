@@ -11,7 +11,6 @@
 namespace sina {
 
 namespace {
-char const URI_KEY[] = "uri";
 char const MIMETYPE_KEY[] = "mimetype";
 char const FILE_TYPE_NAME[] = "File";
 char const TAGS_KEY[] = "tags";
@@ -21,8 +20,8 @@ File::File(std::string uri_) : uri{std::move(uri_)} {}
 
 File::File(char const *uri_) : uri{uri_} {}
 
-File::File(std::string const &uri, nlohmann::json const &asJson) :
-    uri{uri},
+File::File(std::string uri_, nlohmann::json const &asJson) :
+    uri{std::move(uri_)},
     mimeType{getOptionalString(MIMETYPE_KEY, asJson, FILE_TYPE_NAME)} {
         auto tagsIter = asJson.find(TAGS_KEY);
         if(tagsIter != asJson.end()){

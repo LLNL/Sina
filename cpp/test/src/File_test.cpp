@@ -4,7 +4,6 @@
 
 namespace sina { namespace testing { namespace {
 
-char const EXPECTED_URI_KEY[] = "uri";
 char const EXPECTED_MIMETYPE_KEY[] = "mimetype";
 char const EXPECTED_TAGS_KEY[] = "tags";
 

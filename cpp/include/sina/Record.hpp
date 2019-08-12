@@ -19,8 +19,7 @@
 namespace sina {
 
 /**
- * FileEqualByURI is used to store files in a Record. Files with identical URIs
- * overwrite, last in wins.
+ * FileEqualByURI is used to store files in a Record.
  */
 struct FileEqualByURI {
     bool operator()(const File &file1, const File &file2) const {
