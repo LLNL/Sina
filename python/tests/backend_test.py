@@ -52,32 +52,31 @@ def populate_database_with_data(record_dao):
     spam_record.data["spam_scal_2"] = {"value": 200}
     spam_record.data["val_data"] = {"value": "runny", "tags": ["edible"]}
     spam_record.data["val_data_2"] = {"value": "double yolks"}
-    spam_record.files = [{"uri": "beep.wav"},
-                         {"uri": "beep.pong"}]
+    spam_record.files = {"beep.wav": {},
+                         "beep.pong": {}}
 
     spam_record_2 = Record(id="spam2", type="run")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
-    spam_record_2.files = [{"uri": "beep/png"}]
+    spam_record_2.files = {"beep/png": {}}
 
     spam_record_3 = Record(id="spam3", type="foo")
     spam_record_3.data["spam_scal"] = {"value": 10.5}
     spam_record_3.data["spam_scal_2"] = {"value": 10.5}
     spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
     spam_record_3.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_3.files = [{"uri": "beeq.png"}]
+    spam_record_3.files = {"beeq.png": {}}
 
     spam_record_4 = Record(id="spam4", type="bar")
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_4.files = [{"uri": "beep.png"}]
+    spam_record_4.files = {"beep.png": {}}
 
     spam_record_5 = Record(id="spam5", type="run")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
     spam_record_5.data["val_data_3"] = {"value": "sugar"}
     spam_record_5.data["val_data_list_1"] = {"value": [0, 9.3]}
     spam_record_5.data["val_data_list_2"] = {"value": ['eggs', 'pancake']}
-    spam_record_5.files = [{"uri": "beep.wav",
-                            "tags": ["output", "eggs"],
-                            "mimetype": 'audio/wav'}]
+    spam_record_5.files = {"beep.wav": {"tags": ["output", "eggs"],
+                                        "mimetype": 'audio/wav'}}
 
     spam_record_6 = Record(id="spam6", type="spamrec")
     spam_record_6.data["val_data_3"] = {"value": "syrup"}
@@ -181,7 +180,7 @@ class TestModify(unittest.TestCase):
         record_dao = self.create_dao_factory().create_record_dao()
         rec = Record(id="spam", type="eggs",
                      data={"eggs": {"value": 12, "units": None, "tags": ["runny"]}},
-                     files=[{"uri": "eggs.brek", "mimetype": "egg", "tags": ["fried"]}],
+                     files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
                      user_defined={})
         record_dao.insert(rec)
         returned_record = record_dao.get("spam")
@@ -206,7 +205,7 @@ class TestModify(unittest.TestCase):
         record_dao = factory.create_record_dao()
         data = {"eggs": {"value": 12, "tags": ["breakfast"]},
                 "flavor": {"value": "tasty"}}
-        files = [{"uri": "justheretoexist.png"}]
+        files = {"justheretoexist.png": {}}
         record_dao.insert(Record(id="rec_1", type="sample", data=data, files=files))
         record_dao.delete("rec_1")
         # Make sure the data, raw, files, and relationships were deleted as well
@@ -641,13 +640,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Test the RecordDAO type query correctly returns multiple Records."""
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
-
-    # ########################### get_files #############################
-    def test_recorddao_get_files(self):
-        """Test that the RecordDAO is getting files for records correctly."""
-        get_one = self.record_dao.get_files(id="spam5")
-        files = self.record_dao.get("spam5").files
-        self.assertEqual(get_one, files)
 
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):

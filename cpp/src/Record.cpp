@@ -30,8 +30,10 @@ Record::Record(ID id_, std::string type_) :
 nlohmann::json Record::toJson() const {
     nlohmann::json asJson;
     asJson[TYPE_FIELD] = type;
+    nlohmann::json fileRef;
     for (auto &file : files) {
-        asJson[FILES_FIELD].emplace_back(file.toJson());
+        fileRef[file.getUri()] = file.toJson();
+    asJson[FILES_FIELD] = fileRef;
     }
     id.addTo(asJson);
     //Loop through vector of data and append Json
@@ -55,8 +57,8 @@ Record::Record(nlohmann::json const &asJson) :
     }
     auto filesIter = asJson.find(FILES_FIELD);
     if (filesIter != asJson.end()) {
-        for (auto &file : *filesIter) {
-            files.emplace_back(file);
+        for (auto &namedFile : filesIter->items()){
+            files.insert(File(namedFile.key(), namedFile.value()));
         }
     }
     auto userDefinedIter = asJson.find(USER_DEFINED_KEY);
@@ -70,7 +72,7 @@ void Record::add(std::string name, Datum datum) {
 }
 
 void Record::add(File file) {
-    files.emplace_back(std::move(file));
+    files.insert(std::move(file));
 }
 
 void Record::setUserDefinedContent(nlohmann::json userDefined_) {

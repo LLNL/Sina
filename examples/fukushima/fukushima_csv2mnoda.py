@@ -246,8 +246,7 @@ class FukushimaData(object):
         self.recs.append({
             "type": "exp",
             "id": exp_id,
-            "files": [{"uri": self.get_exp_fn(exp_id), "mimetype": "text/csv",
-                      "tags": ["data"]}]
+            "files": {self.get_exp_fn(exp_id): {"mimetype": "text/csv", "tags": ["data"]}}
             })
 
     def add_exp2obs(self, exp_id, obs_id):
@@ -293,14 +292,13 @@ class FukushimaData(object):
         Add the source record, which contains the original data and associated
         files.
         """
-        lfiles = []
-        lfiles.append({"uri": os.path.join(self.files_dn, DATA_FN),
-                       "mimetype": "text/csv", "tags": ["data"]})
+        lfiles = {}
+        lfiles[os.path.join(self.files_dn, DATA_FN)] = {"mimetype": "text/csv",
+                                                        "tags": ["data"]}
 
         for extra_fn, tag, mtype in MORE_FILES:
-            lfiles.append({"uri": os.path.join(os.path.dirname(self.files_dn),
-                                               extra_fn),
-                           "mimetype": mtype, "tags": [tag]})
+            lfiles[os.path.join(os.path.dirname(self.files_dn), extra_fn)] = {"mimetype": mtype,
+                                                                              "tags": [tag]}
 
         self.recs.append({"type": "source", "id": "AMS-C12", "files": lfiles})
 
