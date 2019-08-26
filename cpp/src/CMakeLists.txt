@@ -13,16 +13,23 @@ blt_register_library(NAME libdl
         LINK_FLAGS -ldl
         )
 
-blt_register_library(NAME adiak
-       TREAT_INCLUDES_AS_SYSTEM ON
-       INCLUDES "/g/g14/haluska2/adiak/build/installed/include"
-       LIBRARIES "/g/g14/haluska2/adiak/build/installed/lib/libadiak.a" 
-       )
 
 blt_register_library(NAME nlohmann_json
         INCLUDES "${nlohmann_json_DIR}/../../../include"
         TREAT_INCLUDES_AS_SYSTEM ON
         )
+
+if(${BUILD_ADIAK_BINDINGS})
+    add_definitions(-DBUILD_ADIAK_BINDINGS)
+    find_package(adiak REQUIRED)
+    blt_register_library(NAME adiak
+        TREAT_INCLUDES_AS_SYSTEM ON
+        # TODO do adiak_include and adiak_libraries get defined?
+        # If so, use those instead of paths relative to adiak_DIR.
+        INCLUDES "${adiak_DIR}/../../../include"
+        LIBRARIES "${adiak_DIR}/../../libadiak.a"
+    )
+endif(${BUILD_ADIAK_BINDINGS})
 
 blt_add_library(NAME sina
     HEADERS
