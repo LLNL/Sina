@@ -390,6 +390,32 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIsInstance(exact_match, types.GeneratorType,
                               "Method must return a generator.")
 
+    # ###################### get_having_max ##########################
+    def test_get_having_max(self):
+        """Test that we return the id of the record with the highest scalar_name value."""
+        max_spam_scal = self.record_dao.get_having_max("spam_scal", id_only=True)
+        self.assertEqual(max_spam_scal, "spam2")
+
+    def test_get_having_max_throws_value_error(self):
+        """Test that we throw properly when given a scalar we can't find."""
+        with self.assertRaises(ValueError) as context:
+            self.record_dao.get_having_max("i_dont_exist", id_only=True)
+        self.assertIn("No records found containing scalar",
+                      str(context.exception))
+
+    # ###################### get_having_min ##########################
+    def test_get_having_min(self):
+        """Test that we return the id of the record with the lowest scalar_name value."""
+        min_spam_scal = self.record_dao.get_having_min("spam_scal", id_only=True)
+        self.assertEqual(min_spam_scal, "spam")
+
+    def test_get_having_min_throws_value_error(self):
+        """Test that we throw properly when given a scalar we can't find."""
+        with self.assertRaises(ValueError) as context:
+            self.record_dao.get_having_min("i_dont_exist", id_only=True)
+        self.assertIn("No records found containing scalar",
+                      str(context.exception))
+
     def test_recorddao_uri_one_wildcard(self):
         """Test that RecordDAO is retrieving based on a wildcard-containing uri correctly."""
         end_wildcard = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=True)

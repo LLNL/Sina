@@ -704,6 +704,74 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(set(match_ids)):
                 yield record
 
+    def _get_having_max_min_helper(self, scalar_name, id_only, sort_ascending):
+        """
+        Handle shared logic for the max/min functions.
+
+        :param sort_ascending: Whether the smallest value should be at the top (True)
+                               or the bottom (False)
+        :returns: Either an id or Record object fitting the criteria.
+        """
+        # Relies on Cassandra data always being stored sorted.
+        order_by = 'value' if sort_ascending else '-value'
+        try:
+            id = (schema.RecordFromScalarData.objects.filter(name=scalar_name)
+                  .order_by(order_by).limit(1).get()).id
+        except DoesNotExist:
+            raise ValueError("No records found containing scalar {}.".format(scalar_name))
+        if id_only:
+            return id
+        return self.get(id)
+
+    def get_having_max(self, scalar_name, id_only=False):
+        """
+        Return the Record object associated with the highest value of scalar_name.
+
+        This and its partner rely on Cassandra data being stored sorted. This is a
+        guarantee of the backend.
+        """
+        return self._get_having_max_min_helper(scalar_name, id_only, sort_ascending=False)
+
+    def get_having_min(self, scalar_name, id_only=False):
+        """Return the Record object associated with the lowest value of scalar_name."""
+        return self._get_having_max_min_helper(scalar_name, id_only, sort_ascending=True)
+
+    @classmethod
+    def _get_data_helper(data_list, id_list, with_units=True):
+        """Get data for the get_datas."""
+        # The query table changes based on whether we're restricting by ID.
+        query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
+                        if id_list is not None
+                        else [schema.RecordFromScalarData, schema.RecordFromStringData])
+        queries = []
+        values_list = ['id', 'name', 'value']
+        if with_units:
+            values_list.append("units")
+        for query_table in query_tables:
+            query = (query_table.objects
+                     .filter(query_table.name.in_(data_list)))  # pylint: disable=no-member
+            if id_list is not None:
+                query = query.filter(query_table.id.in_(id_list))  # pylint: disable=no-member
+            query = query.values_list(*values_list)
+            queries.append(query)
+        return queries
+
+    def get_data_for_graphing(self, data_list, id_list=None):
+        """
+        Get data formatted for plotting.
+
+        Retrieves in the form {"id":[id_1, id_2, ...], "density":[density_1, density_2, ...]}
+        """
+        data = {x: [] for x in ["id"]+data_list}
+        queries = self._get_data_helper(data_list=data_list, id_list=id_list, with_units=False)
+        for query in queries:
+            for result_no, result in enumerate(query):
+                id, name, value, _ = result
+                if result_no % len(data_list):
+                    data['id'].append(id)
+                data[name].append(value)
+        return data
+
     def get_data_for_records(self, data_list, id_list=None, omit_tags=False):
         """
         Retrieve a subset of data for Records (or optionally a subset of Records).
@@ -739,18 +807,8 @@ class RecordDAO(dao.RecordDAO):
                      data_list,
                      'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
-
-        # The query table changes based on whether we're restricting by ID.
-        query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
-                        if id_list is not None
-                        else [schema.RecordFromScalarData, schema.RecordFromStringData])
-
-        for query_table in query_tables:
-            query = (query_table.objects
-                     .filter(query_table.name.in_(data_list)))  # pylint: disable=no-member
-            if id_list is not None:
-                query = query.filter(query_table.id.in_(id_list))  # pylint: disable=no-member
-            query = query.values_list('id', 'name', 'value', 'units')
+        queries = self._get_data_helper(data_list=data_list, id_list=id_list)
+        for query in queries:
             for result in query:
                 id, name, value, units = result
                 datapoint = {"value": value}

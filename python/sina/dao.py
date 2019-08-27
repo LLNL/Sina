@@ -196,6 +196,40 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
+    def get_having_max(self, scalar_name, id_only=False):
+        """
+        Return the Record object or id associated with the highest value of scalar_name.
+
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the maximum record for.
+        :param id_only: Whether to only return the id (provided mostly for consistency)
+
+        :returns: A single record object or id.
+
+        :raises ValueError: if no records are found for scalar_name.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_having_min(self, scalar_name, id_only=False):
+        """
+        Return the Record object or id associated with the lowest value of scalar_name.
+
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the minimum record for.
+        :param id_only: Whether to only return the id (provided mostly for consistency)
+
+        :returns: A single record object or id.
+
+        :raises ValueError: if no records are found for scalar_name.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_scalars(self, id, scalar_names):
         """
         LEGACY: Retrieve scalars for a given record id.
