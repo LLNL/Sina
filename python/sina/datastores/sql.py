@@ -432,33 +432,35 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
-    def _get_having_max_min_helper(self, scalar_name, id_only, get_min):
+    def _get_having_max_min_helper(self, scalar_name, count, id_only, get_min):
         """
         Handle shared logic for the max/min functions.
 
         :param get_min: Whether we should be looking for the smallest val (True)
                         or largest (False).
         :returns: Either an id or Record object fitting the criteria.
-
-        :raises ValueError: If no Records are found containing scalar_name
         """
-        sort_func = sqlalchemy.func.min if get_min else sqlalchemy.func.max
-        id = (self.session.query(schema.ScalarData.id, sort_func(schema.ScalarData.value))
-              .filter(schema.ScalarData.name == scalar_name)
-              .one())[0]
-        if id is None:
-            raise ValueError("No records found containing scalar {}.".format(scalar_name))
-        if id_only:
-            return id
-        return self.get(id)
+        if count == 1:
+            sort_by = sqlalchemy.func.min if get_min else sqlalchemy.func.max
+            query_set = (self.session.query(schema.ScalarData.id, sort_by(schema.ScalarData.value))
+                         .filter(schema.ScalarData.name == scalar_name)
+                         .one())
+            ids = [query_set[0]]
+        else:
+            sort_by = schema.ScalarData.value.asc() if get_min else schema.ScalarData.value.desc()
+            query_set = (self.session.query(schema.ScalarData.id)
+                         .filter(schema.ScalarData.name == scalar_name)
+                         .order_by(sort_by).limit(count).all())
+            ids = (x[0] for x in query_set)
+        return ids if id_only else self.get_many(ids)
 
-    def get_having_max(self, scalar_name, id_only=False):
+    def get_having_max(self, scalar_name, count=1, id_only=False):
         """Return the Record object or id associated with the highest value of scalar_name."""
-        return self._get_having_max_min_helper(scalar_name, id_only, get_min=False)
+        return self._get_having_max_min_helper(scalar_name, count, id_only, get_min=False)
 
-    def get_having_min(self, scalar_name, id_only=False):
+    def get_having_min(self, scalar_name, count=1, id_only=False):
         """Return the Record object or id associated with the highest value of scalar_name."""
-        return self._get_having_max_min_helper(scalar_name, id_only, get_min=True)
+        return self._get_having_max_min_helper(scalar_name, count, id_only, get_min=True)
 
     def _apply_ranges_to_query(self, query, data, table):
         """

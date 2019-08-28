@@ -704,41 +704,45 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(set(match_ids)):
                 yield record
 
-    def _get_having_max_min_helper(self, scalar_name, id_only, sort_ascending):
+    def _get_having_max_min_helper(self, scalar_name, count, id_only, sort_ascending):
         """
         Handle shared logic for the max/min functions.
 
         :param sort_ascending: Whether the smallest value should be at the top (True)
                                or the bottom (False)
-        :returns: Either an id or Record object fitting the criteria.
         """
         # Relies on Cassandra data always being stored sorted.
         order_by = 'value' if sort_ascending else '-value'
-        try:
-            id = (schema.RecordFromScalarData.objects.filter(name=scalar_name)
-                  .order_by(order_by).limit(1).get()).id
-        except DoesNotExist:
-            raise ValueError("No records found containing scalar {}.".format(scalar_name))
-        if id_only:
-            return id
-        return self.get(id)
+        ids = (schema.RecordFromScalarData.objects.filter(name=scalar_name)
+               .order_by(order_by).limit(count).all().values_list('id', flat=True))
+        return ids if id_only else self.get_many(ids)
 
-    def get_having_max(self, scalar_name, id_only=False):
+    def get_having_max(self, scalar_name, count=1, id_only=False):
         """
-        Return the Record object associated with the highest value of scalar_name.
+        Return the Record object(s) associated with the highest value(s) of scalar_name.
 
         This and its partner rely on Cassandra data being stored sorted. This is a
         guarantee of the backend.
         """
-        return self._get_having_max_min_helper(scalar_name, id_only, sort_ascending=False)
+        return self._get_having_max_min_helper(scalar_name, count, id_only, sort_ascending=False)
 
-    def get_having_min(self, scalar_name, id_only=False):
-        """Return the Record object associated with the lowest value of scalar_name."""
-        return self._get_having_max_min_helper(scalar_name, id_only, sort_ascending=True)
+    def get_having_min(self, scalar_name, count=1, id_only=False):
+        """Return the Record object(s) associated with the lowest value(s) of scalar_name."""
+        return self._get_having_max_min_helper(scalar_name, count, id_only, sort_ascending=True)
 
     @classmethod
-    def _get_data_helper(data_list, id_list, with_units=True):
-        """Get data for the get_datas."""
+    def _get_data_helper(cls, data_list, id_list, with_units):
+        """
+        Get some set of data for some set of records, optionally including units.
+
+        Separates out data retrieval logic, which is shared between methods.
+
+        :param data_list: A list of the names of data fields to find
+        :param id_list: A list of the record ids to find data for, None if
+                        all Records should be considered.
+        :param with_units: Whether to return units or not. For some uses (ex: graphing large
+                           datasets), retrieving the units is cost without benefit.
+        """
         # The query table changes based on whether we're restricting by ID.
         query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
                         if id_list is not None
@@ -755,22 +759,6 @@ class RecordDAO(dao.RecordDAO):
             query = query.values_list(*values_list)
             queries.append(query)
         return queries
-
-    def get_data_for_graphing(self, data_list, id_list=None):
-        """
-        Get data formatted for plotting.
-
-        Retrieves in the form {"id":[id_1, id_2, ...], "density":[density_1, density_2, ...]}
-        """
-        data = {x: [] for x in ["id"]+data_list}
-        queries = self._get_data_helper(data_list=data_list, id_list=id_list, with_units=False)
-        for query in queries:
-            for result_no, result in enumerate(query):
-                id, name, value, _ = result
-                if result_no % len(data_list):
-                    data['id'].append(id)
-                data[name].append(value)
-        return data
 
     def get_data_for_records(self, data_list, id_list=None, omit_tags=False):
         """
@@ -807,7 +795,7 @@ class RecordDAO(dao.RecordDAO):
                      data_list,
                      'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
-        queries = self._get_data_helper(data_list=data_list, id_list=id_list)
+        queries = self._get_data_helper(data_list, id_list, with_units=True)
         for query in queries:
             for result in query:
                 id, name, value, units = result

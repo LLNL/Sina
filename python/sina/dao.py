@@ -196,36 +196,38 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def get_having_max(self, scalar_name, id_only=False):
+    def get_having_max(self, scalar_name, count=1, id_only=False):
         """
-        Return the Record object or id associated with the highest value of scalar_name.
+        Return the Record objects or ids associated with the highest values of <scalar_name>.
 
+        Highest first, then second-highest, etc, until <count> records have been listed.
         This will only return records for plain scalars (not lists of scalars, strings, or
         list of strings).
 
-        :param scalar_name: The name of the scalar to find the maximum record for.
-        :param id_only: Whether to only return the id (provided mostly for consistency)
+        :param scalar_name: The name of the scalar to find the maximum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
 
-        :returns: A single record object or id.
-
-        :raises ValueError: if no records are found for scalar_name.
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> largest <scalar_name> values, ordered largest first.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def get_having_min(self, scalar_name, id_only=False):
+    def get_having_min(self, scalar_name, count=1, id_only=False):
         """
-        Return the Record object or id associated with the lowest value of scalar_name.
+        Return the Record objects or ids associated with the lowest values of <scalar_name>.
 
+        Lowest first, then second-lowest, etc, until <count> records have been listed.
         This will only return records for plain scalars (not lists of scalars, strings, or
         list of strings).
 
-        :param scalar_name: The name of the scalar to find the minimum record for.
-        :param id_only: Whether to only return the id (provided mostly for consistency)
+        :param scalar_name: The name of the scalar to find the minumum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
 
-        :returns: A single record object or id.
-
-        :raises ValueError: if no records are found for scalar_name.
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> smallest <scalar_name> values, ordered smallest first.
         """
         raise NotImplementedError
 
