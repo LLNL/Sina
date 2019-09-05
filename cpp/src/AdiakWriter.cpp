@@ -1,8 +1,12 @@
 /// @file
+
+#ifdef BUILD_ADIAK_BINDINGS
+
 #include <stdexcept>
 #include <utility>
 #include <iostream>
 #include <fstream>
+#include <stdexcept>
 
 extern "C" {
 #include "adiak_tool.h"
@@ -16,26 +20,12 @@ extern "C" {
 #include "sina/AdiakWriter.hpp"
 
 
-namespace sina{
+namespace {
 /**
-* Initial draft is pretty bare-bones.
-* We'll dump a "Document" consisting of a single Record and nothing else.
-* Also, hardcoded id and type. All fixable once there's a need.
-* NOTES:
-* Adiak doesn't have rec_id, rec_type, or rec_app analogues, but does have version
+* Add a sina::Datum object to a Record. These are the sina equivalent
+* of an Adiak datapoint. Since we track slightly different info, this function
+* harvests what it can and hands it off to the Record.
 **/
-void flushRecord(const std::string &filename, sina::Record *record){
-    std::ofstream outfile(filename);
-    if (outfile.is_open()) {
-      outfile << record->toJson();
-      outfile.close();
-    }
-    //In the future, we might want more than one record per document
-    //sina::Document doc;
-    //doc.add(record_ptr);
-    //sina::saveDocument(doc, filename);
-}
-
 template <typename T>
 // TODO: Check how to pass the std::vector, since we'll be moving it
 void addDatum(const std::string &name, T sina_safe_val, std::vector<std::string> tags, sina::Record *record){
@@ -43,6 +33,10 @@ void addDatum(const std::string &name, T sina_safe_val, std::vector<std::string>
     datum.setTags(std::move(tags));
     record->add(name, datum);
 }
+
+}
+
+namespace sina {
 
 // We don't care about type here, there's only one adiak type that acts as a file
 void addFile(const std::string &name, const std::string &uri, sina::Record *record){
@@ -97,8 +91,7 @@ double toScalar(adiak_value_t *val, adiak_datatype_t *t){
 	    return tval->tv_sec + (tval->tv_usec / 1000000.0);
         }
         default:
-            printf("ERROR: adiak-to-sina double converter given something not convertible to double"); 
-            throw 1;
+            throw std::runtime_error("adiak-to-sina double converter given something not convertible to double");
     }
 }
 
@@ -117,8 +110,7 @@ std::string toString(adiak_value_t *val, adiak_datatype_t *t){
         case adiak_path:
             return std::string(static_cast<char *>(val->v_ptr));
         default:
-            printf("ERROR: adiak-to-sina string converter given something not convertible to string");
-            throw 1;
+            throw std::runtime_error("adiak-to-sina string converter given something not convertible to string");
     }
 }
 
@@ -142,7 +134,7 @@ std::vector<std::string> toStringList(adiak_value_t *subvals, adiak_datatype_t *
     return sina_safe_list;
 }
 
-void adiakSinaCallback(const char *name, adiak_category_t category, const char *subcategory, adiak_value_t *val, adiak_datatype_t *t, void *void_record)
+void adiakSinaCallback(const char *name, adiak_category_t, const char *subcategory, adiak_value_t *val, adiak_datatype_t *t, void *void_record)
 {
     if (!t){
         printf("ERROR: type must be specified for Adiak data");
@@ -178,7 +170,7 @@ void adiakSinaCallback(const char *name, adiak_category_t category, const char *
          // Further simplification: everything has to be the same type
          // Even further simplification: nothing nested. In the future, depth>1 lists
          // should be sent to user_defined
-         adiak_value_t *subvals = (adiak_value_t *) val->v_ptr;
+         adiak_value_t *subvals = static_cast<adiak_value_t *>(val->v_ptr);
          SinaType list_type = findSinaType(t->subtype[0]); 
          tags.emplace_back(adiak_type_to_string(t->subtype[0], 1));
          switch (list_type) {
@@ -196,14 +188,15 @@ void adiakSinaCallback(const char *name, adiak_category_t category, const char *
                  addDatum(name, toScalarList(subvals, t), tags, record);
                  break;
              case sina_unknown:
-                 printf("ERROR: type must not be unknown for list entries to be added to a Sina record");
-                 throw 1;
+                 throw std::runtime_error("type must not be unknown for list entries to be added to a Sina record");
              default:
-                 printf("ERROR: type must be set for list entries to be added to a Sina record");
-                 throw 1;
+                 throw std::runtime_error("ERROR: type must be set for list entries to be added to a Sina record");
          }
          break;
      }
    }
 }
 }
+
+#endif // BUILD_ADIAK_BINDINGS
+

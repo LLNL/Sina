@@ -1,13 +1,12 @@
-#include "adiak.hpp"
 #include <vector>
 #include <set>
-#include "sina/AdiakWriter.hpp"
-#include "sina/Document.hpp"
-#include "sina/Record.hpp"
-
 #include <time.h>
 #include <sys/time.h>
 
+#include "adiak.hpp"
+#include "sina/AdiakWriter.hpp"
+#include "sina/Document.hpp"
+#include "sina/Record.hpp"
 
 extern "C" {
   #include "adiak_tool.h"
@@ -19,8 +18,11 @@ extern "C" {
 
 using namespace std;
 
-int main(int argc, char *argv[])
-{
+int main(
+#ifdef USE_MPI
+int argc, char *argv[]
+#endif
+) {
    sina::Document doc;
    sina::ID id{"test_run", sina::IDType::Local}; 
    std::unique_ptr<sina::Record> run{new sina::Run{id, "testappcxx", "1.0"}};
@@ -31,14 +33,14 @@ int main(int argc, char *argv[])
 #if defined(USE_MPI)
    MPI_Comm world = MPI_COMM_WORLD;
 #endif
-   struct timeval start, end;
+   struct timeval start; //, end;
 
-   gettimeofday(&start, NULL);
+   gettimeofday(&start, nullptr);
 #if defined(USE_MPI)
    MPI_Init(&argc, &argv);
    adiak::init(&world);
 #else
-   adiak::init(NULL);
+   adiak::init(nullptr);
 #endif
 
    vector<double> grid;
@@ -70,8 +72,8 @@ int main(int argc, char *argv[])
    ap_c.push_back(1.0);
    ap_c.push_back(4.0);
    ap_c.push_back(9.0);
-   tuple<vector<string>, vector<double>, vector<double> > antipoints = make_tuple(ap_a, ap_b, ap_c);
-   const tuple<vector<string>, vector<double>, vector<double> > &antipoints_r = antipoints;
+   //tuple<vector<string>, vector<double>, vector<double> > antipoints = make_tuple(ap_a, ap_b, ap_c);
+   //const tuple<vector<string>, vector<double>, vector<double> > &antipoints_r = antipoints;
 
    //These first three are forms Sina doesn't deal with
    //result = adiak::value("points", points);
@@ -89,7 +91,7 @@ int main(int argc, char *argv[])
    result = adiak::value("compiler", adiak::version("gcc@8.1.0"));
    if (!result) printf("return: %d\n\n", result);
 
-   result = adiak::value("mydouble", (double) 3.14);
+   result = adiak::value("mydouble", 3.14);
    if (!result) printf("return: %d\n\n", result);
 
    result = adiak::value("gridvalues", grid);
@@ -173,3 +175,4 @@ int main(int argc, char *argv[])
 #endif
    return 0;
 }
+
