@@ -10,8 +10,8 @@
 
 namespace sina {
 /**
- * A File tracks the location (URI) and mimetype of a file on the file system. In the Sina schema, a File always
- * belongs to a Record or one of Record's inheriting types.
+ * A File tracks the location (URI) and mimetype of a file on the file system, plus any tags.
+ * In the Sina schema, a File always belongs to a Record or one of Record's inheriting types.
  *
  * Every File must have a URI, while mimetype and tags are optional.
  *
@@ -45,9 +45,10 @@ public:
     /**
      * Construct a new File.
      *
-     * @param asJson the JSON representation of the file
+     * @param uri the uri for a file
+     * @param asJson the JSON representation of the file's additional info
      */
-    explicit File(nlohmann::json const &asJson);
+    File(std::string uri, nlohmann::json const &asJson);
 
     /**
      * Get the File's URI.
@@ -102,6 +103,7 @@ private:
     std::string mimeType;
     std::vector<std::string> tags;
 };
+
 }
 
 #endif //SINA_FILE_HPP

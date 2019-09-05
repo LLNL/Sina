@@ -198,9 +198,9 @@ class RecordDAO(object):
     @abstractmethod
     def get_scalars(self, id, scalar_names):
         """
-        Retrieve scalars for a given record id.
+        LEGACY: Retrieve scalars for a given record id.
 
-        Scalars are returned in alphabetical order.
+        Scalars are returned in alphabetical order. Consider using Record.data instead.
 
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
@@ -234,19 +234,6 @@ class RecordDAO(object):
 
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_files(self, id):
-        """
-        Retrieve files for a given record id.
-
-        Files are returned in the alphabetical order of their URIs
-
-        :param id: The record id to find files for
-
-        :returns: A list of file JSON objects matching the Mnoda specification
         """
         raise NotImplementedError
 

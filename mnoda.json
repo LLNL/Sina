@@ -5,18 +5,18 @@
     "description" : "Mnoda schema for simulation data",
     "type" : "object",
     "definitions" : {
-        "fileArray" : {
-            "type": "array",
-            "items": { "$ref": "#/definitions/fileType" },
-            "uniqueItems": true
+        "fileDict" : {
+            "description": "Dictionary of files associated with Record",
+            "type": "object",
+            "additionalProperties": {"$ref": "#/definitions/fileType" }
         },
         "fileType" : {
+            "description": "User-defined file values",
+            "type": "object",
             "properties": {
-                "uri": { "type": "string" },
-                "mimetype": { "type": "string" },
-                "tags": { "$ref": "#/definitions/tagArray" }
-            },
-            "required" :  [ "uri" ]
+              "mimetype": { "type": "string" },
+              "tags": { "$ref": "#/definitions/tagArray" }
+            }
         },
         "stringDataArray" : {
             "type": "array",
@@ -61,7 +61,7 @@
         "recordData" : {
             "description": "Optional, indexed simulation data",
             "properties": {
-                "files": { "$ref": "#/definitions/fileArray" },
+                "files": { "$ref": "#/definitions/fileDict" },
                 "data": { "$ref": "#/definitions/dataDict" },
                 "user_defined": {}
             }

@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "nlohmann/json.hpp"
 
@@ -16,6 +17,25 @@
 #include "sina/File.hpp"
 
 namespace sina {
+
+/**
+ * FileEqualByURI is used to store files in a Record.
+ */
+struct FileEqualByURI {
+    bool operator()(const File &file1, const File &file2) const {
+        return file1.getUri() == file2.getUri();
+    }
+};
+
+/**
+ * FileHashByURI is used to store files in a Record. Files are stored according
+ * to the hash of their URI.
+ */
+struct FileHashByURI {
+    size_t operator()(const File &file) const {
+        return std::hash<std::string>()(file.getUri());
+    }
+};
 
 /**
  * The Record class represents an entry in a Document's Record list. Records represent the data to be stored
@@ -43,7 +63,7 @@ namespace sina {
 class Record {
 public:
     using DatumMap = std::unordered_map<std::string, Datum>;
-    using FileList = std::vector<File>;
+    using FileSet = std::unordered_set<File, FileHashByURI, FileEqualByURI>;
 
     /**
      * Construct a new Record.
@@ -111,7 +131,7 @@ public:
      *
      * @return the record's files
      */
-    FileList const &getFiles() const noexcept {
+    FileSet const &getFiles() const noexcept {
         return files;
     }
 
@@ -153,7 +173,7 @@ private:
     internal::IDField id;
     std::string type;
     DatumMap data;
-    FileList files;
+    FileSet files;
     nlohmann::json userDefined;
 };
 
