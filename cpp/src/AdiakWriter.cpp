@@ -21,28 +21,6 @@ extern "C" {
 
 
 namespace {
-// Unused for now. Delete???
-#if 0
-/**
-* Initial draft is pretty bare-bones.
-* We'll dump a "Document" consisting of a single Record and nothing else.
-* Also, hardcoded id and type. All fixable once there's a need.
-* NOTES:
-* Adiak doesn't have rec_id, rec_type, or rec_app analogues, but does have version
-**/
-void flushRecord(const std::string &filename, sina::Record *record){
-    std::ofstream outfile(filename);
-    if (outfile.is_open()) {
-      outfile << record->toJson();
-      outfile.close();
-    }
-    //In the future, we might want more than one record per document
-    //sina::Document doc;
-    //doc.add(record_ptr);
-    //sina::saveDocument(doc, filename);
-}
-#endif
-
 /**
 * Add a sina::Datum object to a Record. These are the sina equivalent
 * of an Adiak datapoint. Since we track slightly different info, this function
