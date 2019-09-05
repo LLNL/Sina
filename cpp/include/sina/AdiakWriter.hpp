@@ -1,3 +1,5 @@
+#ifdef BUILD_ADIAK_BINDINGS
+
 #ifndef SINA_ADIAK_HPP
 #define SINA_ADIAK_HPP
 
@@ -22,14 +24,6 @@ namespace sina {
 * -Print to stdout if no file specified
 * -Store nested lists in UserDefined
 **/ 
-
-/**
-* Add a sina::Datum object to a Record. These are the sina equivalent
-* of an Adiak datapoint. Since we track slightly different info, this function
-* harvests what it can and hands it off to the Record.
-**/
-template <typename T>
-void addDatum(const std::string &name, T sina_safe_val, adiak_datatype_t* type, sina::Record *record);
 
 /**
 * Add a sina::File object to our current Record. Adiak stores paths,
@@ -80,3 +74,5 @@ void adiakSinaCallback(const char *name, adiak_category_t category, const char *
 
 }
 #endif
+
+#endif // BUILD_ADIAK_BINDINGS

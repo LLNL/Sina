@@ -19,16 +19,17 @@ blt_register_library(NAME nlohmann_json
         TREAT_INCLUDES_AS_SYSTEM ON
         )
 
+set(OPTIONAL_SINA_DEPENDENCIES "")
+
 if(${BUILD_ADIAK_BINDINGS})
-    add_definitions(-DBUILD_ADIAK_BINDINGS)
+    add_definitions(-DBUILD_ADIAK_BINDINGS=1)
     find_package(adiak REQUIRED)
     blt_register_library(NAME adiak
         TREAT_INCLUDES_AS_SYSTEM ON
-        # TODO do adiak_include and adiak_libraries get defined?
-        # If so, use those instead of paths relative to adiak_DIR.
         INCLUDES "${adiak_DIR}/../../../include"
         LIBRARIES "${adiak_DIR}/../../libadiak.a"
     )
+    string(CONCAT OPTIONAL_SINA_DEPENDENCIES "adiak")
 endif(${BUILD_ADIAK_BINDINGS})
 
 blt_add_library(NAME sina
@@ -56,18 +57,20 @@ blt_add_library(NAME sina
         AdiakWriter.cpp
     DEPENDS_ON
         nlohmann_json
-        adiak
+        ${OPTIONAL_SINA_DEPENDENCIES}
 )
 
-blt_add_executable(
- NAME testappcxx 
- SOURCES
-    testapp.cpp
- DEPENDS_ON
-    sina
-    libdl
-    adiak
+if(${BUILD_ADIAK_BINDINGS})
+    blt_add_executable(
+      NAME testappcxx 
+      SOURCES
+        testapp.cpp
+      DEPENDS_ON
+        sina
+        libdl
+        adiak
 )
+endif()
 
 install(TARGETS sina
     ARCHIVE DESTINATION "lib"
