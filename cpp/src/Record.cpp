@@ -30,18 +30,25 @@ Record::Record(ID id_, std::string type_) :
 nlohmann::json Record::toJson() const {
     nlohmann::json asJson;
     asJson[TYPE_FIELD] = type;
-    nlohmann::json fileRef;
-    for (auto &file : files) {
-        fileRef[file.getUri()] = file.toJson();
-    asJson[FILES_FIELD] = fileRef;
-    }
     id.addTo(asJson);
-    //Loop through vector of data and append Json
-    nlohmann::json datumRef;
-    for(auto &datum : data)
-        datumRef[datum.first] = datum.second.toJson();
-    asJson[DATA_FIELD] = datumRef;
-    asJson[USER_DEFINED_KEY] = userDefined;
+    // Optional fields
+    if(!files.empty()){
+      nlohmann::json fileRef;
+      for (auto &file : files) {
+          fileRef[file.getUri()] = file.toJson();
+      asJson[FILES_FIELD] = fileRef;
+      }
+    }
+    if(!data.empty()){
+      //Loop through vector of data and append Json
+      nlohmann::json datumRef;
+      for(auto &datum : data)
+          datumRef[datum.first] = datum.second.toJson();
+      asJson[DATA_FIELD] = datumRef;
+    }
+    if(!userDefined.is_null()){
+      asJson[USER_DEFINED_KEY] = userDefined;
+    }
     return asJson;
 }
 

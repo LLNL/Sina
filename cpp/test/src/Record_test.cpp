@@ -160,6 +160,17 @@ TEST(Record, toJson_globalId) {
     EXPECT_EQ(0, asJson.count(EXPECTED_GLOBAL_ID_KEY));
 }
 
+TEST(Record, toJson_default_values) {
+    ID id{"the id", IDType::Global};
+    Record record{id, "my type"};
+    auto asJson = record.toJson();
+    EXPECT_TRUE(asJson.is_object());
+    // We want to be sure that unset optional fields aren't present
+    EXPECT_EQ(asJson.find(EXPECTED_DATA_KEY), asJson.end());
+    EXPECT_EQ(asJson.find(EXPECTED_FILES_KEY), asJson.end());
+    EXPECT_EQ(asJson.find(EXPECTED_USER_DEFINED_KEY), asJson.end());
+}
+
 TEST(Record, toJson_userDefined) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
