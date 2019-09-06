@@ -27,22 +27,15 @@ void Document::add(Relationship relationship) {
 }
 
 nlohmann::json Document::toJson() const {
-    nlohmann::json recordsList;
-    if(!records.empty()){
-      for (auto &record : records) {
-          recordsList.emplace_back(record->toJson());
-      }
-    } else {
-      recordsList = nlohmann::json::array({});
+    // note nlohmann::json::array is a function, not a type
+    nlohmann::json recordsList = nlohmann::json::array({});
+    for (auto &record : records) {
+        recordsList.emplace_back(record->toJson());
     }
 
-    nlohmann::json relationshipsList;
-    if(!relationships.empty()){
-      for (auto &relationship : relationships) {
-          relationshipsList.emplace_back(relationship.toJson());
-      }
-    } else {
-      relationshipsList = nlohmann::json::array({});
+    nlohmann::json relationshipsList = nlohmann::json::array({});
+    for (auto &relationship : relationships) {
+        relationshipsList.emplace_back(relationship.toJson());
     }
 
     return nlohmann::json{
