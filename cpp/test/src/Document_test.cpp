@@ -95,11 +95,12 @@ TEST(Document, create_fromJson_withRelationships) {
 }
 
 TEST(Document, toJson_empty) {
+    // A sina document should always have, at minimum, both records and
+    // relationships as empty arrays.
     Document const document;
     nlohmann::json asJson = document.toJson();
-    EXPECT_EQ(nlohmann::json::value_t::null, asJson[EXPECTED_RECORDS_KEY]);
-    EXPECT_EQ(nlohmann::json::value_t::null,
-            asJson[EXPECTED_RELATIONSHIPS_KEY]);
+    EXPECT_EQ(nlohmann::json::array({}), asJson[EXPECTED_RECORDS_KEY]);
+    EXPECT_EQ(nlohmann::json::array({}), asJson[EXPECTED_RELATIONSHIPS_KEY]);
 }
 
 TEST(Document, toJson_records) {
@@ -151,6 +152,7 @@ TEST(Document, toJson_relationships) {
         EXPECT_EQ(expectedPredicates[i], actualRelationship["predicate"]);
     }
 }
+
 
 /**
  * Instances of this class acquire a temporary file name when created
