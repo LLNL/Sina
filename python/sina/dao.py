@@ -196,7 +196,7 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def get_having_max(self, scalar_name, count=1, id_only=False):
+    def get_with_max(self, scalar_name, count=1, id_only=False):
         """
         Return the Record objects or ids associated with the highest values of <scalar_name>.
 
@@ -214,7 +214,7 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def get_having_min(self, scalar_name, count=1, id_only=False):
+    def get_with_min(self, scalar_name, count=1, id_only=False):
         """
         Return the Record objects or ids associated with the lowest values of <scalar_name>.
 

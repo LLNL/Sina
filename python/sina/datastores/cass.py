@@ -704,7 +704,7 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(set(match_ids)):
                 yield record
 
-    def _get_having_max_min_helper(self, scalar_name, count, id_only, sort_ascending):
+    def _get_with_max_min_helper(self, scalar_name, count, id_only, sort_ascending):
         """
         Handle shared logic for the max/min functions.
 
@@ -717,48 +717,42 @@ class RecordDAO(dao.RecordDAO):
                .order_by(order_by).limit(count).all().values_list('id', flat=True))
         return ids if id_only else self.get_many(ids)
 
-    def get_having_max(self, scalar_name, count=1, id_only=False):
+    def get_with_max(self, scalar_name, count=1, id_only=False):
         """
         Return the Record object(s) associated with the highest value(s) of scalar_name.
 
         This and its partner rely on Cassandra data being stored sorted. This is a
         guarantee of the backend.
+
+        Highest first, then second-highest, etc, until <count> records have been listed.
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the maximum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
+
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> largest <scalar_name> values, ordered largest first.
         """
-        return self._get_having_max_min_helper(scalar_name, count, id_only, sort_ascending=False)
+        return self._get_with_max_min_helper(scalar_name, count, id_only, sort_ascending=False)
 
-    def get_having_min(self, scalar_name, count=1, id_only=False):
-        """Return the Record object(s) associated with the lowest value(s) of scalar_name."""
-        return self._get_having_max_min_helper(scalar_name, count, id_only, sort_ascending=True)
-
-    @classmethod
-    def _get_data_helper(cls, data_list, id_list, with_units):
+    def get_with_min(self, scalar_name, count=1, id_only=False):
         """
-        Get some set of data for some set of records, optionally including units.
+        Return the Record objects or ids associated with the lowest values of <scalar_name>.
 
-        Separates out data retrieval logic, which is shared between methods.
+        Lowest first, then second-lowest, etc, until <count> records have been listed.
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
 
-        :param data_list: A list of the names of data fields to find
-        :param id_list: A list of the record ids to find data for, None if
-                        all Records should be considered.
-        :param with_units: Whether to return units or not. For some uses (ex: graphing large
-                           datasets), retrieving the units is cost without benefit.
+        :param scalar_name: The name of the scalar to find the minumum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
+
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> smallest <scalar_name> values, ordered smallest first.
         """
-        # The query table changes based on whether we're restricting by ID.
-        query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
-                        if id_list is not None
-                        else [schema.RecordFromScalarData, schema.RecordFromStringData])
-        queries = []
-        values_list = ['id', 'name', 'value']
-        if with_units:
-            values_list.append("units")
-        for query_table in query_tables:
-            query = (query_table.objects
-                     .filter(query_table.name.in_(data_list)))  # pylint: disable=no-member
-            if id_list is not None:
-                query = query.filter(query_table.id.in_(id_list))  # pylint: disable=no-member
-            query = query.values_list(*values_list)
-            queries.append(query)
-        return queries
+        return self._get_with_max_min_helper(scalar_name, count, id_only, sort_ascending=True)
 
     def get_data_for_records(self, data_list, id_list=None, omit_tags=False):
         """
@@ -795,8 +789,16 @@ class RecordDAO(dao.RecordDAO):
                      data_list,
                      'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
-        queries = self._get_data_helper(data_list, id_list, with_units=True)
-        for query in queries:
+        query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
+                        if id_list is not None
+                        else [schema.RecordFromScalarData, schema.RecordFromStringData])
+        values_list = ['id', 'name', 'value', 'units']
+        for query_table in query_tables:
+            query = (query_table.objects
+                     .filter(query_table.name.in_(data_list)))  # pylint: disable=no-member
+            if id_list is not None:
+                query = query.filter(query_table.id.in_(id_list))  # pylint: disable=no-member
+            query = query.values_list(*values_list)
             for result in query:
                 id, name, value, units = result
                 datapoint = {"value": value}
