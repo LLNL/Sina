@@ -390,6 +390,32 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIsInstance(exact_match, types.GeneratorType,
                               "Method must return a generator.")
 
+    # ###################### get_with_max ##########################
+    def test_get_with_max(self):
+        """Test that we return the id of the record with the highest scalar_name value."""
+        max_spam_scal = list(self.record_dao.get_with_max("spam_scal", id_only=True))
+        self.assertEqual(max_spam_scal[0], "spam2")
+
+    def test_get_with_max_multi(self):
+        """Test we can return the X largest in correct order."""
+        max_spam_scals = list(self.record_dao.get_with_max("spam_scal",
+                                                           count=2,
+                                                           id_only=True))
+        self.assertEqual(max_spam_scals, ["spam2", "spam3"])
+
+    # ###################### get_with_min ##########################
+    def test_get_with_min(self):
+        """Test that we return the id of the record with the lowest scalar_name value."""
+        min_spam_scal = list(self.record_dao.get_with_min("spam_scal", id_only=True))
+        self.assertEqual(min_spam_scal[0], "spam")
+
+    def test_get_with_min_multi(self):
+        """Test we can return the X smallest in correct order."""
+        min_spam_scals = list(self.record_dao.get_with_min("spam_scal",
+                                                           count=2,
+                                                           id_only=True))
+        self.assertEqual(min_spam_scals, ["spam", "spam3"])
+
     def test_recorddao_uri_one_wildcard(self):
         """Test that RecordDAO is retrieving based on a wildcard-containing uri correctly."""
         end_wildcard = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=True)

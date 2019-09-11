@@ -432,6 +432,62 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(filtered_ids):
                 yield record
 
+    def _get_with_max_min_helper(self, scalar_name, count, id_only, get_min):
+        """
+        Handle shared logic for the max/min functions.
+
+        :param get_min: Whether we should be looking for the smallest val (True)
+                        or largest (False).
+        :returns: Either an id or Record object fitting the criteria.
+        """
+        if count == 1:
+            sort_by = sqlalchemy.func.min if get_min else sqlalchemy.func.max
+            query_set = (self.session.query(schema.ScalarData.id, sort_by(schema.ScalarData.value))
+                         .filter(schema.ScalarData.name == scalar_name)
+                         .one())
+            ids = [query_set[0]]
+        else:
+            sort_by = schema.ScalarData.value.asc() if get_min else schema.ScalarData.value.desc()
+            query_set = (self.session.query(schema.ScalarData.id)
+                         .filter(schema.ScalarData.name == scalar_name)
+                         .order_by(sort_by).limit(count).all())
+            ids = (x[0] for x in query_set)
+        return ids if id_only else self.get_many(ids)
+
+    def get_with_max(self, scalar_name, count=1, id_only=False):
+        """
+        Return the Record objects or ids associated with the highest values of <scalar_name>.
+
+        Highest first, then second-highest, etc, until <count> records have been listed.
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the maximum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
+
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> largest <scalar_name> values, ordered largest first.
+        """
+        return self._get_with_max_min_helper(scalar_name, count, id_only, get_min=False)
+
+    def get_with_min(self, scalar_name, count=1, id_only=False):
+        """
+        Return the Record objects or ids associated with the lowest values of <scalar_name>.
+
+        Lowest first, then second-lowest, etc, until <count> records have been listed.
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the minumum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
+
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> smallest <scalar_name> values, ordered smallest first.
+        """
+        return self._get_with_max_min_helper(scalar_name, count, id_only, get_min=True)
+
     def _apply_ranges_to_query(self, query, data, table):
         """
         Filter query object based on list of (name, criteria).
