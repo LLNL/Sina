@@ -24,5 +24,5 @@ class SinaCpp(CMakePackage):
     def configure_args(self):
         spec = self.spec if self.spec is not None else ""
         return [
-            '-DBUILD_ADIAK_BINDINGS={0}'.format('YES' if '+adiak' in spec else 'NO'),
+            '-DSINA_BUILD_ADIAK_BINDINGS={0}'.format('YES' if '+adiak' in spec else 'NO'),
         ]

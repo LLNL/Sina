@@ -21,8 +21,8 @@ blt_register_library(NAME nlohmann_json
 
 set(OPTIONAL_SINA_DEPENDENCIES "")
 
-if(${BUILD_ADIAK_BINDINGS})
-    add_definitions(-DBUILD_ADIAK_BINDINGS=1)
+if(${SINA_BUILD_ADIAK_BINDINGS})
+    add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
     find_package(adiak REQUIRED)
     blt_register_library(NAME adiak
         TREAT_INCLUDES_AS_SYSTEM ON
@@ -30,7 +30,7 @@ if(${BUILD_ADIAK_BINDINGS})
         LIBRARIES "${adiak_DIR}/../../libadiak.a"
     )
     string(CONCAT OPTIONAL_SINA_DEPENDENCIES "adiak")
-endif(${BUILD_ADIAK_BINDINGS})
+endif(${SINA_BUILD_ADIAK_BINDINGS})
 
 blt_add_library(NAME sina
     HEADERS
@@ -60,9 +60,9 @@ blt_add_library(NAME sina
         ${OPTIONAL_SINA_DEPENDENCIES}
 )
 
-if(${BUILD_ADIAK_BINDINGS})
+if(${SINA_BUILD_ADIAK_BINDINGS})
     blt_add_executable(
-      NAME testappcxx 
+      NAME testappcxx
       SOURCES
         testapp.cpp
       DEPENDS_ON
