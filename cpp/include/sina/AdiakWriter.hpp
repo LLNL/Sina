@@ -1,4 +1,4 @@
-#ifdef BUILD_ADIAK_BINDINGS
+#ifdef SINA_BUILD_ADIAK_BINDINGS
 
 #ifndef SINA_ADIAK_HPP
 #define SINA_ADIAK_HPP
@@ -23,7 +23,7 @@ namespace sina {
 * POTENTIAL IMPROVEMENTS:
 * -Print to stdout if no file specified
 * -Store nested lists in UserDefined
-**/ 
+**/
 
 /**
 * Add a sina::File object to our current Record. Adiak stores paths,
@@ -40,13 +40,13 @@ enum SinaType {sina_scalar, sina_string, sina_list, sina_file, sina_unknown};
 /**
 * Given an Adiak type, return its corresponding Sina type.
 **/
-SinaType findSinaType(adiak_datatype_t *t); 
+SinaType findSinaType(adiak_datatype_t *t);
 
 /**
 * Several Adiak types become what Sina views as a "scalar" (a double).
 * Manage the conversions from various Adiak types to the final double
 * representation
-**/ 
+**/
 double toScalar(adiak_value_t *val, adiak_datatype_t *t);
 
 /**
@@ -67,7 +67,7 @@ std::vector<double> toScalarList(adiak_value_t *subvals, adiak_datatype_t *t);
 * Partner method to the above, invoked when the children of an adiak list
 * type are strings (according to Sina).
 **/
-std::vector<std::string> toStringList(adiak_value_t *subvals, adiak_datatype_t *t); 
+std::vector<std::string> toStringList(adiak_value_t *subvals, adiak_datatype_t *t);
 
 // Register the sina callback with Adiak
 void adiakSinaCallback(const char *name, adiak_category_t category, const char *subcategory, adiak_value_t *value, adiak_datatype_t *t, void *opaque_value);
@@ -75,4 +75,4 @@ void adiakSinaCallback(const char *name, adiak_category_t category, const char *
 }
 #endif
 
-#endif // BUILD_ADIAK_BINDINGS
+#endif // SINA_BUILD_ADIAK_BINDINGS

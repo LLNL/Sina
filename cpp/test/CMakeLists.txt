@@ -16,6 +16,7 @@ blt_add_executable(NAME unittests
         src/Relationship_test.cpp
         src/Run_test.cpp
         src/Datum_test.cpp
+        src/AdiakWriter_test.cpp
         src/TestRecord.cpp
     DEPENDS_ON sina gtest gmock nlohmann_json
 )
