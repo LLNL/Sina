@@ -142,7 +142,6 @@ void adiakSinaCallback(const char *name, adiak_category_t, const char *subcatego
         case sina_unknown:
             // If we don't know what it is, we can't store it, so as above...
             throw std::runtime_error("Unknown Adiak type cannot be added to Sina record.");
-            break;
         case sina_scalar: {
             tags.emplace_back(adiak_type_to_string(adiak_type, 1));
             addDatum(name, toScalar(val, adiak_type), tags, record);
@@ -171,7 +170,7 @@ void adiakSinaCallback(const char *name, adiak_category_t, const char *subcatego
                  break;
              // Weird case wherein we're given a list of filenames, which we can somewhat manage
              case sina_file:
-                 for (int i=0; i < t->num_elements; i++) {
+                 for (int i=0; i < adiak_type->num_elements; i++) {
                      addFile(name, toString(subvals+i, adiak_type->subtype[0]), record);
                  }
                  break;

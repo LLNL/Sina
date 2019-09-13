@@ -4,6 +4,22 @@ add_definitions(${SINA_CXX_TEST_FLAGS})
 
 include_directories("${PROJECT_SOURCE_DIR}/test/include")
 
+blt_register_library(NAME libdl
+    TREAT_INCLUDES_AS_SYSTEM ON
+    LINK_FLAGS -ldl
+)
+
+if(${SINA_BUILD_ADIAK_BINDINGS})
+    add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
+    find_package(adiak REQUIRED)
+    blt_register_library(NAME adiak
+        TREAT_INCLUDES_AS_SYSTEM ON
+        INCLUDES "${adiak_DIR}/../../../include"
+        LIBRARIES "${adiak_DIR}/../../libadiak.a"
+    )
+    string(CONCAT OPTIONAL_SINA_DEPENDENCIES "adiak")
+endif(${SINA_BUILD_ADIAK_BINDINGS})
+
 blt_add_executable(NAME unittests
     SOURCES
         include/sina/testing/TestRecord.hpp
@@ -18,7 +34,7 @@ blt_add_executable(NAME unittests
         src/Datum_test.cpp
         src/AdiakWriter_test.cpp
         src/TestRecord.cpp
-    DEPENDS_ON sina gtest gmock nlohmann_json
+    DEPENDS_ON sina gtest gmock nlohmann_json libdl
 )
 
 blt_add_test(NAME unittests
