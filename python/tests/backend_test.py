@@ -297,6 +297,42 @@ class TestModify(unittest.TestCase):
             self.assertEqual(result.object_id, relationship.object_id)
             self.assertEqual(result.predicate, relationship.predicate)
 
+    def test_relationshipdao_get_uses_and(self):
+        relationship_dao = self.create_dao_factory().create_relationship_dao()
+
+        subjects = ['s' + str(i + 1) for i in range(0, 3)]
+        predicates = ['p' + str(i + 1) for i in range(0, 4)]
+        objects = ['o' + str(i + 1) for i in range(0, 5)]
+
+        for subject_id in subjects:
+            for predicate in predicates:
+                for object_id in objects:
+                    relationship_dao.insert(Relationship(subject_id=subject_id,
+                                                         predicate=predicate,
+                                                         object_id=object_id))
+
+        def check(restrict_subject, restrict_predicate, restrict_object):
+            restrictions = {}
+
+            def add_restriction(restrict, key, values):
+                if restrict:
+                    restrictions[key] = values[0]
+                    return [values[0]]
+                return values
+
+            allowed_subjects = add_restriction(restrict_subject, 'subject_id', subjects)
+            allowed_predicates = add_restriction(restrict_predicate, 'predicate', predicates)
+            allowed_objects = add_restriction(restrict_object, 'object_id', objects)
+
+            relationships = relationship_dao.get(**restrictions)
+            self.assertEqual(len(allowed_subjects) * len(allowed_predicates) * len(allowed_objects),
+                             len(relationships))
+
+        for restrict_subject in (True, False):
+            for restrict_predicate in (True, False):
+                for restrict_object in (True, False):
+                    check(restrict_subject, restrict_predicate, restrict_object)
+
     def test_relationshipdao_bad_insert(self):
         """Test that the RelationshipDAO refuses to insert malformed relationships."""
         relationship_dao = self.create_dao_factory().create_relationship_dao()

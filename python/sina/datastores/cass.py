@@ -959,62 +959,48 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                     predicate=entry[0],
                                                     object_id=entry[1]))
 
-    # pylint: disable=fixme
-    # TODO: Should these return generators? SIBO-541
-    def _get_given_subject_id(self, subject_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as subject.
+    def get(self, subject_id=None, object_id=None, predicate=None):
+        LOGGER.debug('Getting relationships with subject_id=%s, '
+                     'predicate=%s, object_id=%s.',
+                     subject_id, predicate, object_id)
 
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
+        params_specified = [False, False, False]
+        if subject_id:
+            query = schema.ObjectFromSubject.objects.filter(subject_id=subject_id)
+            params_specified[0] = True
+            if predicate:
+                query = query.filter(predicate=predicate)
+                params_specified[1] = True
+            if object_id:
+                query = query.filter(object_id=object_id)
+                params_specified[2] = True
+        else:
+            query = schema.SubjectFromObject.objects
+            if object_id:
+                query = query.filter(object_id=object_id)
+                params_specified[0] = True
 
-        :param subject_id: The subject_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
+            if predicate:
+                query = query.filter(predicate=predicate)
+                params_specified[1] = True
 
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        LOGGER.debug('Getting relationships related to subject_id=%s and '
-                     'predicate=%s.', subject_id, predicate)
-        query = (schema.ObjectFromSubject.objects
-                 .filter(subject_id=subject_id))
-        if predicate:
-            query = query.filter(predicate=predicate)
+            if subject_id:
+                query = query.filter(subject_id=subject_id)
+                params_specified[2] = True
+
+        need_filtering = False
+        if False in params_specified:
+            if True in params_specified:
+                first_false = params_specified.index(False)
+                last_true = len(params_specified) - 1 - params_specified[::-1].index(True)
+                need_filtering = first_false < last_true
+            else:
+                need_filtering = True
+
+        if need_filtering:
+            query = query.allow_filtering()
+
         return self._build_relationships(query.all())
-
-    def _get_given_object_id(self, object_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as object.
-
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
-
-        :param object_id: The object_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
-
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        LOGGER.debug('Getting relationships related to object_id=%s and '
-                     'predicate=%s.', object_id, predicate)
-        query = schema.SubjectFromObject.objects.filter(object_id=object_id)
-        if predicate:
-            # pylint: disable=fixme
-            # TODO: If predicate query table implemented, change. SIBO-145
-            query = query.filter(predicate=predicate)
-        return self._build_relationships(query.allow_filtering().all())
-
-    def _get_given_predicate(self, predicate):
-        """
-        Given predicate, return all Relationships with that predicate.
-
-        :param predicate: The predicate describing Relationships to return
-
-        :returns: A list of Relationships fitting the criteria
-        """
-        LOGGER.debug('Getting relationships related to predicate=%s.', predicate)
-        # pylint: disable=fixme
-        # TODO: If predicate query table implemented, change. SIBO-145
-        query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
-        return self._build_relationships(query.allow_filtering().all())
 
 
 class RunDAO(dao.RunDAO):
