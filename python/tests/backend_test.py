@@ -298,6 +298,7 @@ class TestModify(unittest.TestCase):
             self.assertEqual(result.predicate, relationship.predicate)
 
     def test_relationshipdao_get_uses_and(self):
+        """Test that RelationshipDAO.get() users "and" to join restrictions."""
         relationship_dao = self.create_dao_factory().create_relationship_dao()
 
         subjects = ['s' + str(i + 1) for i in range(0, 3)]
@@ -311,10 +312,25 @@ class TestModify(unittest.TestCase):
                                                          predicate=predicate,
                                                          object_id=object_id))
 
-        def check(restrict_subject, restrict_predicate, restrict_object):
+        def assertRightValuesReturned(restrict_subject, restrict_predicate, restrict_object):
+            """
+            Assert that the right relationships are returned for the given
+            restrictions.
+
+            :param restrict_subject: whether to restrict the subject
+            :param restrict_predicate: whether to restrict the predicate
+            :param restrict_object: whether to restrict the object
+            """
             restrictions = {}
 
             def add_restriction(restrict, key, values):
+                """
+                Add a restriction to the query
+                :param restrict: whether to restrict the given key
+                :param key: the key-word parameter of the restriction
+                :param values: the array of values for the restriction
+                :return: the valid values for the key
+                """
                 if restrict:
                     restrictions[key] = values[0]
                     return [values[0]]
@@ -325,13 +341,14 @@ class TestModify(unittest.TestCase):
             allowed_objects = add_restriction(restrict_object, 'object_id', objects)
 
             relationships = relationship_dao.get(**restrictions)
-            self.assertEqual(len(allowed_subjects) * len(allowed_predicates) * len(allowed_objects),
-                             len(relationships))
+            expected_len = len(allowed_subjects) * len(allowed_predicates) * len(allowed_objects)
+            self.assertEqual(expected_len, len(relationships))
 
         for restrict_subject in (True, False):
             for restrict_predicate in (True, False):
                 for restrict_object in (True, False):
-                    check(restrict_subject, restrict_predicate, restrict_object)
+                    assertRightValuesReturned(
+                        restrict_subject, restrict_predicate, restrict_object)
 
     def test_relationshipdao_bad_insert(self):
         """Test that the RelationshipDAO refuses to insert malformed relationships."""

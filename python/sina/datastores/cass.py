@@ -964,38 +964,32 @@ class RelationshipDAO(dao.RelationshipDAO):
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)
 
-        params_specified = [False, False, False]
         if subject_id:
             query = schema.ObjectFromSubject.objects.filter(subject_id=subject_id)
-            params_specified[0] = True
             if predicate:
                 query = query.filter(predicate=predicate)
-                params_specified[1] = True
             if object_id:
                 query = query.filter(object_id=object_id)
-                params_specified[2] = True
         else:
             query = schema.SubjectFromObject.objects
             if object_id:
                 query = query.filter(object_id=object_id)
-                params_specified[0] = True
 
             if predicate:
                 query = query.filter(predicate=predicate)
-                params_specified[1] = True
 
             if subject_id:
                 query = query.filter(subject_id=subject_id)
-                params_specified[2] = True
 
-        need_filtering = False
-        if False in params_specified:
-            if True in params_specified:
-                first_false = params_specified.index(False)
-                last_true = len(params_specified) - 1 - params_specified[::-1].index(True)
-                need_filtering = first_false < last_true
-            else:
-                need_filtering = True
+        # Both tables have the predicate in the middle, and the subject
+        # and object IDs on either end.
+        if predicate:
+            # Only need to filter here if we only have the middle column
+            need_filtering = not (subject_id or object_id)
+        else:
+            # Only need to filter here if we skip the middle column -- we don't
+            # need to filter when we don't specify any column
+            need_filtering = subject_id and object_id
 
         if need_filtering:
             query = query.allow_filtering()
