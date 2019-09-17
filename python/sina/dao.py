@@ -369,6 +369,7 @@ class RelationshipDAO(object):
         for item in list_to_insert:
             self.insert(item)
 
+    @abstractmethod
     def get(self, subject_id=None, object_id=None, predicate=None):
         """
         Given Relationship info, return matching Relationships (or empty list).
@@ -379,55 +380,6 @@ class RelationshipDAO(object):
         :param subject_id: the subject_id of Relationships to return
         :param object_id: the object_id of Relationships to return
         :param predicate: the predicate of Relationships to return
-
-        :raises ValueError: if none of the parameters are provided.
-        """
-        if not (subject_id or object_id or predicate):
-            raise ValueError("Must supply subject_id, object_id, or predicate")
-        if subject_id:
-            return self._get_given_subject_id(subject_id, predicate)
-        elif object_id:
-            return self._get_given_object_id(object_id, predicate)
-        return self._get_given_predicate(predicate)
-
-    @abstractmethod
-    def _get_given_subject_id(self, subject_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as subject.
-
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well (TODO: misleading name? Should it be internal?).
-
-        :param subject_id: The subject_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
-
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def _get_given_object_id(self, object_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as object.
-
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
-
-        :param object_id: The object_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
-
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def _get_given_predicate(self, predicate):
-        """
-        Given predicate, return all Relationships with that predicate.
-
-        :param predicate: The predicate describing Relationships to return
-
-        :returns: A list of Relationships fitting the criteria
         """
         raise NotImplementedError
 

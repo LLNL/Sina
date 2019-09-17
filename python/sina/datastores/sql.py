@@ -749,61 +749,17 @@ class RelationshipDAO(dao.RelationshipDAO):
 
     # Note that get() is implemented by its parent.
 
-    # pylint: disable=fixme
-    # TODO: Should these return generators? SIBO-541
-    def _get_given_subject_id(self, subject_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as subject.
-
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
-
-        :param subject_id: The subject_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
-
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        LOGGER.debug('Getting relationships related to subject_id=%s and '
-                     'predicate=%s.', subject_id, predicate)
-        query = (self.session.query(schema.Relationship)
-                 .filter(schema.Relationship.subject_id == subject_id))
+    def get(self, subject_id=None, object_id=None, predicate=None):
+        LOGGER.debug('Getting relationships with subject_id=%s, '
+                     'predicate=%s, object_id=%s.',
+                     subject_id, predicate, object_id)
+        query = self.session.query(schema.Relationship)
+        if subject_id:
+            query = query.filter(schema.Relationship.subject_id == subject_id)
+        if object_id:
+            query = query.filter(schema.Relationship.object_id == object_id)
         if predicate:
-            query.filter(schema.Relationship.predicate == predicate)
-
-        return self._build_relationships(query.all())
-
-    def _get_given_object_id(self, object_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as object.
-
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
-
-        :param object_id: The object_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
-
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        LOGGER.debug('Getting relationships related to object_id=%s and '
-                     'predicate=%s.', object_id, predicate)
-        query = (self.session.query(schema.Relationship)
-                 .filter(schema.Relationship.object_id == object_id))
-        if predicate:
-            query.filter(schema.Relationship.predicate == predicate)
-
-        return self._build_relationships(query.all())
-
-    def _get_given_predicate(self, predicate):
-        """
-        Given predicate, return all Relationships with that predicate.
-
-        :param predicate: The predicate describing Relationships to return
-
-        :returns: A list of Relationships fitting the criteria
-        """
-        LOGGER.debug('Getting relationships related to predicate=%s.', predicate)
-        query = (self.session.query(schema.Relationship)
-                 .filter(schema.Relationship.predicate == predicate))
+            query = query.filter(schema.Relationship.predicate == predicate)
 
         return self._build_relationships(query.all())
 
