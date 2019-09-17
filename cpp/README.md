@@ -44,7 +44,7 @@ with either/both, indicate they should be built in the ../create_spconfig.sh cal
     ...
 ```
 
-Building with Adiak also requires specifying -DSINA_BUILD_ADIAK_BINDINGS in order to 
+Using Sina with Adiak also requires specifying -DSINA_BUILD_ADIAK_BINDINGS.
 
 
 # Troubleshooting

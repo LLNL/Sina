@@ -4,14 +4,15 @@ add_definitions(${SINA_CXX_TEST_FLAGS})
 
 include_directories("${PROJECT_SOURCE_DIR}/test/include")
 
-blt_register_library(NAME libdl
-    TREAT_INCLUDES_AS_SYSTEM ON
-    LINK_FLAGS -ldl
-)
-
 if(${SINA_BUILD_ADIAK_BINDINGS})
+    blt_register_library(NAME libdl
+        TREAT_INCLUDES_AS_SYSTEM ON
+        LINK_FLAGS -ldl
+    )
+
     add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
     find_package(adiak REQUIRED)
+
     blt_register_library(NAME adiak
         TREAT_INCLUDES_AS_SYSTEM ON
         INCLUDES "${adiak_DIR}/../../../include"

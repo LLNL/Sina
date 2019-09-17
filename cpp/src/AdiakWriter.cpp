@@ -20,33 +20,41 @@ extern "C" {
 #include "sina/AdiakWriter.hpp"
 
 
+namespace sina {
 namespace {
+
+/**
+* Adiak has a much wider array of supported types than Sina. We will convert
+* Adiak types to ones Sina understands; SinaType holds the possibilities.
+**/
+enum SinaType {sina_scalar, sina_string, sina_list, sina_file, sina_unknown};
+
 /**
 * Add a sina::Datum object to a Record. These are the sina equivalent
 * of an Adiak datapoint. Since we track slightly different info, this function
 * harvests what it can and hands it off to the Record.
 **/
 template <typename T>
-// TODO: Check how to pass the std::vector, since we'll be moving it
-void addDatum(const std::string &name, T sina_safe_val, std::vector<std::string> tags, sina::Record *record){
+void addDatum(const std::string &name, T sina_safe_val, const std::vector<std::string> &tags, sina::Record *record){
     sina::Datum datum{sina_safe_val};
     datum.setTags(std::move(tags));
     record->add(name, datum);
 }
 
-}
-
-namespace sina {
-
-// We don't care about type here, there's only one adiak type that acts as a file
+/**
+* Add a sina::File object to our current Record. Adiak stores paths,
+* which are essentially the same as Sina's idea of storing files.
+**/
 void addFile(const std::string &name, const std::string &uri, sina::Record *record){
+    // We don't care about type here, there's only one adiak type that acts as a file
     sina::File file{uri};
-    // TODO: Isn't there a shortcut way of declaring vectors? combine 2 lines
-    std::vector<std::string> tags = {name};
-    file.setTags(std::move(tags));
+    file.setTags(std::vector<std::string>{name});
     record->add(std::move(file));
 }
 
+/**
+* Given an Adiak type, return its corresponding Sina type.
+**/
 SinaType findSinaType(adiak_datatype_t *t){
     switch (t->dtype){
         case adiak_long:
@@ -75,7 +83,11 @@ SinaType findSinaType(adiak_datatype_t *t){
     }
 }
 
-// Intentionally do not have one for lists, we should not have nested lists at this stage
+/**
+* Several Adiak types become what Sina views as a "scalar" (a double).
+* Manage the conversions from various Adiak types to the final double
+* representation
+**/
 double toScalar(adiak_value_t *val, adiak_datatype_t *t){
     switch (t->dtype){
         case adiak_long:
@@ -95,6 +107,10 @@ double toScalar(adiak_value_t *val, adiak_datatype_t *t){
     }
 }
 
+/**
+* Some Adiak types become what Sina views as a string.
+* Manage the conversions from various Adiak types to said string.
+**/
 std::string toString(adiak_value_t *val, adiak_datatype_t *t){
     switch (t->dtype){
         case adiak_date: {
@@ -114,6 +130,12 @@ std::string toString(adiak_value_t *val, adiak_datatype_t *t){
     }
 }
 
+/**
+* Some Adiak types become a list of some form. Sina, being concerned
+* with queries and visualization, only handles lists that are all scalars
+* or all strings. Manage conversions from various Adiak list types that
+* contain scalars to a simple list (vector) of scalars.
+**/
 std::vector<double> toScalarList(adiak_value_t *subvals, adiak_datatype_t *t){
     std::vector<double> sina_safe_list;
     for (int i = 0; i < t->num_elements; i++) {
@@ -122,12 +144,19 @@ std::vector<double> toScalarList(adiak_value_t *subvals, adiak_datatype_t *t){
     return sina_safe_list;
 }
 
+
+/**
+* Partner method to toScalarList, invoked when the children of an adiak list
+* type are strings (according to Sina).
+**/
 std::vector<std::string> toStringList(adiak_value_t *subvals, adiak_datatype_t *t){
     std::vector<std::string> sina_safe_list;
     for (int i = 0; i < t->num_elements; i++) {
         sina_safe_list.emplace_back(toString(subvals+i, t->subtype[0]));
     }
     return sina_safe_list;
+}
+
 }
 
 void adiakSinaCallback(const char *name, adiak_category_t, const char *subcategory, adiak_value_t *val, adiak_datatype_t *adiak_type, void *void_record)
@@ -148,7 +177,6 @@ void adiakSinaCallback(const char *name, adiak_category_t, const char *subcatego
             break;
         }
         case sina_string: {
-           // TODO: Feel like this info isn't useful for strings, but maybe?
            tags.emplace_back(adiak_type_to_string(adiak_type, 1));
            addDatum(name, toString(val, adiak_type), tags, record);
            break;
