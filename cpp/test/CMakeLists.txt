@@ -4,12 +4,14 @@ add_definitions(${SINA_CXX_TEST_FLAGS})
 
 include_directories("${PROJECT_SOURCE_DIR}/test/include")
 
-if(${SINA_BUILD_ADIAK_BINDINGS})
-    blt_register_library(NAME libdl
-        TREAT_INCLUDES_AS_SYSTEM ON
-        LINK_FLAGS -ldl
-    )
+# libdl is a requirement of Adiak, not Sina, but conditional inclusion
+# creates issues on CZ. Delete this when Adiak includes libdl 
+blt_register_library(NAME libdl
+    TREAT_INCLUDES_AS_SYSTEM ON
+    LINK_FLAGS -ldl
+)
 
+if(${SINA_BUILD_ADIAK_BINDINGS})
     add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
     find_package(adiak REQUIRED)
 

@@ -7,14 +7,16 @@ blt_register_library(NAME nlohmann_json
         TREAT_INCLUDES_AS_SYSTEM ON
         )
 
+# libdl is a requirement of Adiak, not Sina, but conditional inclusion
+# creates issues on CZ. Delete this when Adiak includes libdl 
+blt_register_library(NAME libdl
+    TREAT_INCLUDES_AS_SYSTEM ON
+    LINK_FLAGS -ldl
+)
+
 set(OPTIONAL_SINA_DEPENDENCIES "")
 
 if(${SINA_BUILD_ADIAK_BINDINGS})
-    blt_register_library(NAME libdl
-            TREAT_INCLUDES_AS_SYSTEM ON
-            LINK_FLAGS -ldl
-    )
-
     add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
     set_source_files_properties(AdiakWriter.cpp PROPERTIES COMPILE_FLAGS -Wno-covered-switch-default)
     find_package(adiak REQUIRED)

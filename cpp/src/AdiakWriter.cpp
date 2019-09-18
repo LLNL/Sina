@@ -88,8 +88,8 @@ SinaType findSinaType(adiak_datatype_t *t){
 * Manage the conversions from various Adiak types to the final double
 * representation
 **/
-double toScalar(adiak_value_t *val, adiak_datatype_t *t){
-    switch (t->dtype){
+double toScalar(adiak_value_t *val, adiak_datatype_t *adiak_type){
+    switch (adiak_type->dtype){
         case adiak_long:
         case adiak_ulong:
             return static_cast<double>(val->v_long);
@@ -102,6 +102,18 @@ double toScalar(adiak_value_t *val, adiak_datatype_t *t){
 	          struct timeval *tval = static_cast<struct timeval *>(val->v_ptr);
 	          return tval->tv_sec + (tval->tv_usec / 1000000.0);
         }
+        // None of the rest of these should ever be reachable, so special error message
+        case adiak_date:
+        case adiak_version:
+        case adiak_string:
+        case adiak_catstring:
+        case adiak_path:
+        case adiak_set:
+        case adiak_tuple:
+        case adiak_range:
+        case adiak_list:
+        case adiak_type_unset:
+            throw std::runtime_error(std::string("Logic error, contact maintainer: Adiak-to-Sina double converter given ") + adiak_type_to_string(adiak_type, 1)); 
         default:
             throw std::runtime_error("Adiak-to-Sina double converter given something not convertible to double");
     }
@@ -111,8 +123,8 @@ double toScalar(adiak_value_t *val, adiak_datatype_t *t){
 * Some Adiak types become what Sina views as a string.
 * Manage the conversions from various Adiak types to said string.
 **/
-std::string toString(adiak_value_t *val, adiak_datatype_t *t){
-    switch (t->dtype){
+std::string toString(adiak_value_t *val, adiak_datatype_t *adiak_type){
+    switch (adiak_type->dtype){
         case adiak_date: {
       	    char datestr[512];
       	    signed long seconds_since_epoch = static_cast<signed long>(val->v_long);
@@ -125,6 +137,18 @@ std::string toString(adiak_value_t *val, adiak_datatype_t *t){
         case adiak_string:
         case adiak_path:
             return std::string(static_cast<char *>(val->v_ptr));
+        case adiak_long:
+        case adiak_ulong:
+        case adiak_int:
+        case adiak_uint:
+        case adiak_double:
+        case adiak_timeval:
+        case adiak_set:
+        case adiak_tuple:
+        case adiak_range:
+        case adiak_list:
+        case adiak_type_unset:
+            throw std::runtime_error(std::string("Logic error, contact maintainer: Adiak-to-Sina string converter given ") + adiak_type_to_string(adiak_type, 1)); 
         default:
             throw std::runtime_error("Adiak-to-Sina string converter given something not convertible to string");
     }
@@ -207,6 +231,8 @@ void adiakSinaCallback(const char *name, adiak_category_t, const char *subcatego
                  break;
              case sina_unknown:
                  throw std::runtime_error("Type must not be unknown for list entries to be added to a Sina record");
+             case sina_list:
+                 throw std::runtime_error("Lists must not be nested for list entries to be added to a Sina record"); 
              default:
                  throw std::runtime_error("Type must be set for list entries to be added to a Sina record");
          }
