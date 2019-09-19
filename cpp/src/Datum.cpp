@@ -135,12 +135,6 @@ nlohmann::json Datum::toJson() const {
         case ValueType::StringArray:
             asJson[VALUE_FIELD] = stringArrayValue;
             break;
-        default:
-            std::ostringstream message;
-            message << "The field '" << VALUE_FIELD
-                    << "' must be a string, double, list of strings, or list of doubles.";
-            throw std::invalid_argument(message.str());
-
     }
     if(tags.size() > 0)
         asJson[TAGS_FIELD] = tags;

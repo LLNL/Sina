@@ -7,6 +7,28 @@ blt_register_library(NAME nlohmann_json
         TREAT_INCLUDES_AS_SYSTEM ON
         )
 
+# libdl is a requirement of Adiak, not Sina, but conditional inclusion
+# creates issues on CZ. Delete this when Adiak includes libdl 
+blt_register_library(NAME libdl
+    TREAT_INCLUDES_AS_SYSTEM ON
+    LINK_FLAGS -ldl
+)
+
+set(OPTIONAL_SINA_DEPENDENCIES "")
+
+if(${SINA_BUILD_ADIAK_BINDINGS})
+    add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
+    set_source_files_properties(AdiakWriter.cpp PROPERTIES COMPILE_FLAGS -Wno-covered-switch-default)
+    find_package(adiak REQUIRED)
+
+    blt_register_library(NAME adiak
+        TREAT_INCLUDES_AS_SYSTEM ON
+        INCLUDES "${adiak_DIR}/../../../include"
+        LIBRARIES "${adiak_DIR}/../../libadiak.a"
+    )
+    string(CONCAT OPTIONAL_SINA_DEPENDENCIES "adiak")
+endif(${SINA_BUILD_ADIAK_BINDINGS})
+
 blt_add_library(NAME sina
     HEADERS
         ../include/sina/CppBridge.hpp
@@ -19,6 +41,7 @@ blt_add_library(NAME sina
         ../include/sina/Relationship.hpp
         ../include/sina/Run.hpp
         ../include/sina/Datum.hpp
+        ../include/sina/AdiakWriter.hpp
     SOURCES
         Document.cpp
         File.cpp
@@ -28,10 +51,12 @@ blt_add_library(NAME sina
         Relationship.cpp
         Run.cpp
         Datum.cpp
-    DEPENDS_ON nlohmann_json
+        AdiakWriter.cpp
+    DEPENDS_ON
+        nlohmann_json
+        ${OPTIONAL_SINA_DEPENDENCIES}
 )
 
 install(TARGETS sina
     ARCHIVE DESTINATION "lib"
     LIBRARY DESTINATION "lib")
-

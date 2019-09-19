@@ -33,6 +33,19 @@ used/installed, see [the package file](package.py).
     make test
 ```
 
+# Building with Extras
+
+Sina-cpp can optionally be built with documentation and Adiak integration. To build
+with either/both, indicate they should be built in the ../create_spconfig.sh call:
+
+```bash
+    ...
+    ../create_spconfig.sh +docs +adiak
+    ...
+```
+
+Using Sina with Adiak also requires specifying -DSINA_BUILD_ADIAK_BINDINGS.
+
 
 # Troubleshooting
 
