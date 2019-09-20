@@ -82,7 +82,7 @@ deployDocs() {
     echo "Building documentation..."
     make docs
   fi
-  mv $DOC_SOURCE $DOC_PATH
+  cd $DOC_SOURCE && mv * $DOC_PATH/
 
   # Ensure permissions are set appropriately and the shortcut links to the latest
   chown -R :$PERM_GROUP $DOC_PATH
@@ -180,6 +180,10 @@ deployVenv() {
       echo "WARNING: Ignoring invalid build target since $opt not in $VALID_MAKE_TARGETS"
     fi
   done
+  # Ensure that installed Sina is the new wheel (fixes permission issues)
+  source $VENV_DEST/bin/activate
+  python $VENV_PATH/bin/pip install --force-reinstall --no-deps $WHEEL_DEST/$WHEEL_FILENAME
+  deactivate
 
   # Ensure permissions are set appropriately and the shortcut links to the latest
   chown -R :$PERM_GROUP $VENV_DEST

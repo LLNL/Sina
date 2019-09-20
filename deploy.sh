@@ -17,7 +17,8 @@ set -e
 # Arg check
 if [ $# != 3 ]
   then
-    echo "Script takes exactly three arguments: <wheel_deploy_dir> <doc_deploy_dir> <examples_deploy_dir>"
+    echo "This toplevel script requires exactly 3 positional args; the
+python-only deploy can take named args. Usage: <DEPLOY_DIR> <DOC_DIR> <EXAMPLE_LINK>"
     exit 1
 fi
 
@@ -35,7 +36,7 @@ fi
 
 cd python
 # Build the Sina python deployment with all the known options
-./deploy.sh --build-with=cassandra,cli_tools,jupyter --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK 
+./deploy.sh --build-with=cassandra,cli_tools,jupyter --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK
 
 cd ../cpp
 CREATED_TAR=$(sh create_spack_package.sh)
