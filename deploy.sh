@@ -9,9 +9,6 @@
 # Run this AFTER Bamboo test jobs or AFTER a manual run of `make tests` and `make docs`.
 
 # Converts any relative paths to absolute and ensures ending in /
-CPP_DOCS=$DOC_DIR/sina/cpp
-PERM_GROUP=wciuser
-
 set -e
 
 # Arg check
@@ -24,6 +21,8 @@ fi
 
 DEPLOY_DIR=`readlink -f $1`/
 DOC_DIR=`readlink -f $2`/
+CPP_DOCS=$DOC_DIR/sina/cpp
+PERM_GROUP=wciuser
 
 # Do not read the link or python/deploy.sh will fail to create the example link to the latest
 # examples (since it will think EXAMPLE_LINK is a directory).
@@ -36,7 +35,9 @@ fi
 
 cd python
 # Build the Sina python deployment with all the known options
-./deploy.sh --build-with=cassandra,cli_tools,jupyter --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK
+# NOTE: Cython currently fails on Python 3.7. This is addressed in the Bamboo job (sets python to use 3.6.4).
+./deploy.sh --build-with=cassandra,cli_tools,jupyter --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK --skip=git
+echo "Python deployment complete! Continuing to C++ portion..."
 
 cd ../cpp
 CREATED_TAR=$(sh create_spack_package.sh)

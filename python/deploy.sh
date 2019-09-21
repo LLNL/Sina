@@ -21,7 +21,7 @@ umask 027
 VALID_MAKE_TARGETS="cassandra,cli_tools,jupyter"
 
 # Valid deployment processing steps
-VALID_STEPS="clean,git,tests,wheel,venv,docs,examples"
+VALID_STEPS="clean,git,tests,venv,docs,examples"
 
 # Default values for LC
 LC_GROUP=wciuser  # Group to be given access to deployed artifacts
@@ -104,6 +104,7 @@ deployExamples() {
   # Ensure the deployment directory exists
   if [ ! -d $EXAMPLES_DEST_ROOT ]; then
     mkdir -p $EXAMPLES_DEST_ROOT
+    chown :$PERM_GROUP $EXAMPLES_DEST_ROOT
   fi
 
   # Build the example databases
@@ -147,6 +148,9 @@ deployExamples() {
   if [ "$EXAMPLES_DEST_ROOT" != "$EXAMPLES_LINK" ]; then
     echo "Linking $EXAMPLES_LINK to $EXAMPLES_DEST_ROOT..."
 
+    # Since we can't readlink on $EXAMPLES_LINK (see ../deploy.sh), we have to
+    # make sure we're in the right directory in case EXAMPLES_LINK was a relative path
+    cd $SOURCE_DIR
     # Explicitly remove the link to ensure it is replaced by the new symlink
     rm -f $EXAMPLES_LINK
     ln -s $EXAMPLES_DEST_ROOT $EXAMPLES_LINK
@@ -158,7 +162,7 @@ deployExamples() {
 # deployWheel:  Don't bother creating a shortcut or link to the latest wheel as
 # it appears python will complain that it's not a valid wheel name.
 deployWheel() {
-  echo "Deploying the wheel into $WHEEL_DEST..."
+  echo "Deploying the wheel into $WHEEL_DEST"
 
   mv -f ./dist/$WHEEL_FILENAME $WHEEL_DEST/$WHEEL_FILENAME
   chown :$PERM_GROUP $WHEEL_DEST/$WHEEL_FILENAME
@@ -193,6 +197,7 @@ deployVenv() {
   # Explicitly remove the link to ensure it is replaced by the new symlink
   rm -f $DEPLOY_DIR/$VENV_LINK_NAME
   ln -sf $VENV_DEST $DEPLOY_DIR/$VENV_LINK_NAME
+  chown :$PERM_GROUP $DEPLOY_DIR/$VENV_LINK_NAME
 }
 
 # Run whatever tests are associated with this deployment. Decided by
@@ -219,7 +224,8 @@ executeTests() {
           echo "WARNING: Skipping Cassandra tests due to server issues (see SIBO-231)"
         fi
       else
-        echo "WARNING: Ignoring invalid test target since $opt not in $VALID_MAKE_TARGETS"
+        echo "ERROR: Invalid test target! $opt is not in $VALID_MAKE_TARGETS"
+        exit 1
       fi
     done
   fi
@@ -244,7 +250,7 @@ printUsage() {
   echo "  <group>          Group permissions for deployment directories"
   echo "                     [default=$LC_GROUP]"
   echo "  <skip-steps>     Comma-separated list of deployment steps to skip from:"
-  echo "                     clean,git,tests,wheel,venv,docs,examples [default='']"
+  echo "                     clean,git,tests,venv,docs,examples [default='']"
   exit 1
 }
 
@@ -270,7 +276,7 @@ for arg in "$@"; do
   --group) PERM_GROUP=$value;;
   --help) printUsage; exit 0;;
   --skip) SKIP_STEPS=$(echo $value | tr "," "\n");;
-  *) echo "WARNING: Ignoring unrecognized option: $arg";;
+  *) echo "ERROR: Unrecognized option $arg" && exit 1;;
   esac
 done
 
@@ -291,14 +297,12 @@ fi
 # Set up some globals to ensure they are available across deployment steps.
 
 # Ensure wheel destination is available across deployment steps
+# If it doesn't exist, warn and quit 
 WHEEL_DEST=$DEPLOY_DIR/wheels
+[ ! -d "$DEPLOY_DIR/wheels" ] && echo "ERROR: $DEPLOY_DIR doesn't contain a 'wheels' folder." && exit 1
 
 # The path for the latest docs and examples is "sina-<version>" in order to
 # continue to allow "sina" to be used as a symlink to the latest version.
-#
-# This is also needed to derive the name of a wheel should building it be
-# skipped in a subsequent run, where the assumption is the appropriate wheel
-# filename will start with the same prefix.
 VERSION_SUBDIR=sina-`grep VERSION ./sina/__init__.py | sed 's/[^0-9.]//g'`
 
 
@@ -330,34 +334,21 @@ fi
 
 # wheel: Build and deploy the wheel, making sure to expose the wheel filename
 #        for virtual environment directory purposes.
-if [[ ! "${SKIP_STEPS[@]}" =~ "wheel" ]]; then
-  make wheel
-  WHEEL_FILENAME=`ls ./dist/*.whl | cut -d / -f3`
-  deployWheel
-else
-  # Need the wheel filename for building the venv and or deploying examples
-  # even when the wheel is not created on this deployment pass.  There is
-  # an assumption that the filename structure conforms to:
-  #     sina-<sina-version>-py<pyversion>-*.whl
-  PY_VERSION=`python -c 'import sys; print(sys.version_info[0])'`
-  echo "PY_VERSION=$PY_VERSION"
-  DEPLOYED_WHEEL=$WHEEL_DEST/$VERSION_SUBDIR-py$PY_VERSION-*.whl
-  echo "DEPLOYED_WHEEL=$DEPLOYED_WHEEL"
-  WHEEL_FILENAME=`ls $DEPLOYED_WHEEL | rev | cut -d / -f1 | rev`
-fi
+make wheel
+WHEEL_FILENAME=`ls ./dist/*.whl | cut -d / -f3`
+deployWheel
 
 # venv: Build and deploy the virtual environment using the wheel name as the
 #       basis for the directory name.
 if [ "$WHEEL_FILENAME" != "" ]; then
-  # Need the virtual environment path for deploying examples even when the
-  # wheel is not created on this deployment pass.
+  # Need the virtual environment path for deploying examples
   VENV_PATH=$DEPLOY_DIR/`basename $WHEEL_FILENAME .whl`
   if [[ ! "${SKIP_STEPS[@]}" =~ "venv" ]]; then
       deployVenv $VENV_PATH $VENV_SYM_NAME $PYTHON_3
       deployVenv $VENV_PATH$PYTHON_2_SUFFIX $VENV_SYM_NAME$PYTHON_2_SUFFIX $PYTHON_2
   fi
 else
-  echo "ERROR: The wheel file is required to derive the venv pathname"
+  echo "ERROR: The wheel file could not be found. Did it fail to build?"
   exit 1
 fi
 
