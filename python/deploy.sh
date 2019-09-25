@@ -25,9 +25,9 @@ VALID_STEPS="clean,git,tests,venv,docs,examples"
 
 # Default values for LC
 LC_GROUP=wciuser  # Group to be given access to deployed artifacts
-LC_DEPLOY_DIR=/collab/usr/gapps/wf/releases  # Release directory
+LC_DEPLOY_DIR=/collab/usr/gapps/wf/releases  # Release directory (also holds the usage examples)
 LC_DOCS_DIR=/usr/global/web-pages/lc/www/workflow/docs  # Workflow docs
-LC_EXAMPLES_LINK=/collab/usr/gapps/wf/examples  # Backward-compatible link to latest examples dir
+LC_EXAMPLES_LINK=/collab/usr/gapps/wf/examples  # Link to examples
 
 # Common names
 DOC_SYM_NAME=sina  # symlink for the documentation subdirectory
@@ -82,7 +82,7 @@ deployDocs() {
     echo "Building documentation..."
     make docs
   fi
-  cd $DOC_SOURCE && mv * $DOC_PATH/
+  (cd $DOC_SOURCE && mv * $DOC_PATH/)
 
   # Ensure permissions are set appropriately and the shortcut links to the latest
   chown -R :$PERM_GROUP $DOC_PATH
@@ -94,12 +94,12 @@ deployDocs() {
   ln -sf $DOC_PATH $DOCS_DIR/$DOC_SYM_NAME
 }
 
-# Deploy the examples. Rather than deploying them directly, build them wherever
-# the script is run and then link to them.
+# Deploy the examples. Build within $DEPLOY_DIR/examples/<version>, then make
+# a link at $EXAMPLES_LINK
 deployExamples() {
   EXAMPLES_SOURCE_DIR=`dirname $SOURCE_DIR`/examples
   EXAMPLES_DEST_ROOT=$DEPLOY_DIR/examples/$VERSION_SUBDIR
-  echo; echo "Deploying examples into $EXAMPLES_DEST_ROOT..."
+  echo "Deploying examples into $EXAMPLES_DEST_ROOT..."
 
   # Ensure the deployment directory exists
   if [ ! -d $EXAMPLES_DEST_ROOT ]; then
@@ -123,6 +123,8 @@ deployExamples() {
 
     echo "Building $DATASET_NAME database in $EXAMPLE_DEST..."
     cd $EXAMPLE_DEST
+    # Run the script for creating the database needed for this set of examples
+    # The database is created in $EXAMPLE_DEST
     bash $db_build_script $DATASET_SOURCE_DIR
     cd $SOURCE_DIR
   done
@@ -148,9 +150,6 @@ deployExamples() {
   if [ "$EXAMPLES_DEST_ROOT" != "$EXAMPLES_LINK" ]; then
     echo "Linking $EXAMPLES_LINK to $EXAMPLES_DEST_ROOT..."
 
-    # Since we can't readlink on $EXAMPLES_LINK (see ../deploy.sh), we have to
-    # make sure we're in the right directory in case EXAMPLES_LINK was a relative path
-    cd $SOURCE_DIR
     # Explicitly remove the link to ensure it is replaced by the new symlink
     rm -f $EXAMPLES_LINK
     ln -s $EXAMPLES_DEST_ROOT $EXAMPLES_LINK
@@ -186,6 +185,8 @@ deployVenv() {
   done
   # Ensure that installed Sina is the new wheel (fixes permission issues)
   source $VENV_DEST/bin/activate
+  # Due to Bamboo's penchant for long, deep paths, the generated pip shebang can
+  # become too long for Linux to handle. Work around this by using python directly.
   python $VENV_PATH/bin/pip install --force-reinstall --no-deps $WHEEL_DEST/$WHEEL_FILENAME
   deactivate
 
@@ -297,7 +298,7 @@ fi
 # Set up some globals to ensure they are available across deployment steps.
 
 # Ensure wheel destination is available across deployment steps
-# If it doesn't exist, warn and quit 
+# If it doesn't exist, warn and quit
 WHEEL_DEST=$DEPLOY_DIR/wheels
 [ ! -d "$DEPLOY_DIR/wheels" ] && echo "ERROR: $DEPLOY_DIR doesn't contain a 'wheels' folder." && exit 1
 

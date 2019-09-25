@@ -8,7 +8,6 @@
 # and moves it and documentation relative to where the Python is deployed.
 # Run this AFTER Bamboo test jobs or AFTER a manual run of `make tests` and `make docs`.
 
-# Converts any relative paths to absolute and ensures ending in /
 set -e
 
 # Arg check
@@ -19,14 +18,13 @@ python-only deploy can take named args. Usage: <DEPLOY_DIR> <DOC_DIR> <EXAMPLE_L
     exit 1
 fi
 
+# Convert any relative paths to absolute and standardize ending in /
 DEPLOY_DIR=`readlink -f $1`/
 DOC_DIR=`readlink -f $2`/
+# EXAMPLE_DIR is a symlink, so no ending /
+EXAMPLE_LINK=`readlink -f $3`
 CPP_DOCS=$DOC_DIR/sina/cpp
 PERM_GROUP=wciuser
-
-# Do not read the link or python/deploy.sh will fail to create the example link to the latest
-# examples (since it will think EXAMPLE_LINK is a directory).
-EXAMPLE_LINK=$3
 
 if [ ! -d cpp/build/docs/html ]; then
     echo "You must have run the C++ tests and built the docs"
