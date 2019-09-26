@@ -104,7 +104,8 @@ deployExamples() {
   # Ensure the deployment directory exists
   if [ ! -d $EXAMPLES_DEST_ROOT ]; then
     mkdir -p $EXAMPLES_DEST_ROOT
-    chown :$PERM_GROUP $EXAMPLES_DEST_ROOT
+    # Make sure we chown from the parent directory, which might also have been created
+    chown -R :$PERM_GROUP $DEPLOY_DIR/examples 
   fi
 
   # Build the example databases
