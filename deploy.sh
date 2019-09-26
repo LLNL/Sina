@@ -8,25 +8,23 @@
 # and moves it and documentation relative to where the Python is deployed.
 # Run this AFTER Bamboo test jobs or AFTER a manual run of `make tests` and `make docs`.
 
-# Converts any relative paths to absolute and ensures ending in /
-CPP_DOCS=$DOC_DIR/sina/cpp
-PERM_GROUP=wciuser
-
 set -e
 
 # Arg check
 if [ $# != 3 ]
   then
-    echo "Script takes exactly three arguments: <wheel_deploy_dir> <doc_deploy_dir> <examples_deploy_dir>"
+    echo "This toplevel script requires exactly 3 positional args; the
+python-only deploy can take named args. Usage: <DEPLOY_DIR> <DOC_DIR> <EXAMPLE_LINK>"
     exit 1
 fi
 
+# Convert any relative paths to absolute and standardize ending in /
 DEPLOY_DIR=`readlink -f $1`/
 DOC_DIR=`readlink -f $2`/
-
-# Do not read the link or python/deploy.sh will fail to create the example link to the latest
-# examples (since it will think EXAMPLE_LINK is a directory).
-EXAMPLE_LINK=$3
+# EXAMPLE_DIR is a symlink, so no ending /
+EXAMPLE_LINK=`readlink -f $3`
+CPP_DOCS=$DOC_DIR/sina/cpp
+PERM_GROUP=wciuser
 
 if [ ! -d cpp/build/docs/html ]; then
     echo "You must have run the C++ tests and built the docs"
@@ -35,7 +33,9 @@ fi
 
 cd python
 # Build the Sina python deployment with all the known options
-./deploy.sh --build-with=cassandra,cli_tools,jupyter --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK 
+# NOTE: Cython currently fails on Python 3.7. This is addressed in the Bamboo job (sets python to use 3.6.4).
+./deploy.sh --build-with=cassandra,cli_tools,jupyter --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK --skip=git
+echo "Python deployment complete! Continuing to C++ portion..."
 
 cd ../cpp
 CREATED_TAR=$(sh create_spack_package.sh)
