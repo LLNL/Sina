@@ -5,6 +5,14 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.6
+===
+- Added support for Adiak to Sina C++
+- Made Sina compatible with Python 3.7
+- Added get_available_types(), get_having_min(), and get_having_max()
+- added set_data() and related Record QoL methods
+- Renamed Mnoda JSON to Sina JSON
+
 1.5
 ===
 - Made Cassandra, Jupyter, and some cli tools optional
