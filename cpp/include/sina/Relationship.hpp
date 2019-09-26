@@ -1,5 +1,5 @@
-#ifndef MNODA_RELATIONSHIP_HPP
-#define MNODA_RELATIONSHIP_HPP
+#ifndef SINA_RELATIONSHIP_HPP
+#define SINA_RELATIONSHIP_HPP
 
 /**
  * @file
@@ -11,9 +11,9 @@
 
 #include "nlohmann/json.hpp"
 
-#include "mnoda/ID.hpp"
+#include "sina/ID.hpp"
 
-namespace mnoda {
+namespace sina {
 
 /**
  * A Relationship consists of three parts: a subject, an object, and a predicate. It describes
@@ -39,9 +39,9 @@ namespace mnoda {
  * ID documentation.
  *
  * \code
- * mnoda::ID task22{"Task_22", mnoda::IDType::Global};
- * mnoda::ID run1024{"Run_1024", mnoda::IDType::Global};
- * mnoda::Relationship myRelationship{task22, "contains", run1024};
+ * sina::ID task22{"Task_22", sina::IDType::Global};
+ * sina::ID run1024{"Run_1024", sina::IDType::Global};
+ * sina::Relationship myRelationship{task22, "contains", run1024};
  * std::cout << myRelationship.toJson() << std::endl;
  * \endcode
  *
@@ -50,15 +50,15 @@ namespace mnoda {
  * {"object":"Run_1024","predicate":"contains","subject":"Task_22"}
  * \endcode
  *
- * As with any other Mnoda ID, the subject or object may be either local (uniquely refer to one object
+ * As with any other Sina ID, the subject or object may be either local (uniquely refer to one object
  * in a JSON file) or global (uniquely refer to one object in a database). Local IDs are replaced with
  * global ones upon ingestion; all Relationships referring to that Local ID (as well as the Record possessing
  * that ID) will be updated to use the same global ID.
  *
  * \code
- * mnoda::ID myLocalID{"my_local_run", mnoda::IDType::Local};
- * std::unique_ptr<mnoda::Record> myRun{new mnoda::Run{myLocalID, "My Sim Code", "1.2.3", "jdoe"}};
- * mnoda::Relationship myRelationship{task22, "contains", myLocalID};
+ * sina::ID myLocalID{"my_local_run", sina::IDType::Local};
+ * std::unique_ptr<sina::Record> myRun{new sina::Run{myLocalID, "My Sim Code", "1.2.3", "jdoe"}};
+ * sina::Relationship myRelationship{task22, "contains", myLocalID};
  * \endcode
  *
  * In the above code, "my_local_run" would be replaced by a global ID on ingestion. If this new global ID was,
@@ -126,4 +126,4 @@ private:
 
 }
 
-#endif //MNODA_RELATIONSHIP_HPP
+#endif //SINA_RELATIONSHIP_HPP

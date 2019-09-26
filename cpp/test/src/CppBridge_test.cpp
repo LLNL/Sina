@@ -2,9 +2,9 @@
 
 #include "gtest/gtest.h"
 
-#include "mnoda/CppBridge.hpp"
+#include "sina/CppBridge.hpp"
 
-namespace mnoda { namespace internal {  namespace testing { namespace {
+namespace sina { namespace internal {  namespace testing { namespace {
 
 
 TEST(CppBridge, make_unique_noParams) {

@@ -54,7 +54,7 @@ class Record(object):
         self.id = id
         self.type = type
         self.data = data if data else {}
-        self.files = files if files else []
+        self.files = files if files else {}
         self.user_defined = user_defined if user_defined else {}
 
     @property
@@ -140,6 +140,78 @@ class Record(object):
         return ('Model Record <id={}, type={}>'
                 .format(self.id, self.type))
 
+    def add_data(self, name, value, units=None, tags=None):
+        """
+        Add a data entry to a Record.
+
+        Will throw an error if that datum is already part of the Record.
+
+        :param name: The name describing the data (ex: "direction", "volume", "time")
+        :param value: The data's value (ex: "northwest", 12, [0, 1, 3, 6])
+        :param units: Units for the value. Optional (ex: "cm^3", "seconds")
+        :param tags: List of tags describing this data. Optional (ex: ["inputs", "opt"])
+
+        :raises ValueError: if a datum with that name is already part of the record.
+        """
+        if name in self.data:
+            raise ValueError('Duplicate datum: "{}" is already an entry in Record "{}".'
+                             .format(name, self.id))
+        else:
+            self.set_data(name, value, units, tags)
+
+    def set_data(self, name, value, units=None, tags=None):
+        """
+        Set a data entry for a Record.
+
+        If that datum doesn't exist, add it. If it does, update it.
+
+        :param name: The name describing the data (ex: "direction", "volume", "time")
+        :param value: The data's value (ex: "northwest", 12, [0, 1, 3, 6])
+        :param units: Units for the value. Optional (ex: "cm^3", "seconds")
+        :param tags: List of tags describing this data. Optional (ex: ["inputs", "opt"])
+        """
+        datum = {"value": value}
+        if units is not None:
+            datum["units"] = units
+        if tags is not None:
+            datum["tags"] = tags
+        self.data[name] = datum
+
+    def add_file(self, uri, mimetype=None, tags=None):
+        """
+        Add file info to a Record.
+
+        Will throw an error if a file with that uri is already recorded in the Record.
+
+        :param uri: The uri that uniquely describes the file. (ex: "/g/g10/doe/foo.txt")
+        :param mimetype: The mimetype of the file. Optional (ex: "text/html")
+        :param tags: List of tags describing this file. Optional (ex: ["post-processing"])
+
+        :raises ValueError: if a file with that uri is already recorded in the Record.
+        """
+        if uri in self.files:
+            raise ValueError('Duplicate file: "{}" is already a file in Record "{}".'
+                             .format(uri, self.id))
+        else:
+            self.set_file(uri, mimetype, tags)
+
+    def set_file(self, uri, mimetype=None, tags=None):
+        """
+        Set a file's info for a Record.
+
+        If that file doesn't exist, add its info. If it does, update it.
+
+        :param uri: The uri that uniquely describes the file. (ex: "/g/g10/doe/foo.txt")
+        :param mimetype: The mimetype of the file. Optional (ex: "text/html")
+        :param tags: List of tags describing this file. Optional (ex: ["post-processing"])
+        """
+        file_info = {}
+        if mimetype is not None:
+            file_info["mimetype"] = mimetype
+        if tags is not None:
+            file_info["tags"] = tags
+        self.files[uri] = file_info
+
     def to_json(self):
         """
         Create a JSON string from a Record.
@@ -170,25 +242,20 @@ class Record(object):
         # practice these lists can be thousands of entries long, in which case
         # the error is probably in an importer script (and so present in all
         # files/data) and doesn't warrant spamming the logger.
-        for entry in self.files:
-            if not isinstance(entry, dict):
+        for file_info in self.files.values():
+            if not isinstance(file_info, dict):
                 (warnings.append("At least one file entry belonging to "
                                  "Record {} is not a dictionary. Value: {}"
-                                 .format(self.id, entry)))
-                break
-            if "uri" not in entry:
-                (warnings.append("At least one file entry belonging to "
-                                 "Record {} is missing a uri. File: {}"
-                                 .format(self.id, entry)))
+                                 .format(self.id, file_info)))
                 break
             # Python2 and 3 compatible way of checking if the tags are
             # a list, tuple, etc (but not a string)
-            if (entry.get("tags") and
-                    (isinstance(entry.get("tags"), six.string_types) or
-                     not isinstance(entry.get("tags"), collections.Sequence))):
+            if (file_info.get("tags") and
+                    (isinstance(file_info.get("tags"), six.string_types) or
+                     not isinstance(file_info.get("tags"), collections.Sequence))):
                 (warnings.append("At least one file entry belonging to "
                                  "Record {} has a malformed tag list. File: {}"
-                                 .format(self.id, entry)))
+                                 .format(self.id, file_info)))
 
         if not isinstance(self.data, dict):
             (warnings.append("Record {}'s data field must be a dictionary!"

@@ -2,9 +2,9 @@
 #include <stdexcept>
 #include <sstream>
 
-#include "mnoda/JsonUtil.hpp"
+#include "sina/JsonUtil.hpp"
 
-namespace mnoda {
+namespace sina {
 
 namespace {
 /**

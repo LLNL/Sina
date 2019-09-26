@@ -131,14 +131,14 @@ class RecordDAO(dao.RecordDAO):
         Does not commit(), caller needs to do that.
 
         :param id: The Record ID to associate the files to.
-        :param files: The list of files to insert.
+        :param files: The dictionary of files to insert.
         """
         LOGGER.debug('Inserting %i files to record id=%s.', len(files), id)
-        for entry in files:
-            tags = (json.dumps(entry['tags']) if 'tags' in entry else None)
+        for uri, file_info in six.iteritems(files):
+            tags = (json.dumps(file_info['tags']) if 'tags' in file_info else None)
             self.session.add(schema.Document(id=id,
-                                             uri=entry['uri'],
-                                             mimetype=entry.get('mimetype'),
+                                             uri=uri,
+                                             mimetype=file_info.get('mimetype'),
                                              tags=tags))
 
     def delete(self, id):
@@ -386,6 +386,15 @@ class RecordDAO(dao.RecordDAO):
                                                for record_id in records_list))
         return list_of_record_ids_sets
 
+    def get_available_types(self):
+        """
+        Return a list of all the Record types in the database.
+
+        :returns: A list of types present (ex: ["run", "experiment"])
+        """
+        results = self.session.query(schema.Record.type).distinct().all()
+        return [entry[0] for entry in results]
+
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
@@ -422,6 +431,62 @@ class RecordDAO(dao.RecordDAO):
             filtered_ids = (x[0] for x in query.all())
             for record in self.get_many(filtered_ids):
                 yield record
+
+    def _get_with_max_min_helper(self, scalar_name, count, id_only, get_min):
+        """
+        Handle shared logic for the max/min functions.
+
+        :param get_min: Whether we should be looking for the smallest val (True)
+                        or largest (False).
+        :returns: Either an id or Record object fitting the criteria.
+        """
+        if count == 1:
+            sort_by = sqlalchemy.func.min if get_min else sqlalchemy.func.max
+            query_set = (self.session.query(schema.ScalarData.id, sort_by(schema.ScalarData.value))
+                         .filter(schema.ScalarData.name == scalar_name)
+                         .one())
+            ids = [query_set[0]]
+        else:
+            sort_by = schema.ScalarData.value.asc() if get_min else schema.ScalarData.value.desc()
+            query_set = (self.session.query(schema.ScalarData.id)
+                         .filter(schema.ScalarData.name == scalar_name)
+                         .order_by(sort_by).limit(count).all())
+            ids = (x[0] for x in query_set)
+        return ids if id_only else self.get_many(ids)
+
+    def get_with_max(self, scalar_name, count=1, id_only=False):
+        """
+        Return the Record objects or ids associated with the highest values of <scalar_name>.
+
+        Highest first, then second-highest, etc, until <count> records have been listed.
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the maximum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
+
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> largest <scalar_name> values, ordered largest first.
+        """
+        return self._get_with_max_min_helper(scalar_name, count, id_only, get_min=False)
+
+    def get_with_min(self, scalar_name, count=1, id_only=False):
+        """
+        Return the Record objects or ids associated with the lowest values of <scalar_name>.
+
+        Lowest first, then second-lowest, etc, until <count> records have been listed.
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the minumum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
+
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> smallest <scalar_name> values, ordered smallest first.
+        """
+        return self._get_with_max_min_helper(scalar_name, count, id_only, get_min=True)
 
     def _apply_ranges_to_query(self, query, data, table):
         """
@@ -567,9 +632,9 @@ class RecordDAO(dao.RecordDAO):
         conditions.append(")")
         return sqlalchemy.text(''.join(conditions))
 
-    def get_data_for_records(self, id_list, data_list):
+    def get_data_for_records(self, data_list, id_list=None):
         """
-        Retrieve a subset of data for Records in id_list.
+        Retrieve a subset of data for Records (or optionally a subset of Records).
 
         For example, it might get "debugger_version" and "volume" for the
         Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
@@ -585,13 +650,16 @@ class RecordDAO(dao.RecordDAO):
         if a Record ends up containing none of the requested data, it will be
         omitted.
 
-        :param id_list: A list of the record ids to find data for
         :param data_list: A list of the names of data fields to find
+        :param id_list: A list of the record ids to find data for, None if
+                        all Records should be considered.
 
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in %s for record ids in %s', data_list, id_list)
+        LOGGER.debug('Getting data in %s for %s',
+                     data_list,
+                     'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarData, schema.StringData]
         for query_table in query_tables:
@@ -600,8 +668,9 @@ class RecordDAO(dao.RecordDAO):
                                         query_table.value,
                                         query_table.units,
                                         query_table.tags)
-                     .filter(query_table.id.in_(id_list))
                      .filter(query_table.name.in_(data_list)))
+            if id_list is not None:
+                query = query.filter(query_table.id.in_(id_list))
             for result in query:
                 datapoint = {"value": result.value}
                 if result.units:
@@ -627,6 +696,8 @@ class RecordDAO(dao.RecordDAO):
 
         :return: A dict of scalars matching the Mnoda data specification
         """
+        LOGGER.warning("Using deprecated method get_scalars()."
+                       "Consider using Record.data instead.")
         # Not a strict subset of get_data_for_records() in that this will
         # never return stringdata
         LOGGER.debug('Getting scalars=%s for record id=%s', scalar_names, id)
@@ -644,26 +715,6 @@ class RecordDAO(dao.RecordDAO):
                                  'units': entry[2],
                                  'tags': tags}
         return scalars
-
-    def get_files(self, id):
-        """
-        Retrieve files for a given record id.
-
-        Files are returned in the alphabetical order of their URIs
-
-        :param id: The record id to find files for
-        :return: A list of file JSON objects matching the Mnoda specification
-        """
-        LOGGER.debug('Getting files for record id=%s', id)
-        query = (self.session.query(schema.Document.uri, schema.Document.mimetype,
-                                    schema.Document.tags)
-                 .filter(schema.Document.id == id)
-                 .order_by(schema.Document.uri.asc()).all())
-        files = []
-        for entry in query:
-            tags = json.loads(entry[2]) if entry[2] else None
-            files.append({'uri': entry[0], 'mimetype': entry[1], 'tags': tags})
-        return files
 
 
 class RelationshipDAO(dao.RelationshipDAO):
@@ -698,61 +749,17 @@ class RelationshipDAO(dao.RelationshipDAO):
 
     # Note that get() is implemented by its parent.
 
-    # pylint: disable=fixme
-    # TODO: Should these return generators? SIBO-541
-    def _get_given_subject_id(self, subject_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as subject.
-
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
-
-        :param subject_id: The subject_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
-
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        LOGGER.debug('Getting relationships related to subject_id=%s and '
-                     'predicate=%s.', subject_id, predicate)
-        query = (self.session.query(schema.Relationship)
-                 .filter(schema.Relationship.subject_id == subject_id))
+    def get(self, subject_id=None, object_id=None, predicate=None):
+        LOGGER.debug('Getting relationships with subject_id=%s, '
+                     'predicate=%s, object_id=%s.',
+                     subject_id, predicate, object_id)
+        query = self.session.query(schema.Relationship)
+        if subject_id:
+            query = query.filter(schema.Relationship.subject_id == subject_id)
+        if object_id:
+            query = query.filter(schema.Relationship.object_id == object_id)
         if predicate:
-            query.filter(schema.Relationship.predicate == predicate)
-
-        return self._build_relationships(query.all())
-
-    def _get_given_object_id(self, object_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as object.
-
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
-
-        :param object_id: The object_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
-
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        LOGGER.debug('Getting relationships related to object_id=%s and '
-                     'predicate=%s.', object_id, predicate)
-        query = (self.session.query(schema.Relationship)
-                 .filter(schema.Relationship.object_id == object_id))
-        if predicate:
-            query.filter(schema.Relationship.predicate == predicate)
-
-        return self._build_relationships(query.all())
-
-    def _get_given_predicate(self, predicate):
-        """
-        Given predicate, return all Relationships with that predicate.
-
-        :param predicate: The predicate describing Relationships to return
-
-        :returns: A list of Relationships fitting the criteria
-        """
-        LOGGER.debug('Getting relationships related to predicate=%s.', predicate)
-        query = (self.session.query(schema.Relationship)
-                 .filter(schema.Relationship.predicate == predicate))
+            query = query.filter(schema.Relationship.predicate == predicate)
 
         return self._build_relationships(query.all())
 

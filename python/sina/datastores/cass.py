@@ -11,6 +11,10 @@ import six
 
 # Disable pylint check due to its issue with virtual environments
 from cassandra.cqlengine.query import DoesNotExist, BatchQuery  # pylint: disable=import-error
+# This is used to patch the default limit issue that will be fixed in cassandra-driver 4.0.0
+# The behavior of queries is changed in that the default limit (10,000) is disabled
+# This affects the object itself; if you inherit this module, you will see the effect.
+from cassandra.cqlengine.query import AbstractQuerySet  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
@@ -32,6 +36,34 @@ TABLE_LOOKUP = {
     "scalarlist": {"record_table": schema.RecordFromScalarListData,
                    "data_table": schema.ScalarListDataFromRecord}
 }
+
+
+def _disable_cqlengine_implicit_query_limit():
+    """
+    Hack around QuerySets having an implicit limit of 10,000 results.
+
+    Note that this behavior will affect *all* QuerySets once this is loaded.
+    This is just an expansion on AbstractQuerySet's original init. See DAOFactory
+    for use.
+    """
+    orig_init = AbstractQuerySet.__init__
+
+    def queryset_init_sans_default_limit(abstractqueryset, aqs_model):
+        """
+        Initialize an abstractqueryset as usual, except with the limit disabled.
+
+        :param <all>: inherited from the "real" init with meanings unchanged.
+        """
+        orig_init(abstractqueryset, aqs_model)
+        # Currently the only way to tweak this.
+        # pylint: disable=protected-access
+        abstractqueryset._limit = 0
+
+    # Replace the old init with the patched one.
+    AbstractQuerySet.__init__ = queryset_init_sans_default_limit
+
+
+_disable_cqlengine_implicit_query_limit()
 
 
 class RecordDAO(dao.RecordDAO):
@@ -160,11 +192,11 @@ class RecordDAO(dao.RecordDAO):
                                    tags=entry[3])
             if record.files:
                 document_batch = []
-                for entry in record.files:
+                for uri, file_info in six.iteritems(record.files):
                     # Mimetype and tags can be None, use get() for safety
-                    document_batch.append((entry['uri'],
-                                           entry.get('mimetype'),
-                                           entry.get('tags')))
+                    document_batch.append((uri,
+                                           file_info.get('mimetype'),
+                                           file_info.get('tags')))
                 table = schema.DocumentFromRecord
                 with BatchQuery() as batch_query:
                     create = (table.batch(batch_query).create if force_overwrite
@@ -243,11 +275,11 @@ class RecordDAO(dao.RecordDAO):
                      len(files), id, force_overwrite)
         create = (schema.DocumentFromRecord.create if force_overwrite
                   else schema.DocumentFromRecord.if_not_exists().create)
-        for entry in files:
+        for uri, file_info in six.iteritems(files):
             create(id=id,
-                   uri=entry['uri'],
-                   mimetype=entry.get('mimetype'),
-                   tags=entry.get('tags'))
+                   uri=uri,
+                   mimetype=file_info.get('mimetype'),
+                   tags=file_info.get('tags'))
 
     def delete(self, id):
         """
@@ -595,6 +627,15 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(query):
                 yield record
 
+    def get_available_types(self):
+        """
+        Return a list of all the Record types in the database.
+
+        :returns: A list of types present (ex: ["run", "experiment"])
+        """
+        # CQL's "distinct" is limited to partition columns (ID) and "static" columns only.
+        return list(set(schema.Record.objects.values_list('type', flat=True)))
+
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
@@ -663,9 +704,59 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get_many(set(match_ids)):
                 yield record
 
-    def get_data_for_records(self, id_list, data_list, omit_tags=False):
+    def _get_with_max_min_helper(self, scalar_name, count, id_only, sort_ascending):
         """
-        Retrieve a subset of data for Records in id_list.
+        Handle shared logic for the max/min functions.
+
+        :param sort_ascending: Whether the smallest value should be at the top (True)
+                               or the bottom (False)
+        """
+        # Relies on Cassandra data always being stored sorted.
+        order_by = 'value' if sort_ascending else '-value'
+        ids = (schema.RecordFromScalarData.objects.filter(name=scalar_name)
+               .order_by(order_by).limit(count).all().values_list('id', flat=True))
+        return ids if id_only else self.get_many(ids)
+
+    def get_with_max(self, scalar_name, count=1, id_only=False):
+        """
+        Return the Record object(s) associated with the highest value(s) of scalar_name.
+
+        This and its partner rely on Cassandra data being stored sorted. This is a
+        guarantee of the backend.
+
+        Highest first, then second-highest, etc, until <count> records have been listed.
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the maximum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
+
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> largest <scalar_name> values, ordered largest first.
+        """
+        return self._get_with_max_min_helper(scalar_name, count, id_only, sort_ascending=False)
+
+    def get_with_min(self, scalar_name, count=1, id_only=False):
+        """
+        Return the Record objects or ids associated with the lowest values of <scalar_name>.
+
+        Lowest first, then second-lowest, etc, until <count> records have been listed.
+        This will only return records for plain scalars (not lists of scalars, strings, or
+        list of strings).
+
+        :param scalar_name: The name of the scalar to find the minumum record(s) for.
+        :param count: How many to return.
+        :param id_only: Whether to only return the id
+
+        :returns: An iterator of the record objects or ids corresponding to the
+                  <count> smallest <scalar_name> values, ordered smallest first.
+        """
+        return self._get_with_max_min_helper(scalar_name, count, id_only, sort_ascending=True)
+
+    def get_data_for_records(self, data_list, id_list=None, omit_tags=False):
+        """
+        Retrieve a subset of data for Records (or optionally a subset of Records).
 
         For example, it might get "debugger_version" and "volume" for the
         Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
@@ -681,8 +772,9 @@ class RecordDAO(dao.RecordDAO):
         if a Record ends up containing none of the requested data, it will be
         omitted.
 
-        :param id_list: A list of the record ids to find data for
         :param data_list: A list of the names of data fields to find
+        :param id_list: A list of the record ids to find data for, None if
+                        all Records should be considered.
         :param omit_tags: Whether to avoid returning tags. A Cassandra
                           limitation results in up to id_list*data_list+1
                           queries to include the tags, rather than the single
@@ -693,40 +785,67 @@ class RecordDAO(dao.RecordDAO):
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in %s for record ids in %s', data_list, id_list)
+        LOGGER.debug('Getting data in %s for %s',
+                     data_list,
+                     'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
-        query_tables = [schema.ScalarDataFromRecord,
-                        schema.StringDataFromRecord]
-
-        # Disable pylint check until team decides to refactor the code
-        for query_table in query_tables:  # pylint: disable=too-many-nested-blocks
+        query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
+                        if id_list is not None
+                        else [schema.RecordFromScalarData, schema.RecordFromStringData])
+        values_list = ['id', 'name', 'value', 'units']
+        for query_table in query_tables:
             query = (query_table.objects
-                     # cqlengine's use of in_ seems to confuse Pylint
-                     .filter(query_table.id.in_(id_list))  # pylint: disable=no-member
-                     .filter(query_table.name.in_(data_list))  # pylint: disable=no-member
-                     .values_list('id', 'name', 'value', 'units'))
+                     .filter(query_table.name.in_(data_list)))  # pylint: disable=no-member
+            if id_list is not None:
+                query = query.filter(query_table.id.in_(id_list))  # pylint: disable=no-member
+            query = query.values_list(*values_list)
             for result in query:
                 id, name, value, units = result
                 datapoint = {"value": value}
                 if units:
                     datapoint["units"] = units
                 data[id][name] = datapoint
-            # Cassandra has a limitation wherein any "IN" query stops working
-            # if one of the columns requested contains collections. 'tags' is a
-            # collection column. Unfortunately, there's a further limitation
-            # that a BatchQuery can't select (only create, update, or delete),
-            # so the best we can do (until they fix one of the above) is:
-            if not omit_tags:
-                for id in data:
-                    for name in data[id]:
-                        if "tags" not in data[id][name]:
-                            tags = (query_table.objects
-                                    .filter(query_table.id == id)
-                                    .filter(query_table.name == name)
-                                    .values_list('tags', flat=True)).all()
-                            if tags and tags[0] is not None:
-                                data[id][name]["tags"] = tags[0]
+
+        if not omit_tags:
+            for id in data:
+                for name in data[id]:
+                    tags = self._get_tags_for_datum(id, name)
+                    if tags is not None:
+                        data[id][name]["tags"] = tags
         return data
+
+    @staticmethod
+    def _get_tags_for_datum(id, name):
+        """
+        Given a specific datum for a specific Record, return its tags.
+
+        We'll go through our query tables until we find the data entry, so this
+        works for strings/scalars/lists thereof, but not non-data entries (files, etc).
+
+        Cassandra has a limitation wherein any "IN" query stops working
+        if one of the columns requested contains collections. 'tags' is a
+        collection column. Unfortunately, there's a further limitation
+        that a BatchQuery can't select (only create, update, or delete),
+        so the best we can do (until they fix one of the above) is to send a
+        flurry of tiny queries. If you're using this helper, consider
+        adding an optarg to disable returning tags.
+
+        :param id: The id the datum belongs to
+        :param name: The name of the datum
+
+        :returns: The corresponding tags, or None if none were found.
+
+        :raises ValueError: if given a name or id not found in the database.
+        """
+        query_tables = [TABLE_LOOKUP[x]["data_table"] for x in TABLE_LOOKUP]
+        for table in query_tables:
+            tags = (table.objects
+                    .filter(table.id == id)
+                    .filter(table.name == name)
+                    .values_list('tags', flat=True)).all()
+            if tags:
+                return tags[0]
+        raise ValueError('No data entry "{}" for record {}'.format(name, id))
 
     def get_scalars(self, id, scalar_names):
         """
@@ -743,6 +862,8 @@ class RecordDAO(dao.RecordDAO):
 
         :return: A dict of scalars matching the Mnoda data specification
         """
+        LOGGER.warning("Using deprecated method get_scalars()."
+                       "Consider using Record.data instead.")
         LOGGER.debug('Getting scalars=%s for record id=%s', scalar_names, id)
         scalars = {}
         # Cassandra has special restrictions on list types that prevents us
@@ -761,21 +882,6 @@ class RecordDAO(dao.RecordDAO):
                 # If scalar doesn't exist, continue
                 pass
         return scalars
-
-    def get_files(self, id):
-        """
-        Retrieve files for a given record id.
-
-        Files are returned in the alphabetical order of their URIs
-
-        :param id: The record id to find files for
-        :return: A list of file JSON objects matching the Mnoda specification
-        """
-        LOGGER.debug('Getting files for record id=%s', id)
-        files = (schema.DocumentFromRecord.objects
-                 .filter(id=id)
-                 .values_list('uri', 'mimetype', 'tags')).all()
-        return [{'uri': x[0], 'mimetype': x[1], 'tags': x[2]} for x in files]
 
 
 class RelationshipDAO(dao.RelationshipDAO):
@@ -853,62 +959,42 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                     predicate=entry[0],
                                                     object_id=entry[1]))
 
-    # pylint: disable=fixme
-    # TODO: Should these return generators? SIBO-541
-    def _get_given_subject_id(self, subject_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as subject.
+    def get(self, subject_id=None, object_id=None, predicate=None):
+        LOGGER.debug('Getting relationships with subject_id=%s, '
+                     'predicate=%s, object_id=%s.',
+                     subject_id, predicate, object_id)
 
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
+        if subject_id:
+            query = schema.ObjectFromSubject.objects.filter(subject_id=subject_id)
+            if predicate:
+                query = query.filter(predicate=predicate)
+            if object_id:
+                query = query.filter(object_id=object_id)
+        else:
+            query = schema.SubjectFromObject.objects
+            if object_id:
+                query = query.filter(object_id=object_id)
 
-        :param subject_id: The subject_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
+            if predicate:
+                query = query.filter(predicate=predicate)
 
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        LOGGER.debug('Getting relationships related to subject_id=%s and '
-                     'predicate=%s.', subject_id, predicate)
-        query = (schema.ObjectFromSubject.objects
-                 .filter(subject_id=subject_id))
+            if subject_id:
+                query = query.filter(subject_id=subject_id)
+
+        # Both tables have the predicate in the middle, and the subject
+        # and object IDs on either end.
         if predicate:
-            query = query.filter(predicate=predicate)
+            # Only need to filter here if we only have the middle column
+            need_filtering = not (subject_id or object_id)
+        else:
+            # Only need to filter here if we skip the middle column -- we don't
+            # need to filter when we don't specify any column
+            need_filtering = subject_id and object_id
+
+        if need_filtering:
+            query = query.allow_filtering()
+
         return self._build_relationships(query.all())
-
-    def _get_given_object_id(self, object_id, predicate=None):
-        """
-        Given record id, return all Relationships with that id as object.
-
-        Returns None if none found. Wrapped by get(). Optionally filters on
-        predicate as well.
-
-        :param object_id: The object_id of Relationships to return
-        :param predicate: Optionally, the Relationship predicate to filter on.
-
-        :returns: A list of Relationships fitting the criteria or None.
-        """
-        LOGGER.debug('Getting relationships related to object_id=%s and '
-                     'predicate=%s.', object_id, predicate)
-        query = schema.SubjectFromObject.objects.filter(object_id=object_id)
-        if predicate:
-            # pylint: disable=fixme
-            # TODO: If predicate query table implemented, change. SIBO-145
-            query = query.filter(predicate=predicate)
-        return self._build_relationships(query.allow_filtering().all())
-
-    def _get_given_predicate(self, predicate):
-        """
-        Given predicate, return all Relationships with that predicate.
-
-        :param predicate: The predicate describing Relationships to return
-
-        :returns: A list of Relationships fitting the criteria
-        """
-        LOGGER.debug('Getting relationships related to predicate=%s.', predicate)
-        # pylint: disable=fixme
-        # TODO: If predicate query table implemented, change. SIBO-145
-        query = schema.ObjectFromSubject.objects.filter(predicate=predicate)
-        return self._build_relationships(query.allow_filtering().all())
 
 
 class RunDAO(dao.RunDAO):

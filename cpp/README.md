@@ -33,6 +33,19 @@ used/installed, see [the package file](package.py).
     make test
 ```
 
+# Building with Extras
+
+Sina-cpp can optionally be built with documentation and Adiak integration. To build
+with either/both, indicate they should be built in the ../create_spconfig.sh call:
+
+```bash
+    ...
+    ../create_spconfig.sh +docs +adiak
+    ...
+```
+
+Using Sina with Adiak also requires specifying -DSINA_BUILD_ADIAK_BINDINGS.
+
 
 # Troubleshooting
 
@@ -49,8 +62,8 @@ value.
 
 # Supported Environments
 
-What follows is a list of environments mnoda-cpp is tested in.
-Absence is not an indication that mnoda-cpp will not work;
+What follows is a list of environments sina-cpp is tested in.
+Absence is not an indication that sina-cpp will not work;
 please consider expanding this list!
 
 - **OSX 10.13**: Primary development environment.

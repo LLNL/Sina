@@ -1,6 +1,6 @@
 /// @file
 
-#include "mnoda/Document.hpp"
+#include "sina/Document.hpp"
 
 #include <cstdio>
 #include <fstream>
@@ -10,12 +10,12 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace mnoda {
+namespace sina {
 
 namespace {
 char const RECORDS_KEY[] = "records";
 char const RELATIONSHIPS_KEY[] = "relationships";
-char const SAVE_TMP_FILE_EXTENSION[] = ".mnoda.tmp";
+char const SAVE_TMP_FILE_EXTENSION[] = ".sina.tmp";
 }
 
 void Document::add(std::unique_ptr<Record> record) {
@@ -27,12 +27,13 @@ void Document::add(Relationship relationship) {
 }
 
 nlohmann::json Document::toJson() const {
-    nlohmann::json recordsList;
+    // note nlohmann::json::array is a function, not a type
+    nlohmann::json recordsList = nlohmann::json::array({});
     for (auto &record : records) {
         recordsList.emplace_back(record->toJson());
     }
 
-    nlohmann::json relationshipsList;
+    nlohmann::json relationshipsList = nlohmann::json::array({});
     for (auto &relationship : relationships) {
         relationshipsList.emplace_back(relationship.toJson());
     }

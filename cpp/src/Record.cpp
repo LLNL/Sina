@@ -1,14 +1,14 @@
 /// @file
 
-#include "mnoda/Record.hpp"
+#include "sina/Record.hpp"
 
 #include <stdexcept>
 #include <utility>
 
-#include "mnoda/CppBridge.hpp"
-#include "mnoda/JsonUtil.hpp"
-#include "mnoda/Run.hpp"
-#include "mnoda/Datum.hpp"
+#include "sina/CppBridge.hpp"
+#include "sina/JsonUtil.hpp"
+#include "sina/Run.hpp"
+#include "sina/Datum.hpp"
 
 namespace {
 
@@ -21,7 +21,7 @@ char const USER_DEFINED_KEY[] = "user_defined";
 
 }
 
-namespace mnoda {
+namespace sina {
 
 Record::Record(ID id_, std::string type_) :
         id{std::move(id_), LOCAL_ID_FIELD, GLOBAL_ID_FIELD},
@@ -30,16 +30,25 @@ Record::Record(ID id_, std::string type_) :
 nlohmann::json Record::toJson() const {
     nlohmann::json asJson;
     asJson[TYPE_FIELD] = type;
-    for (auto &file : files) {
-        asJson[FILES_FIELD].emplace_back(file.toJson());
-    }
     id.addTo(asJson);
-    //Loop through vector of data and append Json
-    nlohmann::json datumRef;
-    for(auto &datum : data)
-        datumRef[datum.first] = datum.second.toJson();
-    asJson[DATA_FIELD] = datumRef;
-    asJson[USER_DEFINED_KEY] = userDefined;
+    // Optional fields
+    if(!files.empty()){
+      nlohmann::json fileRef;
+      for (auto &file : files) {
+          fileRef[file.getUri()] = file.toJson();
+      asJson[FILES_FIELD] = fileRef;
+      }
+    }
+    if(!data.empty()){
+      //Loop through vector of data and append Json
+      nlohmann::json datumRef;
+      for(auto &datum : data)
+          datumRef[datum.first] = datum.second.toJson();
+      asJson[DATA_FIELD] = datumRef;
+    }
+    if(!userDefined.is_null()){
+      asJson[USER_DEFINED_KEY] = userDefined;
+    }
     return asJson;
 }
 
@@ -55,8 +64,8 @@ Record::Record(nlohmann::json const &asJson) :
     }
     auto filesIter = asJson.find(FILES_FIELD);
     if (filesIter != asJson.end()) {
-        for (auto &file : *filesIter) {
-            files.emplace_back(file);
+        for (auto &namedFile : filesIter->items()){
+            files.insert(File(namedFile.key(), namedFile.value()));
         }
     }
     auto userDefinedIter = asJson.find(USER_DEFINED_KEY);
@@ -70,7 +79,7 @@ void Record::add(std::string name, Datum datum) {
 }
 
 void Record::add(File file) {
-    files.emplace_back(std::move(file));
+    files.insert(std::move(file));
 }
 
 void Record::setUserDefinedContent(nlohmann::json userDefined_) {

@@ -1,5 +1,5 @@
-#ifndef MNODA_DOCUMENT_HPP
-#define MNODA_DOCUMENT_HPP
+#ifndef SINA_DOCUMENT_HPP
+#define SINA_DOCUMENT_HPP
 
 /// @file
 
@@ -8,15 +8,15 @@
 
 #include "nlohmann/json.hpp"
 
-#include "mnoda/Record.hpp"
-#include "mnoda/Relationship.hpp"
+#include "sina/Record.hpp"
+#include "sina/Relationship.hpp"
 
-namespace mnoda {
+namespace sina {
 
 /**
  * A Document represents the top-level object of a JSON file conforming to the
- * Mnoda schema. When serialized, these documents can be ingested into a
- * Mnoda database and used with the Sina tool.
+ * Sina schema. When serialized, these documents can be ingested into a
+ * Sina database and used with the Sina tool.
  *
  * Documents contain at most two objects: a list of Records and a list of Relationships. A simple, empty document:
  * \code{.json}
@@ -32,27 +32,27 @@ namespace mnoda {
  * Documents can be assembled programatically and/or generated from existing JSON. An example of an assembled
  * Document is provided on the main page. To load a Document from an existing JSON file:
  * \code
- * mnoda::Document myDocument = mnoda::loadDocument("path/to/infile.json");
+ * sina::Document myDocument = sina::loadDocument("path/to/infile.json");
  * \endcode
  *
  * To generate a Document from a JSON string and vice versa:
  * \code
  * nhlohmann::json jObj = "{\"records\":[{\"type\":\"run\",\"id\":\"test\"}],\"relationships\":[]}"_json;
- * mnoda::Document myDocument = mnoda::Document(jObj, mnoda::createRecordLoaderWithAllKnownTypes());
+ * sina::Document myDocument = sina::Document(jObj, sina::createRecordLoaderWithAllKnownTypes());
  * std::cout << myDocument.toJson().dump(4) << std::endl;);
  * \endcode
  *
  * You can add further entries to the Document using add():
  * \code
- * std::unique_ptr<mnoda::Record> myRun{new mnoda::Run{someID, "My Sim Code", "1.2.3", "jdoe"}};
- * mnoda::Relationship myRelationship{someID, "comes before", someOtherID};
+ * std::unique_ptr<sina::Record> myRun{new sina::Run{someID, "My Sim Code", "1.2.3", "jdoe"}};
+ * sina::Relationship myRelationship{someID, "comes before", someOtherID};
  * myDocument.add(myRun);
  * myDocument.add(myRelationship);
  * \endcode
  *
  * You can also export your Document to file:
  * \code
- * mnoda::saveDocument(myDocument, "path/to/outfile.json")
+ * sina::saveDocument(myDocument, "path/to/outfile.json")
  * \endcode
  *
  */
@@ -160,4 +160,4 @@ Document loadDocument(std::string const &path,
 }
 
 
-#endif //MNODA_DOCUMENT_HPP
+#endif //SINA_DOCUMENT_HPP

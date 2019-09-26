@@ -11,7 +11,7 @@ fi
 set -e
 SCRIPT_DIR=`dirname ${BASH_SOURCE[0]}`
 branch=$(git rev-parse --abbrev-ref HEAD)
-repo_namespace=mnoda-${branch}
+repo_namespace=sina-cpp-${branch}
 
 # During Bamboo builds, we can get a race condition between the builds for
 # different machines (e.g. rzgenie and rzuseq). To avoid this, if SYS_TYPE
@@ -40,9 +40,9 @@ cd ${temp_repo_location}
 $SPACK repo create $repo_namespace
 $SPACK repo add $repo_namespace
 cd ..
-mkdir -p ${ns_repo_location}/packages/mnoda
-cp ${SCRIPT_DIR}/package.py ${ns_repo_location}/packages/mnoda/
-$SPACK setup ${repo_namespace}.mnoda@develop%${SPACK_COMPILER} ${@:1}
+mkdir -p ${ns_repo_location}/packages/sina-cpp
+cp ${SCRIPT_DIR}/package.py ${ns_repo_location}/packages/sina-cpp/
+$SPACK setup ${repo_namespace}.sina-cpp@develop%${SPACK_COMPILER} ${@:1}
 
 # Clean up since we don't need this any more
 $SPACK repo remove ${ns_repo_location}

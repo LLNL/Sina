@@ -7,13 +7,13 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "mnoda/CppBridge.hpp"
-#include "mnoda/Document.hpp"
-#include "mnoda/Run.hpp"
+#include "sina/CppBridge.hpp"
+#include "sina/Document.hpp"
+#include "sina/Run.hpp"
 
-#include "mnoda/testing/TestRecord.hpp"
+#include "sina/testing/TestRecord.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 using ::testing::ElementsAre;
 using ::testing::HasSubstr;
@@ -95,11 +95,12 @@ TEST(Document, create_fromJson_withRelationships) {
 }
 
 TEST(Document, toJson_empty) {
+    // A sina document should always have, at minimum, both records and
+    // relationships as empty arrays.
     Document const document;
     nlohmann::json asJson = document.toJson();
-    EXPECT_EQ(nlohmann::json::value_t::null, asJson[EXPECTED_RECORDS_KEY]);
-    EXPECT_EQ(nlohmann::json::value_t::null,
-            asJson[EXPECTED_RELATIONSHIPS_KEY]);
+    EXPECT_EQ(nlohmann::json::array({}), asJson[EXPECTED_RECORDS_KEY]);
+    EXPECT_EQ(nlohmann::json::array({}), asJson[EXPECTED_RELATIONSHIPS_KEY]);
 }
 
 TEST(Document, toJson_records) {
@@ -151,6 +152,7 @@ TEST(Document, toJson_relationships) {
         EXPECT_EQ(expectedPredicates[i], actualRelationship["predicate"]);
     }
 }
+
 
 /**
  * Instances of this class acquire a temporary file name when created
@@ -257,7 +259,7 @@ TEST(Document, load_specifiedRecordLoader) {
 }
 
 TEST(Document, load_defaultRecordLoaders) {
-    auto originalRun = internal::make_unique<mnoda::Run>(
+    auto originalRun = internal::make_unique<sina::Run>(
             ID{"the ID", IDType::Global}, "the app", "1.2.3", "jdoe");
     Document originalDocument;
     originalDocument.add(std::move(originalRun));
@@ -270,7 +272,7 @@ TEST(Document, load_defaultRecordLoaders) {
 
     Document loadedDocument = loadDocument(file.getName());
     ASSERT_EQ(1u, loadedDocument.getRecords().size());
-    auto loadedRun = dynamic_cast<mnoda::Run const *>(
+    auto loadedRun = dynamic_cast<sina::Run const *>(
             loadedDocument.getRecords()[0].get());
     EXPECT_NE(nullptr, loadedRun);
 }

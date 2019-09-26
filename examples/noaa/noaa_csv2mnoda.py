@@ -241,15 +241,12 @@ class NoaaData(object):
 
         :param exp: experiment id string
         """
-        lfiles = []
-        lfiles.append({"uri": os.path.join(self.files_dn, DATA_FN),
-                       "mimetype": "text/csv", "tags": ["data"]})
-
+        lfiles = {}
+        lfiles[os.path.join(self.files_dn, DATA_FN)] = {"mimetype": "text/csv",
+                                                        "tags": ["data"]}
         for extra_fn, tag, mtype in MORE_FILES:
-            lfiles.append({"uri": os.path.join(self.files_dn,
-                                               os.path.basename(extra_fn)),
-                           "mimetype": mtype, "tags": [tag]})
-
+            lfiles[os.path.join(self.files_dn, os.path.basename(extra_fn))] = {"mimetype": mtype,
+                                                                               "tags": [tag]}
         self.recs.append({"type": "exp", "id": exp, "files": lfiles})
 
     def add_exp2obs(self, exp, obs):
@@ -285,9 +282,7 @@ class NoaaData(object):
         self.recs.append({
             "type": "obs",
             "id": oid,
-            "files": [
-                {"uri": obs_fn, "mimetype": "text/plain"},
-                ],
+            "files": {obs_fn: {"mimetype": "text/plain"}},
             "data": {
                 "depth": {"value": float(depth), "units": "meters"},
                 "press": {"value": float(press), "units": "decibars"},

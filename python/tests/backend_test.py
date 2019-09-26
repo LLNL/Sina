@@ -52,32 +52,31 @@ def populate_database_with_data(record_dao):
     spam_record.data["spam_scal_2"] = {"value": 200}
     spam_record.data["val_data"] = {"value": "runny", "tags": ["edible"]}
     spam_record.data["val_data_2"] = {"value": "double yolks"}
-    spam_record.files = [{"uri": "beep.wav"},
-                         {"uri": "beep.pong"}]
+    spam_record.files = {"beep.wav": {},
+                         "beep.pong": {}}
 
     spam_record_2 = Record(id="spam2", type="run")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
-    spam_record_2.files = [{"uri": "beep/png"}]
+    spam_record_2.files = {"beep/png": {}}
 
     spam_record_3 = Record(id="spam3", type="foo")
     spam_record_3.data["spam_scal"] = {"value": 10.5}
     spam_record_3.data["spam_scal_2"] = {"value": 10.5}
-    spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible"]}
+    spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
     spam_record_3.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_3.files = [{"uri": "beeq.png"}]
+    spam_record_3.files = {"beeq.png": {}}
 
     spam_record_4 = Record(id="spam4", type="bar")
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_4.files = [{"uri": "beep.png"}]
+    spam_record_4.files = {"beep.png": {}}
 
     spam_record_5 = Record(id="spam5", type="run")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
     spam_record_5.data["val_data_3"] = {"value": "sugar"}
     spam_record_5.data["val_data_list_1"] = {"value": [0, 9.3]}
     spam_record_5.data["val_data_list_2"] = {"value": ['eggs', 'pancake']}
-    spam_record_5.files = [{"uri": "beep.wav",
-                            "tags": ["output", "eggs"],
-                            "mimetype": 'audio/wav'}]
+    spam_record_5.files = {"beep.wav": {"tags": ["output", "eggs"],
+                                        "mimetype": 'audio/wav'}}
 
     spam_record_6 = Record(id="spam6", type="spamrec")
     spam_record_6.data["val_data_3"] = {"value": "syrup"}
@@ -181,7 +180,7 @@ class TestModify(unittest.TestCase):
         record_dao = self.create_dao_factory().create_record_dao()
         rec = Record(id="spam", type="eggs",
                      data={"eggs": {"value": 12, "units": None, "tags": ["runny"]}},
-                     files=[{"uri": "eggs.brek", "mimetype": "egg", "tags": ["fried"]}],
+                     files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
                      user_defined={})
         record_dao.insert(rec)
         returned_record = record_dao.get("spam")
@@ -206,7 +205,7 @@ class TestModify(unittest.TestCase):
         record_dao = factory.create_record_dao()
         data = {"eggs": {"value": 12, "tags": ["breakfast"]},
                 "flavor": {"value": "tasty"}}
-        files = [{"uri": "justheretoexist.png"}]
+        files = {"justheretoexist.png": {}}
         record_dao.insert(Record(id="rec_1", type="sample", data=data, files=files))
         record_dao.delete("rec_1")
         # Make sure the data, raw, files, and relationships were deleted as well
@@ -297,6 +296,59 @@ class TestModify(unittest.TestCase):
             self.assertEqual(result.subject_id, relationship.subject_id)
             self.assertEqual(result.object_id, relationship.object_id)
             self.assertEqual(result.predicate, relationship.predicate)
+
+    def test_relationshipdao_get_uses_and(self):
+        """Test that RelationshipDAO.get() users "and" to join restrictions."""
+        relationship_dao = self.create_dao_factory().create_relationship_dao()
+
+        subjects = ['s' + str(i + 1) for i in range(0, 3)]
+        predicates = ['p' + str(i + 1) for i in range(0, 4)]
+        objects = ['o' + str(i + 1) for i in range(0, 5)]
+
+        for subject_id in subjects:
+            for predicate in predicates:
+                for object_id in objects:
+                    relationship_dao.insert(Relationship(subject_id=subject_id,
+                                                         predicate=predicate,
+                                                         object_id=object_id))
+
+        def assertRightValuesReturned(restrict_subject, restrict_predicate, restrict_object):
+            """
+            Assert that the right relationships are returned for the given
+            restrictions.
+
+            :param restrict_subject: whether to restrict the subject
+            :param restrict_predicate: whether to restrict the predicate
+            :param restrict_object: whether to restrict the object
+            """
+            restrictions = {}
+
+            def add_restriction(restrict, key, values):
+                """
+                Add a restriction to the query
+                :param restrict: whether to restrict the given key
+                :param key: the key-word parameter of the restriction
+                :param values: the array of values for the restriction
+                :return: the valid values for the key
+                """
+                if restrict:
+                    restrictions[key] = values[0]
+                    return [values[0]]
+                return values
+
+            allowed_subjects = add_restriction(restrict_subject, 'subject_id', subjects)
+            allowed_predicates = add_restriction(restrict_predicate, 'predicate', predicates)
+            allowed_objects = add_restriction(restrict_object, 'object_id', objects)
+
+            relationships = relationship_dao.get(**restrictions)
+            expected_len = len(allowed_subjects) * len(allowed_predicates) * len(allowed_objects)
+            self.assertEqual(expected_len, len(relationships))
+
+        for restrict_subject in (True, False):
+            for restrict_predicate in (True, False):
+                for restrict_object in (True, False):
+                    assertRightValuesReturned(
+                        restrict_subject, restrict_predicate, restrict_object)
 
     def test_relationshipdao_bad_insert(self):
         """Test that the RelationshipDAO refuses to insert malformed relationships."""
@@ -391,6 +443,32 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIsInstance(exact_match, types.GeneratorType,
                               "Method must return a generator.")
 
+    # ###################### get_with_max ##########################
+    def test_get_with_max(self):
+        """Test that we return the id of the record with the highest scalar_name value."""
+        max_spam_scal = list(self.record_dao.get_with_max("spam_scal", id_only=True))
+        self.assertEqual(max_spam_scal[0], "spam2")
+
+    def test_get_with_max_multi(self):
+        """Test we can return the X largest in correct order."""
+        max_spam_scals = list(self.record_dao.get_with_max("spam_scal",
+                                                           count=2,
+                                                           id_only=True))
+        self.assertEqual(max_spam_scals, ["spam2", "spam3"])
+
+    # ###################### get_with_min ##########################
+    def test_get_with_min(self):
+        """Test that we return the id of the record with the lowest scalar_name value."""
+        min_spam_scal = list(self.record_dao.get_with_min("spam_scal", id_only=True))
+        self.assertEqual(min_spam_scal[0], "spam")
+
+    def test_get_with_min_multi(self):
+        """Test we can return the X smallest in correct order."""
+        min_spam_scals = list(self.record_dao.get_with_min("spam_scal",
+                                                           count=2,
+                                                           id_only=True))
+        self.assertEqual(min_spam_scals, ["spam", "spam3"])
+
     def test_recorddao_uri_one_wildcard(self):
         """Test that RecordDAO is retrieving based on a wildcard-containing uri correctly."""
         end_wildcard = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=True)
@@ -414,6 +492,12 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Ensure that a uri=% (wildcard) uri query matches all Records with files."""
         all_wildcard = self.record_dao.get_given_document_uri(uri="%")
         self.assertEqual(len(list(all_wildcard)), 5)
+
+    # ####################### test_get_available_types ######################
+    def test_get_available_types(self):
+        """Make sure that we return a correct list of the types in a datebase."""
+        types_found = self.record_dao.get_available_types()
+        six.assertCountEqual(self, types_found, ["run", "spamrec", "bar", "foo", "eggrec"])
 
     # ########################### basic data_query ##########################
     def test_recorddao_scalar_datum_query(self):
@@ -636,13 +720,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
 
-    # ########################### get_files #############################
-    def test_recorddao_get_files(self):
-        """Test that the RecordDAO is getting files for records correctly."""
-        get_one = self.record_dao.get_files(id="spam5")
-        files = self.record_dao.get("spam5").files
-        self.assertEqual(get_one, files)
-
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):
         """Test that we're getting a datum for one record correctly."""
@@ -670,13 +747,19 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         six.assertCountEqual(self, for_many["spam3"].keys(), ["spam_scal",
                                                               "spam_scal_2",
                                                               "val_data"])
-        self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible"])
+        self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible", "simple"])
 
     def test_recorddao_get_no_data_for_nonexistant_records(self):
         """Test that we're not getting data for records that don't exist."""
         for_none = self.record_dao.get_data_for_records(id_list=["nope", "nada"],
                                                         data_list=["gone", "away"])
         self.assertFalse(for_none)
+
+    def test_recorddao_get_data_for_all_records(self):
+        """Test that we're getting data for all records when id_list isn't specified."""
+        for_all = self.record_dao.get_data_for_records(data_list=["val_data_3"])
+        six.assertCountEqual(self, for_all.keys(), ["spam5", "spam6"])
+        six.assertCountEqual(self, for_all["spam5"].keys(), ["val_data_3"])
 
     # ###################### get_scalars (legacy) ########################
     def test_recorddao_get_scalars(self):

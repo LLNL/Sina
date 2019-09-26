@@ -4,12 +4,12 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "mnoda/Record.hpp"
-#include "mnoda/CppBridge.hpp"
+#include "sina/Record.hpp"
+#include "sina/CppBridge.hpp"
 
-#include "mnoda/testing/TestRecord.hpp"
+#include "sina/testing/TestRecord.hpp"
 
-namespace mnoda { namespace testing { namespace {
+namespace sina { namespace testing { namespace {
 
 using ::testing::ElementsAre;
 using ::testing::HasSubstr;
@@ -64,7 +64,7 @@ TEST(Record, create_globalId_data) {
     };
     std::string name1 = "datum name 1";
     std::string name2 = "datum name 2";
-    originalJson[EXPECTED_DATA_KEY][name1] = 
+    originalJson[EXPECTED_DATA_KEY][name1] =
         R"({"value": "value 1"})"_json;
     originalJson[EXPECTED_DATA_KEY][name2] =
         R"({"value": 2.22,
@@ -84,18 +84,26 @@ TEST(Record, create_globalId_data) {
 TEST(Record, create_globalId_files) {
     nlohmann::json originalJson{
             {EXPECTED_TYPE_KEY, "my type"},
-            {EXPECTED_GLOBAL_ID_KEY, "the ID"}
+            {EXPECTED_GLOBAL_ID_KEY, "the ID"},
+            {EXPECTED_FILES_KEY, R"({})"_json}
     };
-    originalJson[EXPECTED_FILES_KEY].emplace_back(R"({"uri": "uri1"})"_json);
-    originalJson[EXPECTED_FILES_KEY].emplace_back(R"({"uri": "uri2"})"_json);
-    originalJson[EXPECTED_FILES_KEY].emplace_back(R"({"uri": "uri3"})"_json);
-
+    std::string uri1 = "/some/uri.txt";
+    std::string uri2 = "www.anotheruri.com";
+    std::string uri3 = "yet another uri";
+    originalJson[EXPECTED_FILES_KEY][uri1] =
+        R"({})"_json;
+    originalJson[EXPECTED_FILES_KEY][uri2] =
+        R"({"mimetype": "html"})"_json;
+    originalJson[EXPECTED_FILES_KEY][uri3] =
+        R"({"tags": ["cool_file"]})"_json;
     Record record{originalJson};
     auto &files = record.getFiles();
+    for (auto &file : files) {
+        std::cout << file.toJson() << std::endl;}
     ASSERT_EQ(3u, files.size());
-    EXPECT_EQ("uri1", files[0].getUri());
-    EXPECT_EQ("uri2", files[1].getUri());
-    EXPECT_EQ("uri3", files[2].getUri());
+    EXPECT_EQ(1, files.count(File{uri1}));
+    EXPECT_EQ(1, files.count(File{uri2}));
+    EXPECT_EQ(1, files.count(File{uri3}));
 }
 
 TEST(Record, create_fromJson_userDefined) {
@@ -152,6 +160,17 @@ TEST(Record, toJson_globalId) {
     EXPECT_EQ(0, asJson.count(EXPECTED_GLOBAL_ID_KEY));
 }
 
+TEST(Record, toJson_default_values) {
+    ID id{"the id", IDType::Global};
+    Record record{id, "my type"};
+    auto asJson = record.toJson();
+    EXPECT_TRUE(asJson.is_object());
+    // We want to be sure that unset optional fields aren't present
+    EXPECT_EQ(asJson.find(EXPECTED_DATA_KEY), asJson.end());
+    EXPECT_EQ(asJson.find(EXPECTED_FILES_KEY), asJson.end());
+    EXPECT_EQ(asJson.find(EXPECTED_USER_DEFINED_KEY), asJson.end());
+}
+
 TEST(Record, toJson_userDefined) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
@@ -194,16 +213,18 @@ TEST(Record, toJson_data) {
 TEST(Record, toJson_files) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
-    File file{"uri1"};
+    std::string uri1 = "uri1";
+    std::string uri2 = "uri2";
+    File file{uri1};
     file.setMimeType("mt1");
     record.add(file);
-    record.add(File{"uri2"});
+    record.add(File{uri2});
+    // Identical uris should overwrite
+    record.add(File{uri2});
     auto asJson = record.toJson();
     ASSERT_EQ(2u, asJson[EXPECTED_FILES_KEY].size());
-    EXPECT_EQ("uri1", asJson[EXPECTED_FILES_KEY][0]["uri"]);
-    EXPECT_EQ("mt1", asJson[EXPECTED_FILES_KEY][0]["mimetype"]);
-    EXPECT_EQ("uri2", asJson[EXPECTED_FILES_KEY][1]["uri"]);
-    EXPECT_TRUE(asJson[EXPECTED_FILES_KEY][1]["mimetype"].is_null());
+    EXPECT_EQ("mt1", asJson[EXPECTED_FILES_KEY][uri1]["mimetype"]);
+    EXPECT_TRUE(asJson[EXPECTED_FILES_KEY][uri2]["mimetype"].is_null());
 }
 
 TEST(RecordLoader, load_missingLoader) {

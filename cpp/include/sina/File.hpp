@@ -1,5 +1,5 @@
-#ifndef MNODA_FILE_HPP
-#define MNODA_FILE_HPP
+#ifndef SINA_FILE_HPP
+#define SINA_FILE_HPP
 
 /// @file
 
@@ -8,17 +8,17 @@
 
 #include "nlohmann/json.hpp"
 
-namespace mnoda {
+namespace sina {
 /**
- * A File tracks the location (URI) and mimetype of a file on the file system. In the Mnoda schema, a File always
- * belongs to a Record or one of Record's inheriting types.
+ * A File tracks the location (URI) and mimetype of a file on the file system, plus any tags.
+ * In the Sina schema, a File always belongs to a Record or one of Record's inheriting types.
  *
  * Every File must have a URI, while mimetype and tags are optional.
  *
  * \code
- * mnoda::File myFile{"/path/to/file.png"};
+ * sina::File myFile{"/path/to/file.png"};
  * myFile.setMimeType("image/png");
- * mnoda::File myOtherFile{"/path/to/other/file.txt"};
+ * sina::File myOtherFile{"/path/to/other/file.txt"};
  * myOtherFile.setTags({"these","are","tags"});
  * myRecord->add(myFile);
  * myRecord->add(myOtherFile);
@@ -45,9 +45,10 @@ public:
     /**
      * Construct a new File.
      *
-     * @param asJson the JSON representation of the file
+     * @param uri the uri for a file
+     * @param asJson the JSON representation of the file's additional info
      */
-    explicit File(nlohmann::json const &asJson);
+    File(std::string uri, nlohmann::json const &asJson);
 
     /**
      * Get the File's URI.
@@ -102,6 +103,7 @@ private:
     std::string mimeType;
     std::vector<std::string> tags;
 };
+
 }
 
-#endif //MNODA_FILE_HPP
+#endif //SINA_FILE_HPP
