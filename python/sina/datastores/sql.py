@@ -29,7 +29,7 @@ SQLITE = "sqlite:///"
 # see _apply_ranges_to_query() for usage
 PARAM_OFFSETS = {schema.ScalarData: "",
                  schema.StringData: "_1",
-                 schema.ListScalarDataEntry: "_2",
+                 schema.ListScalarData: "_2",
                  schema.ListStringDataEntry: "_3"}
 
 
@@ -86,32 +86,29 @@ class RecordDAO(dao.RecordDAO):
                 # Using json.dumps() instead of str() (or join()) gives
                 # valid JSON
                 tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
-                # Check if empty list
-                if datum:
-                    kind_master = (schema.ListScalarDataMaster
-                                   if isinstance(datum['value'][0],
-                                                 numbers.Real)
-                                   else schema.ListStringDataMaster)
+                # If we've been given an empty list or a list of numbers:
+                if not datum or isinstance(datum['value'][0], numbers.Real):
+                    self.session.add(schema.ListScalarData(id=id,
+                                                           name=datum_name,
+                                                           min=min(datum['value']),
+                                                           max=max(datum['value']),
+                                                           # units might be None,
+                                                           # always use get()
+                                                           units=datum.get('units'),
+                                                           tags=tags))
                 else:
-                    # Default to Scalar table
-                    kind_master = schema.ListScalarDataMaster
-                self.session.add(kind_master(id=id,
-                                             name=datum_name,
-                                             # units might be None, always use
-                                             # get()
-                                             units=datum.get('units'),
-                                             tags=tags))
+                    # it's a list of strings
+                    self.session.add(schema.ListStringDataMaster(id=id,
+                                                                 name=datum_name,
+                                                                 units=datum.get('units'),
+                                                                 tags=tags))
 
-                # Store list entries in entry table
-                for index, entry in enumerate(datum['value']):
-                    # Check if it's a scalar
-                    kind = (schema.ListScalarDataEntry
-                            if isinstance(entry, numbers.Real)
-                            else schema.ListStringDataEntry)
-                    self.session.add(kind(id=id,
-                                          name=datum_name,
-                                          index=index,
-                                          value=entry))
+                    # Each entry in a list of strings requires its own row
+                    for index, entry in enumerate(datum['value']):
+                        self.session.add(schema.ListStringDataEntry(id=id,
+                                                                    name=datum_name,
+                                                                    index=index,
+                                                                    value=entry))
             elif isinstance(datum['value'], (numbers.Number, six.string_types)):
                 tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
                 # Check if it's a scalar
@@ -298,8 +295,9 @@ class RecordDAO(dao.RecordDAO):
         sure datum_name is the name of a list-type datum (timeseries, etc).
 
         :param datum_name: The name of the datum
-        :param list_of_contents: All the values datum_name must contain. Can be
-                                 single values ("egg", 12) or DataRanges.
+        :param list_of_contents: All the values datum_name must contain. Single values
+                                 for strings ("egg", "ham") or the ONLY operation,
+                                 DataRanges for numbers.
         :pram operation: What kind of ListQueryOperation to do.
         :param ids_only: Whether to only return ids rather than full Records.
         :returns: A generator of ids of matching Records or the Records
@@ -320,7 +318,7 @@ class RecordDAO(dao.RecordDAO):
                for x in list_of_contents):
             numeric = True
             list_of_record_ids_sets.extend(
-                self._list_query(table=schema.ListScalarDataEntry,
+                self._list_query(table=schema.ListScalarData,
                                  datum_name=datum_name,
                                  list_of_contents=list_of_contents))
         elif all(isinstance(x, six.string_types) or
@@ -345,7 +343,7 @@ class RecordDAO(dao.RecordDAO):
                       else utils.DataRange(x, x, max_inclusive=True)
                       for x in list_of_contents]
             if numeric:
-                excluded_ids = self._list_query(table=schema.ListScalarDataEntry,
+                excluded_ids = self._list_query(table=schema.ListScalarData,
                                                 datum_name=datum_name,
                                                 list_of_contents=utils.invert_ranges(ranges))
             else:
@@ -504,7 +502,7 @@ class RecordDAO(dao.RecordDAO):
         :param query: A SQLAlchemy query object
         :param data: A list of (name, criteria) pairs to apply to the query object
         :param table: The table to query against, either ScalarData,
-            StringData, ListScalarDataEntry, or ListStringDataEntry.
+            StringData, ListScalarData, or ListStringDataEntry.
 
         :returns: <query>, now filtering on <data>
         :raises ValueError: If given an invalid table.
@@ -512,7 +510,7 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Filtering <query=%s> with <data=%s>.', query, data)
         if (table not in [schema.ScalarData,
                           schema.StringData,
-                          schema.ListScalarDataEntry,
+                          schema.ListScalarData,
                           schema.ListStringDataEntry]):
             msg = 'Given invalid table to query: {}'.format(table)
             LOGGER.error(msg)
@@ -564,7 +562,7 @@ class RecordDAO(dao.RecordDAO):
                                             .format(sqlalchemy.func.count(table.id),
                                                     components_length))))
         if (table == schema.ListStringDataEntry or
-                table == schema.ListScalarDataEntry):
+                table == schema.ListScalarData):
             query = _count_checker(is_list=True)
         else:
             query = _count_checker(is_list=False)
@@ -604,8 +602,8 @@ class RecordDAO(dao.RecordDAO):
             tablename = "ScalarData"
         elif table == schema.StringData:
             tablename = "StringData"
-        elif table == schema.ListScalarDataEntry:
-            tablename = "ListScalarDataEntry"
+        elif table == schema.ListScalarData:
+            tablename = "ListScalarData"
         elif table == schema.ListStringDataEntry:
             tablename = "ListStringDataEntry"
         else:
@@ -748,8 +746,8 @@ class RelationshipDAO(dao.RelationshipDAO):
         self.session.commit()
 
     # Note that get() is implemented by its parent.
-
     def get(self, subject_id=None, object_id=None, predicate=None):
+        """Retrieve relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)

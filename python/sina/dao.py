@@ -7,8 +7,10 @@ and Relationships, it will not differ between backends, e.g., Cassandra and sql.
 """
 from abc import ABCMeta, abstractmethod
 import logging
+import numbers
 
 import sina.model
+from sina.utils import DataRange
 
 LOGGER = logging.getLogger(__name__)
 
@@ -156,6 +158,28 @@ class RecordDAO(object):
     def get_given_data(self, **kwargs):
         """Alias of data_query() to fit historical naming convention."""
         return self.data_query(**kwargs)
+
+    @classmethod
+    def _criteria_are_for_scalars(cls, criteria):
+        """
+        Determine whether criteria for a single datum describes scalars or strings.
+
+        If criteria are mixed (both scalar and string criteria), raise an error.
+
+        :param criteria: The criteria to check.
+        :returns: True if they're all scalar criteria, false if all string criteria.
+        :raises TypeError: if mixed-type criteria are provided.
+        """
+        criterion_is_for_scalars = []
+        for criterion in criteria:
+            if isinstance(criterion, DataRange):
+                criterion_is_for_scalars.append(criterion.is_numeric_range())
+            else:
+                criterion_is_for_scalars.append(isinstance(criterion, numbers.Real))
+        if not all(criterion_is_for_scalars[0] == x for x in criterion_is_for_scalars):
+            raise TypeError("String and scalar criteria cannot be mixed for one datum. Given: {}"
+                            .format(criteria))
+        return criterion_is_for_scalars[0]
 
     @abstractmethod
     def get_all_of_type(self, type, ids_only=False):
