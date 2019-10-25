@@ -25,6 +25,7 @@ class Record(Base):
     id = Column(String(255), primary_key=True)
     type = Column(String(255), nullable=False)
     raw = Column(Text(), nullable=True)
+    Index('type_idx', type)
 
     def __init__(self, id, type, raw=None):
         """Create Record table entry with id, type, raw."""
@@ -93,7 +94,7 @@ class ScalarData(Base):
     value = Column(Float(), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
-    Index('record_scalar_idx', id, name)
+    Index('scalar_name_idx', name)
 
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, id, name, value,   # pylint: disable=too-many-arguments
@@ -187,7 +188,6 @@ class ListScalarDataEntry(Base):
     name = Column(String(255), nullable=False, primary_key=True)
     index = Column(Integer(), nullable=False, primary_key=True)
     value = Column(Float(), nullable=False)
-    Index('record_scalar_list_idx', id, name, index)
 
     def __init__(self, id, name, value, index):
         """
@@ -238,6 +238,7 @@ class StringData(Base):
     value = Column(String(255), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
+    Index('string_name_idx', name)
 
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, id, name, value,  # pylint: disable=too-many-arguments
@@ -339,6 +340,7 @@ class ListStringDataEntry(Base):
     name = Column(String(255), nullable=False, primary_key=True)
     index = Column(Integer(), nullable=False, primary_key=True)
     value = Column(String(255), nullable=False)
+    Index('stringlist_name_idx', name)
 
     def __init__(self, id, name, index, value):
         """
@@ -382,6 +384,7 @@ class Document(Base):
     uri = Column(String(255), nullable=False, primary_key=True)
     mimetype = Column(String(255), nullable=True)
     tags = Column(Text(), nullable=True)
+    Index('uri_idx', uri)
 
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, id, uri,  # pylint: disable=too-many-arguments
