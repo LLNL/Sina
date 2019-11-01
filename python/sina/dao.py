@@ -159,8 +159,8 @@ class RecordDAO(object):
         """Alias of data_query() to fit historical naming convention."""
         return self.data_query(**kwargs)
 
-    @classmethod
-    def _criteria_are_for_scalars(cls, criteria):
+    @staticmethod
+    def _criteria_are_for_scalars(criteria):
         """
         Determine whether criteria for a single datum describes scalars or strings.
 
