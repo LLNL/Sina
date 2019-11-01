@@ -7,6 +7,7 @@ from sina.utils import DataRange, ListQueryOperation
 from sina.model import Record
 
 
+@unittest.skip("Disabled while list queries are reworked")
 class TestSQLRecordDAOGetList(unittest.TestCase):
     """Unit tests for the SQL.RecordDAO.get_list portion of the DAO."""
 
