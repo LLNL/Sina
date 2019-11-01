@@ -32,9 +32,9 @@ TABLE_LOOKUP = {
     "string": {"record_table": schema.RecordFromStringData,
                "data_table": schema.StringDataFromRecord},
     "stringlist": {"record_table": schema.RecordFromStringListData,
-                   "data_table": schema.StringListDataFromRecord},
+                   "data_table": None},
     "scalarlist": {"record_table": schema.RecordFromScalarListData,
-                   "data_table": schema.ScalarListDataFromRecord}
+                   "data_table": None}
 }
 
 
@@ -124,16 +124,23 @@ class RecordDAO(dao.RecordDAO):
                      'force_overwrite=%s and _type_managed=%s.',
                      len(list_to_insert), force_overwrite, _type_managed)
         # Because batch is done by partition key, we'll need to store info for
-        # tables whose full per-partition info isn't supplied by one Record
+        # tables whose full per-partition info isn't supplied by one Record.
+        # Thus, these rec_from_x dicts last for the full insert.
         from_scalar_batch = defaultdict(list)
         from_string_batch = defaultdict(list)
         from_scalar_list_batch = defaultdict(list)
         from_string_list_batch = defaultdict(list)
 
-        def _cross_populate_batch(batch_dict, batch_list):
-            """Insert data into a batch dict and list."""
+        def _cross_populate_batch(batch_dict, batch_list=None):
+            """
+            Insert data into a batch dict (rec_from_x) and list (x_from_rec).
+
+            Not all data types make sense for an x_from_rec table (ex: lists),
+            so in those cases, simply skip the list population.
+            """
             batch_dict[datum_name].append((value, id, units, tags))
-            batch_list.append((datum_name, value, units, tags))
+            if batch_list is not None:
+                batch_list.append((datum_name, value, units, tags))
 
         for record in list_to_insert:
             # Insert the Record itself
@@ -146,10 +153,10 @@ class RecordDAO(dao.RecordDAO):
                    type=record.type,
                    raw=json.dumps(record.raw))
             if record.data:
+                # Unlike the rec_from_x dictionaries, these have the scope of a
+                # single Record, since the record id acts as their partition key.
                 string_from_rec_batch = []
                 scalar_from_rec_batch = []
-                string_list_from_rec_batch = []
-                scalar_list_from_rec_batch = []
                 tags, units, value, datum_name, id = [None]*5
 
                 for datum_name, datum in record.data.items():
@@ -165,22 +172,16 @@ class RecordDAO(dao.RecordDAO):
                         # This is safe as long as future functionality involving
                         # modifying already-ingested data checks type on re-ingestion
                         if not value or isinstance(value[0], numbers.Real):
-                            _cross_populate_batch(from_scalar_list_batch,
-                                                  scalar_list_from_rec_batch)
+                            _cross_populate_batch(from_scalar_list_batch)
                         else:
-                            _cross_populate_batch(from_string_list_batch,
-                                                  string_list_from_rec_batch)
+                            _cross_populate_batch(from_string_list_batch)
                     else:
                         # It's a string (or it's something else and Cassandra will yell)
                         _cross_populate_batch(from_string_batch, string_from_rec_batch)
 
-                # We've finished this record's data--do the batch inserts
+                # We've finished this record's data--do the x_from_rec batch inserts
                 for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
-                                         (schema.StringDataFromRecord, string_from_rec_batch),
-                                         (schema.ScalarListDataFromRecord,
-                                          scalar_list_from_rec_batch),
-                                         (schema.StringListDataFromRecord,
-                                          string_list_from_rec_batch)):
+                                         (schema.StringDataFromRecord, string_from_rec_batch)):
                     with BatchQuery() as batch_query:
                         create = (table.batch(batch_query).create if force_overwrite
                                   else table.batch(batch_query).if_not_exists().create)
@@ -207,8 +208,8 @@ class RecordDAO(dao.RecordDAO):
                                mimetype=doc[1],
                                tags=doc[2])
 
-        # We've gone through every record we were given. The from_scalar_batch
-        # and from_string_batch dictionaries are ready for batch inserting.
+        # We've gone through every record we were given. The rec_from_x batch
+        # dictionaries are ready for inserting.
         for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
                                       (schema.RecordFromStringData, from_string_batch)):
             for partition, data_list in six.iteritems(partition_data):
@@ -222,18 +223,26 @@ class RecordDAO(dao.RecordDAO):
                                units=entry[2],
                                tags=entry[3])
         # The RecordFromList-type tables differ form their partners slightly more
-        # to support their associated queries
-        for table, partition_data in ((schema.RecordFromScalarListData, from_scalar_list_batch),
-                                      (schema.RecordFromStringListData, from_string_list_batch)):
-            for partition, data_list in six.iteritems(partition_data):
-                with BatchQuery() as batch_query:
-                    # We no longer worry about overriding, trusting the partner
-                    # table to catch it if necessary.
-                    for entry in data_list:
-                        for value in entry[0]:
-                            table.batch(batch_query).create(name=partition,
-                                                            value=value,
-                                                            id=entry[1])
+        # to support their associated queries. They also differ from one another.
+        table = schema.RecordFromScalarListData
+        for partition, data_list in six.iteritems(from_scalar_list_batch):
+            with BatchQuery() as batch_query:
+                for entry in data_list:
+                    # We track only the min and max, that's all we need for queries
+                    table.batch(batch_query).create(name=partition,
+                                                    min=min(entry[0]),
+                                                    max=max(entry[0]),
+                                                    id=entry[1])
+        table = schema.RecordFromStringListData
+        for partition, data_list in six.iteritems(from_string_list_batch):
+            with BatchQuery() as batch_query:
+                # We no longer worry about overriding, trusting the partner
+                # table to catch it if necessary.
+                for entry in data_list:
+                    for value in entry[0]:
+                        table.batch(batch_query).create(name=partition,
+                                                        value=value,
+                                                        id=entry[1])
 
     @staticmethod
     def _insert_data(data, id, force_overwrite=False):
@@ -252,12 +261,12 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting %i data entries to Record ID %s and force_overwrite=%s.',
                      len(data), id, force_overwrite)
         for datum_name, datum in data.items():
-            schema.cross_populate_data_tables(id=id,
-                                              name=datum_name,
-                                              value=datum['value'],
-                                              units=datum.get('units'),
-                                              tags=datum.get('tags'),
-                                              force_overwrite=force_overwrite)
+            schema.cross_populate_query_tables(id=id,
+                                               name=datum_name,
+                                               value=datum['value'],
+                                               units=datum.get('units'),
+                                               tags=datum.get('tags'),
+                                               force_overwrite=force_overwrite)
 
     @staticmethod
     def _insert_files(id, files, force_overwrite=False):
@@ -328,10 +337,10 @@ class RecordDAO(dao.RecordDAO):
         # Delete every piece of data
         # Done a bit differently because record_id isn't always the partition key
         for name, datum in six.iteritems(record['data']):
-            schema.cross_batch_delete_data_tables(id=record_id,
-                                                  name=name,
-                                                  value=datum['value'],
-                                                  batch=batch)
+            schema.cross_batch_delete_query_tables(id=record_id,
+                                                   name=name,
+                                                   value=datum['value'],
+                                                   batch=batch)
 
         # Because Relationships are created separately from Records, we have to
         # manually discover all relationships. Because they are mirrored, we
@@ -514,7 +523,8 @@ class RecordDAO(dao.RecordDAO):
 
         Done per table, unlike data_query. This is only meant to be used in
         conjunction with data_query() and related. Criteria can be DataRanges
-        or single values (12, "dog", etc).
+        or single values (12, "dog", etc). As such, it is not used for the list
+        data tables.
 
         Because each piece of data is its own row and we need to compare between
         rows, we can't use a simple AND. In SQL, we get around this with
@@ -758,8 +768,12 @@ class RecordDAO(dao.RecordDAO):
         """
         Retrieve a subset of data for Records (or optionally a subset of Records).
 
-        For example, it might get "debugger_version" and "volume" for the
-        Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
+        NOTE: This is not for list-type data! If you have a use case involving
+        getting list-type data for large numbers of Records at once, please
+        let us know. For now, list-type data is ignored.
+
+        This method might, for example, get "debugger_version" and "volume" for the
+        Records with ids "foo_1" and "foo_3". Results are returned in a dictionary of
         dictionaries; the outer key is the record_id, the inner key is the
         name of the data piece (ex: "volume"). So::
 
@@ -819,8 +833,10 @@ class RecordDAO(dao.RecordDAO):
         """
         Given a specific datum for a specific Record, return its tags.
 
-        We'll go through our query tables until we find the data entry, so this
-        works for strings/scalars/lists thereof, but not non-data entries (files, etc).
+        Helper method for get_data_for_records.
+
+        We'll go through our data tables until we find the entry, so this
+        works for strings and scalars, but not lists or files.
 
         Cassandra has a limitation wherein any "IN" query stops working
         if one of the columns requested contains collections. 'tags' is a
@@ -837,8 +853,8 @@ class RecordDAO(dao.RecordDAO):
 
         :raises ValueError: if given a name or id not found in the database.
         """
-        query_tables = [TABLE_LOOKUP[x]["data_table"] for x in TABLE_LOOKUP]
-        for table in query_tables:
+        data_tables = [TABLE_LOOKUP[x]["data_table"] for x in ("scalar", "string")]
+        for table in data_tables:
             tags = (table.objects
                     .filter(table.id == id)
                     .filter(table.name == name)
@@ -960,6 +976,7 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                     object_id=entry[1]))
 
     def get(self, subject_id=None, object_id=None, predicate=None):
+        """Retrieve relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)

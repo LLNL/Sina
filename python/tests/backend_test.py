@@ -314,8 +314,7 @@ class TestModify(unittest.TestCase):
 
         def assertRightValuesReturned(restrict_subject, restrict_predicate, restrict_object):
             """
-            Assert that the right relationships are returned for the given
-            restrictions.
+            Assert that the right relationships are returned for the given restrictions.
 
             :param restrict_subject: whether to restrict the subject
             :param restrict_predicate: whether to restrict the predicate
@@ -325,7 +324,8 @@ class TestModify(unittest.TestCase):
 
             def add_restriction(restrict, key, values):
                 """
-                Add a restriction to the query
+                Add a restriction to the query.
+
                 :param restrict: whether to restrict the given key
                 :param key: the key-word parameter of the restriction
                 :param values: the array of values for the restriction
