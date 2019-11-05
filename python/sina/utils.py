@@ -33,9 +33,10 @@ class ListQueryOperation(Enum):
     (has_all(), etc).
     """
 
-    ANY = "ANY"
-    ALL = "ALL"
-    ONLY = "ONLY"
+    HAS_ANY = "HAS_ANY"
+    HAS_ALL = "HAS_ALL"
+    ANY_IN = "ANY_IN"
+    ALL_IN = "ALL_IN"
 
 
 def import_many_jsons(factory, json_list):
@@ -479,16 +480,10 @@ def sort_and_standardize_criteria(criteria_dict):
                                                          max_inclusive=True)))
         elif isinstance(criterion, DataRange) and criterion.is_lexographic_range():
             string_criteria.append((data_name, criterion))
-        elif isinstance(criterion, ListCriteria):
-            if criterion.is_numeric:
-                scalar_list_criteria.append((data_name, criterion))
-            elif criterion.is_lexographic:
-                string_list_criteria.append((data_name, criterion))
-            else:
-                raise ValueError("criteria must be a number, string, numerical"
-                                 "or lexographic DataRange, or numerical or lexographic"
-                                 "ListCriteria. Given a ListCriteria that is neither"
-                                 "numerical nor lexographic: {}".format(criterion))
+        elif isinstance(criterion, ScalarListCriteria):
+            scalar_list_criteria.append((data_name, criterion))
+        elif isinstance(criterion, StringListCriteria):
+            string_list_criteria.append((data_name, criterion))
         else:
             # Probably a null range; we don't know what table to look in
             # While we may support this in the future, we don't now.
@@ -581,99 +576,100 @@ def get_example_path(relpath,
 
 def has_all(*args):
     """
-    Create a ListCriteria representing the "ALL" operator.
+    Create a StringListCriteria representing the "HAS_ALL" operator.
 
     As an example, has_all("pineapple", "cheese") would match
     ["cheese", "pineapple"] or ["pineapple", "cheese", "pepperoni"], but not
     ["cheese"].
 
-    :param args: The values the ListCriteria will represent. Can be either single values
-                 (like "egg" or 12) or DataRanges. Every arg must represent the same
-                 type of data, either scalars or strings.
+    :param args: The values the StringListCriteria will represent. Must be one
+                 or more strings.
     :returns: A ListCriteria object representing this criterion.
     """
-    return ListCriteria(entries=args, operation="ALL")
+    return StringListCriteria(value=args, operation="HAS_ALL")
 
 
 def has_any(*args):
     """
-    Create a ListCriteria representing the "ANY" operator.
+    Create a StringListCriteria representing the "HAS_ANY" operator.
 
     As an example, has_any("pineapple", "cheese") would match
     ["cheese", "pineapple"] or ["pineapple", "cheese", "pepperoni"] or
     ["cheese"], but not ["pepperoni"].
 
-    :param args: The values the ListCriteria will represent. Can be either single values
-                 (like "egg" or 12) or DataRanges. Every arg must represent the same
-                 type of data, either scalars or strings.
-    :returns: A ListCriteria object representing this criterion.
+    :param args: The values the StringListCriteria will represent. Must be one
+                 or more strings.
+    :returns: A StringListCriteria object representing this criterion.
     """
-    return ListCriteria(entries=args, operation="ANY")
+    return StringListCriteria(value=args, operation="HAS_ANY")
 
 
-def has_only(*args):
+def all_in(args):
     """
-    Create a ListCriteria representing the "ONLY" operator.
+    Create a ScalarListCriteria representing the "ALL_IN" operator.
 
-    As an example, has_only("pineapple", "cheese") would match
-    ["cheese", "pineapple", "cheese"], but not ["pineapple", "cheese", "pepperoni"]
-    or ["cheese"].
+    As an example, all_in(0, 10) would match [0, 0, 1.67, 2, 6, 9]
+    or [5], but not [-1, 0, 1] or [1, 2.2, 3, 10].
 
-    :param args: The values the ListCriteria will represent. Can be either single values
-                 (like "egg" or 12) or DataRanges. Every arg must represent the same
-                 type of data, either scalars or strings.
-    :returns: A ListCriteria object representing this criterion.
+    :param args: The range the ScalarListCriteria will represent. Must be
+                 a single numerical DataRange.
+    :returns: A ScalarListCriteria object representing this criterion.
     """
-    return ListCriteria(entries=args, operation="ONLY")
+    return ScalarListCriteria(value=args, operation="ALL_IN")
 
 
-class ListCriteria(object):
+def any_in(args):
     """
-    Express some criteria a list datum must fulfill, such as "contains foo and bar".
+    Create a ScalarListCriteria representing the "ANY_IN" operator.
 
-    Supports the following types of operation:
-    ANY: Passes if one of the entries is found.
-    ALL: Passes if all the entries are found.
-    ONLY: Passes if ONLY the entries are found, though there can be duplicates.
+    As an example, any_in(0, 10) would match [0, 0, 1.67, 2, 6, 9]
+    or [5.19] or [-1, 1], but not [-22, -18.2] or [10, 11.111, 12].
 
-    Helper object. See has_any(), has_all(), and has_only() for more info. Used with
-    data_query() in the backends.
+    :param args: The range the ScalarListCriteria will represent. Must be
+                 a single numerical DataRange.
+    :returns: A ScalarListCriteria object representing this criterion.
+    """
+    return ScalarListCriteria(value=args, operation="ANY_IN")
+
+
+class BaseListCriteria(object):
+    """
+    Express some criteria a list datum must fulfill.
+
+    Helper object. See its children for more info. Used with data_query has_any(), etc.
     """
 
-    def __init__(self, entries, operation):
+    def __init__(self, value, operation):
         """
         Initialize ListCriteria with necessary info.
 
-        :param entries: A tuple of entries the operation will be used with.
+        :param value: The value the operation will be used with.
         :param operation: The operation the ListCriteria represents.
         """
         # The attributes on the next line are all set via properties.
-        self._entries, self._operation, self._is_numeric, self._is_lexographic = [None]*4
-        self.entries = entries
+        self._value, self._operation = [None]*2
+        self.value = value
         self.operation = operation
 
     @property
-    def entries(self):
+    def value(self):
         """
-        Get the ListCriteria's tuple of entries.
+        Get the ListCriteria's value.
 
-        :returns: the ListCriteria's entries.
+        :returns: the ListCriteria's value.
         """
-        return self._entries
+        return self._value
 
-    @entries.setter
-    def entries(self, entries):
+    @value.setter
+    def value(self, value):
         """
-        Set the Listcriteria's entries.
+        Set the Listcriteria's value.
 
-        :param entries: The ListCriteria's entries
+        :param value: The ListCriteria's value
 
-        :raises TypeError: if entries aren't a tuple.
+        :raises TypeError: if the value is the wrong type for the ListCriteria
         """
-        if not isinstance(entries, tuple):
-            raise TypeError("Entries must be expressed as a tuple, were {}."
-                            .format(entries))
-        self._validate_and_set_entries_and_type(entries)
+        self._validate_and_set_value(value)
 
     @property
     def operation(self):
@@ -687,76 +683,108 @@ class ListCriteria(object):
     @operation.setter
     def operation(self, operation):
         """
-        Set the operation the ListCriteria represents.
+        Validate and, if legal, set the operation the ListCriteria represents.
 
         :param operation: A string representing the ListCriteria's operation
                           ("ANY", "ALL", or "ONLY") or a valid ListQueryOperation.
         """
-        if not isinstance(operation, ListQueryOperation):
-            self._operation = ListQueryOperation(operation)
-        else:
-            self._operation = operation
-
-    @property
-    def is_numeric(self):
-        """
-        Get whether the ListCriteria is numeric.
-
-        A numeric ListCriteria's entries are all scalars or numeric DataRanges.
-        A ListCriteria cannot be both numeric and lexographic.
-
-        :returns: whether this ListCriteria is numeric.
-        """
-        return self._is_numeric
-
-    @property
-    def is_lexographic(self):
-        """
-        Get whether the ListCriteria is lexographic.
-
-        A numeric ListCriteria's entries are all strings or lexographic DataRanges.
-        A ListCriteria cannot be both lexographic and numeric.
-
-        :returns: whether this ListCriteria is lexographic.
-        """
-        return self._is_lexographic
+        self._validate_and_set_operation(operation)
 
     def __repr__(self):
         """Return a comprehensive (debug) representation of a ListCriteria."""
-        return ('ListCriteria <entries={}, operation={}>'
-                .format(self.entries,
+        return ('ListCriteria <value={}, operation={}>'
+                .format(self.value,
                         self.operation))
 
     def __str__(self):
         """Return a string representation of a ListCriteria."""
         return self.__repr__()
 
-    def _validate_and_set_entries_and_type(self, entries):
+    def _validate_and_set_value(self, value):
         """
-        Ensure entries are valid. If so, updates ListCriteria appropriately.
+        Ensure value is valid. If so, updates ListCriteria appropriately.
 
-        :param entries: A tuple of entries the ListCriteria should represent.
-        :raises TypeError: if not all entries are lexographic xor numeric,
-                           or if there's no entries
+        :param value: The values the ListCriteria should represent.
+        :raises TypeError: if the value is the wrong type for the ListCriteria
         """
-        if not entries:
-            raise TypeError("Entries must be a tuple of strings/lexographic DataRanges, "
-                            "or of scalars/numeric DataRanges, not empty")
-        if all((isinstance(x, Real) or
-                (isinstance(x, DataRange) and x.is_numeric_range()))
-               for x in entries):
-            self._is_numeric = True
-            self._is_lexographic = False
-            self._entries = entries
-        elif all((isinstance(x, six.string_types) or
-                  (isinstance(x, DataRange) and x.is_lexographic_range()))
-                 for x in entries):
-            self._is_numeric = False
-            self._is_lexographic = True
-            self._entries = entries
-        else:
-            raise TypeError("Entries must be only strings/lexographic DataRanges "
-                            "or only scalars/numeric DataRanges.")
+        raise NotImplementedError
+
+    def _validate_and_set_operation(self, operation):
+        """
+        Ensure operation is valid. If so, updates ListCriteria appropriately.
+
+        :param operation: The operation the ListCriteria should represent.
+        :raises TypeError: if the operation is a wrong type for the ListCriteria.
+        """
+        raise NotImplementedError
+
+
+class StringListCriteria(BaseListCriteria):
+    """
+    Express some criteria a string list datum must fulfill, such as "contains foo and bar".
+
+    Helper object. Used to express the string queries, has_any and has_all.
+    """
+
+    def _validate_and_set_value(self, value):
+        """
+        Ensure value is valid; if so, update StringListCriteria appropriately.
+
+        :param value: A tuple of strings the StringListCriteria should represent.
+        :raises TypeError: if not all value entries are strings, or if there's no entries
+        """
+        if (not value or not isinstance(value, tuple)
+                or not all((isinstance(x, six.string_types)) for x in value)):
+            raise TypeError("Value must be a tuple of strings, was {}."
+                            .format(value))
+        self._value = value
+
+    def _validate_and_set_operation(self, operation):
+        """
+        Ensure operation is valid. If so, updates StringListCriteria appropriately.
+
+        :param operation: A ListQueryOperation the StringListCriteria should represent.
+        :raises TypeError: If it's an illegal type of ListQueryOperation.
+        """
+        if not isinstance(operation, ListQueryOperation):
+            operation = ListQueryOperation(operation)
+        if operation not in (ListQueryOperation.HAS_ALL, ListQueryOperation.HAS_ANY):
+            raise TypeError("Operation {} is not valid for a tuple of strings."
+                            .format(operation))
+        self._operation = operation
+
+
+class ScalarListCriteria(BaseListCriteria):
+    """
+    Express some criteria a scalar list datum must fulfill, such as "always greater than 0".
+
+    Helper object. Used to express the scalar queries, all_in and any_in.
+    """
+
+    def _validate_and_set_value(self, value):
+        """
+        Ensure value is valid (numerical DataRange); if so, update ScalarListCriteria.
+
+        :param value: A numerical DataRange the ScalarListCriteria should represent.
+        :raises TypeError: if value is not a numerical DataRange
+        """
+        if not isinstance(value, DataRange) or not value.is_numeric_range():
+            raise TypeError('Value must be a numeric DataRange, was {}'.format(value))
+        self._value = value
+
+    def _validate_and_set_operation(self, operation):
+        """
+        Ensure operation is valid. If so, updates ScalarListCriteria appropriately.
+
+        :param operation: A ListQueryOperation the ScalarListCriteria should represent.
+        :raises TypeError: If it's an illegal type of ListQueryOperation.
+        """
+        if not isinstance(operation, ListQueryOperation):
+            operation = ListQueryOperation(operation)
+        if operation not in (ListQueryOperation.ALL_IN, ListQueryOperation.ANY_IN):
+            raise TypeError("Operation {} is not valid for a numeric datarange."
+                            .format(operation))
+        self._operation = operation
 
 
 class DataRange(object):
