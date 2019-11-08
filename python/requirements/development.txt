@@ -2,7 +2,11 @@
 -r links.txt
 
 # Development dependencies
-tox
+# more-itertools is required by other dependencies. We specify its
+# version first because newer versions drop python 2 support,
+# but use of the py2&3--compatible version is not enforced otherwise
+more-itertools<=5.0.0
+tox<3.14
 flake8
 mock
 jsonschema
