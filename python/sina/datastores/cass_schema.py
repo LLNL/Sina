@@ -211,9 +211,9 @@ def _discover_tables_from_value(value):
     # Check if it's a list
     if isinstance(value, list):
         # Check if it's a scalar or empty
-        x_from_rec, rec_from_x = ((None, RecordFromScalarListData)
-                                  if not value or isinstance(value[0], numbers.Real)
-                                  else (None, RecordFromStringListData))
+        x_from_rec = None
+        rec_from_x = (RecordFromScalarListData if not value or isinstance(value[0], numbers.Real)
+                      else RecordFromStringListData)
     else:
         x_from_rec, rec_from_x = ((ScalarDataFromRecord, RecordFromScalarData)
                                   if isinstance(value, numbers.Real)
