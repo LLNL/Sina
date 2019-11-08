@@ -94,33 +94,14 @@ class RecordFromScalarListData(Model):
     """
     Query table for finding records given scalar list criteria.
 
-    Each entry in a scalar list is given its own row in the database in this
-    table (not in its partner table) to facilitate the specific case of
-    "find Records where x contains (y, a value < y, etc.)" This is more efficient
-    for querying, but does mean that the arrangement of list members, as well as
-    any duplication within a list (rows overwrite) is lost. The partner table
-    is in charge of maintaining this order.
-
-    We store neither units nor tags since they're not required for this type of
-    query. Those are more for 'find me everything tagged "output" in "record_1"'
-    (tags) or simple retrieval (units), both of which use the partner table.
+    This is the only query table for scalar lists--if you want to
+    retrieve scalar lists for a record, you do it from the raw.
     """
 
     name = columns.Text(primary_key=True)
-    value = columns.Double(primary_key=True)
+    min = columns.Double(primary_key=True)
+    max = columns.Double(primary_key=True)
     id = columns.Text(primary_key=True)
-
-
-class ScalarListDataFromRecord(Model):
-    """Query table for finding a scalar list-valued Record.data entry given record ID."""
-
-    id = columns.Text(primary_key=True)
-    name = columns.Text(primary_key=True)
-    # CQLEngine support for frozen collections isn't part of their API.
-    # Currently, _freeze_db_type() *is* the least hacky option.
-    # pylint: disable=protected-access
-    value = columns.List(columns.Double(), primary_key=True)
-    value._freeze_db_type()
     units = columns.Text()
     tags = columns.Set(columns.Text())
 
@@ -154,25 +135,13 @@ class RecordFromStringListData(Model):
     """
     Query table for finding records given string list criteria.
 
-    Differs from its partner in the same ways as RecordFromScalarListData.
+    As with its partner, if you want to retrieve string lists for a record,
+    you do it from the raw, no dedicated query table.
     """
 
     name = columns.Text(primary_key=True)
     value = columns.Text(primary_key=True)
     id = columns.Text(primary_key=True)
-
-
-class StringListDataFromRecord(Model):
-    """Query table for finding a scalar list-valued Record.data entry given record ID."""
-
-    id = columns.Text(primary_key=True)
-    name = columns.Text(primary_key=True)
-    # Until freeze support is public-facing, this is the cleanest option
-    # pylint: disable=protected-access
-    value = columns.List(columns.Text(), primary_key=True)
-    value._freeze_db_type()
-    units = columns.Text()
-    tags = columns.Set(columns.Text())
 
 
 class Run(Model):
@@ -242,9 +211,9 @@ def _discover_tables_from_value(value):
     # Check if it's a list
     if isinstance(value, list):
         # Check if it's a scalar or empty
-        x_from_rec, rec_from_x = ((ScalarListDataFromRecord, RecordFromScalarListData)
-                                  if not value or isinstance(value[0], numbers.Real)
-                                  else (StringListDataFromRecord, RecordFromStringListData))
+        x_from_rec = None
+        rec_from_x = (RecordFromScalarListData if not value or isinstance(value[0], numbers.Real)
+                      else RecordFromStringListData)
     else:
         x_from_rec, rec_from_x = ((ScalarDataFromRecord, RecordFromScalarData)
                                   if isinstance(value, numbers.Real)
@@ -254,12 +223,12 @@ def _discover_tables_from_value(value):
 
 # Disable pylint check until the team decides to increase configuration limits or
 # refactor the code.
-def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
-                               value,
-                               id,
-                               tags=None,
-                               units=None,
-                               force_overwrite=False):
+def cross_populate_query_tables(name,  # pylint: disable=too-many-arguments
+                                value,
+                                id,
+                                tags=None,
+                                units=None,
+                                force_overwrite=False):
     """
     Simultaneously add data entries to a pair of tables.
 
@@ -287,15 +256,17 @@ def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
     x_from_rec, rec_from_x = _discover_tables_from_value(value)
 
     # Now that we know which tables to use, determine how to insert
-    x_from_rec_create = (x_from_rec.create if force_overwrite
-                         else x_from_rec.if_not_exists().create)
-    x_from_rec_create(id=id,
-                      name=name,
-                      value=value,
-                      tags=tags,
-                      units=units)
+    # Note that tables only have an "x_from_rec" if it's needed for queries
+    if x_from_rec is not None:
+        x_from_rec_create = (x_from_rec.create if force_overwrite
+                             else x_from_rec.if_not_exists().create)
+        x_from_rec_create(id=id,
+                          name=name,
+                          value=value,
+                          tags=tags,
+                          units=units)
 
-    if rec_from_x in (RecordFromStringListData, RecordFromScalarListData):
+    if rec_from_x is RecordFromStringListData:
         # We allow overwriting in the list tables, because we want only one
         # entry per value (no duplicates tracking). So we rely on the partner
         # table to detect that first if not force_overwrite (hence the early
@@ -304,6 +275,13 @@ def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
             rec_from_x.create(id=id,
                               name=name,
                               value=entry)
+    elif rec_from_x is RecordFromScalarListData:
+        # We only store the min and max because that's all we need to perform
+        # supported queries.
+        rec_from_x.create(id=id,
+                          name=name,
+                          min=min(value),
+                          max=max(value))
     else:
         rec_from_x_create = (rec_from_x.create if force_overwrite
                              else rec_from_x.if_not_exists().create)
@@ -314,10 +292,10 @@ def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
                           units=units)
 
 
-def cross_batch_delete_data_tables(name,
-                                   value,
-                                   id,
-                                   batch):
+def cross_batch_delete_query_tables(name,
+                                    value,
+                                    id,
+                                    batch):
     """
     Simultaneously create batch deletion statements for a pair of tables.
 
@@ -334,10 +312,7 @@ def cross_batch_delete_data_tables(name,
 
     x_from_rec.objects(id=id, name=name, value=value).batch(batch).delete()
 
-    if rec_from_x in (RecordFromStringListData, RecordFromScalarListData):
-        for entry in value:
-            rec_from_x.objects(id=id, name=name, value=entry).batch(batch).delete()
-    else:
+    if rec_from_x is not None:
         rec_from_x.objects(id=id, name=name, value=value).batch(batch).delete()
 
 
@@ -369,5 +344,3 @@ def form_connection(keyspace, node_ip_list=None):
     sync_table(RecordFromStringData)
     sync_table(RecordFromScalarListData)
     sync_table(RecordFromStringListData)
-    sync_table(ScalarListDataFromRecord)
-    sync_table(StringListDataFromRecord)
