@@ -612,7 +612,7 @@ def all_in(range):
     As an example, all_in(0, 10) would match [0, 0, 1.67, 2, 6, 9]
     or [5], but not [-1, 0, 1] or [1, 2.2, 3, 10].
 
-    :param args: The range the ScalarListCriteria will represent. Must be
+    :param range: The range the ScalarListCriteria will represent. Must be
                  a single numerical DataRange.
     :returns: A ScalarListCriteria object representing this criterion.
     """
