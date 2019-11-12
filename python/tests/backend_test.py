@@ -74,7 +74,7 @@ def populate_database_with_data(record_dao):
     spam_record_5 = Record(id="spam5", type="run")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
     spam_record_5.data["val_data_3"] = {"value": "sugar"}
-    spam_record_5.data["val_data_list_1"] = {"value": [0, 9.3]}
+    spam_record_5.data["val_data_list_1"] = {"value": [0, 8]}
     spam_record_5.data["val_data_list_2"] = {"value": ['eggs', 'pancake']}
     spam_record_5.files = {"beep.wav": {"tags": ["output", "eggs"],
                                         "mimetype": 'audio/wav'}}
@@ -581,30 +581,46 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("spam5", just_5_and_6)
         self.assertIn("spam6", just_5_and_6)
 
-    def test_recorddao_data_query_all_in_mixed(self):
-        """
-        Test that the RecordDAO is retrieving on mixed data types for has_all.
+    def test_recorddao_data_query_scalar_list_inclusive(self):
+        """Test that inclusiveness is respected for all_in and any_in."""
+        not_4 = list(self.record_dao.data_query(
+            val_data_list_1=any_in(DataRange(-9, 0,
+                                             min_inclusive=False,
+                                             max_inclusive=True))))  # 5, not 4
+        self.assertEqual(len(not_4), 1)
+        self.assertIn("spam5", not_4)
+        only_5 = list(self.record_dao.data_query(
+            val_data_list_1=all_in(DataRange(0, 8,
+                                             max_inclusive=True))))  # 5
+        self.assertEqual(len(only_5), 1)
+        self.assertIn("spam5", only_5)
+        none = list(self.record_dao.data_query(
+            val_data_list_1=all_in(DataRange(0, 8,
+                                             min_inclusive=False))))  # 5
+        self.assertEqual(none, [])
 
-        Test that we can mix searching on scalars and lists of scalars.
-        """
-        just_5 = list(self.record_dao.data_query(
-            val_data_list_1=all_in(DataRange(min=-9, max=20,
-                                             min_inclusive=False, max_inclusive=True)),  # 5 & 6
-            spam_scal_3=DataRange(0, 50)))  # 5 only
-        self.assertEqual(len(just_5), 1)
-        self.assertEqual(just_5[0], "spam5")
+    def test_recorddao_data_query_any_in_open_range(self):
+        """Test that any-in works with partially open DataRanges."""
+        just_5_and_6 = list(self.record_dao.data_query(
+            val_data_list_1=any_in(DataRange(min=-1))))  # 5 & 6
+        self.assertEqual(len(just_5_and_6), 2)
+        self.assertIn("spam5", just_5_and_6)
+        self.assertIn("spam6", just_5_and_6)
+        just_4 = list(self.record_dao.data_query(
+            val_data_list_1=any_in(DataRange(max=-1))))  # 4
+        self.assertEqual(len(just_4), 1)
+        self.assertIn("spam4", just_4)
 
-    def test_recorddao_data_query_any_in_mixed(self):
-        """
-        Test that the RecordDAO is retrieving on mixed data types for has_any.
-
-        Test that we can mix searching on scalars and lists of scalars.
-        """
-        just_5 = list(self.record_dao.data_query(
-            val_data_list_1=any_in(DataRange(-1, 9)),  # 5 & 6
-            spam_scal_3=DataRange(0, 50)))  # 5 only
-        self.assertEqual(len(just_5), 1)
-        self.assertEqual(just_5[0], "spam5")
+    def test_recorddao_data_query_all_in_open_range(self):
+        """Test that all-in works with partially open DataRanges."""
+        just_6 = list(self.record_dao.data_query(
+            val_data_list_1=all_in(DataRange(min=8))))  # 6
+        self.assertEqual(len(just_6), 1)
+        self.assertIn("spam6", just_6)
+        just_4 = list(self.record_dao.data_query(
+            val_data_list_1=all_in(DataRange(max=0))))  # 4
+        self.assertEqual(len(just_4), 1)
+        self.assertIn("spam4", just_4)
 
     def test_recorddao_data_query_string_list_has_all(self):
         """Test that the RecordDAO is retrieving on a has_all list of strings."""
@@ -626,11 +642,11 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """
         Test that the RecordDAO is retrieving on mixed data criteria.
 
-        Test that we can mix searching on strings, lists of strings, and lists of scalars.
+        Test that we can mix searching on strings, lists of strings, and dataranges.
         """
         just_6 = list(self.record_dao.data_query(
             val_data_list_2=has_all('eggs', 'pancake'),  # 5 & 6
-            val_data_list_1=any_in(0, 8, max_inclusive=True),  # 5 & 6
+            val_data_list_1=any_in(DataRange(0, 8, max_inclusive=True)),  # 5 & 6
             val_data_3='syrup'))  # 6 only
         self.assertEqual(len(just_6), 1)
         self.assertEqual(just_6[0], "spam6")
@@ -640,14 +656,14 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         Test that the RecordDAO is retrieving on mixed data criteria.
 
         Test that we can mix searching on strings, scalars, lists of strings,
-        and lists of scalars, using has_all, has_any, all_in, any_in, and
+        and dataranges, using has_all, has_any, all_in, any_in, and
         simple equivalence.
         """
         no_match = list(self.record_dao.data_query(
             val_data_list_1=any_in(DataRange(8, 8, max_inclusive=True)),  # 5 & 6
             spam_scal_3=DataRange(0, 50),  # 5 only
             val_data_list_2=has_all('eggs'),  # 5 & 6
-            val_data_3=all_in(7, 21)))  # 6 only
+            val_data_3=all_in(DataRange(7, 21))))  # 6 only
         self.assertFalse(no_match)
 
         just_5 = list(self.record_dao.data_query(

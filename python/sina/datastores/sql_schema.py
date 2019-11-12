@@ -146,6 +146,7 @@ class ListScalarData(Base):
     max = Column(Float(), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
+    Index('scalarlist_name_idx', name)
 
     # We disable too-many-arguments because they're all needed to form the table.
     def __init__(self, id, name, min, max,  # pylint: disable=too-many-arguments

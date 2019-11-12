@@ -192,46 +192,31 @@ class RecordDAO(dao.RecordDAO):
             raise ValueError("You must supply at least one criterion.")
         (scalar_criteria,
          string_criteria,
-         scalarlist,
-         stringlist) = sort_and_standardize_criteria(kwargs)
+         scalarlist_criteria,
+         stringlist_criteria) = sort_and_standardize_criteria(kwargs)
         result_ids = []
 
-        if scalar_criteria:
-            scalar_query = self.session.query(schema.ScalarData.id)
-            scalar_query = self._apply_ranges_to_query(scalar_query,
-                                                       scalar_criteria,
-                                                       schema.ScalarData)
-        if string_criteria:
-            string_query = self.session.query(schema.StringData.id)
-            string_query = self._apply_ranges_to_query(string_query,
-                                                       string_criteria,
-                                                       schema.StringData)
-        #  If we have more than one set of data, we need to perform a union
-        if scalar_criteria and string_criteria:
-            and_query = scalar_query.intersect(string_query)
-            result_ids.append(str(x[0]) for x in and_query.all())
-        # Otherwise, just find which one has something to return
-        elif scalar_criteria:
-            result_ids.append(str(x[0]) for x in scalar_query.all())
-        elif string_criteria:
-            result_ids.append(str(x[0]) for x in string_query.all())
+        # First handle scalar and string criteria
+        for criteria, table in ((scalar_criteria, schema.ScalarData),
+                                (string_criteria, schema.StringData)):
+            if criteria:
+                query = self.session.query(table.id)
+                query = self._apply_ranges_to_query(query,
+                                                    criteria,
+                                                    table)
+                result_ids.append(str(x[0]) for x in query.all())
 
         # Move on to any list criteria
-        for criterion in stringlist:
-            # Unpack the criterion
-            datum_name, list_criteria = criterion
-            ids = self.list_query(datum_name=datum_name,
-                                  list_of_contents=list_criteria.entries,
-                                  ids_only=True,
-                                  operation=list_criteria.operation)
-            result_ids.append(ids)
-        for criterion in scalarlist:
-            # Unpack the criterion
-            datum_name, list_criteria = criterion
-            result_ids.append(self._scalar_list_query(datum_name=datum_name,
-                                                      datarange=list_criteria.entries[0],
-                                                      operation=list_criteria.operation,
-                                                      ids_only=True))
+        for criteria, query_func in ((stringlist_criteria, self._string_list_query),
+                                     (scalarlist_criteria, self._scalar_list_query)):
+            for criterion in criteria:
+                # Unpack
+                datum_name, list_criteria = criterion
+                ids = query_func(datum_name=datum_name,
+                                 criterion=list_criteria.value,
+                                 operation=list_criteria.operation)
+                result_ids.append(ids)
+
         # If we have more than one set of data, we need to find the intersect.
         for id in utils.intersect_lists(result_ids):
             yield id
@@ -275,44 +260,51 @@ class RecordDAO(dao.RecordDAO):
     def _scalar_list_query(self,
                            datum_name,
                            operation,
-                           datarange,
-                           ids_only=False):
+                           criterion):
         """
         Return all Records where [datum_name] fulfills [operation] on [datarange].
 
         Helper method for data_query.
+
+        :param datum_name: The name of the datum
+        :param criterion: A datarange to be used with <operation>
+        :pram operation: What kind of ListQueryOperation to do.
+        :returns: A generator of ids of matching Records.
+        :raises ValueError: if given an empty list_of_contents
         """
         LOGGER.info('Finding Records where datum %s has %s in %s', datum_name,
-                    operation.value.split('_')[0], datarange)
-        table = schema.ScalarListData
+                    operation.value.split('_')[0], criterion)
+        table = schema.ListScalarData
         query = self.session.query(table.id)
         filters = []
         if operation == utils.ListQueryOperation.ALL_IN:
-            query_op = sqlalchemy.and_
+            # What must be [>,>=] the criterion's min
+            gt_crit_min = table.min
+            # What must be [<,<=] the criterion's max
+            lt_crit_max = table.max
         elif operation == utils.ListQueryOperation.ANY_IN:
-            query_op = sqlalchemy.or_
+            gt_crit_min = table.max
+            lt_crit_max = table.min
         else:
-            raise ValueError("Given an invalid operation for a scalar list query: {}"
+            raise ValueError("Given an invalid operation for a scalar range query: {}"
                              .format(operation.value))
-        for col, criteria, inclusive in ((table.min, datarange.min, datarange.min_inclusive),
-                                         (table.max, datarange.max, datarange.max_inclusive)):
-            if criteria is not None:
-                col_op = col.__ge__ if inclusive else col.__gt__
-                filters.append(col_op(datarange.min))
-        record_ids = query.filter(query_op(*filters))
-        if ids_only:
-            for record_id in record_ids:
-                yield record_id
-        else:
-            for record in self.get_many(record_ids):
-                yield record
+        # Set whether it's > or >=, < or <=
+        if criterion.min is not None:
+            col_op = gt_crit_min.__ge__ if criterion.min_inclusive else gt_crit_min.__gt__
+            filters.append(col_op(criterion.min))
+        if criterion.max is not None:
+            col_op = lt_crit_max.__le__ if criterion.max_inclusive else lt_crit_max.__lt__
+            filters.append(col_op(criterion.max))
+
+        record_ids = query.filter(*filters)
+        for record_id in record_ids:
+            yield record_id[0]
 
     # Disable the pylint check to if and until the team decides to refactor the method
     def _string_list_query(self,  # pylint: disable=too-many-branches
                            datum_name,
-                           list_of_contents,
-                           operation,
-                           ids_only=False):
+                           criterion,
+                           operation):
         """
         Given a string list datum and values, return Records where the datum contains those values.
 
@@ -325,24 +317,22 @@ class RecordDAO(dao.RecordDAO):
         sure datum_name is the name of a string list-type datum.
 
         :param datum_name: The name of the datum
-        :param list_of_contents: All the values datum_name must contain.
-                                 Must be a list of string values.
+        :param criterion: A list of strings datum_name must contain.
         :pram operation: What kind of ListQueryOperation to do.
-        :param ids_only: Whether to only return ids rather than full Records.
         :returns: A generator of ids of matching Records or the Records
                   themselves (see ids_only).
         :raises ValueError: if given an empty list_of_contents
         """
         LOGGER.info('Finding Records where datum %s contains %s: %s', datum_name,
-                    operation.value.split('_')[1], list_of_contents)
-        if not list_of_contents:
+                    operation.value.split('_')[1], criterion)
+        if not criterion:
             raise ValueError("Must supply at least one entry in "
                              "list_of_contents for {}".format(datum_name))
 
         list_of_record_ids_sets = []
         list_of_record_ids_sets.extend(
-            self._list_query(datum_name=datum_name,
-                             list_of_contents=list_of_contents))
+            self._execute_string_list_query(datum_name=datum_name,
+                                            list_of_contents=criterion))
 
         # This reduce "ands" together all the sets (one per criterion),
         # creating one set that adheres to all our individual criterion sets.
@@ -350,12 +340,8 @@ class RecordDAO(dao.RecordDAO):
             record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
         elif operation == utils.ListQueryOperation.HAS_ANY:
             record_ids = set.union(*list_of_record_ids_sets)
-        if ids_only:
-            for record_id in record_ids:
-                yield record_id
-        else:
-            for record in self.get_many(record_ids):
-                yield record
+        for record_id in record_ids:
+            yield record_id
 
     def _execute_string_list_query(self, datum_name, list_of_contents):
         """
