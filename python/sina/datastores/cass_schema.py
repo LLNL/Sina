@@ -5,7 +5,7 @@ Based on Mnoda
 """
 import numbers
 import logging
-import os  # Used for resolving ~-containing paths
+import os
 import getpass
 
 # Disable pylint checks due to ubiquitous use of id,
@@ -366,9 +366,6 @@ def form_connection(keyspace, node_ip_list=None, sonar_cqlshrc_path=None):
     """
     Set up our connection info and prep our tables.
 
-    Note the lack of a "session" object. Looks like each cqlengine
-    create-statement lightly builds its own.
-
     :param keyspace: The keyspace to connect to.
     :param node_ip_list: A list of ips belonging to nodes on the target
                          Cassandra instance. If None, connects to localhost.
@@ -400,6 +397,7 @@ def form_connection(keyspace, node_ip_list=None, sonar_cqlshrc_path=None):
         session = cluster.connect()
         session.set_keyspace(keyspace)
         connection.set_session(session)
+        sync_tables()
     else:
         if not node_ip_list:
             node_ip_list = ['127.0.0.1']
