@@ -440,42 +440,46 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
     def test_basic_stringlistcriteria(self):
         """Test that StringListCriteria can be initialized properly."""
         strings = ("spam", "eggs")
-        has_all_alt = sina.utils.ListQueryOperation.HAS_ALL
-        with_strings = StringListCriteria(value=strings, operation="HAS_ALL")
+        has_all = sina.utils.ListQueryOperation.HAS_ALL
+        with_strings = StringListCriteria(value=strings, operation=has_all)
         self.assertEqual(with_strings.value, strings)
-        self.assertEqual(with_strings.operation, has_all_alt)
+        self.assertEqual(with_strings.operation, has_all)
 
     def test_basic_scalarlistcriteria(self):
         """Test that ScalarListCriteria can be initialized properly."""
         datarange = DataRange(1, 4)
-        all_in_alt = sina.utils.ListQueryOperation.ALL_IN
-        with_scalars = ScalarListCriteria(value=datarange, operation=all_in_alt)
+        all_in = sina.utils.ListQueryOperation.ALL_IN
+        with_scalars = ScalarListCriteria(value=datarange, operation=all_in)
         self.assertEqual(with_scalars.value, datarange)
-        self.assertEqual(with_scalars.operation, all_in_alt)
+        self.assertEqual(with_scalars.operation, all_in)
 
     def test_stringlistcriteria_assignment(self):
         """Verify StringListCriteria setters and getters are working as expected."""
         strings = ("spam", "eggs")
         new_strings = ("ham", "hashbrowns")
-        criteria = StringListCriteria(value=strings, operation="HAS_ALL")
+        criteria = StringListCriteria(value=strings,
+                                      operation=sina.utils.ListQueryOperation.HAS_ALL)
         # Setters (we're using @property)
         criteria.value = new_strings
-        criteria.operation = "HAS_ANY"
+        has_any = sina.utils.ListQueryOperation.HAS_ALL
+        criteria.operation = has_any
         # Getters
         self.assertEqual(criteria.value, new_strings)
-        self.assertEqual(criteria.operation, sina.utils.ListQueryOperation.HAS_ANY)
+        self.assertEqual(criteria.operation, has_any)
 
     def test_scalarlistcriteria_assignment(self):
         """Verify ScalarListCriteria setters and getters are working as expected."""
         datarange = DataRange(1, 4)
         new_range = DataRange(7, 10)
-        criteria = ScalarListCriteria(value=datarange, operation="ALL_IN")
+        criteria = ScalarListCriteria(value=datarange,
+                                      operation=sina.utils.ListQueryOperation.ALL_IN)
         # Setters (we're using @property)
         criteria.value = new_range
-        criteria.operation = "ANY_IN"
+        any_in = sina.utils.ListQueryOperation.ANY_IN
+        criteria.operation = any_in
         # Getters
         self.assertEqual(criteria.value, new_range)
-        self.assertEqual(criteria.operation, sina.utils.ListQueryOperation.ANY_IN)
+        self.assertEqual(criteria.operation, any_in)
 
     def test_stringlistcriteria_tostring(self):
         """Verify that StringListCriteria display as expected."""
@@ -486,31 +490,23 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
                          'StringListCriteria <value={}, operation={}>'
                          .format(strings, all_alt))
 
-    def test_stringlistcriteria_validation_tuple(self):
-        """Test StringListCriteria only accepts a tuple."""
-        valid_vals = ("spam", "eggs")
-        disallowed_iter = ["spam", "eggs"]
-        criteria = StringListCriteria(value=valid_vals, operation="HAS_ALL")
-        with self.assertRaises(TypeError) as context:
-            criteria.value = disallowed_iter
-        self.assertIn("Value must be a tuple of strings",
-                      str(context.exception))
-
     def test_stringlistcriteria_validation_values_exist(self):
-        """Test StringListCriteria enforces a non-empty value tuple."""
+        """Test StringListCriteria enforces a non-empty value iterator."""
         valid_vals = ("spam", "eggs")
         no_vals = ()
-        criteria = StringListCriteria(value=valid_vals, operation="HAS_ALL")
+        criteria = StringListCriteria(value=valid_vals,
+                                      operation=sina.utils.ListQueryOperation.HAS_ALL)
         with self.assertRaises(TypeError) as context:
             criteria.value = no_vals
-        self.assertIn('Value must be a tuple of strings',
+        self.assertIn('Value must be a non-empty iterable of strings',
                       str(context.exception))
 
     def test_scalarlistcriteria_validation_datarange(self):
         """Test ScalarListCriteria only accepts a datarange."""
         valid_val = DataRange(1, 2, max_inclusive=True)
         disallowed_iter = [1, 2]
-        criteria = ScalarListCriteria(value=valid_val, operation="ALL_IN")
+        criteria = ScalarListCriteria(value=valid_val,
+                                      operation=sina.utils.ListQueryOperation.ALL_IN)
         with self.assertRaises(TypeError) as context:
             criteria.value = disallowed_iter
         self.assertIn('Value must be a numeric DataRange',
@@ -520,60 +516,68 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
         """Test StringListCriteria enforces value entries being strings."""
         valid_vals = ("spam", "eggs")
         invalid_vals = (1, 2)
-        criteria = StringListCriteria(value=valid_vals, operation="HAS_ALL")
+        criteria = StringListCriteria(value=valid_vals,
+                                      operation=sina.utils.ListQueryOperation.HAS_ALL)
         with self.assertRaises(TypeError) as context:
             criteria.value = invalid_vals
-        self.assertIn('Value must be a tuple of strings', str(context.exception))
+        self.assertIn('Value must be a non-empty iterable of strings', str(context.exception))
 
     def test_scalarlistcriteria_validation_value_type(self):
         """Test ScalarListCriteria enforces range being numeric."""
         valid_vals = DataRange(1, 2)
         invalid_vals = DataRange("moo", "zar")
-        criteria = ScalarListCriteria(value=valid_vals, operation="ALL_IN")
+        criteria = ScalarListCriteria(value=valid_vals,
+                                      operation=sina.utils.ListQueryOperation.ALL_IN)
         with self.assertRaises(TypeError) as context:
             criteria.value = invalid_vals
         self.assertIn("Value must be a numeric DataRange", str(context.exception))
 
     def test_stringlistcriteria_validation_operator(self):
         """Test StringListCriteria enforces choosing a valid ListQueryOperation."""
-        criteria = StringListCriteria(value=("spam", "eggs"), operation="HAS_ALL")
+        criteria = StringListCriteria(value=("spam", "eggs"),
+                                      operation=sina.utils.ListQueryOperation.HAS_ALL)
         with self.assertRaises(TypeError) as context:
-            criteria.operation = "ALL_IN"
-        self.assertIn('is not valid for a tuple of strings',
+            criteria.operation = sina.utils.ListQueryOperation.ALL_IN
+        self.assertIn('is not valid for an iterable of strings',
                       str(context.exception))
 
     def test_scalarlistcriteria_validation_operator(self):
         """Test ScalarListCriteria enforces choosing a valid ListQueryOperation."""
-        criteria = ScalarListCriteria(value=DataRange(2), operation="ANY_IN")
+        criteria = ScalarListCriteria(value=DataRange(2),
+                                      operation=sina.utils.ListQueryOperation.ANY_IN)
         with self.assertRaises(TypeError) as context:
-            criteria.operation = "HAS_ANY"
+            criteria.operation = sina.utils.ListQueryOperation.HAS_ANY
         self.assertIn('is not valid for a numeric datarange', str(context.exception))
 
     def test_has_all(self):
         """Test that has_all is creating the expected StringListCriteria object."""
         has_all = sina.utils.has_all("spam", "egg")
-        equiv = StringListCriteria(value=("spam", "egg"), operation="HAS_ALL")
+        equiv = StringListCriteria(value=("spam", "egg"),
+                                   operation=sina.utils.ListQueryOperation.HAS_ALL)
         self.assertEqual(has_all.value, equiv.value)
         self.assertEqual(has_all.operation, equiv.operation)
 
     def test_has_any(self):
         """Test that has_any is creating the expected StringListCriteria object."""
         has_any = sina.utils.has_any("spam", "egg")
-        equiv = StringListCriteria(value=("spam", "egg"), operation="HAS_ANY")
+        equiv = StringListCriteria(value=("spam", "egg"),
+                                   operation=sina.utils.ListQueryOperation.HAS_ANY)
         self.assertEqual(has_any.value, equiv.value)
         self.assertEqual(has_any.operation, equiv.operation)
 
     def test_all_in(self):
         """Test that all_in is creating the expected ScalarListCriteria object."""
         all_in = sina.utils.all_in(DataRange(1, 2))
-        equiv = ScalarListCriteria(value=DataRange(1, 2), operation="ALL_IN")
+        equiv = ScalarListCriteria(value=DataRange(1, 2),
+                                   operation=sina.utils.ListQueryOperation.ALL_IN)
         self.assertEqual(all_in.value, equiv.value)
         self.assertEqual(all_in.operation, equiv.operation)
 
     def test_any_in(self):
         """Test that any_in is creating the expected ScalarListCriteria object."""
         any_in = sina.utils.any_in(DataRange(1, 2))
-        equiv = ScalarListCriteria(value=DataRange(1, 2), operation="ANY_IN")
+        equiv = ScalarListCriteria(value=DataRange(1, 2),
+                                   operation=sina.utils.ListQueryOperation.ANY_IN)
         self.assertEqual(any_in.value, equiv.value)
         self.assertEqual(any_in.operation, equiv.operation)
 
@@ -584,9 +588,9 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
                     "num": 12,
                     "num2": 2,
                     "listnum": ScalarListCriteria(value=DataRange(1, 2),
-                                                  operation="ALL_IN"),
+                                                  operation=sina.utils.ListQueryOperation.ANY_IN),
                     "liststr": StringListCriteria(value=("foo", "bar"),
-                                                  operation="HAS_ANY"),
+                                                  operation=sina.utils.ListQueryOperation.HAS_ANY),
                     "lex": "cat"}
         scalar, string, scalar_list, string_list = sort_and_standardize_criteria(criteria)
         num_equiv = DataRange(12, 12, max_inclusive=True)

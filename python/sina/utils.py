@@ -1,5 +1,6 @@
 """Module for handling miscellany."""
 from __future__ import print_function
+import abc
 import logging
 import json
 import os
@@ -574,7 +575,7 @@ def get_example_path(relpath,
     return filename
 
 
-def has_all(*args):
+def has_all(*values):
     """
     Create a StringListCriteria representing the "HAS_ALL" operator.
 
@@ -582,14 +583,14 @@ def has_all(*args):
     ["cheese", "pineapple"] or ["pineapple", "cheese", "pepperoni"], but not
     ["cheese"].
 
-    :param args: The values the StringListCriteria will represent. Must be one
-                 or more strings.
+    :param values: The values the StringListCriteria will represent. Must be one
+                   or more strings.
     :returns: A ListCriteria object representing this criterion.
     """
-    return StringListCriteria(value=args, operation="HAS_ALL")
+    return StringListCriteria(value=values, operation=ListQueryOperation.HAS_ALL)
 
 
-def has_any(*args):
+def has_any(*values):
     """
     Create a StringListCriteria representing the "HAS_ANY" operator.
 
@@ -597,39 +598,39 @@ def has_any(*args):
     ["cheese", "pineapple"] or ["pineapple", "cheese", "pepperoni"] or
     ["cheese"], but not ["pepperoni"].
 
-    :param args: The values the StringListCriteria will represent. Must be one
-                 or more strings.
+    :param values: The values the StringListCriteria will represent. Must be one
+                   or more strings.
     :returns: A StringListCriteria object representing this criterion.
     """
-    return StringListCriteria(value=args, operation="HAS_ANY")
+    return StringListCriteria(value=values, operation=ListQueryOperation.HAS_ANY)
 
 
-def all_in(args):
+def all_in(range):
     """
     Create a ScalarListCriteria representing the "ALL_IN" operator.
 
     As an example, all_in(0, 10) would match [0, 0, 1.67, 2, 6, 9]
     or [5], but not [-1, 0, 1] or [1, 2.2, 3, 10].
 
-    :param args: The range the ScalarListCriteria will represent. Must be
+    :param range: The range the ScalarListCriteria will represent. Must be
                  a single numerical DataRange.
     :returns: A ScalarListCriteria object representing this criterion.
     """
-    return ScalarListCriteria(value=args, operation="ALL_IN")
+    return ScalarListCriteria(value=range, operation=ListQueryOperation.ALL_IN)
 
 
-def any_in(args):
+def any_in(range):
     """
     Create a ScalarListCriteria representing the "ANY_IN" operator.
 
     As an example, any_in(0, 10) would match [0, 0, 1.67, 2, 6, 9]
     or [5.19] or [-1, 1], but not [-22, -18.2] or [10, 11.111, 12].
 
-    :param args: The range the ScalarListCriteria will represent. Must be
-                 a single numerical DataRange.
+    :param range: The range the ScalarListCriteria will represent. Must be
+                  a single numerical DataRange.
     :returns: A ScalarListCriteria object representing this criterion.
     """
-    return ScalarListCriteria(value=args, operation="ANY_IN")
+    return ScalarListCriteria(value=range, operation=ListQueryOperation.ANY_IN)
 
 
 class BaseListCriteria(object):
@@ -639,6 +640,8 @@ class BaseListCriteria(object):
     Helper object. See its children for more info. Used with data_query has_any(), etc.
     """
 
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self, value, operation):
         """
         Initialize ListCriteria with necessary info.
@@ -647,7 +650,8 @@ class BaseListCriteria(object):
         :param operation: The operation the ListCriteria represents.
         """
         # The attributes on the next line are all set via properties.
-        self._value, self._operation = [None]*2
+        self._value = None
+        self._operation = None
         self.value = value
         self.operation = operation
 
@@ -700,6 +704,7 @@ class BaseListCriteria(object):
         """Return a string representation of a ListCriteria."""
         return self.__repr__()
 
+    @abc.abstractmethod
     def _validate_and_set_value(self, value):
         """
         Ensure value is valid. If so, updates ListCriteria appropriately.
@@ -709,6 +714,7 @@ class BaseListCriteria(object):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
     def _validate_and_set_operation(self, operation):
         """
         Ensure operation is valid. If so, updates ListCriteria appropriately.
@@ -730,12 +736,12 @@ class StringListCriteria(BaseListCriteria):
         """
         Ensure value is valid; if so, update StringListCriteria appropriately.
 
-        :param value: A tuple of strings the StringListCriteria should represent.
+        :param value: An iterator of strings the StringListCriteria should represent.
         :raises TypeError: if not all value entries are strings, or if there's no entries
         """
-        if (not value or not isinstance(value, tuple)
-                or not all((isinstance(x, six.string_types)) for x in value)):
-            raise TypeError("Value must be a tuple of strings, was {}."
+        vals = list(value)  # This guarantees it is some sort of iterable
+        if not vals or not all(isinstance(x, six.string_types) for x in vals):
+            raise TypeError("Value must be a non-empty iterable of strings, was {}."
                             .format(value))
         self._value = value
 
@@ -746,10 +752,8 @@ class StringListCriteria(BaseListCriteria):
         :param operation: A ListQueryOperation the StringListCriteria should represent.
         :raises TypeError: If it's an illegal type of ListQueryOperation.
         """
-        if not isinstance(operation, ListQueryOperation):
-            operation = ListQueryOperation(operation)
         if operation not in (ListQueryOperation.HAS_ALL, ListQueryOperation.HAS_ANY):
-            raise TypeError("Operation {} is not valid for a tuple of strings."
+            raise TypeError("Operation {} is not valid for an iterable of strings."
                             .format(operation))
         self._operation = operation
 
@@ -779,8 +783,6 @@ class ScalarListCriteria(BaseListCriteria):
         :param operation: A ListQueryOperation the ScalarListCriteria should represent.
         :raises TypeError: If it's an illegal type of ListQueryOperation.
         """
-        if not isinstance(operation, ListQueryOperation):
-            operation = ListQueryOperation(operation)
         if operation not in (ListQueryOperation.ALL_IN, ListQueryOperation.ANY_IN):
             raise TypeError("Operation {} is not valid for a numeric datarange."
                             .format(operation))
