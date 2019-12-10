@@ -90,20 +90,32 @@ class ScalarDataFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class RecordFromScalarListData(Model):
+class RecordFromScalarListDataMin(Model):
     """
     Query table for finding records given scalar list criteria.
 
-    This is the only query table for scalar lists--if you want to
-    retrieve scalar lists for a record, you do it from the raw.
+    Because of how Cassandra restricts querying--you can't do two key ranges
+    in one query, essentially--we need to break min and max into different
+    tables. Min is used for range queries where only a min is specified,
+    Max for Max, both for both. If this runs into memory issues, it may be
+    possible to allow_filtering() and combine the tables.
     """
 
     name = columns.Text(primary_key=True)
     min = columns.Double(primary_key=True)
+    id = columns.Text(primary_key=True)
+
+
+class RecordFromScalarListDataMax(Model):
+    """
+    Query table for finding records given scalar list criteria.
+
+    Companion table to RecordFromScalarListDataMin, see its note for explanation.
+    """
+
+    name = columns.Text(primary_key=True)
     max = columns.Double(primary_key=True)
     id = columns.Text(primary_key=True)
-    units = columns.Text()
-    tags = columns.Set(columns.Text())
 
 
 class RecordFromStringData(Model):
@@ -212,7 +224,8 @@ def _discover_tables_from_value(value):
     if isinstance(value, list):
         # Check if it's a scalar or empty
         x_from_rec = None
-        rec_from_x = (RecordFromScalarListData if not value or isinstance(value[0], numbers.Real)
+        rec_from_x = (RecordFromScalarListDataMin if not value or isinstance(value[0],
+                                                                             numbers.Real)
                       else RecordFromStringListData)
     else:
         x_from_rec, rec_from_x = ((ScalarDataFromRecord, RecordFromScalarData)
@@ -267,7 +280,7 @@ def cross_populate_query_tables(name,  # pylint: disable=too-many-arguments
                           units=units)
 
     if rec_from_x is RecordFromStringListData:
-        # We allow overwriting in the list tables, because we want only one
+        # We allow overwriting in the string list table, because we want only one
         # entry per value (no duplicates tracking). So we rely on the partner
         # table to detect that first if not force_overwrite (hence the early
         # insert). Also, since we only want one value per entry, we loop.
@@ -275,13 +288,22 @@ def cross_populate_query_tables(name,  # pylint: disable=too-many-arguments
             rec_from_x.create(id=id,
                               name=name,
                               value=entry)
-    elif rec_from_x is RecordFromScalarListData:
+
+    elif rec_from_x is RecordFromScalarListDataMin:
         # We only store the min and max because that's all we need to perform
         # supported queries.
+        rec_from_x_create = (rec_from_x.create if force_overwrite
+                             else rec_from_x.if_not_exists().create)
+        # There's a small supporting table we insert into as well.
+        rec_from_x_max_create = (RecordFromScalarListDataMax.create if force_overwrite
+                                 else RecordFromScalarListDataMax.if_not_exists().create)
         rec_from_x.create(id=id,
                           name=name,
-                          min=min(value),
-                          max=max(value))
+                          min=min(value))
+        rec_from_x_max_create(id=id,
+                              name=name,
+                              max=max(value))
+
     else:
         rec_from_x_create = (rec_from_x.create if force_overwrite
                              else rec_from_x.if_not_exists().create)
@@ -342,5 +364,6 @@ def form_connection(keyspace, node_ip_list=None):
     sync_table(ScalarDataFromRecord)
     sync_table(StringDataFromRecord)
     sync_table(RecordFromStringData)
-    sync_table(RecordFromScalarListData)
+    sync_table(RecordFromScalarListDataMin)
+    sync_table(RecordFromScalarListDataMax)
     sync_table(RecordFromStringListData)
