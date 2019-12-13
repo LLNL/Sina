@@ -297,7 +297,7 @@ def cross_populate_query_tables(name,  # pylint: disable=too-many-arguments
         # There's a small supporting table we insert into as well.
         rec_from_x_max_create = (RecordFromScalarListDataMax.create if force_overwrite
                                  else RecordFromScalarListDataMax.if_not_exists().create)
-        rec_from_x.create(id=id,
+        rec_from_x_create(id=id,
                           name=name,
                           min=min(value))
         rec_from_x_max_create(id=id,
