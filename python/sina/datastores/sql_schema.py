@@ -117,100 +117,67 @@ class ScalarData(Base):
                         self.units))
 
 
-class ListScalarDataMaster(Base):
+class ListScalarData(Base):
     """
     Implementation of a table to store info about lists of scalar-type data.
 
-    Info that applies to all values in the list are stored here. The list
+    The list itself isn't stored (because it isn't queried)--get it from the raw.
+    Info that applies to the entirety of the list is stored here. The list
     scalar tables relates record ids to contained lists of data if (and only
     if) those data entries have lists of numerical values. For example,
     "density":{"value":[200.14, 12]} would be represented here, but
     "strategy":{"value":["best-fit", "some-string"]} would not be. Instead,
     it would go in the ListStringDataMaster table. Scalar and
-    string data cannot be mixed in the same list. The list entries themselves
-    are stored in the ListScalarDataEntry table.
+    string data cannot be mixed in the same list.
 
     These tables are not exposed to the user. It's decided based on type
     which table should be accessed.
     """
 
-    __tablename__ = 'ListScalarDataMaster'
+    __tablename__ = 'ListScalarData'
     id = Column(String(255),
                 ForeignKey(Record.id, ondelete='CASCADE',
                            deferrable=True, initially='DEFERRED'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
+    # Min and max are used for performing queries such as "are all values above X?"
+    min = Column(Float(), nullable=False)
+    max = Column(Float(), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
+    Index('scalarlist_name_idx', name)
 
-    def __init__(self, id, name, tags=None, units=None):
+    # We disable too-many-arguments because they're all needed to form the table.
+    def __init__(self, id, name, min, max,  # pylint: disable=too-many-arguments
+                 tags=None, units=None):
         """
-        Create a ListScalarDataMaster entry with the given args.
+        Create a ListScalarData entry with the given args.
 
         :param id: The record id associated with this value.
         :param name: The name of the datum associated with this value.
         :param tags: A list of tags to store.
         :param units: The associated units of the value.
+        :param min: The minimum value within the list.
+        :param max: The maximum value within the list.
         """
         self.id = id
         self.name = name
+        self.min = min
+        self.max = max
         self.tags = tags
         self.units = units
 
     def __repr__(self):
-        """Return a string repr. of a sql schema ListScalarDataMaster entry."""
-        return ('SQL Schema ListScalarDataMaster: <id={}, name={}, tags={}, '
-                'units={}>'
+        """Return a string repr. of a sql schema ListScalarData entry."""
+        return ('SQL Schema ListScalarData: <id={}, name={}, min={}, '
+                'max = {}, tags={}, units={}>'
                 .format(self.id,
                         self.name,
+                        self.min,
+                        self.max,
                         self.tags,
                         self.units))
-
-
-class ListScalarDataEntry(Base):
-    """
-    Implementation of a table to store list entries of scalar-type data.
-
-    This table contains scalar-data list entries related to a list from the
-    ListScalarDataMaster table.
-
-    These tables are not exposed to the user. It's decided based on type
-    which table should be accessed.
-    """
-
-    __tablename__ = 'ListScalarDataEntry'
-    id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE',
-                           deferrable=True, initially='DEFERRED'),
-                nullable=False,
-                primary_key=True)
-    name = Column(String(255), nullable=False, primary_key=True)
-    index = Column(Integer(), nullable=False, primary_key=True)
-    value = Column(Float(), nullable=False)
-
-    def __init__(self, id, name, value, index):
-        """
-        Create a ListScalarDataEntry entry with the given args.
-
-        :param id: The record id associated with this value.
-        :param name: The name of the datum associated with this value.
-        :param index: The location in the scalar list of the value.
-        :param value: The value to store.
-        """
-        self.id = id
-        self.name = name
-        self.index = index
-        self.value = value
-
-    def __repr__(self):
-        """Return a string repr. of a sql schema ListScalarDataEntry entry."""
-        return ('SQL Schema ListScalarDataEntry: <id={}, name={}, index={}, '
-                'value={}>'
-                .format(self.id,
-                        self.name,
-                        self.index,
-                        self.value))
 
 
 class StringData(Base):
@@ -240,7 +207,7 @@ class StringData(Base):
     units = Column(String(255), nullable=True)
     Index('string_name_idx', name)
 
-    # Disable the pylint check if and until the team decides to refactor the code
+    # We disable too-many-arguments because they're all needed to form the table.
     def __init__(self, id, name, value,  # pylint: disable=too-many-arguments
                  tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
@@ -273,7 +240,7 @@ class ListStringDataMaster(Base):
     only if) those data entries have lists of non-numerical values. For
     example, "strategy":{"value":["best-fit", "some-string"]} would be
     represented here, but "density":{"value":[200.14, 12]} would not be, and
-    would instead go in the ListScalarDataMaster table. This is done so we can
+    would instead go in the ListScalarData table. This is done so we can
     store non-scalar values while still giving users the benefit of numerical
     comparison lookups (being faster than string comparisons). Scalar and
     string data cannot be mixed in the same list. The list entries themselves
