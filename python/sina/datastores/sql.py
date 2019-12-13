@@ -317,7 +317,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: A generator of ids of matching Records or the Records
                   themselves (see ids_only).
 
-        :raises ValueError: if string_list is empty or if operation is invalid for a string list
+        :raises ValueError: if given an invalid operation for a string list
         """
         LOGGER.info('Finding Records where datum %s contains %s: %s', datum_name,
                     operation.value.split('_')[1], string_list)
