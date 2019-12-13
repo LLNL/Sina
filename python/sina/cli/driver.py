@@ -223,7 +223,9 @@ def _add_common_args(parser, required_group=None):
                                 required=True,
                                 dest='database',
                                 help='URI of database to connect to. For Cassandra: <ip>:<port>, '
-                                'use {} to specify keyspace. For SQLite: <filepath>.'
+                                'use {} to specify keyspace. For SQLite: <filepath>. If "sql" is '
+                                'specified as the database type and this contaings "://", then '
+                                'this is interpreted as the URL to pass to the database connector.'
                                 .format(COMMON_OPTION_CASSANDRA_DEST))
     parser.add_argument(COMMON_OPTION_CASSANDRA_DEST,
                         type=str,

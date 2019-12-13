@@ -14,6 +14,7 @@ Contents
 - Using the Example Notebooks
 - Testing
 - Supported Environments
+- Database Support
 
 
 Overview
@@ -202,3 +203,23 @@ Sina is regularly tested in the following environments:
 - **TOSS 3, RedHat 7.5 (catalyst, rztopaz)**: Secondary development environment
 
 Absence is not an indication that Sina will not work; please consider expanding this list!
+
+
+Database Support
+================
+
+Out-of-the-box, Sina does not install drivers for relational databases other
+than SQLite. If you wish to connect to other databases (e.g. MySQL, MariaDB,
+or Oracle), you need to install the appropriate drivers for that database.
+For example, for MySQL/MariaDB, you would need to do::
+
+    (venv) $ pip install mysql-connector-python
+
+After you install the connector, you can connect to these types of databases
+from the command line tools::
+
+    $ sina ingest --database-type=sql --database "mysql+mysqlconnector://host:port/?read_default_file=~/.my.cnf"
+
+You can also connect with the programmatic API::
+
+    factory = DAOFactory("mysql+mysqlconnector://host:port/?read_default_file=~/.my.cnf")
