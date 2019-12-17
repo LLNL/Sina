@@ -23,7 +23,7 @@ from sina import utils
 LOGGER = logging.getLogger(__name__)
 
 # String used to identify a sqlite database for SQLALchemy
-SQLITE = "sqlite:///"
+SQLITE_PREFIX = "sqlite:///"
 
 # Parameter offsets used when combining queries across tables
 # see _apply_ranges_to_query() for usage
@@ -49,46 +49,40 @@ class RecordDAO(dao.RecordDAO):
         if isinstance(records, model.Record):
             records = [records]
         for record in records:
-            self._insert_one(record, called_from_child=False)
-
-    def _insert_one(self, record, called_from_child):
-        """
-        Given a Record, insert it into the current SQL database.
-
-        Helper method to manage insertion for the various Record types. For
-        Record-only insertion, called_from_child should be False.
-
-        :param record: A Record to insert
-        :param called_from_child: Whether a child of Record (such as Run) is
-                                  calling this. Used to skip committing in
-                                  order to preserve atomicity.
-        """
-        LOGGER.debug('Inserting %s into SQL.', record)
-        is_valid, warnings = record.is_valid()
-        if not is_valid:
-            raise ValueError(warnings)
-        self.session.add(schema.Record(id=record.id,
-                                       type=record.type,
-                                       raw=json.dumps(record.raw)))
-        if record.data:
-            self._insert_data(record.id, record.data)
-        if record.files:
-            self._insert_files(record.id, record.files)
-
-        # If called from child, child is responsible for committing.
-        if not called_from_child:
+            LOGGER.debug('Inserting record %s into SQL.', record.id or record.local_id)
+            sql_record = self.create_sql_record(record)
+            self.session.add(sql_record)
             self.session.commit()
 
-    def _insert_data(self, id, data):
+    @staticmethod
+    def create_sql_record(sina_record):
         """
-        Insert data entries into the ScalarData and StringData tables.
+        Create a SQL record object for the given Sina Record.
 
-        Does not commit(), caller needs to do that.
+        :param sina_record: A Record to insert
+        :return: the created record
+        """
+        is_valid, warnings = sina_record.is_valid()
+        if not is_valid:
+            raise ValueError(warnings)
+        sql_record = schema.Record(id=sina_record.id, type=sina_record.type,
+                                   raw=json.dumps(sina_record.raw))
+        if sina_record.data:
+            RecordDAO._attach_data(sql_record, sina_record.data)
+        if sina_record.files:
+            RecordDAO._attach_files(sql_record, sina_record.files)
 
-        :param id: The Record ID to associate the data to.
+        return sql_record
+
+    @staticmethod
+    def _attach_data(record, data):
+        """
+        Attach the data entries to the given SQL record.
+
+        :param record: The SQL schema record to associate the data to.
         :param data: The dictionary of data to insert.
         """
-        LOGGER.debug('Inserting %i data entries to Record ID %s.', len(data), id)
+        LOGGER.debug('Inserting %i data entries to Record ID %s.', len(data), record.id)
         for datum_name, datum in data.items():
             if isinstance(datum['value'], list):
                 # Store info such as units and tags in master table
@@ -99,55 +93,49 @@ class RecordDAO(dao.RecordDAO):
                 tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
                 # If we've been given an empty list or a list of numbers:
                 if not datum or isinstance(datum['value'][0], numbers.Real):
-                    self.session.add(schema.ListScalarData(id=id,
-                                                           name=datum_name,
-                                                           min=min(datum['value']),
-                                                           max=max(datum['value']),
-                                                           # units might be None,
-                                                           # always use get()
-                                                           units=datum.get('units'),
-                                                           tags=tags))
+                    record.scalar_lists.append(schema.ListScalarData(
+                        name=datum_name,
+                        min=min(datum['value']),
+                        max=max(datum['value']),
+                        units=datum.get('units'),  # units might be None, always use get()
+                        tags=tags))
                 else:
                     # it's a list of strings
-                    self.session.add(schema.ListStringDataMaster(id=id,
-                                                                 name=datum_name,
-                                                                 units=datum.get('units'),
-                                                                 tags=tags))
+                    record.string_lists_master.append(schema.ListStringDataMaster(
+                        name=datum_name, units=datum.get('units'), tags=tags))
 
                     # Each entry in a list of strings requires its own row
                     for index, entry in enumerate(datum['value']):
-                        self.session.add(schema.ListStringDataEntry(id=id,
-                                                                    name=datum_name,
-                                                                    index=index,
-                                                                    value=entry))
+                        record.string_lists_entry.append(schema.ListStringDataEntry(
+                            name=datum_name, index=index, value=entry))
             elif isinstance(datum['value'], (numbers.Number, six.string_types)):
                 tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
-                # Check if it's a scalar
-                kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
-                        else schema.StringData)
-                self.session.add(kind(id=id,
-                                      name=datum_name,
-                                      value=datum['value'],
-                                      # units might be None, always use get()
-                                      units=datum.get('units'),
-                                      tags=tags))
+                if isinstance(datum['value'], numbers.Real):
+                    data_type = schema.ScalarData
+                    list_in_record = record.scalars
+                else:
+                    data_type = schema.StringData
+                    list_in_record = record.strings
+                list_in_record.append(data_type(name=datum_name,
+                                                value=datum['value'],
+                                                # units might be None, always use get()
+                                                units=datum.get('units'),
+                                                tags=tags))
 
-    def _insert_files(self, id, files):
+    @staticmethod
+    def _attach_files(record, files):
         """
-        Insert files into the Document table.
+        Attach the file entries to the given SQL record.
 
-        Does not commit(), caller needs to do that.
-
-        :param id: The Record ID to associate the files to.
+        :param record: The Record to associate the files to.
         :param files: The dictionary of files to insert.
         """
         LOGGER.debug('Inserting %i files to record id=%s.', len(files), id)
         for uri, file_info in six.iteritems(files):
             tags = (json.dumps(file_info['tags']) if 'tags' in file_info else None)
-            self.session.add(schema.Document(id=id,
-                                             uri=uri,
-                                             mimetype=file_info.get('mimetype'),
-                                             tags=tags))
+            record.documents.append(schema.Document(uri=uri,
+                                                    mimetype=file_info.get('mimetype'),
+                                                    tags=tags))
 
     def delete(self, ids):
         """
@@ -788,12 +776,13 @@ class RunDAO(dao.RunDAO):
         if isinstance(runs, model.Run):
             runs = [runs]
         for run in runs:
-            self.record_dao._insert_one(run, called_from_child=True)
-            self.session.add(schema.Run(id=run.id,
-                                        application=run.application,
-                                        user=run.user,
-                                        version=run.version))
-        self.session.commit()
+            record = RecordDAO.create_sql_record(run)
+            run = schema.Run(application=run.application, user=run.user,
+                             version=run.version)
+            run.record = record
+            self.session.add(record)
+            self.session.add(run)
+            self.session.commit()
 
     def get(self, id):
         """
@@ -835,22 +824,33 @@ class DAOFactory(dao.DAOFactory):
         Currently supports only SQLite.
 
         :param db_path: Path to the database to use as a backend. If None, will
-                        use an in-memory database.
+                        use an in-memory database. If it contains a '://', it is assumed that
+                        this is a URL which can be used to connect to the database. Otherwise,
+                        this is treated as a path for a SQLite database.
         """
         self.db_path = db_path
+        use_sqlite = False
         if db_path:
-            engine = sqlalchemy.create_engine(SQLITE + db_path)
-            if not os.path.exists(db_path):
+            if '://' not in db_path:
+                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
+                if not os.path.exists(db_path):
+                    schema.Base.metadata.create_all(engine)
+                use_sqlite = True
+            else:
+                engine = sqlalchemy.create_engine(db_path)
                 schema.Base.metadata.create_all(engine)
         else:
-            engine = sqlalchemy.create_engine('sqlite:///')
+            engine = sqlalchemy.create_engine(SQLITE_PREFIX)
             schema.Base.metadata.create_all(engine)
+            use_sqlite = True
 
-        def configure_on_connect(connection, _):
-            """Activate foreign key support on connection creation."""
-            connection.execute('pragma foreign_keys=ON')
+        if use_sqlite:
+            def configure_on_connect(connection, _):
+                """Activate foreign key support on connection creation."""
+                connection.execute('pragma foreign_keys=ON')
 
-        sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
+            sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
+
         session = sqlalchemy.orm.sessionmaker(bind=engine)
         self.session = session()
 
