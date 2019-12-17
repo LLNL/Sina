@@ -839,7 +839,7 @@ class TestImportExport(unittest.TestCase):
         factory = self.create_dao_factory()
         json_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                  "test_files/mnoda_1.json")
-        import_json(factory=factory, json_path=json_path)
+        import_json(factory=factory, json_paths=json_path)
         parent = factory.create_record_dao().get("parent_1")
         relation = factory.create_relationship_dao().get(object_id="child_1")
         run_factory = factory.create_run_dao()

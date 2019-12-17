@@ -59,7 +59,7 @@ class TestCLI(unittest.TestCase):
         mock_args = mock_import.call_args[1]  # Named args
         self.assertIsInstance(mock_args['factory'], sina_sql.DAOFactory)
         self.assertEqual(mock_args['factory'].db_path, self.created_db)
-        self.assertEqual(mock_args['json_path'], self.args.source)
+        self.assertEqual(mock_args['json_paths'], [self.args.source])
 
     @attr('cassandra')
     @patch('sina.cli.driver.import_json', return_value=True)
@@ -77,7 +77,7 @@ class TestCLI(unittest.TestCase):
         self.assertIsInstance(mock_args['factory'], sina_cass.DAOFactory)
         self.assertEqual(mock_args['factory'].keyspace,
                          self.args.cass_keyspace)
-        self.assertEqual(mock_args['json_path'], self.args.source)
+        self.assertEqual(mock_args['json_paths'], [self.args.source])
         self.args.cass_keyspace = None
         # Ingesting without keyspace shouldn't result in another call
         with self.assertRaises(ValueError) as context:
@@ -90,7 +90,7 @@ class TestCLI(unittest.TestCase):
         test_json = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                  "../test_files/mnoda_1.json")
         factory = sina_sql.DAOFactory()
-        import_json(factory=factory, json_path=test_json)
+        import_json(factory=factory, json_paths=test_json)
         local_rec = list(factory.create_record_dao().get_all_of_type("eggs"))
         global_id = local_rec[0].id
         relationship = (factory.create_relationship_dao().get(object_id=global_id))
