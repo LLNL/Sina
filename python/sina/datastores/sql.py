@@ -40,12 +40,23 @@ class RecordDAO(dao.RecordDAO):
         """Initialize RecordDAO with session for its SQL database."""
         self.session = session
 
-    # pylint: disable=arguments-differ
-    # Args differ because called_from_child is analogous to Cassandra's
-    # insert_many() _type_managed; this will be revisited in SIBO-661
-    def insert(self, record, called_from_child=False):
+    def insert(self, records):
+        """
+        Given (a) Record(s), insert it into the current SQL database.
+
+        :param records: A Record or iterator of Records to insert
+        """
+        if isinstance(records, model.Record):
+            records = [records]
+        for record in records:
+            self._insert_one(record, called_from_child=False)
+
+    def _insert_one(self, record, called_from_child):
         """
         Given a Record, insert it into the current SQL database.
+
+        Helper method to manage insertion for the various Record types. For
+        Record-only insertion, called_from_child should be False.
 
         :param record: A Record to insert
         :param called_from_child: Whether a child of Record (such as Run) is
@@ -138,34 +149,26 @@ class RecordDAO(dao.RecordDAO):
                                              mimetype=file_info.get('mimetype'),
                                              tags=tags))
 
-    def delete(self, id):
+    def delete(self, ids):
         """
-        Given the id of a Record, delete all mention of it from the SQL database.
+        Given id(s) of (a) Record(s), delete all mention from the SQL database.
 
-        This includes removing all its data, its raw, any relationships
-        involving it, etc. Because the id is a foreign key in every table
+        This includes removing all data, raw(s), any relationships
+        involving it/them, etc. Because the id is a foreign key in every table
         (besides Record itself but including Run, etc), we can rely on
         cascading to propogate the deletion.
 
-        :param id: The id of the Record to delete.
+        :param ids: The id or iterator of ids of the Record(s) to delete.
         """
-        LOGGER.debug('Deleting record with id: %s', id)
-        self.session.query(schema.Record).filter(schema.Record.id == id).delete()
+        if isinstance(ids, six.string_types):
+            ids = [ids]
+        LOGGER.debug('Deleting records with ids in: %s', ids)
+        (self.session.query(schema.Record)
+             .filter(schema.Record.id.in_(ids))
+             .delete(synchronize_session='fetch'))
         self.session.commit()
 
-    def delete_many(self, ids_to_delete):
-        """
-        Given a list of Record ids, delete all mentions of them from the SQL database.
-
-        :param ids_to_delete: A list of the ids of Records to delete.
-        """
-        LOGGER.debug('Deleting records with ids in: %s', ids_to_delete)
-        (self.session.query(schema.Record).filter(schema.Record.id.in_(ids_to_delete))
-         .delete(synchronize_session='fetch'))
-        self.session.commit()
-
-    # Disable pylint checks to if and until team decides to refactor the method
-    def data_query(self, **kwargs):  # pylint: disable=too-many-branches,too-many-locals
+    def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -220,19 +223,37 @@ class RecordDAO(dao.RecordDAO):
         for id in utils.intersect_lists(result_ids):
             yield id
 
-    def get(self, id):
+    def get(self, ids):
         """
-        Given a id, return match (if any) from SQL database.
+        Given (a) Record id(s), return match(es) from SQL database.
 
-        :param id: The id of the Record to return
+        :param ids: A Record id or iteratable or Record ids.
 
-        :returns: A Record matching id or None
+        :returns: A generator of Records matching the identifier(s) or None if
+                  no Record is found. In the case that an id (not an iterable
+                  of ids) is provided, will return a Record or None
         """
-        LOGGER.debug('Getting record with id=%s', id)
-        query = (self.session.query(schema.Record)
-                 .filter(schema.Record.id == id).one())
-        return model.generate_record_from_json(
-            json_input=json.loads(query.raw))
+        def get_record(id):
+            """Get a Record, allowing for easy wrapping in a generator."""
+            result = (self.session.query(schema.Record)
+                      .filter(schema.Record.id == id).one_or_none())
+            if result is not None:
+                return model.generate_record_from_json(
+                    json_input=json.loads(result.raw))
+            return result
+
+        def gen_records(ids):
+            """Hack around the limitation of returning generators XOR non-gens."""
+            for id in ids:
+                yield get_record(id)
+
+        if isinstance(ids, six.string_types):
+            LOGGER.debug('Getting record with id=%s', ids)
+            return get_record(ids)
+
+        ids = list(ids)
+        LOGGER.debug('Getting records with ids in=%s', ids)
+        return gen_records(ids)
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -253,7 +274,7 @@ class RecordDAO(dao.RecordDAO):
                 yield str(record_id[0])
         else:
             filtered_ids = (str(x[0]) for x in query.all())
-            for record in self.get_many(filtered_ids):
+            for record in self.get(filtered_ids):
                 yield record
 
     def _scalar_list_query(self,
@@ -405,7 +426,7 @@ class RecordDAO(dao.RecordDAO):
                 yield record_id[0]
         else:
             filtered_ids = (x[0] for x in query.all())
-            for record in self.get_many(filtered_ids):
+            for record in self.get(filtered_ids):
                 yield record
 
     def _get_with_max_min_helper(self, scalar_name, count, id_only, get_min):
@@ -428,7 +449,7 @@ class RecordDAO(dao.RecordDAO):
                          .filter(schema.ScalarData.name == scalar_name)
                          .order_by(sort_by).limit(count).all())
             ids = (x[0] for x in query_set)
-        return ids if id_only else self.get_many(ids)
+        return ids if id_only else self.get(ids)
 
     def get_with_max(self, scalar_name, count=1, id_only=False):
         """
@@ -700,27 +721,36 @@ class RelationshipDAO(dao.RelationshipDAO):
         """Initialize RelationshipDAO with session for its SQL database."""
         self.session = session
 
-    def insert(self, relationship=None, subject_id=None,
+    def insert(self, relationships=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given some Relationship, import it into a SQL database.
+        Given some Relationship(s), import it into a SQL database.
 
         This can create an entry from either an existing relationship object
         or from its components (subject id, object id, predicate). If all four
-        are provided, the Relationship will be used.
+        are provided, the Relationship will be used. If inserting many
+        Relationships, a list of Relationships MUST be provided (and no
+        other fields)
 
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
         :param predicate: A string describing the relationship.
-        :param relationship: A Relationship object to build entry from.
+        :param relationships: A Relationship object to build entry from or an iterable of them.
         """
-        subj, obj, pred = self._validate_insert(relationship=relationship,
-                                                subject_id=subject_id,
-                                                object_id=object_id,
-                                                predicate=predicate)
-        self.session.add(schema.Relationship(subject_id=subj,
-                                             object_id=obj,
-                                             predicate=pred))
+        if (isinstance(relationships, model.Relationship)
+                or any(x is not None for x in (subject_id, object_id, predicate))):
+            subj, obj, pred = self._validate_insert(relationship=relationships,
+                                                    subject_id=subject_id,
+                                                    object_id=object_id,
+                                                    predicate=predicate)
+            self.session.add(schema.Relationship(subject_id=subj,
+                                                 object_id=obj,
+                                                 predicate=pred))
+        else:
+            for rel in relationships:
+                self.session.add(schema.Relationship(subject_id=rel.subject_id,
+                                                     object_id=rel.object_id,
+                                                     predicate=rel.predicate))
         self.session.commit()
 
     # Note that get() is implemented by its parent.
@@ -749,50 +779,46 @@ class RunDAO(dao.RunDAO):
         self.session = session
         self.record_dao = record_dao
 
-    def insert(self, run):
+    def insert(self, runs):
         """
-        Given a Run, import it into the current SQL database.
+        Given (a) Run(s), insert it into the current database.
 
-        :param run: A Run to import
+        :param runs: A Run or iterator of Runs to import
         """
-        self.record_dao.insert(run, called_from_child=True)
-        self.session.add(schema.Run(id=run.id,
-                                    application=run.application,
-                                    user=run.user,
-                                    version=run.version))
+        if isinstance(runs, model.Run):
+            runs = [runs]
+        for run in runs:
+            self.record_dao._insert_one(run, called_from_child=True)
+            self.session.add(schema.Run(id=run.id,
+                                        application=run.application,
+                                        user=run.user,
+                                        version=run.version))
         self.session.commit()
 
     def get(self, id):
         """
-        Given a run's id, return match (if any) from the SQL database.
+        Given (a) Run id(s), return match(es) (if any) from the SQL database.
 
-        :param id: The id of some run
+        :param id: The id of some Run or an iterator of Run ids.
 
-        :returns: A run matching that identifier or None
+        :returns: A generator of Runs matching the identifier(s). In the case that an id
+                  (not an iterator of ids) is provided, will return a Run or None
         """
         LOGGER.debug('Getting run with id: %s', id)
         record = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one())
         return model.generate_run_from_json(json.loads(record.raw))
 
-    def delete(self, id):
+    def delete(self, ids):
         """
-        Given the id of a Run, delete all mention of it from the SQL database.
+        Given (a) Run id(s), delete all mention from the SQL database.
 
-        This includes removing all its data, its raw, any relationships
-        involving it, etc.
+        This includes removing all related data, raw(s), any relationships
+        involving it/them, etc.
 
-        :param id: The id of the Run to delete.
+        :param ids: The id or iterator of ids of the Run to delete.
         """
-        self.record_dao.delete(id)
-
-    def delete_many(self, ids_to_delete):
-        """
-        Given a list of Run ids, delete all mentions of them from the SQL database.
-
-        :param ids_to_delete: A list of the ids of Runs to delete.
-        """
-        self.record_dao.delete_many(ids_to_delete)
+        self.record_dao.delete(ids)
 
 
 class DAOFactory(dao.DAOFactory):

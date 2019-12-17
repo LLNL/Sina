@@ -87,9 +87,8 @@ def populate_database_with_data(record_dao):
     egg_record = Record(id="eggs", type="eggrec")
     egg_record.data["eggs_scal"] = {"value": 0}
 
-    record_dao.insert_many([spam_record, spam_record_2, spam_record_3,
-                            spam_record_4, spam_record_5, spam_record_6,
-                            egg_record])
+    record_dao.insert([spam_record, spam_record_2, spam_record_3, spam_record_4,
+                       spam_record_5, spam_record_6, egg_record])
 
 
 def remove_file(filename):
@@ -224,7 +223,7 @@ class TestModify(unittest.TestCase):
         relationship_dao = factory.create_relationship_dao()
         record_1 = Record(id="rec_1", type="sample")
         record_2 = Record(id="rec_2", type="sample")
-        record_dao.insert_many([record_1, record_2])
+        record_dao.insert([record_1, record_2])
         relationship_dao.insert(subject_id="rec_1", object_id="rec_2", predicate="dupes")
         record_dao.delete("rec_1")
         # Make sure the relationship was deleted
@@ -243,13 +242,13 @@ class TestModify(unittest.TestCase):
         record_3 = Record(id="rec_3", type="sample")
         record_4 = Record(id="rec_4", type="sample")
         all_ids = ["rec_1", "rec_2", "rec_3", "rec_4"]
-        record_dao.insert_many([record_1, record_2, record_3, record_4])
+        record_dao.insert([record_1, record_2, record_3, record_4])
         relationship_dao.insert(subject_id="rec_1", object_id="rec_2", predicate="dupes")
         relationship_dao.insert(subject_id="rec_2", object_id="rec_2", predicate="is")
         relationship_dao.insert(subject_id="rec_3", object_id="rec_4", predicate="dupes")
         relationship_dao.insert(subject_id="rec_4", object_id="rec_4", predicate="is")
         # Delete several
-        record_dao.delete_many(["rec_1", "rec_2", "rec_3"])
+        record_dao.delete(["rec_1", "rec_2", "rec_3"])
         remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
         self.assertEqual(remaining_records, ["rec_4"])
 
@@ -388,7 +387,7 @@ class TestModify(unittest.TestCase):
         relationship_dao = factory.create_relationship_dao()
         run_1 = Run(id="run_1", application="eggs")
         run_2 = Run(id="run_2", application="spam")
-        run_dao.insert_many([run_1, run_2])
+        run_dao.insert([run_1, run_2])
         relationship_dao.insert(subject_id="run_1", object_id="run_2", predicate="dupes")
         # Ensure there's two entries in the Run table
         self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 2)
@@ -427,6 +426,31 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     # Due to the length of this section of tests, tests dealing with specific
     # methods are separated by headers.
+    # ############################### get #################################
+    def test_recorddao_get_one(self):
+        """Test our ability to fetch a single record."""
+        just_one = self.record_dao.get("spam3")
+        self.assertTrue(isinstance(just_one, Record))
+        self.assertEqual(just_one.type, "foo")
+
+    def test_recorddao_get_none(self):
+        """Test our ability to fetch None when a record doesn't exist."""
+        get_none = self.record_dao.get("Idontexist")
+        self.assertEqual(get_none, None)
+
+    def test_recorddao_get_many(self):
+        """Test our ability to fetch several Records, in this case from a generator."""
+        many_gen = (x for x in ("spam", "spam2", "spam3"))
+        assigned_types = ["run", "run", "foo"]
+        returned_types = [x.type for x in self.record_dao.get(many_gen)]
+        self.assertEqual(len(returned_types), 3)
+        six.assertCountEqual(self, returned_types, assigned_types)
+
+    def test_recorddao_get_none_from_many(self):
+        """Test that we return None for nonexistant ids."""
+        get_none = list(self.record_dao.get(["Idontexist", "NeitherdoI"]))
+        self.assertEqual(get_none, [None, None])
+
     # ###################### get_given_document_uri ##########################
     def test_recorddao_uri_no_wildcards(self):
         """Test that RecordDAO is retrieving based on full uris correctly."""

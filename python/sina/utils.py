@@ -118,9 +118,9 @@ def import_json(factory, json_path):
             runs.append(entry)
         else:
             generic_records.append(entry)
-    factory.create_record_dao().insert_many(generic_records)
-    factory.create_run_dao().insert_many(runs)
-    factory.create_relationship_dao().insert_many(relationships)
+    factory.create_record_dao().insert(generic_records)
+    factory.create_run_dao().insert(runs)
+    factory.create_relationship_dao().insert(relationships)
 
 
 def _process_relationship_entry(entry, local_ids):

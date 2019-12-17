@@ -58,78 +58,38 @@ class RecordDAO(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get(self, id):
+    def get(self, ids):
         """
-        Given the id of a Record, return matching Record or None.
+        Given an id or iterable of ids, return matching Record or None.
 
-        :param id: The id of the Record to return.
+        :param ids: The id(s) of the Record(s) to return.
 
-        :returns: The matching Record or None.
+        :returns: A generator of Records matching the identifier(s) or None if
+                  no Record is found. In the case that an id (not an iterator
+                  of ids) is provided, will return a Record or None
         """
         raise NotImplementedError
-
-    def get_many(self, iter_of_ids):
-        """
-        Given an iterable of ids, retrieve each corresponding Record.
-
-        If a given DAO's backend can bulk read more cleverly,
-        this should be reimplemented there.
-
-        :param iter_of_ids: An iterable object of ids to find.
-
-        :returns: A generator of found records
-        """
-        LOGGER.debug('Getting many records with iter: %s', iter_of_ids)
-        for id in iter_of_ids:
-            record = self.get(id)
-            yield record
 
     @abstractmethod
-    def insert(self, record):
+    def insert(self, records):
         """
-        Given a Record, insert it into the DAO's backend.
+        Given one or more Records, insert them into the DAO's backend.
 
-        :param record: A Record to insert
+        :param records: A Record or iter of Records to insert
         """
         raise NotImplementedError
-
-    def insert_many(self, list_to_insert):
-        """
-        Given a list of Records, insert each into the DAO's backend.
-
-        If a given DAO's backend can bulk insert more cleverly, this should be
-        reimplemented there.
-
-        :param list_to_insert: A list of Records to insert
-        """
-        LOGGER.debug('Inserting %s records.', len(list_to_insert))
-        for item in list_to_insert:
-            self.insert(item)
 
     @abstractmethod
-    def delete(self, id):
+    def delete(self, ids):
         """
-        Given the id of a Record, delete all mention of it from the DAO's backend.
+        Given one or more Record ids, delete all mention from the DAO's backend.
 
-        This includes removing all its data, its raw, any relationships
-        involving it, etc.
+        This includes removing all data, raw(s), any relationships
+        involving it/them, etc.
 
-        :param id: The id of the Record to delete.
+        :param ids: A Record id or iterable of Record ids to delete.
         """
         raise NotImplementedError
-
-    def delete_many(self, ids_to_delete):
-        """
-        Given a list of Record ids, delete all mentions of them from the DAO's backend.
-
-        If a given DAO's backend can bulk delete more cleverly, this should be
-        reimplemented there.
-
-        :param ids_to_delete: A list of the ids of Records to delete.
-        """
-        LOGGER.debug('Deleting %i records.', len(ids_to_delete))
-        for item in ids_to_delete:
-            self.delete(item)
 
     @abstractmethod
     def data_query(self, **kwargs):
@@ -320,10 +280,10 @@ class RelationshipDAO(object):
         return relationships
 
     @abstractmethod
-    def insert(self, relationship=None, subject_id=None,
+    def insert(self, relationships=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given a Relationship, insert it into the DAO's backend.
+        Given (a) Relationship(s), insert into the DAO's backend.
 
         This can create an entry from either an existing relationship object
         or from its components (subject id, object id, predicate). If all four
@@ -337,7 +297,8 @@ class RelationshipDAO(object):
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
         :param predicate: A string describing the relationship.
-        :param relationship: A Relationship object to build entry from.
+        :param relationships: A Relationship object to build entry from, or an
+                             iterable of them
 
         :raises: A ValueError if neither Relationship nor the subject_id,
                  object_id, and predicate args are provided.
@@ -381,18 +342,6 @@ class RelationshipDAO(object):
             predicate = relationship.predicate
         return subject_id, object_id, predicate
 
-    def insert_many(self, list_to_insert):
-        """
-        Given a list of Relationships, insert each into the DAO's backend.
-
-        If a given DAO's backend can bulk insert more cleverly (bulk inserts),
-        this should be reimplemented there.
-
-        :param list_to_insert: A list of Relationships to insert
-        """
-        for item in list_to_insert:
-            self.insert(item)
-
     @abstractmethod
     def get(self, subject_id=None, object_id=None, predicate=None):
         """
@@ -425,73 +374,35 @@ class RunDAO(object):
     @abstractmethod
     def get(self, id):
         """
-        Given id, return matching Run from the DAO's backend, or None.
+        Given (a) Run id(s), return matching Run(s) from the DAO's backend.
 
-        :param id: The id of the run to return.
+        :param id: The Run id or an iterable of Run ids to find and return
 
-        :returns: The matching Run or None.
+        :returns: A generator of Runs matching the identifier(s). In the case that an id
+                  (not an iterator of ids) is provided, will return a Run or None
         """
         raise NotImplementedError
-
-    def get_many(self, iter_of_ids):
-        """
-        Given an iterable of ids, retrieve each corresponding run from backend.
-
-        If a given DAO's backend can bulk read more cleverly,
-        this should be reimplemented there.
-
-        :param iter_of_ids: An iterable object of ids to find.
-
-        :returns: A generator of found runs
-        """
-        for id in iter_of_ids:
-            yield self.get(id)
 
     @abstractmethod
-    def insert(self, run):
+    def insert(self, runs):
         """
-        Given a Run, insert it into the DAO's backend.
+        Given (a) Run(s), insert them into the DAO's backend.
 
-        :param run: A run to insert
+        :param runs: A Run or iterable of Runs to insert
         """
         raise NotImplementedError
-
-    def insert_many(self, list_to_insert):
-        """
-        Given a list of Runs, insert each into the DAO's backend.
-
-        If a given DAO's backend can bulk insert more cleverly (bulk inserts),
-        this should be reimplemented there.
-
-        :param list_to_insert: A list of Runs to insert
-        """
-        for item in list_to_insert:
-            self.insert(item)
 
     @abstractmethod
-    def delete(self, id):
+    def delete(self, ids):
         """
-        Given the id of a Run, delete all mention of it from the DAO's backend.
+        Given one or more Run ids, delete all mention from the DAO's backend.
 
-        This includes removing all its data, its raw, any relationships
-        involving it, etc.
+        This includes removing all data, raw(s), any relationships
+        involving it/them, etc.
 
-        :param id: The id of the Run to delete.
+        :param ids: A Run id or iterable of Run ids to delete.
         """
         raise NotImplementedError
-
-    def delete_many(self, ids_to_delete):
-        """
-        Given a list of Run ids, delete all mentions of them from the DAO's backend.
-
-        If a given DAO's backend can bulk delete more cleverly, this should be
-        reimplemented there.
-
-        :param ids_to_delete: A list of the ids of Runs to delete.
-        """
-        LOGGER.debug('Deleting %i runs.', len(ids_to_delete))
-        for item in ids_to_delete:
-            self.delete(item)
 
     def get_all(self, ids_only=False):
         """
