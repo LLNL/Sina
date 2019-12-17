@@ -9,6 +9,8 @@ from abc import ABCMeta, abstractmethod
 import logging
 import numbers
 
+import six
+
 import sina.model
 from sina.utils import DataRange
 
@@ -57,7 +59,6 @@ class RecordDAO(object):
 
     __metaclass__ = ABCMeta
 
-    @abstractmethod
     def get(self, ids):
         """
         Given an id or iterable of ids, return matching Record or None.
@@ -67,6 +68,33 @@ class RecordDAO(object):
         :returns: A generator of Records matching the identifier(s) or None if
                   no Record is found. In the case that an id (not an iterator
                   of ids) is provided, will return a Record or None
+        """
+        def gen_records(ids):
+            """Hack around the limitation of returning generators XOR non-gens."""
+            for id in ids:
+                yield self._get_one(id)
+
+        if isinstance(ids, six.string_types):
+            LOGGER.debug('Getting record with id=%s', ids)
+            return self._get_one(ids)
+        ids = list(ids)
+        LOGGER.debug('Getting records with ids in=%s', ids)
+        return gen_records(ids)
+
+    def _get_one(self, id):
+        """
+        Apply some "get" function to a single Record id.
+
+        Because the overload needs to be invisible to the user, we need to
+        be able to return both a generator (from a list) and non-generator
+        (from a single ID). This is the framework for allowing it.
+
+        Currently, this makes sense because Cassandra can't batch reads. May
+        be worth revisiting.
+
+        :param id: A Record id to return
+
+        :returns: A Record if found, else None.
         """
         raise NotImplementedError
 

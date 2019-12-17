@@ -145,9 +145,9 @@ class TestCLI(unittest.TestCase):
            return_value=[MagicMock(raw='hello')])
     @patch('sina.cli.driver.sql.RecordDAO.get_given_data',
            return_value=["hello_there"])
-    @patch('sina.cli.driver.sql.RecordDAO.get_many',
+    @patch('sina.cli.driver.sql.RecordDAO.get',
            return_value=[MagicMock(raw='greetings', id='hello_there')])
-    def test_query_sql(self, mock_get_many, mock_get_given_data, mock_uri):
+    def test_query_sql(self, mock_get, mock_get_given_data, mock_uri):
         """Verify CLI fetches and feeds query info to the DAO (sql)."""
         self.args.database_type = 'sql'
         self.args.raw = ""
@@ -161,8 +161,8 @@ class TestCLI(unittest.TestCase):
         mock_args = mock_get_given_data.call_args[1]  # Named args
         self.assertIsInstance(mock_args['somescalar'], DataRange)
         self.assertEqual(len(mock_args), 1)
-        mock_get_many.assert_called_once()
-        positional_args = mock_get_many.call_args[0][0]
+        mock_get.assert_called_once()
+        positional_args = mock_get.call_args[0][0]
         self.assertEqual(positional_args,
                          mock_get_given_data.return_value)
         self.args.uri = 'somedoc.png'
@@ -179,7 +179,7 @@ class TestCLI(unittest.TestCase):
     @patch('sina.cli.driver.cass.RecordDAO.get_given_data',
            return_value=[MagicMock(raw='hello', id='general')])
     @patch('sina.datastores.cass.schema.form_connection', return_value=True)
-    @patch('sina.cli.driver.cass.RecordDAO.get_many',
+    @patch('sina.cli.driver.cass.RecordDAO.get',
            return_value=[MagicMock(raw='greetings', id='hello_there')])
     def test_query_cass(self, mock_get, mock_connect, mock_data, mock_uri):
         """Verify CLI fetches and feeds query info to the DAO (cass)."""

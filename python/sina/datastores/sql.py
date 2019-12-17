@@ -152,8 +152,8 @@ class RecordDAO(dao.RecordDAO):
             ids = [ids]
         LOGGER.debug('Deleting records with ids in: %s', ids)
         (self.session.query(schema.Record)
-             .filter(schema.Record.id.in_(ids))
-             .delete(synchronize_session='fetch'))
+         .filter(schema.Record.id.in_(ids))
+         .delete(synchronize_session='fetch'))
         self.session.commit()
 
     def data_query(self, **kwargs):
@@ -211,37 +211,23 @@ class RecordDAO(dao.RecordDAO):
         for id in utils.intersect_lists(result_ids):
             yield id
 
-    def get(self, ids):
+    def _get_one(self, id):
         """
-        Given (a) Record id(s), return match(es) from SQL database.
+        Apply some "get" function to a single Record id.
 
-        :param ids: A Record id or iteratable or Record ids.
+        Used by the parent get(), this is the SQL-specific implementation of
+        getting a single Record.
 
-        :returns: A generator of Records matching the identifier(s) or None if
-                  no Record is found. In the case that an id (not an iterable
-                  of ids) is provided, will return a Record or None
+        :param id: A Record id to return
+
+        :returns: A Record if found, else None.
         """
-        def get_record(id):
-            """Get a Record, allowing for easy wrapping in a generator."""
-            result = (self.session.query(schema.Record)
-                      .filter(schema.Record.id == id).one_or_none())
-            if result is not None:
-                return model.generate_record_from_json(
-                    json_input=json.loads(result.raw))
-            return result
-
-        def gen_records(ids):
-            """Hack around the limitation of returning generators XOR non-gens."""
-            for id in ids:
-                yield get_record(id)
-
-        if isinstance(ids, six.string_types):
-            LOGGER.debug('Getting record with id=%s', ids)
-            return get_record(ids)
-
-        ids = list(ids)
-        LOGGER.debug('Getting records with ids in=%s', ids)
-        return gen_records(ids)
+        result = (self.session.query(schema.Record)
+                  .filter(schema.Record.id == id).one_or_none())
+        if result is not None:
+            return model.generate_record_from_json(
+                json_input=json.loads(result.raw))
+        return result
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -712,24 +698,24 @@ class RelationshipDAO(dao.RelationshipDAO):
     def insert(self, relationships=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given some Relationship(s), import it into a SQL database.
+        Given some Relationship(s), import it/them into a SQL database.
 
         This can create an entry from either an existing relationship object
-        or from its components (subject id, object id, predicate). If all four
+        or from its components (subject id, object id, predicate). If all
         are provided, the Relationship will be used. If inserting many
-        Relationships, a list of Relationships MUST be provided (and no
-        other fields)
+        Relationships, a list of Relationships MUST be provided (no
+        other fields). If any field besides Relationships is provided, it's
+        assumed that only one Relationship is being inserted.
 
+        :param relationships: A Relationship object to build entry from or an iterable of them.
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
-        :param predicate: A string describing the relationship.
-        :param relationships: A Relationship object to build entry from or an iterable of them.
+        :param predicate: A string describing the relationship between subject and object.
         """
         if (isinstance(relationships, model.Relationship)
                 or any(x is not None for x in (subject_id, object_id, predicate))):
             subj, obj, pred = self._validate_insert(relationship=relationships,
-                                                    subject_id=subject_id,
-                                                    object_id=object_id,
+                                                    subject_id=subject_id, object_id=object_id,
                                                     predicate=predicate)
             self.session.add(schema.Relationship(subject_id=subj,
                                                  object_id=obj,

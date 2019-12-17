@@ -113,7 +113,10 @@ class RecordDAO(dao.RecordDAO):
                                files=record.files,
                                force_overwrite=force_overwrite)
 
-    def _insert_many(self, list_to_insert, _type_managed, force_overwrite=False):
+    # Disabled until rework, possibly splitting into the first and second batch types
+    # pylint: disable=too-many-locals, too-many-branches
+    @staticmethod
+    def _insert_many(list_to_insert, _type_managed, force_overwrite=False):
         """
         Given a list of Records, insert each into Cassandra.
 
@@ -588,41 +591,29 @@ class RecordDAO(dao.RecordDAO):
         for record_id in set.intersection(*record_ids):
             yield record_id
 
-    def get(self, ids):
+    def _get_one(self, id):
         """
-        Given (a) Record id(s), return match (if any) from Cassandra database.
+        Apply some "get" function to a single Record id.
 
-        :param ids: A Record id or iterable of Record ids to return
+        Used by the parent get(), this is the Cassandra-specific implementation of
+        getting a single Record.
 
-        :returns: A generator of Records matching the identifier(s).
+        :param id: A Record id to return
+
+        :returns: A Record if found, else None.
         """
-        def get_record(id):
-            """Get a Record, allowing for easy wrapping in a generator."""
-            try:
-                query = schema.Record.objects.filter(id=id).get()
-            except DoesNotExist:
-                return
+        try:
+            query = schema.Record.objects.filter(id=id).get()
             return model.generate_record_from_json(
                 json_input=json.loads(query.raw))
-
-        def gen_records(ids):
-            """Hack around the limitation of returning generators XOR non-gens."""
-            for id in ids:
-                yield get_record(id)
-
-        if isinstance(ids, six.string_types):
-            LOGGER.debug('Getting record with id=%s', ids)
-            return get_record(ids)
-
-        ids = list(ids)
-        LOGGER.debug('Getting records with ids in=%s', ids)
-        return gen_records(ids)
+        except DoesNotExist:
+            pass
 
     def get_all_of_type(self, type, ids_only=False):
         """
-        Given a type of record, return all Records of that type.
+        Given a type of Record, return all Records of that type.
 
-        :param type: The type of record to return, ex: run
+        :param type: The type of Record to return, ex: run
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
@@ -914,16 +905,14 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         This can create an entry from either an existing relationship object
         or from its components (subject id, object id, predicate). If all four
-        are provided, the Relationship will be used. If you want to insert
-        many, you must provide a list of Relationships; lists of subjects/
-        objects/etc. cannot be used. If any of those three are specified, it's
-        assumed that they're strings and that you're only inserting one
-        Relationship.
+        are provided, the Relationship will be used. If inserting many
+        Relationships, a list of Relationships MUST be provided (and no
+        other fields)
 
         :param relationships: A Relationship object to build entry from or iterator of them.
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
-        :param predicate: A string describing the relationship.
+        :param predicate: A string describing the relationship between subject and oject.
         """
         if (isinstance(relationships, model.Relationship)
                 or any(x is not None for x in (subject_id, object_id, predicate))):
@@ -947,20 +936,20 @@ class RelationshipDAO(dao.RelationshipDAO):
                 from_object_batch[rel.object_id].append((rel.predicate,
                                                          rel.subject_id))
             # Our dictionaries are populated and ready for batch insertion
-            for object_id, insert_info in six.iteritems(from_object_batch):
+            for obj, insert_info in six.iteritems(from_object_batch):
                 # Only having one entry is a common use case. Skip the overhead!
                 if len(insert_info) == 1:
                     schema.cross_populate_object_and_subject(subject_id=insert_info[0][1],
-                                                             object_id=object_id,
+                                                             object_id=obj,
                                                              predicate=insert_info[0][0])
                 else:
                     with BatchQuery() as batch_query:
                         for entry in insert_info:
                             (schema.SubjectFromObject
-                             .batch(batch_query).create(object_id=object_id,
+                             .batch(batch_query).create(obj=obj,
                                                         predicate=entry[0],
                                                         subject_id=entry[1]))
-            for subject_id, insert_info in six.iteritems(from_subject_batch):
+            for subj, insert_info in six.iteritems(from_subject_batch):
                 # We already handled this use case with the cross_populate above
                 if len(insert_info) == 1:
                     pass
@@ -968,7 +957,7 @@ class RelationshipDAO(dao.RelationshipDAO):
                     with BatchQuery() as batch_query:
                         for entry in insert_info:
                             (schema.ObjectFromSubject
-                             .batch(batch_query).create(subject_id=subject_id,
+                             .batch(batch_query).create(subject_id=subj,
                                                         predicate=entry[0],
                                                         object_id=entry[1]))
 
@@ -1014,8 +1003,9 @@ class RelationshipDAO(dao.RelationshipDAO):
 class RunDAO(dao.RunDAO):
     """DAO responsible for handling Runs, (Record subtype), in Cassandra."""
 
-    # pylint: disable=arguments-differ
     # Args differ because SQL doesn't support force_overwrite yet, SIBO-307
+    # Protected access is to a Record-bound helper method we want to hide from users
+    # pylint: disable=arguments-differ, protected-access
     def insert(self, runs, force_overwrite=False):
         """
         Given (a) Run(s), import into the current Cassandra database.
