@@ -170,6 +170,8 @@ jupyter: $(LINKS_FILE)
 	fi; \
 	echo "Installing jupyter in $(VENV)"; \
 	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/jupyter.txt
+	$(VENV)/bin/jupyter nbextension install widgetsnbextension --user --py
+	$(VENV)/bin/jupyter nbextension enable widgetsnbextension --user --py
 
 # Ensure the appropriate requirement links are established.  This is important
 # for building and testing purposes.
