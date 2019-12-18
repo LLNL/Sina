@@ -2,8 +2,9 @@
 from __future__ import print_function
 
 # Disable pylint checks due to its issue with virtual environments
-from sqlalchemy import (Column, ForeignKey, String, Text, Float,  # pylint: disable=import-error
+from sqlalchemy import (Column, ForeignKey, String, Text, REAL,  # pylint: disable=import-error
                         Integer)
+import sqlalchemy.orm  # pylint: disable=import-error
 from sqlalchemy.ext.declarative import declarative_base  # pylint: disable=import-error
 from sqlalchemy.schema import Index  # pylint: disable=import-error
 
@@ -24,7 +25,16 @@ class Record(Base):
     __tablename__ = 'Record'
     id = Column(String(255), primary_key=True)
     type = Column(String(255), nullable=False)
-    raw = Column(Text(), nullable=True)
+    # 2 ** 24 is the minimum size for a LONGTEXT in mysql. Since the overhead
+    # for that versus MEDIUMTEXT is a byte per row, we specify a size big
+    # enough to trigger the creation of a LONGTEXT column.
+    raw = Column(Text(2**24), nullable=True)
+    scalars = sqlalchemy.orm.relationship('ScalarData')
+    strings = sqlalchemy.orm.relationship('StringData')
+    scalar_lists = sqlalchemy.orm.relationship('ListScalarData')
+    string_lists_master = sqlalchemy.orm.relationship('ListStringDataMaster')
+    string_lists_entry = sqlalchemy.orm.relationship('ListStringDataEntry')
+    documents = sqlalchemy.orm.relationship('Document')
     Index('type_idx', type)
 
     def __init__(self, id, type, raw=None):
@@ -48,12 +58,10 @@ class Relationship(Base):
 
     __tablename__ = 'Relationship'
     subject_id = Column(String(255),
-                        ForeignKey(Record.id, ondelete='CASCADE',
-                                   deferrable=True, initially='DEFERRED'),
+                        ForeignKey(Record.id, ondelete='CASCADE'),
                         primary_key=True)
     object_id = Column(String(255),
-                       ForeignKey(Record.id, ondelete='CASCADE',
-                                  deferrable=True, initially='DEFERRED'),
+                       ForeignKey(Record.id, ondelete='CASCADE'),
                        primary_key=True)
     predicate = Column(String(255), primary_key=True)
 
@@ -86,21 +94,21 @@ class ScalarData(Base):
 
     __tablename__ = 'ScalarData'
     id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE',
-                           deferrable=True, initially='DEFERRED'),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
-    value = Column(Float(), nullable=False)
+    value = Column(REAL(), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
+    record = sqlalchemy.orm.relationship(Record, back_populates='scalars')
+
     Index('scalar_name_idx', name)
 
     # Disable the pylint check if and until the team decides to refactor the code
-    def __init__(self, id, name, value,   # pylint: disable=too-many-arguments
+    def __init__(self, name, value,   # pylint: disable=too-many-arguments
                  tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
-        self.id = id
         self.name = name
         self.value = value
         self.units = units
@@ -136,32 +144,30 @@ class ListScalarData(Base):
 
     __tablename__ = 'ListScalarData'
     id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE',
-                           deferrable=True, initially='DEFERRED'),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
     # Min and max are used for performing queries such as "are all values above X?"
-    min = Column(Float(), nullable=False)
-    max = Column(Float(), nullable=False)
+    min = Column(REAL(), nullable=False)
+    max = Column(REAL(), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
     Index('scalarlist_name_idx', name)
+    record = sqlalchemy.orm.relationship(Record, back_populates='scalar_lists')
 
     # We disable too-many-arguments because they're all needed to form the table.
-    def __init__(self, id, name, min, max,  # pylint: disable=too-many-arguments
+    def __init__(self, name, min, max,  # pylint: disable=too-many-arguments
                  tags=None, units=None):
         """
         Create a ListScalarData entry with the given args.
 
-        :param id: The record id associated with this value.
         :param name: The name of the datum associated with this value.
         :param tags: A list of tags to store.
         :param units: The associated units of the value.
         :param min: The minimum value within the list.
         :param max: The maximum value within the list.
         """
-        self.id = id
         self.name = name
         self.min = min
         self.max = max
@@ -198,20 +204,19 @@ class StringData(Base):
 
     __tablename__ = 'StringData'
     id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE',
-                           deferrable=True, initially='DEFERRED'),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
     value = Column(String(255), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
+    record = sqlalchemy.orm.relationship(Record, back_populates='strings')
     Index('string_name_idx', name)
 
     # We disable too-many-arguments because they're all needed to form the table.
-    def __init__(self, id, name, value,  # pylint: disable=too-many-arguments
+    def __init__(self, name, value,  # pylint: disable=too-many-arguments
                  tags=None, units=None):
         """Create entry from id, name, and value, and optionally tags/units."""
-        self.id = id
         self.name = name
         self.value = value
         # Arguably, string-based values don't need units. But because the
@@ -252,24 +257,22 @@ class ListStringDataMaster(Base):
 
     __tablename__ = 'ListStringDataMaster'
     id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE',
-                           deferrable=True, initially='DEFERRED'),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
+    record = sqlalchemy.orm.relationship(Record, back_populates='string_lists_master')
 
-    def __init__(self, id, name, tags=None, units=None):
+    def __init__(self, name, tags=None, units=None):
         """
         Create a ListStringDataMaster entry with the given args.
 
-        :param id: The record id associated with this value.
         :param name: The name of the datum associated with this value.
         :param tags: A list of tags to store.
         :param units: The associated units of the value.
         """
-        self.id = id
         self.name = name
         # Arguably, string-based values don't need units. But because the
         # value vs. scalar implementation is hidden from the user, we need
@@ -300,25 +303,23 @@ class ListStringDataEntry(Base):
 
     __tablename__ = 'ListStringDataEntry'
     id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE',
-                           deferrable=True, initially='DEFERRED'),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 nullable=False,
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
-    index = Column(Integer(), nullable=False, primary_key=True)
+    index = Column(Integer(), nullable=False, primary_key=True, autoincrement=False)
     value = Column(String(255), nullable=False)
+    record = sqlalchemy.orm.relationship(Record, back_populates='string_lists_entry')
     Index('stringlist_name_idx', name)
 
-    def __init__(self, id, name, index, value):
+    def __init__(self, name, index, value):
         """
         Create a ListStringDataEntry entry with the given args.
 
-        :param id: The record id associated with this value.
         :param name: The name of the datum associated with this value.
         :param index: The location in the scalar list of the value.
         :param value: The value to store.
         """
-        self.id = id
         self.name = name
         self.index = index
         self.value = value
@@ -344,20 +345,19 @@ class Document(Base):
 
     __tablename__ = 'Document'
     id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE',
-                           deferrable=True, initially='DEFERRED'),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 nullable=False,
                 primary_key=True)
     uri = Column(String(255), nullable=False, primary_key=True)
     mimetype = Column(String(255), nullable=True)
     tags = Column(Text(), nullable=True)
     Index('uri_idx', uri)
+    record = sqlalchemy.orm.relationship(Record, back_populates='documents')
 
     # Disable the pylint check if and until the team decides to refactor the code
-    def __init__(self, id, uri,  # pylint: disable=too-many-arguments
+    def __init__(self, uri,  # pylint: disable=too-many-arguments
                  contents=None, mimetype=None, tags=None):
         """Create from id, uri, and optionally contents and mimetype."""
-        self.id = id
         self.uri = uri
         self.contents = contents
         self.mimetype = mimetype
@@ -378,16 +378,15 @@ class Run(Base):
 
     __tablename__ = 'Run'
     id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE',
-                           deferrable=True, initially='DEFERRED'),
+                ForeignKey(Record.id, ondelete='CASCADE'),
                 primary_key=True)
     application = Column(String(255), nullable=False)
     user = Column(String(255), nullable=True)
     version = Column(String(255), nullable=True)
+    record = sqlalchemy.orm.relationship(Record, uselist=False)
 
-    def __init__(self, id, application, user=None, version=None):
+    def __init__(self, application, user=None, version=None):
         """Create Run table entry with id, metadata."""
-        self.id = id
         self.application = application
         self.user = user
         self.version = version
