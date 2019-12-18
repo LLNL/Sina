@@ -5,6 +5,7 @@ import sys
 import unittest
 import warnings
 import json
+import io
 
 from six.moves import cStringIO as StringIO
 
@@ -57,10 +58,10 @@ class TestSQLIntegration(unittest.TestCase):
         """Make sure the files we're importing are valid Mnoda."""
         schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                    '../../mnoda.json')
-        with open(schema_file) as schema:
+        with io.open(schema_file, 'r', encoding='utf-8') as schema:
             schema = json.load(schema)
             for test_file in self.test_files:
-                with open(test_file) as loaded_test:
+                with io.open(test_file, 'r', encoding='utf-8') as loaded_test:
                     file_json = json.load(loaded_test)
                     jsonschema.validate(file_json, schema)
 

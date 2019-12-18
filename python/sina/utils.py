@@ -7,6 +7,7 @@ import os
 import errno
 import uuid
 import csv
+import io
 import time
 import datetime
 from numbers import Real
@@ -75,7 +76,7 @@ def convert_json_to_records_and_relationships(json_path):
     :param json_path: the path to the Sina JSON.
     :returns: a tuple of lists, (list_of_records, list_of_relationships)
     """
-    with open(json_path) as file_:
+    with io.open(json_path, 'r', encoding='utf-8') as file_:
         records = []
         relationships = []
         local = {}
