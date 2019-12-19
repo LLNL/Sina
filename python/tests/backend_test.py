@@ -8,6 +8,7 @@ import csv
 import logging
 from collections import OrderedDict
 import types
+import io
 
 import six
 
@@ -820,7 +821,7 @@ class TestImportExport(unittest.TestCase):
         relation = factory.create_relationship_dao().get(object_id="child_1")
         run_factory = factory.create_run_dao()
         child = run_factory.get("child_1")
-        canonical = json.load(open(json_path))
+        canonical = json.load(io.open(json_path, encoding='utf-8'))
         self.assertEqual(canonical['records'][0]['type'], parent.type)
         self.assertEqual(canonical['records'][1]['application'],
                          child.application)
@@ -892,7 +893,7 @@ class TestImportExport(unittest.TestCase):
             output_type='csv',
             output_file=self.test_file_path.name)
 
-        with open(self.test_file_path.name, 'r') as csvfile:
+        with io.open(self.test_file_path.name, 'r', encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
             rows = [row for row in reader]
             self.assertEqual(rows[0], ['id', 'spam_scal'])
@@ -910,7 +911,7 @@ class TestImportExport(unittest.TestCase):
             output_type='csv',
             output_file=self.test_file_path.name)
 
-        with open(self.test_file_path.name, 'r') as csvfile:
+        with io.open(self.test_file_path.name, 'r', encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
             rows = [row for row in reader]
             self.assertEqual(rows[0], ['id',
@@ -934,7 +935,7 @@ class TestImportExport(unittest.TestCase):
             output_type='csv',
             output_file=self.test_file_path.name)
 
-        with open(self.test_file_path.name, 'r') as csvfile:
+        with io.open(self.test_file_path.name, 'r', encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
             rows = [row for row in reader]
             self.assertEqual(len(rows), 1)
@@ -956,7 +957,7 @@ class TestImportExport(unittest.TestCase):
                     output_file=self.test_file_path.name)
 
         # Validate csv file
-        with open(self.test_file_path.name, 'r') as csvfile:
+        with io.open(self.test_file_path.name, 'r', encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
             rows = [row for row in reader]
             self.assertEqual(len(rows), 3)
