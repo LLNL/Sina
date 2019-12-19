@@ -71,7 +71,7 @@ Record::Record(nlohmann::json const &asJson) :
     auto userDefinedIter = asJson.find(USER_DEFINED_FIELD);
     if (userDefinedIter != asJson.end()) {
         // Enforce that user_defined must be an object
-        if (strcmp(userDefinedIter->type_name(), "object") != 0) {
+        if (!userDefinedIter->is_object()) {
             throw std::invalid_argument("User_defined must be a JSON object");
         }
         userDefined = *userDefinedIter;
