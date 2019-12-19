@@ -106,34 +106,41 @@ interactive demo, see examples/fukushima/fukushima_subsecting_data.ipynb.
 
 Filtering on Lists
 ##################
-Because there are several possible ways a list might "match" some criteria,
+Because there are several possible ways a list might match some criteria,
 the syntax for performing the query is slightly different. Let's say we want all
-Records, again with a :code:`final_volume` of 310, but now they must fulfill several
-criteria for :code:`velocity`, a timeseries. It must have at one point had a
-:code:`velocity` between 10 and 15, inclusive, as well as between 0 and 5,
-exclusive. For example:  :code:`velocity=[0, 1, 4, 5, 15, 20, 21]` or
-:code:`velocity=[1, 10]`::
+Records fulfilling a criterion for :code:`velocity`, a timeseries. In this case,
+we want a velocity that's never gone above 50::
 
-  from sina.utils import has_all
+  from sina.utils import all_in
 
-  records = record_dao.data_query(final_volume=310,
-                                  velocity=has_all(DataRange(10, 15, max_inclusive=True),
-                                                   DataRange(0, 5, min_inclusive=False)))
+  records = record_dao.data_query(velocity=all_in(DataRange(max=50)))
 
-In addition to :code:`has_all()` above, Sina includes :code:`has_any()` and :code:`has_only()`::
+A slightly different set of queries applies to string list data. Let's say
+we want all Records where "strength_1" or "strength_2" were included in
+:code:`active_packages`::
 
-  from sina.utils import has_any, has_only
+  from sina.utils import has_any
 
-  # Retrieve all Records whose quadrants included at least one of "NW" or "SW"
-  records = record_dao.data_query(has_any=["NW", "SW"])
+  records = record_dao.data_query(active_packages=has_any("strength_1", "strength_2"))
 
-  # Retrieve all Records whose quadrants were ONLY "NW" and "SW".
-  # ["SW", "NW", "NW"] would be returned, but ["SW", "NW", "NE"] would not be
-  records = record_dao.data_query(has_only=["NW", "SW"])
+This is the general syntax for list queries in Sina. Supported queries are:
 
-Note that order and count don't matter in the above list queries. They cannot be
-used to, for example, find a Record whose list of quadrants contains exactly two
-instances of "NW".
++------------------------------------------------------------------------------------------------+
+| Scalar List Queries                                                                            |
++============+===================================================================================+
+| all_in     | Takes a DataRange. All values in this datum must be within the DataRange.         |
++------------+-----------------------------------------------------------------------------------+
+| any_in     | Takes a DataRange. At least one value in this datum must be within the DataRange. |
++------------+-----------------------------------------------------------------------------------+
+
++--------------------------------------------------------------------------------------------+
+| String List Queries                                                                        |
++============+===============================================================================+
+| has_all    | Takes one or more strings. All strings must be present in this datum.         |
++------------+-------------------------------------------------------------------------------+
+| has_any    | Takes one or more strings. At least one string must be present in this datum. |
++------------+-------------------------------------------------------------------------------+
+
 
 See examples/basic_usage.ipynb for list queries in use.
 

@@ -26,15 +26,12 @@ import sina.utils as utils
 
 LOGGER = logging.getLogger(__name__)
 
+# Used to support data types with both "XFromRecord" and "RecordFromX" tables
 TABLE_LOOKUP = {
     "scalar": {"record_table": schema.RecordFromScalarData,
                "data_table": schema.ScalarDataFromRecord},
     "string": {"record_table": schema.RecordFromStringData,
-               "data_table": schema.StringDataFromRecord},
-    "stringlist": {"record_table": schema.RecordFromStringListData,
-                   "data_table": schema.StringListDataFromRecord},
-    "scalarlist": {"record_table": schema.RecordFromScalarListData,
-                   "data_table": schema.ScalarListDataFromRecord}
+               "data_table": schema.StringDataFromRecord}
 }
 
 
@@ -124,16 +121,23 @@ class RecordDAO(dao.RecordDAO):
                      'force_overwrite=%s and _type_managed=%s.',
                      len(list_to_insert), force_overwrite, _type_managed)
         # Because batch is done by partition key, we'll need to store info for
-        # tables whose full per-partition info isn't supplied by one Record
+        # tables whose full per-partition info isn't supplied by one Record.
+        # Thus, these rec_from_x dicts last for the full insert.
         from_scalar_batch = defaultdict(list)
         from_string_batch = defaultdict(list)
         from_scalar_list_batch = defaultdict(list)
         from_string_list_batch = defaultdict(list)
 
-        def _cross_populate_batch(batch_dict, batch_list):
-            """Insert data into a batch dict and list."""
+        def _cross_populate_batch(batch_dict, batch_list=None):
+            """
+            Insert data into a batch dict (rec_from_x) and list (x_from_rec).
+
+            Not all data types make sense for an x_from_rec table (ex: lists),
+            so in those cases, simply skip the list population.
+            """
             batch_dict[datum_name].append((value, id, units, tags))
-            batch_list.append((datum_name, value, units, tags))
+            if batch_list is not None:
+                batch_list.append((datum_name, value, units, tags))
 
         for record in list_to_insert:
             # Insert the Record itself
@@ -146,10 +150,10 @@ class RecordDAO(dao.RecordDAO):
                    type=record.type,
                    raw=json.dumps(record.raw))
             if record.data:
+                # Unlike the rec_from_x dictionaries, these have the scope of a
+                # single Record, since the record id acts as their partition key.
                 string_from_rec_batch = []
                 scalar_from_rec_batch = []
-                string_list_from_rec_batch = []
-                scalar_list_from_rec_batch = []
                 tags, units, value, datum_name, id = [None]*5
 
                 for datum_name, datum in record.data.items():
@@ -165,22 +169,16 @@ class RecordDAO(dao.RecordDAO):
                         # This is safe as long as future functionality involving
                         # modifying already-ingested data checks type on re-ingestion
                         if not value or isinstance(value[0], numbers.Real):
-                            _cross_populate_batch(from_scalar_list_batch,
-                                                  scalar_list_from_rec_batch)
+                            _cross_populate_batch(from_scalar_list_batch)
                         else:
-                            _cross_populate_batch(from_string_list_batch,
-                                                  string_list_from_rec_batch)
+                            _cross_populate_batch(from_string_list_batch)
                     else:
                         # It's a string (or it's something else and Cassandra will yell)
                         _cross_populate_batch(from_string_batch, string_from_rec_batch)
 
-                # We've finished this record's data--do the batch inserts
+                # We've finished this record's data--do the x_from_rec batch inserts
                 for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
-                                         (schema.StringDataFromRecord, string_from_rec_batch),
-                                         (schema.ScalarListDataFromRecord,
-                                          scalar_list_from_rec_batch),
-                                         (schema.StringListDataFromRecord,
-                                          string_list_from_rec_batch)):
+                                         (schema.StringDataFromRecord, string_from_rec_batch)):
                     with BatchQuery() as batch_query:
                         create = (table.batch(batch_query).create if force_overwrite
                                   else table.batch(batch_query).if_not_exists().create)
@@ -207,8 +205,8 @@ class RecordDAO(dao.RecordDAO):
                                mimetype=doc[1],
                                tags=doc[2])
 
-        # We've gone through every record we were given. The from_scalar_batch
-        # and from_string_batch dictionaries are ready for batch inserting.
+        # We've gone through every record we were given. The rec_from_x batch
+        # dictionaries are ready for inserting.
         for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
                                       (schema.RecordFromStringData, from_string_batch)):
             for partition, data_list in six.iteritems(partition_data):
@@ -222,18 +220,29 @@ class RecordDAO(dao.RecordDAO):
                                units=entry[2],
                                tags=entry[3])
         # The RecordFromList-type tables differ form their partners slightly more
-        # to support their associated queries
-        for table, partition_data in ((schema.RecordFromScalarListData, from_scalar_list_batch),
-                                      (schema.RecordFromStringListData, from_string_list_batch)):
-            for partition, data_list in six.iteritems(partition_data):
-                with BatchQuery() as batch_query:
-                    # We no longer worry about overriding, trusting the partner
-                    # table to catch it if necessary.
-                    for entry in data_list:
-                        for value in entry[0]:
-                            table.batch(batch_query).create(name=partition,
-                                                            value=value,
+        # to support their associated queries. They also differ from one another.
+        table = schema.RecordFromScalarListDataMin
+        support_table = schema.RecordFromScalarListDataMax
+        for partition, data_list in six.iteritems(from_scalar_list_batch):
+            with BatchQuery() as batch_query:
+                for entry in data_list:
+                    # We track only the min and max, that's all we need for queries
+                    table.batch(batch_query).create(name=partition,
+                                                    min=min(entry[0]),
+                                                    id=entry[1])
+                    support_table.batch(batch_query).create(name=partition,
+                                                            max=max(entry[0]),
                                                             id=entry[1])
+        table = schema.RecordFromStringListData
+        for partition, data_list in six.iteritems(from_string_list_batch):
+            with BatchQuery() as batch_query:
+                # We no longer worry about overriding, trusting the partner
+                # table to catch it if necessary.
+                for entry in data_list:
+                    for value in entry[0]:
+                        table.batch(batch_query).create(name=partition,
+                                                        value=value,
+                                                        id=entry[1])
 
     @staticmethod
     def _insert_data(data, id, force_overwrite=False):
@@ -252,12 +261,12 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting %i data entries to Record ID %s and force_overwrite=%s.',
                      len(data), id, force_overwrite)
         for datum_name, datum in data.items():
-            schema.cross_populate_data_tables(id=id,
-                                              name=datum_name,
-                                              value=datum['value'],
-                                              units=datum.get('units'),
-                                              tags=datum.get('tags'),
-                                              force_overwrite=force_overwrite)
+            schema.cross_populate_query_tables(id=id,
+                                               name=datum_name,
+                                               value=datum['value'],
+                                               units=datum.get('units'),
+                                               tags=datum.get('tags'),
+                                               force_overwrite=force_overwrite)
 
     @staticmethod
     def _insert_files(id, files, force_overwrite=False):
@@ -328,10 +337,10 @@ class RecordDAO(dao.RecordDAO):
         # Delete every piece of data
         # Done a bit differently because record_id isn't always the partition key
         for name, datum in six.iteritems(record['data']):
-            schema.cross_batch_delete_data_tables(id=record_id,
-                                                  name=name,
-                                                  value=datum['value'],
-                                                  batch=batch)
+            schema.cross_batch_delete_query_tables(id=record_id,
+                                                   name=name,
+                                                   value=datum['value'],
+                                                   batch=batch)
 
         # Because Relationships are created separately from Records, we have to
         # manually discover all relationships. Because they are mirrored, we
@@ -355,10 +364,7 @@ class RecordDAO(dao.RecordDAO):
              .batch(batch).delete())
         schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
-    # Disable pylint checks -- including R0914=too-many-locals -- to if and
-    # until the team decides to refactor the code
-    def data_query(self,  # pylint: disable=too-many-branches,too-many-branches,R0914
-                   **kwargs):
+    def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -394,119 +400,19 @@ class RecordDAO(dao.RecordDAO):
                 result_ids.append(self._apply_ranges_to_query(criteria,
                                                               table_type))
 
-        # Different types of list criteria require different logic
-        for criteria, table_type in ((scalarlist, "scalarlist"),
-                                     (stringlist, "stringlist")):
-            for criterion in criteria:
-                # Unpack the criterion
-                datum_name, list_criteria = criterion
-                # Figure out which function to use
-                if list_criteria.operation == utils.ListQueryOperation.ALL:
-                    query_func = self._apply_has_all_to_query
-                elif list_criteria.operation == utils.ListQueryOperation.ANY:
-                    query_func = self._apply_has_any_to_query
-                elif list_criteria.operation == utils.ListQueryOperation.ONLY:
-                    query_func = self._apply_has_only_to_query
-                else:
-                    raise ValueError("Currently, only {} list operations are supported. "
-                                     "Given {}".format((utils.ListQueryOperation.ALL,
-                                                        utils.ListQueryOperation.ANY,
-                                                        utils.ListQueryOperation.ONLY),
-                                                       list_criteria.operation))
-                result_ids.append(query_func(table=table_type,
-                                             datum_name=datum_name,
-                                             datum_criteria=list_criteria.entries))
+        # List values have special logic per type
+        result_ids += [self._string_list_query(datum_name=name,
+                                               string_list=list_criteria.value,
+                                               operation=list_criteria.operation)
+                       for name, list_criteria in stringlist]
+        result_ids += [self._scalar_list_query(datum_name=name,
+                                               data_range=range_criteria.value,
+                                               operation=range_criteria.operation)
+                       for name, range_criteria in scalarlist]
+
         # If we have more than one set of data, we need to find the intersect.
         for id in utils.intersect_lists(result_ids):
             yield id
-
-    def _apply_has_all_to_query(self, datum_name, datum_criteria, table):
-        """
-        Return the ids of all Records whose data fulfill table-specific has_all criteria.
-
-        Used with data_query(), specifically for the has_all list query, which is
-        documented further in sina.utils.has_all().
-
-        :param datum_name: The name of the datum the has_all is performed against.
-        :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
-
-        :returns: a generator of ids fitting the criteria
-        """
-        # Initially, it seemed as though _apply_ranges_to_query was all that was
-        # needed here, but there's an important caveat: _apply_ranges relies on
-        # both the DataFromRecord and RecordFromData tables, and the former
-        # looks much different for list data. And so:
-        rec_table = TABLE_LOOKUP[table]["record_table"]
-        result_sets = []
-        for criterion in datum_criteria:
-            result_sets.append(set(self._configure_query_for_criteria(rec_table.objects,
-                                                                      name=datum_name,
-                                                                      criteria=criterion)
-                                   .values_list('id', flat=True)))
-        return set.intersection(*result_sets)
-
-    def _apply_has_any_to_query(self, datum_name, datum_criteria, table):
-        """
-        Return the ids of all Records whose data fulfill table-specific has_any criteria.
-
-        Used with data_query(), specifically for the has_any list query, which is
-        documented further in sina.utils.has_any().
-
-        :param datum_name: The name of the datum the has_any is performed against.
-        :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
-
-        :returns: a set of ids fitting the criteria
-        """
-        rec_table = TABLE_LOOKUP[table]["record_table"]
-        # Cassandra has no OR operator. Ordinarily we'd chain queries as generators,
-        # but it's possible to get duplicate ids, so we do need to store all results
-        # in memory to filter dupes.
-        distinct_ids = set()
-        for criterion in datum_criteria:
-            ids = self._configure_query_for_criteria(rec_table.objects,
-                                                     datum_name,
-                                                     criterion).values_list('id', flat=True)
-            for id in ids:
-                distinct_ids.add(id)
-        return distinct_ids
-
-    def _apply_has_only_to_query(self, datum_name, datum_criteria, table):
-        """
-        Return the ids of all Records whose data fulfill table-specific has_only criteria.
-
-        Used with data_query(), specifically for the has_only list query, which is
-        documented further in sina.utils.has_only().
-
-        The simplest expression of this in query terms is something like::
-
-            has_only(n) = has_all(n) - has_any(anything not n)
-
-        where n is a list of criteria, but as cqlengine does not support negation
-        at time of writing, the logic here differs to accomodate.
-
-        :param datum_name: The name of the datum the has_only is performed against.
-        :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
-
-        :returns: a set of ids fitting the criteria
-        """
-        included_ids = set(self._apply_has_all_to_query(datum_name, datum_criteria, table))
-        # If this query proves popular but nonperformant, we may want to make a
-        # dedicated query table that stores list data as a set (order and count are explicitly
-        # ignored for has_only). This will only work if has_only is invoked with no
-        # DataRanges. Until then, we convert simple equivalence (x="foo") to DataRanges.
-        ranges = [x if isinstance(x, utils.DataRange)
-                  else utils.DataRange(x, x, max_inclusive=True)
-                  for x in datum_criteria]
-        excluded_ids = self._apply_has_any_to_query(datum_name,
-                                                    utils.invert_ranges(ranges),
-                                                    table)
-        for id in excluded_ids:
-            if id in included_ids:
-                included_ids.remove(id)
-        return included_ids
 
     def _apply_ranges_to_query(self, data, table):
         """
@@ -514,7 +420,8 @@ class RecordDAO(dao.RecordDAO):
 
         Done per table, unlike data_query. This is only meant to be used in
         conjunction with data_query() and related. Criteria can be DataRanges
-        or single values (12, "dog", etc).
+        or single values (12, "dog", etc). As such, it is not used for the list
+        data tables.
 
         Because each piece of data is its own row and we need to compare between
         rows, we can't use a simple AND. In SQL, we get around this with
@@ -590,6 +497,92 @@ class RecordDAO(dao.RecordDAO):
                 else:
                     query = query.filter(value__lt=criteria.max)
         return query
+
+    @staticmethod
+    def _string_list_query(datum_name, string_list, operation):
+        """
+        Return all Records where [datum_name] fulfills [operation] for [string_list].
+
+        Helper method for data_query.
+
+        :param datum_name: The name of the datum
+        :param string_list: A list of strings datum_name must contain.
+        :pram operation: What kind of ListQueryOperation to do.
+        :returns: A generator of ids of matching Records or the Records
+                  themselves (see ids_only).
+
+        :raises ValueError: if given an invalid operation for a string list
+        """
+        def get_list_rows_with_val(value):
+            """Return StringList ids with matching value for datum_name."""
+            query = schema.RecordFromStringListData.filter(name=datum_name, value=value)
+            return query.values_list('id', flat=True)
+
+        # Pre-populate. Necessary for ALL, harmless for ANY
+        distinct_ids = set(get_list_rows_with_val(string_list[0]))
+
+        if operation == utils.ListQueryOperation.HAS_ALL:
+            set_func = distinct_ids.intersection_update
+        elif operation == utils.ListQueryOperation.HAS_ANY:
+            set_func = distinct_ids.update
+        else:
+            # This can only happen if there's an operation that accepts a list
+            # of strings but is not supported by string_list_query.
+            raise ValueError("Given an invalid operation for a string list query: {}"
+                             .format(operation.value))
+
+        for string in string_list[1:]:
+            set_func(get_list_rows_with_val(string))
+
+        return distinct_ids
+
+    @staticmethod
+    def _scalar_list_query(datum_name, data_range, operation):
+        """
+        Return all Records where [datum_name] fulfills [operation] for [data_range].
+
+        Helper method for data_query.
+
+        :param datum_name: The name of the datum
+        :param data_range: A datarange to be used with <operation>
+        :pram operation: What kind of ListQueryOperation to do.
+        :returns: A generator of ids of matching Records.
+
+        :raises ValueError: if given an invalid operation for a datarange
+        """
+        LOGGER.info('Finding Records where datum %s has %s in %s', datum_name,
+                    operation.value.split('_')[0], data_range)
+
+        # Because Cassandra won't let us filter sequential keys, we need to use 2 tables.
+        query_tables = {"min": schema.RecordFromScalarListDataMin,
+                        "max": schema.RecordFromScalarListDataMax}
+
+        # Cassandra's filters use kwargs. We'll have to build names then unpack.
+        if operation == utils.ListQueryOperation.ALL_IN:
+            # (What must be [>,>=] the criterion's min, [<,<=] the criterion's max)
+            op_cols = ("min", "max")
+        elif operation == utils.ListQueryOperation.ANY_IN:
+            op_cols = ("max", "min")
+        else:
+            raise ValueError("Given an invalid operation for a scalar range query: {}"
+                             .format(operation.value))
+
+        # Set whether it's > or >=, < or <=
+        record_ids = []
+        if data_range.min is not None:
+            op_desc = op_cols[0]+"__gte" if data_range.min_inclusive else op_cols[0]+"__gt"
+            record_ids.append(set(query_tables[op_cols[0]].objects
+                                  .filter(name=datum_name)
+                                  .filter(**{op_desc: data_range.min})
+                                  .values_list('id', flat=True)))
+        if data_range.max is not None:
+            op_desc = op_cols[1]+"__lte" if data_range.max_inclusive else op_cols[1]+"__lt"
+            record_ids.append(set(query_tables[op_cols[1]].objects
+                                  .filter(name=datum_name)
+                                  .filter(**{op_desc: data_range.max})
+                                  .values_list('id', flat=True)))
+        for record_id in set.intersection(*record_ids):
+            yield record_id
 
     def get(self, id):
         """
@@ -758,8 +751,12 @@ class RecordDAO(dao.RecordDAO):
         """
         Retrieve a subset of data for Records (or optionally a subset of Records).
 
-        For example, it might get "debugger_version" and "volume" for the
-        Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
+        NOTE: This is not for list-type data! If you have a use case involving
+        getting list-type data for large numbers of Records at once, please
+        let us know. For now, list-type data is ignored.
+
+        This method might, for example, get "debugger_version" and "volume" for the
+        Records with ids "foo_1" and "foo_3". Results are returned in a dictionary of
         dictionaries; the outer key is the record_id, the inner key is the
         name of the data piece (ex: "volume"). So::
 
@@ -819,8 +816,10 @@ class RecordDAO(dao.RecordDAO):
         """
         Given a specific datum for a specific Record, return its tags.
 
-        We'll go through our query tables until we find the data entry, so this
-        works for strings/scalars/lists thereof, but not non-data entries (files, etc).
+        Helper method for get_data_for_records.
+
+        We'll go through our data tables until we find the entry, so this
+        works for strings and scalars, but not lists or files.
 
         Cassandra has a limitation wherein any "IN" query stops working
         if one of the columns requested contains collections. 'tags' is a
@@ -837,8 +836,8 @@ class RecordDAO(dao.RecordDAO):
 
         :raises ValueError: if given a name or id not found in the database.
         """
-        query_tables = [TABLE_LOOKUP[x]["data_table"] for x in TABLE_LOOKUP]
-        for table in query_tables:
+        data_tables = [TABLE_LOOKUP[x]["data_table"] for x in ("scalar", "string")]
+        for table in data_tables:
             tags = (table.objects
                     .filter(table.id == id)
                     .filter(table.name == name)
@@ -960,6 +959,7 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                     object_id=entry[1]))
 
     def get(self, subject_id=None, object_id=None, predicate=None):
+        """Retrieve relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)
