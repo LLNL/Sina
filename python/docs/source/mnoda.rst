@@ -49,13 +49,11 @@ A more fleshed-out example, with field descriptions:
       // Local ID of the Record. Must be unique within JSON document. Will be
       // replaced by global id (or simply 'id') in db.
       "local_id": "obj1",
-      // A list of files associated with the Record
-      "files": [
-          // Each file must have a uri, and can optionally specify a mimetype and tags.
-          {"uri": "foo.png",
-           "mimetype": "image/png",
-           "tags": ["summary_image","output"]}
-      ],
+      // A dictionary of files associated with the Record
+      "files": {
+          // Each file can optionally specify a mimetype and tags.
+          "foo.png": {"mimetype": "image/png", "tags": ["summary_image","output"]}
+      },
       // A dictionary of data associated with the Record
       "data": {
           // Entries must have a value. Optionally, they can have tags and/or units.
@@ -68,8 +66,8 @@ A more fleshed-out example, with field descriptions:
           "revision": { "value": "12-4-11", "tags": ["pedigree"]},
           "presets": { "value": ["quickstart", "glass"]}
       },
+      // A dictionary of information that does not make sense as a data or file entry
       "user_defined": {
-          // Information that does not make sense as a data or file entry should be placed here.
           // None of this will be interpreted by Sina. Instead, it will simply
           // be saved as part of the Record.
           "display_string": "0x477265617420636174636821"
@@ -185,9 +183,9 @@ actual name of the datum (such as "density" or "max_volume").
         {
           "type": "",
           "local_id": "",
-          "files": [
-              {"uri": "", "mimetype": "", "tags": []}
-          ],
+          "files": {
+              "uri": {"mimetype": "", "tags": []}
+          },
           "data": {
               "datum_name": {"value": [], "units": "", "tags": []}
           },

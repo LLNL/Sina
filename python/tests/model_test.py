@@ -61,6 +61,7 @@ class TestModel(unittest.TestCase):
         # Files as a list instead of a dict
         spam.files = {"spam.txt": ["text/plain"]}
         self.assertFalse(spam.is_valid()[0])
+
         # Correct minimal file that has a bad tag list
         spam.files = {"spam.log": {"tags": "output"}}
         self.assertFalse(spam.is_valid()[0])
@@ -69,8 +70,11 @@ class TestModel(unittest.TestCase):
 
         spam.type = "recipe"
 
-        spam.user_defined = {"eggs_in_dozen": 12}
+        # User_defined as a list instead of a dict
+        spam.user_defined = ["hello"]
+        self.assertFalse(spam.is_valid()[0])
 
+        spam.user_defined = {"hello": "greeting"}
         # all previous errors fixed: "maximal" valid run
         self.assertTrue(spam.is_valid()[0])
 

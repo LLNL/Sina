@@ -156,9 +156,9 @@ public:
     /**
      * Set the user-defined content of the object.
      *
-     * @param userDefined the user-defined content
+     * @param userDefined the user-defined content. Must be an object (key/value pairs)
      */
-    void setUserDefinedContent(nlohmann::json userDefined);
+    void setUserDefinedContent(nlohmann::json::object_t userDefined);
 
     /**
      * Convert this record to its JSON representation.
