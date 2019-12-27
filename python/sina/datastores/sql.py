@@ -42,9 +42,9 @@ class RecordDAO(dao.RecordDAO):
 
     def insert(self, records):
         """
-        Given (a) Record(s), insert it into the current SQL database.
+        Given a(n iterable of) Record(s), insert into the current SQL database.
 
-        :param records: A Record or iterator of Records to insert
+        :param records: Record or iterable of Records to insert
         """
         if isinstance(records, model.Record):
             records = [records]
@@ -52,7 +52,7 @@ class RecordDAO(dao.RecordDAO):
             LOGGER.debug('Inserting record %s into SQL.', record.id or record.local_id)
             sql_record = self.create_sql_record(record)
             self.session.add(sql_record)
-            self.session.commit()
+        self.session.commit()
 
     @staticmethod
     def create_sql_record(sina_record):
@@ -139,14 +139,14 @@ class RecordDAO(dao.RecordDAO):
 
     def delete(self, ids):
         """
-        Given id(s) of (a) Record(s), delete all mention from the SQL database.
+        Given a(n iterable of) Record id(s), delete all mention from the SQL database.
 
-        This includes removing all data, raw(s), any relationships
-        involving it/them, etc. Because the id is a foreign key in every table
+        This includes removing all data, raw(s), relationships, etc.
+        Because the id is a foreign key in every table
         (besides Record itself but including Run, etc), we can rely on
         cascading to propogate the deletion.
 
-        :param ids: The id or iterator of ids of the Record(s) to delete.
+        :param ids: The id or iterable of ids of the Record(s) to delete.
         """
         if isinstance(ids, six.string_types):
             ids = [ids]
@@ -211,7 +211,7 @@ class RecordDAO(dao.RecordDAO):
         for id in utils.intersect_lists(result_ids):
             yield id
 
-    def _get_one(self, id):
+    def _get_one(self, id, _record_builder):
         """
         Apply some "get" function to a single Record id.
 
@@ -219,14 +219,15 @@ class RecordDAO(dao.RecordDAO):
         getting a single Record.
 
         :param id: A Record id to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
 
         :returns: A Record if found, else None.
         """
         result = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one_or_none())
         if result is not None:
-            return model.generate_record_from_json(
-                json_input=json.loads(result.raw))
+            return _record_builder(json_input=json.loads(result.raw))
         return result
 
     def get_all_of_type(self, type, ids_only=False):
@@ -745,7 +746,7 @@ class RelationshipDAO(dao.RelationshipDAO):
 
 
 class RunDAO(dao.RunDAO):
-    """DAO responsible for handling Runs, (Record subtype), in SQL."""
+    """DAO responsible for handling Runs (Record subtype) in SQL."""
 
     def __init__(self, session, record_dao):
         """Initialize RunDAO and assign a contained RecordDAO."""
@@ -755,9 +756,9 @@ class RunDAO(dao.RunDAO):
 
     def insert(self, runs):
         """
-        Given (a) Run(s), insert it into the current database.
+        Given a(n iterable of) Run(s), import into the SQL database.
 
-        :param runs: A Run or iterator of Runs to import
+        :param run: A Run or iterator of Runs to import
         """
         if isinstance(runs, model.Run):
             runs = [runs]
@@ -768,21 +769,7 @@ class RunDAO(dao.RunDAO):
             run.record = record
             self.session.add(record)
             self.session.add(run)
-            self.session.commit()
-
-    def get(self, id):
-        """
-        Given (a) Run id(s), return match(es) (if any) from the SQL database.
-
-        :param id: The id of some Run or an iterator of Run ids.
-
-        :returns: A generator of Runs matching the identifier(s). In the case that an id
-                  (not an iterator of ids) is provided, will return a Run or None
-        """
-        LOGGER.debug('Getting run with id: %s', id)
-        record = (self.session.query(schema.Record)
-                  .filter(schema.Record.id == id).one())
-        return model.generate_run_from_json(json.loads(record.raw))
+        self.session.commit()
 
     def delete(self, ids):
         """

@@ -70,9 +70,9 @@ class RecordDAO(dao.RecordDAO):
     # Args differ because SQL doesn't support force_overwrite yet, SIBO-307
     def insert(self, records, force_overwrite=False):
         """
-        Given (a) Record(s), insert it into the current Cassandra database.
+        Given a(n iterable of) Record(s), insert it into the current Cassandra database.
 
-        :param records: A Record or iterator of Records to insert
+        :param records: A Record or iterable of Records to insert
         :param force_overwrite: Whether to forcibly overwrite a preexisting
                                 record that shares this record's id.
         :raises LWTException: If force_overwrite is False and an entry with the
@@ -118,7 +118,7 @@ class RecordDAO(dao.RecordDAO):
     @staticmethod
     def _insert_many(list_to_insert, _type_managed, force_overwrite=False):
         """
-        Given a list of Records, insert each into Cassandra.
+        Given an iterable of Records, insert each into Cassandra.
 
         This method relies heavily on batching--if you're only inserting a few
         records, you may not see performance gains, and may even see some
@@ -132,9 +132,9 @@ class RecordDAO(dao.RecordDAO):
         :param force_overwrite: Whether to forcibly overwrite a preexisting run
                                 that shares this run's id.
         """
-        LOGGER.debug('Inserting %i records to Cassandra with'
+        LOGGER.debug('Inserting records %s to Cassandra with'
                      'force_overwrite=%s and _type_managed=%s.',
-                     len(list_to_insert), force_overwrite, _type_managed)
+                     list_to_insert, force_overwrite, _type_managed)
         # Because batch is done by partition key, we'll need to store info for
         # tables whose full per-partition info isn't supplied by one Record.
         # Thus, these rec_from_x dicts last for the full insert.
@@ -307,7 +307,7 @@ class RecordDAO(dao.RecordDAO):
 
     def delete(self, ids):
         """
-        Given (a) Record id(s), delete the Records from the current Cassandra database.
+        Given a(n iterable of) Record id(s), delete the Record(s) from the current database.
 
         Removes everything: data, related relationships, files. Relies on
         Cassandra batching, one batch per Record if there's only one Record to
@@ -591,7 +591,7 @@ class RecordDAO(dao.RecordDAO):
         for record_id in set.intersection(*record_ids):
             yield record_id
 
-    def _get_one(self, id):
+    def _get_one(self, id, _record_builder):
         """
         Apply some "get" function to a single Record id.
 
@@ -599,13 +599,14 @@ class RecordDAO(dao.RecordDAO):
         getting a single Record.
 
         :param id: A Record id to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
 
         :returns: A Record if found, else None.
         """
         try:
             query = schema.Record.objects.filter(id=id).get()
-            return model.generate_record_from_json(
-                json_input=json.loads(query.raw))
+            return _record_builder(json_input=json.loads(query.raw))
         except DoesNotExist:
             pass
 
@@ -901,15 +902,15 @@ class RelationshipDAO(dao.RelationshipDAO):
     def insert(self, relationships=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given some Relationship(s), import it/them into a Cassandra database.
+        Given some Relationship(s), import into a Cassandra database.
 
         This can create an entry from either an existing relationship object
         or from its components (subject id, object id, predicate). If all four
         are provided, the Relationship will be used. If inserting many
         Relationships, a list of Relationships MUST be provided (and no
-        other fields)
+        other fields).
 
-        :param relationships: A Relationship object to build entry from or iterator of them.
+        :param relationships: A Relationship object to build entry from or iterable of them.
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
         :param predicate: A string describing the relationship between subject and oject.
@@ -1008,9 +1009,9 @@ class RunDAO(dao.RunDAO):
     # pylint: disable=arguments-differ, protected-access
     def insert(self, runs, force_overwrite=False):
         """
-        Given (a) Run(s), import into the current Cassandra database.
+        Given a(n iterable of) Run(s), import into the current Cassandra database.
 
-        :param run: A Run or iterator of Runs to import
+        :param runs: A Run or iterator of Runs to import
         :param force_overwrite: Whether to forcibly overwrite a preexisting
                                 run that shares this run's id.
         """
@@ -1020,6 +1021,7 @@ class RunDAO(dao.RunDAO):
             self.record_dao._insert_one(runs, force_overwrite=force_overwrite)
             runs = [runs]
         else:
+            runs = list(runs)  # We'll need to use it twice
             self.record_dao._insert_many(runs, _type_managed=True,
                                          force_overwrite=force_overwrite)
         # This spans partitions, it can't be batched.
@@ -1032,7 +1034,7 @@ class RunDAO(dao.RunDAO):
 
     def delete(self, ids):
         """
-        Given (a) Run id(s), delete the Runs from the current Cassandra database.
+        Given a(n iterable of) Run id(s), delete the Runs from the current Cassandra database.
 
         Does all the same work as the Record one, but also removes from the Run table.
 
@@ -1049,18 +1051,6 @@ class RunDAO(dao.RunDAO):
                 # The method's "private" status is to avoid confusion with them.
                 # pylint: disable=protected-access
                 self.record_dao._setup_batch_delete(batch, id)
-
-    def get(self, id):
-        """
-        Given a run's id, return match (if any) from Cassandra database.
-
-        :param id: The id of some run
-
-        :returns: A run matching that identifier or None
-        """
-        LOGGER.debug('Getting run with id: %s', id)
-        record = schema.Record.filter(id=id).get()
-        return model.generate_run_from_json(json_input=json.loads(record.raw))
 
 
 class DAOFactory(dao.DAOFactory):

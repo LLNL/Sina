@@ -23,8 +23,9 @@ TARGET = None
 
 
 # Disable pylint invalid-name due to significant number of tests with names
-# exceeding the 30 character limit
-# pylint: disable=invalid-name
+# exceeding the 30 character limit. Also disable too-many-lines
+# pylint: disable=invalid-name,too-many-lines
+
 
 def create_daos(class_):
     """
@@ -191,6 +192,20 @@ class TestModify(unittest.TestCase):
         self.assertEqual(returned_record.data, rec.data)
         self.assertEqual(returned_record.files, rec.files)
         self.assertEqual(returned_record.user_defined, rec.user_defined)
+
+    def test_recorddao_insert_many(self):
+        """Test that RecordDAO is inserting a generator of several Records correctly."""
+        record_dao = self.create_dao_factory().create_record_dao()
+        rec_1 = Record(id="spam", type="eggs",
+                       data={"eggs": {"value": 12}})
+        rec_2 = Record(id="spam2", type="eggs",
+                       data={"eggs": {"value": 32}})
+        record_dao.insert((x for x in (rec_1, rec_2)))
+        returned_records = list(record_dao.get((x for x in ("spam", "spam2"))))
+        self.assertEqual(returned_records[0].data["eggs"]["value"],
+                         rec_1["data"]["eggs"]["value"])
+        self.assertEqual(returned_records[1].data["eggs"]["value"],
+                         rec_2["data"]["eggs"]["value"])
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
@@ -380,6 +395,18 @@ class TestModify(unittest.TestCase):
         self.assertEqual(returned_run.version, run.version)
         self.assertEqual(returned_run.data, run.data)
 
+    def test_runddao_insert_many(self):
+        """Test that RunDAO is inserting and getting many Runs correctly."""
+        run_dao = self.create_dao_factory().create_run_dao()
+        run_1 = Run(id="spam", application="breakfast", data={"eggs": {"value": 12}})
+        run_2 = Run(id="spam2", application="breakfast", data={"eggs": {"value": 32}})
+        run_dao.insert((x for x in (run_1, run_2)))
+        returned_records = list(run_dao.get((x for x in ("spam", "spam2"))))
+        self.assertEqual(returned_records[0].data["eggs"]["value"],
+                         run_1["data"]["eggs"]["value"])
+        self.assertEqual(returned_records[1].data["eggs"]["value"],
+                         run_2["data"]["eggs"]["value"])
+
     def test_rundao_delete(self):
         """Test that RunDAO is deleting correctly."""
         factory = self.create_dao_factory(test_db_dest=self.test_db_dest)
@@ -387,16 +414,22 @@ class TestModify(unittest.TestCase):
         relationship_dao = factory.create_relationship_dao()
         run_1 = Run(id="run_1", application="eggs")
         run_2 = Run(id="run_2", application="spam")
-        run_dao.insert([run_1, run_2])
+        run_3 = Run(id="run_3", application="spam")
+        run_4 = Run(id="run_4", application="spam")
+        run_dao.insert([run_1, run_2, run_3, run_4])
         relationship_dao.insert(subject_id="run_1", object_id="run_2", predicate="dupes")
-        # Ensure there's two entries in the Run table
-        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 2)
+        # Ensure there's four entries in the Run table
+        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 4)
         # Delete one
         run_dao.delete("run_1")
-        # Now there should only be one Run left
-        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
+        # Now there should only be two Runs left
+        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 3)
         # The Relationship should be removed as well
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
+        # Delete several
+        run_dao.delete(("run_2", "run_3"))
+        # Now there should be one
+        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
 
 
 # Disable the pylint check if and until the team decides to refactor the code
@@ -430,13 +463,13 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_recorddao_get_one(self):
         """Test our ability to fetch a single record."""
         just_one = self.record_dao.get("spam3")
-        self.assertTrue(isinstance(just_one, Record))
+        self.assertIsInstance(just_one, Record)
         self.assertEqual(just_one.type, "foo")
 
     def test_recorddao_get_none(self):
         """Test our ability to fetch None when a record doesn't exist."""
         get_none = self.record_dao.get("Idontexist")
-        self.assertEqual(get_none, None)
+        self.assertIsNone(get_none)
 
     def test_recorddao_get_many(self):
         """Test our ability to fetch several Records, in this case from a generator."""

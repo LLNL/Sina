@@ -59,29 +59,33 @@ class RecordDAO(object):
 
     __metaclass__ = ABCMeta
 
-    def get(self, ids):
+    def get(self, ids, _record_builder=sina.model.generate_record_from_json):
         """
         Given an id or iterable of ids, return matching Record or None.
 
         :param ids: The id(s) of the Record(s) to return.
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
 
-        :returns: A generator of Records matching the identifier(s) or None if
-                  no Record is found. In the case that an id (not an iterator
-                  of ids) is provided, will return a Record or None
+        :returns: If provided an iterable, a generator containing either
+                  a matching Record or None for each identifier provided. In the
+                  case that an id (not an iterator of ids) is provided, will
+                  return a Record or None.
         """
         def gen_records(ids):
             """Hack around the limitation of returning generators XOR non-gens."""
             for id in ids:
-                yield self._get_one(id)
+                yield self._get_one(id, _record_builder)
 
         if isinstance(ids, six.string_types):
             LOGGER.debug('Getting record with id=%s', ids)
-            return self._get_one(ids)
+            return self._get_one(ids, _record_builder)
         ids = list(ids)
         LOGGER.debug('Getting records with ids in=%s', ids)
         return gen_records(ids)
 
-    def _get_one(self, id):
+    @abstractmethod
+    def _get_one(self, id, _record_builder):
         """
         Apply some "get" function to a single Record id.
 
@@ -93,6 +97,8 @@ class RecordDAO(object):
         be worth revisiting.
 
         :param id: A Record id to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
 
         :returns: A Record if found, else None.
         """
@@ -311,9 +317,9 @@ class RelationshipDAO(object):
     def insert(self, relationships=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given (a) Relationship(s), insert into the DAO's backend.
+        Given one or more Relationships, insert into the DAO's backend.
 
-        This can create an entry from either an existing relationship object
+        This can create an entry from either an existing Relationship object
         or from its components (subject id, object id, predicate). If all four
         are provided, the Relationship will be used.
 
@@ -399,22 +405,24 @@ class RunDAO(object):
         """
         self.record_dao = record_dao
 
-    @abstractmethod
-    def get(self, id):
+    def get(self, ids):
         """
-        Given (a) Run id(s), return matching Run(s) from the DAO's backend.
+        Given a(n iterable of) Run id(s), return matching Run(s) from the DAO's backend.
 
-        :param id: The Run id or an iterable of Run ids to find and return
+        :param ids: The Run id or an iterable of Run ids to find and return
 
-        :returns: A generator of Runs matching the identifier(s). In the case that an id
-                  (not an iterator of ids) is provided, will return a Run or None
+        :returns: If provided an iterable, a generator containing either
+                  a matching Run or None for each identifier provided. In the
+                  case that an id (not an iterator of ids) is provided, will
+                  return a Run or None.
         """
-        raise NotImplementedError
+        LOGGER.debug('Getting run with id(s): %s', ids)
+        return self.record_dao.get(ids, _record_builder=sina.model.generate_run_from_json)
 
     @abstractmethod
     def insert(self, runs):
         """
-        Given (a) Run(s), insert them into the DAO's backend.
+        Given a(n iterable of) Run(s), insert them into the DAO's backend.
 
         :param runs: A Run or iterable of Runs to insert
         """
@@ -423,7 +431,7 @@ class RunDAO(object):
     @abstractmethod
     def delete(self, ids):
         """
-        Given one or more Run ids, delete all mention from the DAO's backend.
+        Given a(n iterable of) Run id(s), delete all mention from the DAO's backend.
 
         This includes removing all data, raw(s), any relationships
         involving it/them, etc.
@@ -467,7 +475,7 @@ class RunDAO(object):
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
-        Return runs associated with a document uri.
+        Return Runs associated with a document uri.
 
         Really just calls Record's implementation.
 
