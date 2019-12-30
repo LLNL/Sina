@@ -65,7 +65,9 @@ class RecordDAO(object):
 
         :param ids: The id(s) of the Record(s) to return.
         :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw.
+                                (or one of its children) from the raw. Used
+                                by DAOs calling get() (Record, Run), does not
+                                need to be touched by the user.
 
         :returns: If provided an iterable, a generator containing either
                   a matching Record or None for each identifier provided. In the
