@@ -24,8 +24,9 @@ TARGET = None
 
 
 # Disable pylint invalid-name due to significant number of tests with names
-# exceeding the 30 character limit
-# pylint: disable=invalid-name
+# exceeding the 30 character limit. Also disable too-many-lines
+# pylint: disable=invalid-name,too-many-lines
+
 
 def create_daos(class_):
     """
@@ -88,9 +89,8 @@ def populate_database_with_data(record_dao):
     egg_record = Record(id="eggs", type="eggrec")
     egg_record.data["eggs_scal"] = {"value": 0}
 
-    record_dao.insert_many([spam_record, spam_record_2, spam_record_3,
-                            spam_record_4, spam_record_5, spam_record_6,
-                            egg_record])
+    record_dao.insert([spam_record, spam_record_2, spam_record_3, spam_record_4,
+                       spam_record_5, spam_record_6, egg_record])
 
 
 def remove_file(filename):
@@ -194,6 +194,20 @@ class TestModify(unittest.TestCase):
         self.assertEqual(returned_record.files, rec.files)
         self.assertEqual(returned_record.user_defined, rec.user_defined)
 
+    def test_recorddao_insert_many(self):
+        """Test that RecordDAO is inserting a generator of several Records correctly."""
+        record_dao = self.create_dao_factory().create_record_dao()
+        rec_1 = Record(id="spam", type="eggs",
+                       data={"eggs": {"value": 12}})
+        rec_2 = Record(id="spam2", type="eggs",
+                       data={"eggs": {"value": 32}})
+        record_dao.insert((x for x in (rec_1, rec_2)))
+        returned_records = list(record_dao.get((x for x in ("spam", "spam2"))))
+        self.assertEqual(returned_records[0].data["eggs"]["value"],
+                         rec_1["data"]["eggs"]["value"])
+        self.assertEqual(returned_records[1].data["eggs"]["value"],
+                         rec_2["data"]["eggs"]["value"])
+
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
         record_dao = self.create_dao_factory(test_db_dest=self.test_db_dest).create_record_dao()
@@ -225,7 +239,7 @@ class TestModify(unittest.TestCase):
         relationship_dao = factory.create_relationship_dao()
         record_1 = Record(id="rec_1", type="sample")
         record_2 = Record(id="rec_2", type="sample")
-        record_dao.insert_many([record_1, record_2])
+        record_dao.insert([record_1, record_2])
         relationship_dao.insert(subject_id="rec_1", object_id="rec_2", predicate="dupes")
         record_dao.delete("rec_1")
         # Make sure the relationship was deleted
@@ -244,13 +258,13 @@ class TestModify(unittest.TestCase):
         record_3 = Record(id="rec_3", type="sample")
         record_4 = Record(id="rec_4", type="sample")
         all_ids = ["rec_1", "rec_2", "rec_3", "rec_4"]
-        record_dao.insert_many([record_1, record_2, record_3, record_4])
+        record_dao.insert([record_1, record_2, record_3, record_4])
         relationship_dao.insert(subject_id="rec_1", object_id="rec_2", predicate="dupes")
         relationship_dao.insert(subject_id="rec_2", object_id="rec_2", predicate="is")
         relationship_dao.insert(subject_id="rec_3", object_id="rec_4", predicate="dupes")
         relationship_dao.insert(subject_id="rec_4", object_id="rec_4", predicate="is")
         # Delete several
-        record_dao.delete_many(["rec_1", "rec_2", "rec_3"])
+        record_dao.delete(["rec_1", "rec_2", "rec_3"])
         remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
         self.assertEqual(remaining_records, ["rec_4"])
 
@@ -382,6 +396,18 @@ class TestModify(unittest.TestCase):
         self.assertEqual(returned_run.version, run.version)
         self.assertEqual(returned_run.data, run.data)
 
+    def test_runddao_insert_many(self):
+        """Test that RunDAO is inserting and getting many Runs correctly."""
+        run_dao = self.create_dao_factory().create_run_dao()
+        run_1 = Run(id="spam", application="breakfast", data={"eggs": {"value": 12}})
+        run_2 = Run(id="spam2", application="breakfast", data={"eggs": {"value": 32}})
+        run_dao.insert((x for x in (run_1, run_2)))
+        returned_records = list(run_dao.get((x for x in ("spam", "spam2"))))
+        self.assertEqual(returned_records[0].data["eggs"]["value"],
+                         run_1["data"]["eggs"]["value"])
+        self.assertEqual(returned_records[1].data["eggs"]["value"],
+                         run_2["data"]["eggs"]["value"])
+
     def test_rundao_delete(self):
         """Test that RunDAO is deleting correctly."""
         factory = self.create_dao_factory(test_db_dest=self.test_db_dest)
@@ -389,16 +415,22 @@ class TestModify(unittest.TestCase):
         relationship_dao = factory.create_relationship_dao()
         run_1 = Run(id="run_1", application="eggs")
         run_2 = Run(id="run_2", application="spam")
-        run_dao.insert_many([run_1, run_2])
+        run_3 = Run(id="run_3", application="spam")
+        run_4 = Run(id="run_4", application="spam")
+        run_dao.insert([run_1, run_2, run_3, run_4])
         relationship_dao.insert(subject_id="run_1", object_id="run_2", predicate="dupes")
-        # Ensure there's two entries in the Run table
-        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 2)
+        # Ensure there's four entries in the Run table
+        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 4)
         # Delete one
         run_dao.delete("run_1")
-        # Now there should only be one Run left
-        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
+        # Now there should only be two Runs left
+        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 3)
         # The Relationship should be removed as well
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
+        # Delete several
+        run_dao.delete(("run_2", "run_3"))
+        # Now there should be one
+        self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
 
 
 # Disable the pylint check if and until the team decides to refactor the code
@@ -428,6 +460,31 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     # Due to the length of this section of tests, tests dealing with specific
     # methods are separated by headers.
+    # ############################### get #################################
+    def test_recorddao_get_one(self):
+        """Test our ability to fetch a single record."""
+        just_one = self.record_dao.get("spam3")
+        self.assertIsInstance(just_one, Record)
+        self.assertEqual(just_one.type, "foo")
+
+    def test_recorddao_get_none(self):
+        """Test our ability to fetch None when a record doesn't exist."""
+        get_none = self.record_dao.get("Idontexist")
+        self.assertIsNone(get_none)
+
+    def test_recorddao_get_many(self):
+        """Test our ability to fetch several Records, in this case from a generator."""
+        many_gen = (x for x in ("spam", "spam2", "spam3"))
+        assigned_types = ["run", "run", "foo"]
+        returned_types = [x.type for x in self.record_dao.get(many_gen)]
+        self.assertEqual(len(returned_types), 3)
+        six.assertCountEqual(self, returned_types, assigned_types)
+
+    def test_recorddao_get_none_from_many(self):
+        """Test that we return None for nonexistant ids."""
+        get_none = list(self.record_dao.get(["Idontexist", "NeitherdoI"]))
+        self.assertEqual(get_none, [None, None])
+
     # ###################### get_given_document_uri ##########################
     def test_recorddao_uri_no_wildcards(self):
         """Test that RecordDAO is retrieving based on full uris correctly."""
@@ -816,7 +873,7 @@ class TestImportExport(unittest.TestCase):
         factory = self.create_dao_factory()
         json_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                  "test_files/mnoda_1.json")
-        import_json(factory=factory, json_path=json_path)
+        import_json(factory=factory, json_paths=json_path)
         parent = factory.create_record_dao().get("parent_1")
         relation = factory.create_relationship_dao().get(object_id="child_1")
         run_factory = factory.create_run_dao()
