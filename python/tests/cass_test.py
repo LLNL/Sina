@@ -2,8 +2,6 @@
 """Test a Sina backend."""
 
 import logging
-import tempfile
-import time
 
 # Disable pylint checks due to its issue with virtual environments
 from nose.plugins.attrib import attr  # pylint: disable=import-error
@@ -91,13 +89,9 @@ class TestSetup(CassandraMixin, tests.backend_test.TestSetup):
     __test__ = True
 
     def setUp(self):
-        """Define a few shared variables, such as temp files, and builds a keyspace."""
-        self.test_db_dest = './test_{}_file.temp'.format(time.time())
         self.create_cass_keyspace()
 
     def tearDown(self):
-        """Remove any temp files created during test and tears down the keyspace."""
-        tests.backend_test.remove_file(self.test_db_dest)
         self.teardown_cass_keyspace()
 
     @patch('sina.datastores.cass_schema.form_connection', autospec=True)
@@ -123,8 +117,6 @@ class TestModify(CassandraMixin, tests.backend_test.TestModify):
 
     def setUp(self):
         """Create a keyspace to modify."""
-        # Deletion tests need a destination specified; Cassandra's default works.
-        self.test_db_dest = None
         self.create_cass_keyspace()
 
     def tearDown(self):
@@ -166,14 +158,9 @@ class TestImportExport(CassandraMixin, tests.backend_test.TestImportExport):
     __test__ = True
 
     def setUp(self):
-        """Define a few shared variables, such as temp files."""
-        self.test_file_path = tempfile.NamedTemporaryFile(
-            suffix='.csv',
-            delete=False,
-            mode='w+b')
+        super(TestImportExport, self).setUp()
         self.create_cass_keyspace()
 
     def tearDown(self):
-        """Remove any temp files or keyspaces created during test."""
-        tests.backend_test.remove_file(self.test_file_path.name)
+        super(TestImportExport, self).tearDown()
         self.teardown_cass_keyspace()

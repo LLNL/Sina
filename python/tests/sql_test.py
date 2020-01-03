@@ -3,7 +3,6 @@
 
 import os
 import time
-import tempfile
 
 import tests.backend_test
 import sina.datastores.sql as backend
@@ -18,8 +17,6 @@ class SQLMixin(object):  # pylint: disable=no-init,too-few-public-methods
     # Ensure the selected backend is passed to child tests.
     backend = backend
 
-    # This has to be a classmethod because it's called before instantiation
-    # (See TestQuery)
     @classmethod
     def create_dao_factory(cls, test_db_dest=None):
         """
@@ -42,18 +39,14 @@ class TestSetup(SQLMixin, tests.backend_test.TestSetup):
 
     __test__ = True
 
-    def setUp(self):
-        """Define a few shared variables, such as temp files."""
-        self.test_db_dest = './test_{}_file.temp'.format(time.time())
-
-    def tearDown(self):
-        """Remove any temp files created during test."""
-        tests.backend_test.remove_file(self.test_db_dest)
-
     def test_factory_instantiate_file(self):
         """Test to ensure SQL DAOFactory is able to create files."""
-        self.create_dao_factory(self.test_db_dest)
-        self.assertTrue(os.path.isfile(self.test_db_dest))
+        test_db = './test_{}_file.temp'.format(time.time())
+        try:
+            self.create_dao_factory(test_db)
+            self.assertTrue(os.path.isfile(test_db))
+        finally:
+            tests.backend_test.remove_file(test_db)
 
 
 class TestModify(SQLMixin, tests.backend_test.TestModify):
@@ -64,16 +57,6 @@ class TestModify(SQLMixin, tests.backend_test.TestModify):
     """
 
     __test__ = True
-
-    def setUp(self):
-        """Define a few shared variables, such as temp files."""
-        # Paths are needed for SQL because cascading on an in-memory db always fails.
-        # Found no documentation on workarounds.
-        self.test_db_dest = './test_{}_file.temp'.format(time.time())
-
-    def tearDown(self):
-        """Remove any temp files created during test."""
-        tests.backend_test.remove_file(self.test_db_dest)
 
 
 class TestQuery(SQLMixin, tests.backend_test.TestQuery):
@@ -98,15 +81,4 @@ class TestImportExport(SQLMixin, tests.backend_test.TestImportExport):
 
     Also runs any import/export-type tests that are unique to SQL.
     """
-
     __test__ = True
-
-    def setUp(self):
-        """Define a few shared variables, such as temp files."""
-        self.test_file_path = tempfile.NamedTemporaryFile(suffix='.csv',
-                                                          delete=False,
-                                                          mode='w+b')
-
-    def tearDown(self):
-        """Remove any temp files created during test."""
-        tests.backend_test.remove_file(self.test_file_path.name)

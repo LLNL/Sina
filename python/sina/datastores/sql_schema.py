@@ -29,12 +29,28 @@ class Record(Base):
     # for that versus MEDIUMTEXT is a byte per row, we specify a size big
     # enough to trigger the creation of a LONGTEXT column.
     raw = Column(Text(2**24), nullable=True)
-    scalars = sqlalchemy.orm.relationship('ScalarData')
-    strings = sqlalchemy.orm.relationship('StringData')
-    scalar_lists = sqlalchemy.orm.relationship('ListScalarData')
-    string_lists_master = sqlalchemy.orm.relationship('ListStringDataMaster')
-    string_lists_entry = sqlalchemy.orm.relationship('ListStringDataEntry')
-    documents = sqlalchemy.orm.relationship('Document')
+    scalars = sqlalchemy.orm.relationship('ScalarData',
+                                          cascade='all,delete-orphan',
+                                          backref='record',
+                                          passive_deletes=True)
+    strings = sqlalchemy.orm.relationship('StringData',
+                                          cascade='all,delete-orphan',
+                                          backref='record',
+                                          passive_deletes=True)
+    scalar_lists = sqlalchemy.orm.relationship('ListScalarData',
+                                               cascade='all,delete-orphan',
+                                               backref='record',
+                                               passive_deletes=True)
+    string_lists_master = sqlalchemy.orm.relationship('ListStringDataMaster',
+                                                      cascade='all,delete-orphan',
+                                                      backref='record',
+                                                      passive_deletes=True)
+    string_lists_entry = sqlalchemy.orm.relationship('ListStringDataEntry',
+                                                     cascade='all,delete-orphan',
+                                                     backref='record',
+                                                     passive_deletes=True)
+    documents = sqlalchemy.orm.relationship('Document', cascade='all,delete-orphan',
+                                            backref='record', passive_deletes=True)
     Index('type_idx', type)
 
     def __init__(self, id, type, raw=None):
@@ -101,7 +117,6 @@ class ScalarData(Base):
     value = Column(REAL(), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
-    record = sqlalchemy.orm.relationship(Record, back_populates='scalars')
 
     Index('scalar_name_idx', name)
 
@@ -154,7 +169,6 @@ class ListScalarData(Base):
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
     Index('scalarlist_name_idx', name)
-    record = sqlalchemy.orm.relationship(Record, back_populates='scalar_lists')
 
     # We disable too-many-arguments because they're all needed to form the table.
     def __init__(self, name, min, max,  # pylint: disable=too-many-arguments
@@ -210,7 +224,6 @@ class StringData(Base):
     value = Column(String(255), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
-    record = sqlalchemy.orm.relationship(Record, back_populates='strings')
     Index('string_name_idx', name)
 
     # We disable too-many-arguments because they're all needed to form the table.
@@ -263,7 +276,6 @@ class ListStringDataMaster(Base):
     name = Column(String(255), nullable=False, primary_key=True)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
-    record = sqlalchemy.orm.relationship(Record, back_populates='string_lists_master')
 
     def __init__(self, name, tags=None, units=None):
         """
@@ -309,7 +321,6 @@ class ListStringDataEntry(Base):
     name = Column(String(255), nullable=False, primary_key=True)
     index = Column(Integer(), nullable=False, primary_key=True, autoincrement=False)
     value = Column(String(255), nullable=False)
-    record = sqlalchemy.orm.relationship(Record, back_populates='string_lists_entry')
     Index('stringlist_name_idx', name)
 
     def __init__(self, name, index, value):
@@ -352,7 +363,6 @@ class Document(Base):
     mimetype = Column(String(255), nullable=True)
     tags = Column(Text(), nullable=True)
     Index('uri_idx', uri)
-    record = sqlalchemy.orm.relationship(Record, back_populates='documents')
 
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, uri,  # pylint: disable=too-many-arguments
