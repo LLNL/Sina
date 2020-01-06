@@ -107,36 +107,6 @@ def remove_file(filename):
         pass
 
 
-class TestSetup(unittest.TestCase):
-    """
-    Unit tests that involve setting up pre-data-handling.
-
-    Anything involving creating and closing connections, DAOFactories,
-    or data handlers goes here.
-    """
-
-    # This tells nose not to run these tests.
-    # The runnable versions of the tests are provided in backend_specific files (sql_test.py, etc)
-    __test__ = False
-
-    # Sub classes should set a variable with this name at the class or instance level
-    backend = None
-
-    # DAOFactory
-    def test_factory_instantiate(self):
-        """Test to ensure DAOFactories can be created.
-
-        Builds two factories: one in memory, one as a file. Test passes if no
-        errors are thrown and database file is created.
-        """
-        factory = self.create_dao_factory()
-        self.assertIsInstance(factory, self.backend.DAOFactory)
-
-    def create_dao_factory(self):
-        """Create the DAO to run Setup tests. Must be implemented by child."""
-        raise NotImplementedError
-
-
 class TestModify(unittest.TestCase):
     """
     Unit tests that modify the database.

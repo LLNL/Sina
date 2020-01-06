@@ -3,6 +3,7 @@
 
 import os
 import time
+import unittest
 
 import tests.backend_test
 import sina.datastores.sql as backend
@@ -30,14 +31,10 @@ class SQLMixin(object):  # pylint: disable=no-init,too-few-public-methods
         return backend.DAOFactory(test_db_dest)
 
 
-class TestSetup(SQLMixin, tests.backend_test.TestSetup):
+class TestSetup(SQLMixin, unittest.TestCase):
     """
     Provides methods needed for setup-type tests on the SQL backend.
-
-    Also runs any setup-type tests that are unique to SQL.
     """
-
-    __test__ = True
 
     def test_factory_instantiate_file(self):
         """Test to ensure SQL DAOFactory is able to create files."""

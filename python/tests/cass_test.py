@@ -2,6 +2,7 @@
 """Test a Sina backend."""
 
 import logging
+import unittest
 
 # Disable pylint checks due to its issue with virtual environments
 from nose.plugins.attrib import attr  # pylint: disable=import-error
@@ -79,15 +80,10 @@ class CassandraMixin(object):
 
 
 @attr('cassandra')
-class TestSetup(CassandraMixin, tests.backend_test.TestSetup):
+class TestSetup(CassandraMixin, unittest.TestCase):
     """
     Provides methods needed for setup-type tests on the Cassandra backend.
-
-    Also runs any setup-type tests that are unique to Cassandra.
     """
-
-    __test__ = True
-
     def setUp(self):
         self.create_cass_keyspace()
 
