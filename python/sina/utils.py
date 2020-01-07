@@ -7,6 +7,7 @@ import os
 import errno
 import uuid
 import csv
+import io
 import time
 import datetime
 from numbers import Real
@@ -40,29 +41,6 @@ class ListQueryOperation(Enum):
     ALL_IN = "ALL_IN"
 
 
-def import_many_jsons(factory, json_list):
-    """
-    Import multiple JSON documents into a supported backend.
-
-    Lazily multithreaded for backends that support parallel ingestion.
-
-    :param factory: The factory used to perform the import.
-    :param json_list: List of filepaths to import from.
-    """
-    LOGGER.info('Importing json list: %s', json_list)
-    if factory.supports_parallel_ingestion:
-        LOGGER.debug('Factory supports parallel ingest, building thread pool.')
-        arg_tuples = [(factory, x) for x in json_list]
-        pool = ThreadPool(processes=min(len(json_list), MAX_THREADS))
-        pool.map(_import_tuple_args, arg_tuples)
-        pool.close()
-        pool.join()
-    else:
-        LOGGER.debug('Factory does not support parallel ingest.')
-        for json_file in json_list:
-            import_json(factory, json_file)
-
-
 def _import_tuple_args(unpack_tuple):
     """Unpack args to allow using import_json with ThreadPools in <Python3."""
     import_json(unpack_tuple[0], unpack_tuple[1])
@@ -75,7 +53,7 @@ def convert_json_to_records_and_relationships(json_path):
     :param json_path: the path to the Sina JSON.
     :returns: a tuple of lists, (list_of_records, list_of_relationships)
     """
-    with open(json_path) as file_:
+    with io.open(json_path, 'r', encoding='utf-8') as file_:
         records = []
         relationships = []
         local = {}
@@ -102,25 +80,36 @@ def convert_json_to_records_and_relationships(json_path):
     return (records, relationships)
 
 
-def import_json(factory, json_path):
+def import_json(factory, json_paths):
     """
-    Import one JSON document into a supported backend.
+    Import one or more JSON document(s) into a supported backend.
 
     :param factory: The factory used to perform the import.
-    :param json_path: The filepath to the json to import.
+    :param json_path: The filepath or list of paths to the json to import.
     """
-    LOGGER.debug('Importing %s', json_path)
+    LOGGER.debug('Importing %s', json_paths)
+    if isinstance(json_paths, six.string_types):
+        json_paths = [json_paths]
 
-    records, relationships = convert_json_to_records_and_relationships(json_path)
-    generic_records, runs = ([], [])
-    for entry in records:
-        if entry.type == "run":
-            runs.append(entry)
-        else:
-            generic_records.append(entry)
-    factory.create_record_dao().insert_many(generic_records)
-    factory.create_run_dao().insert_many(runs)
-    factory.create_relationship_dao().insert_many(relationships)
+    if not factory.supports_parallel_ingestion or len(json_paths) < 2:
+        for json_path in json_paths:
+            records, relationships = convert_json_to_records_and_relationships(json_path)
+            generic_records, runs = ([], [])
+            for entry in records:
+                if entry.type == "run":
+                    runs.append(entry)
+                else:
+                    generic_records.append(entry)
+            factory.create_record_dao().insert(generic_records)
+            factory.create_run_dao().insert(runs)
+            factory.create_relationship_dao().insert(relationships)
+    else:
+        LOGGER.debug('Factory supports parallel ingest, building thread pool.')
+        arg_tuples = [(factory, x) for x in json_paths]
+        pool = ThreadPool(processes=min(len(json_paths), MAX_THREADS))
+        pool.map(_import_tuple_args, arg_tuples)
+        pool.close()
+        pool.join()
 
 
 def _process_relationship_entry(entry, local_ids):

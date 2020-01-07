@@ -29,7 +29,7 @@ except ImportError:
     CASSANDRA_PRESENT = False
 
 from sina import utils
-from sina.utils import import_many_jsons, import_json, parse_data_string, create_file
+from sina.utils import import_json, parse_data_string, create_file
 import sina.datastores.sql as sql
 if CASSANDRA_PRESENT:
     import sina.datastores.cass as cass
@@ -341,10 +341,7 @@ def ingest(args):
         LOGGER.error(msg)
         raise ValueError(msg)
     factory = _make_factory(args=args)
-    if len(source_list) > 1:
-        import_many_jsons(factory=factory, json_list=source_list)
-    else:
-        import_json(factory=factory, json_path=source_list[0])
+    import_json(factory=factory, json_paths=source_list)
 
 
 def export(args):
@@ -426,7 +423,7 @@ def query(args):
     if args.id:
         print([x for x in matches])
     else:
-        print([x.raw for x in record_dao.get_many(matches)])
+        print([x.raw for x in record_dao.get(matches)])
 
 
 def compare_records(args):

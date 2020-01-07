@@ -5,6 +5,10 @@
     "description" : "Mnoda schema for simulation data",
     "type" : "object",
     "definitions" : {
+      "userDefDict" : {
+          "description": "Dictionary of additional misc. values not belonging elsewhere.",
+          "type": "object"
+        },
         "fileDict" : {
             "description": "Dictionary of files associated with Record",
             "type": "object",
@@ -63,7 +67,7 @@
             "properties": {
                 "files": { "$ref": "#/definitions/fileDict" },
                 "data": { "$ref": "#/definitions/dataDict" },
-                "user_defined": {}
+                "user_defined": { "$ref": "#/definitions/userDefDict"}
             }
         },
         "recordIdType" : {

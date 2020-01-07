@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import os
 import json
+import io
 
 # Disable pylint check due to its issue with virtual environments
 import jsonschema  # pylint: disable=import-error
@@ -45,10 +46,7 @@ class TestNOAA(unittest.TestCase):
     """Test noaa example creates valid mnoda files."""
 
     def setUp(self):
-        """
-        Prepare for each test by extracting tar file and making a temporary
-        output directory.
-        """
+        """Extract a tar file and make a temporary output directory as test setup."""
         self.temp_mnoda_output = tempfile.mkdtemp()
         self.temp_tar_output = tempfile.mkdtemp()
         self.cwd = os.path.dirname(os.path.realpath(__file__))
@@ -96,8 +94,8 @@ def _test_file_against_schema(file_, schema=None):
     if not schema:
         schema = os.path.join(
             os.path.dirname(os.path.realpath(__file__)), '../../mnoda.json')
-    with open(file_) as file_loaded:
+    with io.open(file_, 'r', encoding='utf-8') as file_loaded:
         file_json = json.load(file_loaded)
-        with open(schema) as schema_loaded:
+        with io.open(schema, 'r', encoding='utf-8') as schema_loaded:
             schema = json.load(schema_loaded)
             jsonschema.validate(file_json, schema)
