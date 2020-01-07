@@ -411,12 +411,15 @@ class TestModify(unittest.TestCase):
         """Test that RunDAO is deleting correctly."""
         factory = self.create_dao_factory(test_db_dest=self.test_db_dest)
         run_dao = factory.create_run_dao()
+        record_dao = factory.create_record_dao()
         relationship_dao = factory.create_relationship_dao()
         run_1 = Run(id="run_1", application="eggs")
         run_2 = Run(id="run_2", application="spam")
         run_3 = Run(id="run_3", application="spam")
         run_4 = Run(id="run_4", application="spam")
+        not_a_run = Record(id="rec_1", type="not_a_run")
         run_dao.insert([run_1, run_2, run_3, run_4])
+        record_dao.insert(not_a_run)
         relationship_dao.insert(subject_id="run_1", object_id="run_2", predicate="dupes")
         # Ensure there's four entries in the Run table
         self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 4)
@@ -427,9 +430,11 @@ class TestModify(unittest.TestCase):
         # The Relationship should be removed as well
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
         # Delete several
-        run_dao.delete(("run_2", "run_3"))
-        # Now there should be one
+        run_dao.delete(("run_2", "run_3", "rec_1"))
+        # Now there should be one Run
         self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
+        # and rec_1 should still exist
+        self.assertIsNotNone(record_dao.get("rec_1"))
 
 
 # Disable the pylint check if and until the team decides to refactor the code

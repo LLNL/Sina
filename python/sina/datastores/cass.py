@@ -1066,7 +1066,7 @@ class RunDAO(dao.RunDAO):
 
     def delete(self, ids):
         """
-        Given a(n iterable of) Run id(s), delete the Runs from the current Cassandra database.
+        Given a(n iterable of) id(s), delete those belonging to Runs from the Cassandra database.
 
         Does all the same work as the Record one, but also removes from the Run table.
 
@@ -1074,15 +1074,17 @@ class RunDAO(dao.RunDAO):
         """
         if isinstance(ids, six.string_types):
             ids = [ids]
+        ids = self._return_only_run_ids(ids)
         with BatchQuery() as batch:
             for id in ids:
-                schema.Run.objects(id=id).batch(batch).delete()
-                # In order to accomplish everything within one batch, we hand it off
-                # to a record_dao. However, we do not want to expose this part of
-                # Record deletion to users; it's wrapped by two friendlier functions instead.
-                # The method's "private" status is to avoid confusion with them.
-                # pylint: disable=protected-access
-                self.record_dao._setup_batch_delete(batch, id)
+                if id is not None:
+                    schema.Run.objects(id=id).batch(batch).delete()
+                    # In order to accomplish everything within one batch, we hand it off
+                    # to a record_dao. However, we do not want to expose this part of
+                    # Record deletion to users; it's wrapped by two friendlier functions instead.
+                    # The method's "private" status is to avoid confusion with them.
+                    # pylint: disable=protected-access
+                    self.record_dao._setup_batch_delete(batch, id)
 
 
 class DAOFactory(dao.DAOFactory):
