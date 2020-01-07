@@ -755,11 +755,30 @@ class RunDAO(dao.RunDAO):
         self.session = session
         self.record_dao = record_dao
 
+    def _return_only_run_ids(self, ids):
+        """
+        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
+
+        :param ids: An id or iterable of ids to sort through
+
+        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
+                  if "ids" is an iterable, else returns a single value.
+        """
+        if isinstance(ids, six.string_types):
+            val = self.session.query(schema.Run.id).filter(schema.Run.id == ids).one_or_none()
+            return val[0] if val is not None else None
+        ids = list(ids)
+        query = self.session.query(schema.Run.id).filter(schema.Run.id.in_(ids)).all()
+        run_ids = set(str(x[0]) for x in query)
+        # We do this in order to fulfill the "id or None" requirement
+        results = [x if x in run_ids else None for x in ids]
+        return results
+
     def insert(self, runs):
         """
         Given a(n iterable of) Run(s), import into the SQL database.
 
-        :param run: A Run or iterator of Runs to import
+        :param runs: A Run or iterator of Runs to import
         """
         if isinstance(runs, model.Run):
             runs = [runs]
@@ -777,10 +796,12 @@ class RunDAO(dao.RunDAO):
         Given (a) Run id(s), delete all mention from the SQL database.
 
         This includes removing all related data, raw(s), any relationships
-        involving it/them, etc.
+        involving it/them, etc. Only Runs are deleted--if any other type of
+        Record is given, it's ignored.
 
         :param ids: The id or iterator of ids of the Run to delete.
         """
+        ids = self._return_only_run_ids(ids)
         self.record_dao.delete(ids)
 
 

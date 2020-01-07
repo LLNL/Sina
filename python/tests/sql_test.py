@@ -89,7 +89,7 @@ class TestQuery(SQLMixin, tests.backend_test.TestQuery):
     def setUpClass(cls):
         """Create the connection and populate it."""
         tests.backend_test.create_daos(cls)
-        tests.backend_test.populate_database_with_data(cls.record_dao)
+        tests.backend_test.populate_database_with_data(cls.record_dao, cls.run_dao)
 
 
 class TestImportExport(SQLMixin, tests.backend_test.TestImportExport):

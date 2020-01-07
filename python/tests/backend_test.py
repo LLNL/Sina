@@ -40,14 +40,13 @@ def create_daos(class_):
     class_.relationship_dao = class_.factory.create_relationship_dao()
 
 
-def populate_database_with_data(record_dao):
+def populate_database_with_data(record_dao, run_dao):
     """
     Add test data to a database in a backend-independent way.
 
     :param record_dao: The RecordDAO used to insert records into a database.
     """
-    spam_record = Record(id="spam", type="run")
-    spam_record["application"] = "breakfast_maker"
+    spam_record = Run(id="spam", application="breakfast_maker")
     spam_record["user"] = "Bob"
     spam_record["version"] = "1.4.0"
     spam_record.data["spam_scal"] = {"value": 10, "units": "pigs", "tags": ["hammy"]}
@@ -57,7 +56,7 @@ def populate_database_with_data(record_dao):
     spam_record.files = {"beep.wav": {},
                          "beep.pong": {}}
 
-    spam_record_2 = Record(id="spam2", type="run")
+    spam_record_2 = Run(id="spam2", application="scal_generator")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
     spam_record_2.files = {"beep/png": {}}
 
@@ -73,7 +72,7 @@ def populate_database_with_data(record_dao):
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
     spam_record_4.files = {"beep.png": {}}
 
-    spam_record_5 = Record(id="spam5", type="run")
+    spam_record_5 = Run(id="spam5", application="breakfast_maker")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
     spam_record_5.data["val_data_3"] = {"value": "sugar"}
     spam_record_5.data["val_data_list_1"] = {"value": [0, 8]}
@@ -89,8 +88,8 @@ def populate_database_with_data(record_dao):
     egg_record = Record(id="eggs", type="eggrec")
     egg_record.data["eggs_scal"] = {"value": 0}
 
-    record_dao.insert([spam_record, spam_record_2, spam_record_3, spam_record_4,
-                       spam_record_5, spam_record_6, egg_record])
+    record_dao.insert([spam_record_3, spam_record_4, spam_record_6, egg_record])
+    run_dao.insert([spam_record, spam_record_2, spam_record_5])
 
 
 def remove_file(filename):
@@ -396,7 +395,7 @@ class TestModify(unittest.TestCase):
         self.assertEqual(returned_run.version, run.version)
         self.assertEqual(returned_run.data, run.data)
 
-    def test_runddao_insert_many(self):
+    def test_rundao_insert_many(self):
         """Test that RunDAO is inserting and getting many Runs correctly."""
         run_dao = self.create_dao_factory().create_run_dao()
         run_1 = Run(id="spam", application="breakfast", data={"eggs": {"value": 12}})
@@ -485,6 +484,14 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         get_none = list(self.record_dao.get(["Idontexist", "NeitherdoI"]))
         self.assertEqual(get_none, [None, None])
 
+    # ############################ get for Runs ##############################
+    def test_rundao_get_only_runs(self):
+        """Test our ability to fetch several Records but return only Runs."""
+        many_gen = (x for x in ("spam", "spam2", "spam3"))
+        expected_ids = ["spam", "spam2", None]  # spam3 is not a Run.
+        returned_types = [x.id if x is not None else None for x in self.run_dao.get(many_gen)]
+        six.assertCountEqual(self, returned_types, expected_ids)
+
     # ###################### get_given_document_uri ##########################
     def test_recorddao_uri_no_wildcards(self):
         """Test that RecordDAO is retrieving based on full uris correctly."""
@@ -537,7 +544,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     # ############### get_given_document_uri for Runs ################
     def test_rundao_uri_one_wildcard(self):
-        """Test ability to find Runs by uri."""
+        """Test ability to find only Runs by uri (filter out matching non-Run Records)."""
         end_wildcard_id = list(self.record_dao.get_given_document_uri(uri="beep.%",
                                                                       ids_only=True))
         self.assertEqual(len(end_wildcard_id), 3)
@@ -758,10 +765,11 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
         The current version inherits from RecordDAO and does only a little
         extra processing, and most of that via convert_record_to_run(). We're
-        mostly making sure nothing gets lost between those two.
+        mostly making sure nothing gets lost between those two, and that only
+        Runs are returned.
         """
-        multi_scalar = list(self.run_dao.data_query(spam_scal=DataRange(-500, 500)))
-        six.assertCountEqual(self, multi_scalar, ["spam", "spam2"])
+        multi_run = list(self.run_dao.data_query(spam_scal=DataRange(-500, 500)))
+        six.assertCountEqual(self, multi_run, ["spam", "spam2", None])
 
     # ######################### get_all_of_type ###########################
     def test_recorddao_type(self):
@@ -788,6 +796,13 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Test the RecordDAO type query correctly returns multiple Records."""
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
+
+    # ######################### get_all (Runs) ###########################
+    def test_rundao_get_all(self):
+        """Test the RunDAO's ability to get all Records which are Runs."""
+        get_all = list(self.run_dao.get_all(ids_only=True))
+        all_runs = ["spam", "spam2", "spam5"]
+        six.assertCountEqual(self, get_all, all_runs)
 
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):
@@ -929,7 +944,8 @@ class TestImportExport(unittest.TestCase):
         _export_csv() so we don't actually write to file.
         """
         factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao())
+        populate_database_with_data(factory.create_record_dao(),
+                                    factory.create_run_dao())
         scalars = ['spam_scal']
         export(
             factory=factory,
@@ -952,7 +968,8 @@ class TestImportExport(unittest.TestCase):
         case is an output_type that is not supported.
         """
         factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao())
+        populate_database_with_data(factory.create_record_dao(),
+                                    factory.create_run_dao())
         scalars = ['spam_scal']
         with self.assertRaises(ValueError) as context:
             export(
@@ -969,7 +986,8 @@ class TestImportExport(unittest.TestCase):
     def test_export_one_scalar_csv_good_input(self):
         """Test export one scalar correctly to csv from a sql database."""
         factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao())
+        populate_database_with_data(factory.create_record_dao(),
+                                    factory.create_run_dao())
         export(
             factory=factory,
             id_list=['spam'],
@@ -987,7 +1005,8 @@ class TestImportExport(unittest.TestCase):
     def test_export_two_scalar_csv_good_input(self):
         """Test exporting two scalars & runs correctly to csv from sql."""
         factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao())
+        populate_database_with_data(factory.create_record_dao(),
+                                    factory.create_run_dao())
         export(
             factory=factory,
             id_list=['spam3', 'spam'],
