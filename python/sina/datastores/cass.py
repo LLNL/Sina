@@ -782,8 +782,10 @@ class RecordDAO(dao.RecordDAO):
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in %s for %s',
-                     data_list,
+        if id_list is not None:
+            # Cassandra-driver doesn't handle a gen for id_list safely. Cast early for nice logs.
+            id_list = list(id_list)
+        LOGGER.debug('Getting data in %s for %s', data_list,
                      'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]

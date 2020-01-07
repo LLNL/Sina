@@ -438,11 +438,53 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         exact_match = self.record_dao.get_given_document_uri(uri="idontexist.png", ids_only=True)
         self.assertEqual(len(list(exact_match)), 0)
 
+    def test_recorddao_uri_takes_generator(self):
+        """Test that the uri-query method takes a generator properly."""
+        allowed_ids = (x for x in ("spam3", "spam4"))
+        exact_match = self.record_dao.get_given_document_uri(uri="beep.png",
+                                                             accepted_ids_list=allowed_ids,
+                                                             ids_only=True)
+        self.assertIsInstance(exact_match, types.GeneratorType,
+                              "Method must return a generator.")
+
     def test_recorddao_uri_returns_generator(self):
         """Test that the uri-query method returns a generator."""
         exact_match = self.record_dao.get_given_document_uri(uri="beep.png", ids_only=True)
         self.assertIsInstance(exact_match, types.GeneratorType,
                               "Method must return a generator.")
+
+    def test_recorddao_uri_one_wildcard(self):
+        """Test that RecordDAO is retrieving based on a wildcard-containing uri correctly."""
+        end_wildcard = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=True)
+        # Note that we're expecting 3 even though there's 4 matches.
+        # That's because id "beep" matches twice, but we don't repeat matches.
+        self.assertEqual(len(list(end_wildcard)), 3)
+        mid_wildcard = self.record_dao.get_given_document_uri(uri="beep%png")
+        self.assertEqual(len(list(mid_wildcard)), 2)
+        first_wildcard = self.record_dao.get_given_document_uri(uri="%png")
+        self.assertEqual(len(list(first_wildcard)), 3)
+
+    def test_recorddao_uri_many_wildcards(self):
+        """Test that RecordDAO is retrieving based on many wildcards correctly."""
+        multi_wildcard = self.record_dao.get_given_document_uri(uri="%.%")
+        self.assertEqual(len(list(multi_wildcard)), 4)
+        ids_only = list(self.record_dao.get_given_document_uri(uri="%.%", ids_only=True))
+        self.assertEqual(len(ids_only), 4)
+        six.assertCountEqual(self, ids_only, ["spam", "spam5", "spam3", "spam4"])
+
+    def test_recorddao_uri_full_wildcard(self):
+        """Ensure that a uri=% (wildcard) uri query matches all Records with files."""
+        all_wildcard = self.record_dao.get_given_document_uri(uri="%")
+        self.assertEqual(len(list(all_wildcard)), 5)
+
+    # ############### get_given_document_uri for Runs ################
+    def test_rundao_uri_one_wildcard(self):
+        """Test ability to find Runs by uri."""
+        end_wildcard_id = list(self.record_dao.get_given_document_uri(uri="beep.%",
+                                                                      ids_only=True))
+        self.assertEqual(len(end_wildcard_id), 3)
+        end_wildcard_obj = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=False)
+        six.assertCountEqual(self, end_wildcard_id, (x.id for x in end_wildcard_obj))
 
     # ###################### get_with_max ##########################
     def test_get_with_max(self):
@@ -469,30 +511,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                            count=2,
                                                            id_only=True))
         self.assertEqual(min_spam_scals, ["spam", "spam3"])
-
-    def test_recorddao_uri_one_wildcard(self):
-        """Test that RecordDAO is retrieving based on a wildcard-containing uri correctly."""
-        end_wildcard = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=True)
-        # Note that we're expecting 3 even though there's 4 matches.
-        # That's because id "beep" matches twice, but we don't repeat matches.
-        self.assertEqual(len(list(end_wildcard)), 3)
-        mid_wildcard = self.record_dao.get_given_document_uri(uri="beep%png")
-        self.assertEqual(len(list(mid_wildcard)), 2)
-        first_wildcard = self.record_dao.get_given_document_uri(uri="%png")
-        self.assertEqual(len(list(first_wildcard)), 3)
-
-    def test_recorddao_uri_many_wildcards(self):
-        """Test that RecordDAO is retrieving based on many wildcards correctly."""
-        multi_wildcard = self.record_dao.get_given_document_uri(uri="%.%")
-        self.assertEqual(len(list(multi_wildcard)), 4)
-        ids_only = list(self.record_dao.get_given_document_uri(uri="%.%", ids_only=True))
-        self.assertEqual(len(ids_only), 4)
-        six.assertCountEqual(self, ids_only, ["spam", "spam5", "spam3", "spam4"])
-
-    def test_recorddao_uri_full_wildcard(self):
-        """Ensure that a uri=% (wildcard) uri query matches all Records with files."""
-        all_wildcard = self.record_dao.get_given_document_uri(uri="%")
-        self.assertEqual(len(list(all_wildcard)), 5)
 
     # ####################### test_get_available_types ######################
     def test_get_available_types(self):
@@ -741,6 +759,15 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                               "spam_scal_2",
                                                               "val_data"])
         self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible", "simple"])
+
+    def test_recorddao_get_data_for_gen_of_records(self):
+        """Test that we're getting data for a generator of many records correctly."""
+        many_ids = (x for x in ("spam", "spam2", "spam3"))
+        many_scalars = ["spam_scal", "eggs_scal", "spam_scal_2", "val_data"]
+        for_gen = self.record_dao.get_data_for_records(id_list=many_ids,
+                                                       data_list=many_scalars)
+        six.assertCountEqual(self, for_gen.keys(), ["spam", "spam2", "spam3"])
+        self.assertEqual(for_gen["spam3"]["val_data"]["tags"], ["edible", "simple"])
 
     def test_recorddao_get_no_data_for_nonexistant_records(self):
         """Test that we're not getting data for records that don't exist."""

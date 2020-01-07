@@ -544,6 +544,10 @@ class RunDAO(object):
                                                          accepted_ids_list=accepted_ids_list,
                                                          ids_only=ids_only)
         if records:
-            for record in records:
-                if record.type == "run":
-                    yield sina.model.convert_record_to_run(record)
+            if ids_only:
+                for rec_id in set(self.get_all()).intersection(records):
+                    yield rec_id
+            else:
+                for record in records:
+                    if record.type == "run":
+                        yield sina.model.convert_record_to_run(record)
