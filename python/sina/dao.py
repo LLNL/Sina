@@ -478,8 +478,10 @@ class RunDAO(object):
 
         :returns: A generator of run ids fitting the criteria
         """
-        matched_records = self.record_dao.data_query(**kwargs)
-        return self._return_only_run_ids(matched_records)
+        matched_runs = self._return_only_run_ids(self.record_dao.data_query(**kwargs))
+        for entry in matched_runs:
+            if entry is not None:
+                yield entry
 
     def get_given_data(self, **kwargs):
         """Alias data_query()."""

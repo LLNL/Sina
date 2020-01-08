@@ -774,7 +774,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         Runs are returned.
         """
         multi_run = list(self.run_dao.data_query(spam_scal=DataRange(-500, 500)))
-        six.assertCountEqual(self, multi_run, ["spam", "spam2", None])
+        six.assertCountEqual(self, multi_run, ["spam", "spam2"])
 
     # ######################### get_all_of_type ###########################
     def test_recorddao_type(self):
