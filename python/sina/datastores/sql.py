@@ -806,16 +806,15 @@ class DAOFactory(dao.DAOFactory):
         if db_path:
             if '://' not in db_path:
                 engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
-                if not os.path.exists(db_path):
-                    schema.Base.metadata.create_all(engine)
+                create_db = not os.path.exists(db_path)
                 use_sqlite = True
             else:
                 engine = sqlalchemy.create_engine(db_path)
-                schema.Base.metadata.create_all(engine)
+                create_db = True
         else:
             engine = sqlalchemy.create_engine(SQLITE_PREFIX)
-            schema.Base.metadata.create_all(engine)
             use_sqlite = True
+            create_db = True
 
         if use_sqlite:
             def configure_on_connect(connection, _):
@@ -823,6 +822,9 @@ class DAOFactory(dao.DAOFactory):
                 connection.execute('pragma foreign_keys=ON')
 
             sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
+
+        if create_db:
+            schema.Base.metadata.create_all(engine)
 
         session = sqlalchemy.orm.sessionmaker(bind=engine)
         self.session = session()

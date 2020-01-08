@@ -5,10 +5,12 @@ import os
 import unittest
 import json
 import csv
+import itertools
 import logging
 from collections import OrderedDict
 import types
 import io
+import tempfile
 
 import six
 
@@ -105,45 +107,6 @@ def remove_file(filename):
         pass
 
 
-class TestSetup(unittest.TestCase):
-    """
-    Unit tests that involve setting up pre-data-handling.
-
-    Anything involving creating and closing connections, DAOFactories,
-    or data handlers goes here.
-    """
-
-    # This tells nose not to run these tests.
-    # The runnable versions of the tests are provided in backend_specific files (sql_test.py, etc)
-    __test__ = False
-
-    def setUp(self):
-        """
-        Set up info needed for each Setup test.
-
-        Attributes must be set to appropriate (backend-specific) values by
-        child.
-        """
-        self.backend = None
-        self.test_db_dest = None
-        raise NotImplementedError
-
-    # DAOFactory
-    def test_factory_instantiate(self):
-        """Test to ensure DAOFactories can be created.
-
-        Builds two factories: one in memory, one as a file. Test passes if no
-        errors are thrown and database file is created.
-        """
-        factory = self.create_dao_factory()
-        self.assertIsInstance(factory, self.backend.DAOFactory)
-        self.assertFalse(os.path.isfile(self.test_db_dest))
-
-    def create_dao_factory(self):
-        """Create the DAO to run Setup tests. Must be implemented by child."""
-        raise NotImplementedError
-
-
 class TestModify(unittest.TestCase):
     """
     Unit tests that modify the database.
@@ -154,18 +117,6 @@ class TestModify(unittest.TestCase):
     """
 
     __test__ = False
-
-    def setUp(self):
-        """
-        Set up info needed for each Modify test.
-
-        Attributes must be set to appropriate (backend-specific) values by
-        child.
-
-        param test_db_dest: The database tests will target for modification.
-        """
-        self.test_db_dest = None
-        raise NotImplementedError
 
     def create_dao_factory(self, test_db_dest=None):
         """
@@ -210,14 +161,14 @@ class TestModify(unittest.TestCase):
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
-        record_dao = self.create_dao_factory(test_db_dest=self.test_db_dest).create_record_dao()
+        record_dao = self.create_dao_factory().create_record_dao()
         record_dao.insert(Record(id="rec_1", type="sample"))
         record_dao.delete("rec_1")
         self.assertEqual(list(record_dao.get_all_of_type("sample")), [])
 
     def test_recorddao_delete_data_cascade(self):
         """Test that deletion of a Record correctly cascades to data and files."""
-        factory = self.create_dao_factory(test_db_dest=self.test_db_dest)
+        factory = self.create_dao_factory()
         record_dao = factory.create_record_dao()
         data = {"eggs": {"value": 12, "tags": ["breakfast"]},
                 "flavor": {"value": "tasty"}}
@@ -234,7 +185,7 @@ class TestModify(unittest.TestCase):
 
     def test_recorddao_delete_one_with_relationship(self):
         """Test that RecordDAO deletions include relationships."""
-        factory = self.create_dao_factory(test_db_dest=self.test_db_dest)
+        factory = self.create_dao_factory()
         record_dao = factory.create_record_dao()
         relationship_dao = factory.create_relationship_dao()
         record_1 = Record(id="rec_1", type="sample")
@@ -250,7 +201,7 @@ class TestModify(unittest.TestCase):
 
     def test_recorddao_delete_many(self):
         """Test that RecordDAO can delete many at once."""
-        factory = self.create_dao_factory(test_db_dest=self.test_db_dest)
+        factory = self.create_dao_factory()
         record_dao = factory.create_record_dao()
         relationship_dao = factory.create_relationship_dao()
         record_1 = Record(id="rec_1", type="sample")
@@ -285,7 +236,13 @@ class TestModify(unittest.TestCase):
     # TODO: There's no delete method for Relationships. SIBO-781
     def test_relationshipdao_insert_simple_retrieve(self):
         """Test that RelationshipDAO is inserting and getting correctly."""
-        relationship_dao = self.create_dao_factory().create_relationship_dao()
+        factory = self.create_dao_factory()
+        relationship_dao = factory.create_relationship_dao()
+        record_dao = factory.create_record_dao()
+
+        record_dao.insert(Record('spam', 'test_rec'))
+        record_dao.insert(Record('eggs', 'test_rec'))
+
         relationship = Relationship(subject_id="spam", object_id="eggs", predicate="loves")
         relationship_dao.insert(relationship)
         subj = relationship_dao.get(subject_id=relationship.subject_id)
@@ -299,7 +256,13 @@ class TestModify(unittest.TestCase):
 
     def test_relationshipdao_insert_compound_retrieve(self):
         """Test that RelationshipDAO's multi-criteria getter is working correctly."""
-        relationship_dao = self.create_dao_factory().create_relationship_dao()
+        factory = self.create_dao_factory()
+        relationship_dao = factory.create_relationship_dao()
+        record_dao = factory.create_record_dao()
+
+        record_dao.insert(Record('spam', 'test_rec'))
+        record_dao.insert(Record('eggs', 'test_rec'))
+
         relationship = Relationship(subject_id="spam", object_id="eggs", predicate="loves")
         relationship_dao.insert(relationship)
         obj_pred = relationship_dao.get(object_id=relationship.object_id,
@@ -315,11 +278,17 @@ class TestModify(unittest.TestCase):
 
     def test_relationshipdao_get_uses_and(self):
         """Test that RelationshipDAO.get() users "and" to join restrictions."""
-        relationship_dao = self.create_dao_factory().create_relationship_dao()
+        # pylint: disable-msg=too-many-locals
+        factory = self.create_dao_factory()
+        record_dao = factory.create_record_dao()
+        relationship_dao = factory.create_relationship_dao()
 
         subjects = ['s' + str(i + 1) for i in range(0, 3)]
         predicates = ['p' + str(i + 1) for i in range(0, 4)]
         objects = ['o' + str(i + 1) for i in range(0, 5)]
+
+        for record_id in itertools.chain(subjects, objects):
+            record_dao.insert(Record(record_id, 'test_rec'))
 
         for subject_id in subjects:
             for predicate in predicates:
@@ -410,7 +379,7 @@ class TestModify(unittest.TestCase):
 
     def test_rundao_delete(self):
         """Test that RunDAO is deleting correctly."""
-        factory = self.create_dao_factory(test_db_dest=self.test_db_dest)
+        factory = self.create_dao_factory()
         run_dao = factory.create_run_dao()
         relationship_dao = factory.create_relationship_dao()
         run_1 = Run(id="run_1", application="eggs")
@@ -456,7 +425,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """
         cls.record_dao = None
         cls.run_dao = None
-        raise NotImplementedError
 
     # Due to the length of this section of tests, tests dealing with specific
     # methods are separated by headers.
@@ -857,11 +825,14 @@ class TestImportExport(unittest.TestCase):
 
         Attributes must be set to appropriate (backend-specific) values by
         child.
-
-        :param test_file_path: The path to a test file.
         """
-        self.test_file_path = None
-        raise NotImplementedError
+        self.test_file_path = tempfile.NamedTemporaryFile(
+            suffix='.csv',
+            delete=False,
+            mode='w+b')
+
+    def tearDown(self):
+        remove_file(self.test_file_path.name)
 
     # Importing
     def test_full_import(self):
