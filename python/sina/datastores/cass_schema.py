@@ -35,7 +35,7 @@ except ImportError:
             """Create a simple object that can take arbitrary attributes."""
             self.__dict__.update(kwargs)
             # Mock column types to behave analagously (as far as autodoc cares)
-            self.Text = lambda primary_key=True, required=False: 0
+            self.Text = lambda primary_key=True, required=False, index=False: 0
             self.Set = lambda a, primary_key=True, required=False: a
             self.Double = lambda primary_key=True, required=False: 0
             self.List = lambda a, primary_key=True, required=False: _AutodocFakeColumn()
@@ -57,7 +57,7 @@ class Record(Model):
     """
 
     id = columns.Text(primary_key=True)
-    type = columns.Text()
+    type = columns.Text(index=True)
     raw = columns.Text()
 
 

@@ -604,6 +604,8 @@ class RecordDAO(dao.RecordDAO):
 
         :returns: A Record if found, else None.
         """
+        if id is None:
+            return id  # Cassandra will not do this automatically.
         try:
             query = schema.Record.objects.filter(id=id).get()
             return _record_builder(json_input=json.loads(query.raw))
@@ -622,10 +624,9 @@ class RecordDAO(dao.RecordDAO):
                   generator of their ids
         """
         LOGGER.debug('Getting all records of type %s.', type)
-        # Allow_filtering() is, as a rule, inadvisable; if speed becomes a
-        # concern, an id - type query table should be easy to set up.
-        query = (schema.Record.objects.filter(type=type)
-                 .allow_filtering().values_list('id', flat=True))
+        # There's an index on type, which should be alright as type is expected
+        # to have low cardinality. If speed becomes an issue, a dedicated query table might help.
+        query = (schema.Record.objects.filter(type=type).values_list('id', flat=True))
         if ids_only:
             for id in query:
                 yield str(id)
@@ -795,8 +796,10 @@ class RecordDAO(dao.RecordDAO):
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in %s for %s',
-                     data_list,
+        if id_list is not None:
+            # Cassandra-driver doesn't handle a gen for id_list safely. Cast early for nice logs.
+            id_list = list(id_list)
+        LOGGER.debug('Getting data in %s for %s', data_list,
                      'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
@@ -1004,6 +1007,35 @@ class RelationshipDAO(dao.RelationshipDAO):
 class RunDAO(dao.RunDAO):
     """DAO responsible for handling Runs, (Record subtype), in Cassandra."""
 
+    def _return_only_run_ids(self, ids):
+        """
+        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
+
+        Note that Cassandra doesn't allow __in queries on partition keys, so we're
+        forced to use a number of queries equal to the number of record ids. If this
+        becomes a performance issue, a dedicated query table should help.
+
+        The driver also tries to be clever about deferring certain fields, even
+        ignoring our own defer([]), which is why we don't use the standard
+        values_list call here. This means we're returning an entire Record but
+        discarding most fields.
+
+        :param ids: An id or iterable of ids to sort through
+
+        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
+                  if "ids" is an iterable, else returns a single value.
+        """
+        def return_if_exists(rec_id):
+            """If a Record exists as a Run, return its id."""
+            try:
+                run_id = schema.Run.objects(id=rec_id).get().id
+                return run_id
+            except DoesNotExist:
+                pass
+        if isinstance(ids, six.string_types):
+            return return_if_exists(ids)
+        return (return_if_exists(rec_id) for rec_id in ids)
+
     # Args differ because SQL doesn't support force_overwrite yet, SIBO-307
     # Protected access is to a Record-bound helper method we want to hide from users
     # pylint: disable=arguments-differ, protected-access
@@ -1034,7 +1066,7 @@ class RunDAO(dao.RunDAO):
 
     def delete(self, ids):
         """
-        Given a(n iterable of) Run id(s), delete the Runs from the current Cassandra database.
+        Given a(n iterable of) id(s), delete those belonging to Runs from the Cassandra database.
 
         Does all the same work as the Record one, but also removes from the Run table.
 
@@ -1042,15 +1074,17 @@ class RunDAO(dao.RunDAO):
         """
         if isinstance(ids, six.string_types):
             ids = [ids]
+        ids = self._return_only_run_ids(ids)
         with BatchQuery() as batch:
             for id in ids:
-                schema.Run.objects(id=id).batch(batch).delete()
-                # In order to accomplish everything within one batch, we hand it off
-                # to a record_dao. However, we do not want to expose this part of
-                # Record deletion to users; it's wrapped by two friendlier functions instead.
-                # The method's "private" status is to avoid confusion with them.
-                # pylint: disable=protected-access
-                self.record_dao._setup_batch_delete(batch, id)
+                if id is not None:
+                    schema.Run.objects(id=id).batch(batch).delete()
+                    # In order to accomplish everything within one batch, we hand it off
+                    # to a record_dao. However, we do not want to expose this part of
+                    # Record deletion to users; it's wrapped by two friendlier functions instead.
+                    # The method's "private" status is to avoid confusion with them.
+                    # pylint: disable=protected-access
+                    self.record_dao._setup_batch_delete(batch, id)
 
 
 class DAOFactory(dao.DAOFactory):

@@ -42,14 +42,13 @@ def create_daos(class_):
     class_.relationship_dao = class_.factory.create_relationship_dao()
 
 
-def populate_database_with_data(record_dao):
+def populate_database_with_data(record_dao, run_dao):
     """
     Add test data to a database in a backend-independent way.
 
     :param record_dao: The RecordDAO used to insert records into a database.
     """
-    spam_record = Record(id="spam", type="run")
-    spam_record["application"] = "breakfast_maker"
+    spam_record = Run(id="spam", application="breakfast_maker")
     spam_record["user"] = "Bob"
     spam_record["version"] = "1.4.0"
     spam_record.data["spam_scal"] = {"value": 10, "units": "pigs", "tags": ["hammy"]}
@@ -59,7 +58,7 @@ def populate_database_with_data(record_dao):
     spam_record.files = {"beep.wav": {},
                          "beep.pong": {}}
 
-    spam_record_2 = Record(id="spam2", type="run")
+    spam_record_2 = Run(id="spam2", application="scal_generator")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
     spam_record_2.files = {"beep/png": {}}
 
@@ -75,7 +74,7 @@ def populate_database_with_data(record_dao):
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
     spam_record_4.files = {"beep.png": {}}
 
-    spam_record_5 = Record(id="spam5", type="run")
+    spam_record_5 = Run(id="spam5", application="breakfast_maker")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
     spam_record_5.data["val_data_3"] = {"value": "sugar"}
     spam_record_5.data["val_data_list_1"] = {"value": [0, 8]}
@@ -91,8 +90,8 @@ def populate_database_with_data(record_dao):
     egg_record = Record(id="eggs", type="eggrec")
     egg_record.data["eggs_scal"] = {"value": 0}
 
-    record_dao.insert([spam_record, spam_record_2, spam_record_3, spam_record_4,
-                       spam_record_5, spam_record_6, egg_record])
+    record_dao.insert([spam_record_3, spam_record_4, spam_record_6, egg_record])
+    run_dao.insert([spam_record, spam_record_2, spam_record_5])
 
 
 def remove_file(filename):
@@ -365,7 +364,7 @@ class TestModify(unittest.TestCase):
         self.assertEqual(returned_run.version, run.version)
         self.assertEqual(returned_run.data, run.data)
 
-    def test_runddao_insert_many(self):
+    def test_rundao_insert_many(self):
         """Test that RunDAO is inserting and getting many Runs correctly."""
         run_dao = self.create_dao_factory().create_run_dao()
         run_1 = Run(id="spam", application="breakfast", data={"eggs": {"value": 12}})
@@ -381,12 +380,15 @@ class TestModify(unittest.TestCase):
         """Test that RunDAO is deleting correctly."""
         factory = self.create_dao_factory()
         run_dao = factory.create_run_dao()
+        record_dao = factory.create_record_dao()
         relationship_dao = factory.create_relationship_dao()
         run_1 = Run(id="run_1", application="eggs")
         run_2 = Run(id="run_2", application="spam")
         run_3 = Run(id="run_3", application="spam")
         run_4 = Run(id="run_4", application="spam")
+        not_a_run = Record(id="rec_1", type="not_a_run")
         run_dao.insert([run_1, run_2, run_3, run_4])
+        record_dao.insert(not_a_run)
         relationship_dao.insert(subject_id="run_1", object_id="run_2", predicate="dupes")
         # Ensure there's four entries in the Run table
         self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 4)
@@ -397,9 +399,11 @@ class TestModify(unittest.TestCase):
         # The Relationship should be removed as well
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
         # Delete several
-        run_dao.delete(("run_2", "run_3"))
-        # Now there should be one
+        run_dao.delete(("run_2", "run_3", "rec_1"))
+        # Now there should be one Run
         self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
+        # and rec_1 should still exist
+        self.assertIsNotNone(record_dao.get("rec_1"))
 
 
 # Disable the pylint check if and until the team decides to refactor the code
@@ -453,6 +457,14 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         get_none = list(self.record_dao.get(["Idontexist", "NeitherdoI"]))
         self.assertEqual(get_none, [None, None])
 
+    # ############################ get for Runs ##############################
+    def test_rundao_get_only_runs(self):
+        """Test our ability to fetch several Records but return only Runs."""
+        many_gen = (x for x in ("spam", "spam2", "spam3"))
+        expected_ids = ["spam", "spam2", None]  # spam3 is not a Run.
+        returned_types = [x.id if x is not None else None for x in self.run_dao.get(many_gen)]
+        six.assertCountEqual(self, returned_types, expected_ids)
+
     # ###################### get_given_document_uri ##########################
     def test_recorddao_uri_no_wildcards(self):
         """Test that RecordDAO is retrieving based on full uris correctly."""
@@ -464,11 +476,53 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         exact_match = self.record_dao.get_given_document_uri(uri="idontexist.png", ids_only=True)
         self.assertEqual(len(list(exact_match)), 0)
 
+    def test_recorddao_uri_takes_generator(self):
+        """Test that the uri-query method takes a generator properly."""
+        allowed_ids = (x for x in ("spam3", "spam4"))
+        exact_match = self.record_dao.get_given_document_uri(uri="beep.png",
+                                                             accepted_ids_list=allowed_ids,
+                                                             ids_only=True)
+        self.assertIsInstance(exact_match, types.GeneratorType,
+                              "Method must return a generator.")
+
     def test_recorddao_uri_returns_generator(self):
         """Test that the uri-query method returns a generator."""
         exact_match = self.record_dao.get_given_document_uri(uri="beep.png", ids_only=True)
         self.assertIsInstance(exact_match, types.GeneratorType,
                               "Method must return a generator.")
+
+    def test_recorddao_uri_one_wildcard(self):
+        """Test that RecordDAO is retrieving based on a wildcard-containing uri correctly."""
+        end_wildcard = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=True)
+        # Note that we're expecting 3 even though there's 4 matches.
+        # That's because id "beep" matches twice, but we don't repeat matches.
+        self.assertEqual(len(list(end_wildcard)), 3)
+        mid_wildcard = self.record_dao.get_given_document_uri(uri="beep%png")
+        self.assertEqual(len(list(mid_wildcard)), 2)
+        first_wildcard = self.record_dao.get_given_document_uri(uri="%png")
+        self.assertEqual(len(list(first_wildcard)), 3)
+
+    def test_recorddao_uri_many_wildcards(self):
+        """Test that RecordDAO is retrieving based on many wildcards correctly."""
+        multi_wildcard = self.record_dao.get_given_document_uri(uri="%.%")
+        self.assertEqual(len(list(multi_wildcard)), 4)
+        ids_only = list(self.record_dao.get_given_document_uri(uri="%.%", ids_only=True))
+        self.assertEqual(len(ids_only), 4)
+        six.assertCountEqual(self, ids_only, ["spam", "spam5", "spam3", "spam4"])
+
+    def test_recorddao_uri_full_wildcard(self):
+        """Ensure that a uri=% (wildcard) uri query matches all Records with files."""
+        all_wildcard = self.record_dao.get_given_document_uri(uri="%")
+        self.assertEqual(len(list(all_wildcard)), 5)
+
+    # ############### get_given_document_uri for Runs ################
+    def test_rundao_uri_one_wildcard(self):
+        """Test ability to find only Runs by uri (filter out matching non-Run Records)."""
+        end_wildcard_id = list(self.record_dao.get_given_document_uri(uri="beep.%",
+                                                                      ids_only=True))
+        self.assertEqual(len(end_wildcard_id), 3)
+        end_wildcard_obj = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=False)
+        six.assertCountEqual(self, end_wildcard_id, (x.id for x in end_wildcard_obj))
 
     # ###################### get_with_max ##########################
     def test_get_with_max(self):
@@ -495,30 +549,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                            count=2,
                                                            id_only=True))
         self.assertEqual(min_spam_scals, ["spam", "spam3"])
-
-    def test_recorddao_uri_one_wildcard(self):
-        """Test that RecordDAO is retrieving based on a wildcard-containing uri correctly."""
-        end_wildcard = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=True)
-        # Note that we're expecting 3 even though there's 4 matches.
-        # That's because id "beep" matches twice, but we don't repeat matches.
-        self.assertEqual(len(list(end_wildcard)), 3)
-        mid_wildcard = self.record_dao.get_given_document_uri(uri="beep%png")
-        self.assertEqual(len(list(mid_wildcard)), 2)
-        first_wildcard = self.record_dao.get_given_document_uri(uri="%png")
-        self.assertEqual(len(list(first_wildcard)), 3)
-
-    def test_recorddao_uri_many_wildcards(self):
-        """Test that RecordDAO is retrieving based on many wildcards correctly."""
-        multi_wildcard = self.record_dao.get_given_document_uri(uri="%.%")
-        self.assertEqual(len(list(multi_wildcard)), 4)
-        ids_only = list(self.record_dao.get_given_document_uri(uri="%.%", ids_only=True))
-        self.assertEqual(len(ids_only), 4)
-        six.assertCountEqual(self, ids_only, ["spam", "spam5", "spam3", "spam4"])
-
-    def test_recorddao_uri_full_wildcard(self):
-        """Ensure that a uri=% (wildcard) uri query matches all Records with files."""
-        all_wildcard = self.record_dao.get_given_document_uri(uri="%")
-        self.assertEqual(len(list(all_wildcard)), 5)
 
     # ####################### test_get_available_types ######################
     def test_get_available_types(self):
@@ -708,10 +738,11 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
         The current version inherits from RecordDAO and does only a little
         extra processing, and most of that via convert_record_to_run(). We're
-        mostly making sure nothing gets lost between those two.
+        mostly making sure nothing gets lost between those two, and that only
+        Runs are returned.
         """
-        multi_scalar = list(self.run_dao.data_query(spam_scal=DataRange(-500, 500)))
-        six.assertCountEqual(self, multi_scalar, ["spam", "spam2"])
+        multi_run = list(self.run_dao.data_query(spam_scal=DataRange(-500, 500)))
+        six.assertCountEqual(self, multi_run, ["spam", "spam2"])
 
     # ######################### get_all_of_type ###########################
     def test_recorddao_type(self):
@@ -738,6 +769,13 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Test the RecordDAO type query correctly returns multiple Records."""
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
+
+    # ######################### get_all (Runs) ###########################
+    def test_rundao_get_all(self):
+        """Test the RunDAO's ability to get all Records which are Runs."""
+        get_all = list(self.run_dao.get_all(ids_only=True))
+        all_runs = ["spam", "spam2", "spam5"]
+        six.assertCountEqual(self, get_all, all_runs)
 
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):
@@ -767,6 +805,15 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                               "spam_scal_2",
                                                               "val_data"])
         self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible", "simple"])
+
+    def test_recorddao_get_data_for_gen_of_records(self):
+        """Test that we're getting data for a generator of many records correctly."""
+        many_ids = (x for x in ("spam", "spam2", "spam3"))
+        many_scalars = ["spam_scal", "eggs_scal", "spam_scal_2", "val_data"]
+        for_gen = self.record_dao.get_data_for_records(id_list=many_ids,
+                                                       data_list=many_scalars)
+        six.assertCountEqual(self, for_gen.keys(), ["spam", "spam2", "spam3"])
+        self.assertEqual(for_gen["spam3"]["val_data"]["tags"], ["edible", "simple"])
 
     def test_recorddao_get_no_data_for_nonexistant_records(self):
         """Test that we're not getting data for records that don't exist."""
@@ -873,7 +920,8 @@ class TestImportExport(unittest.TestCase):
         _export_csv() so we don't actually write to file.
         """
         factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao())
+        populate_database_with_data(factory.create_record_dao(),
+                                    factory.create_run_dao())
         scalars = ['spam_scal']
         export(
             factory=factory,
@@ -896,7 +944,8 @@ class TestImportExport(unittest.TestCase):
         case is an output_type that is not supported.
         """
         factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao())
+        populate_database_with_data(factory.create_record_dao(),
+                                    factory.create_run_dao())
         scalars = ['spam_scal']
         with self.assertRaises(ValueError) as context:
             export(
@@ -913,7 +962,8 @@ class TestImportExport(unittest.TestCase):
     def test_export_one_scalar_csv_good_input(self):
         """Test export one scalar correctly to csv from a sql database."""
         factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao())
+        populate_database_with_data(factory.create_record_dao(),
+                                    factory.create_run_dao())
         export(
             factory=factory,
             id_list=['spam'],
@@ -931,7 +981,8 @@ class TestImportExport(unittest.TestCase):
     def test_export_two_scalar_csv_good_input(self):
         """Test exporting two scalars & runs correctly to csv from sql."""
         factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao())
+        populate_database_with_data(factory.create_record_dao(),
+                                    factory.create_run_dao())
         export(
             factory=factory,
             id_list=['spam3', 'spam'],

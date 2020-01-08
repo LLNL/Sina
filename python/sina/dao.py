@@ -66,7 +66,7 @@ class RecordDAO(object):
         :param ids: The id(s) of the Record(s) to return.
         :param _record_builder: The function used to create a Record object
                                 (or one of its children) from the raw. Used
-                                by DAOs calling get() (Record, Run), does not
+                                by DAOs calling get() (RecordDAO, RunDAO), does not
                                 need to be touched by the user.
 
         :returns: If provided an iterable, a generator containing either
@@ -79,6 +79,8 @@ class RecordDAO(object):
             for id in ids:
                 yield self._get_one(id, _record_builder)
 
+        if ids is None:
+            return ids  # This is mostly for Cassandra's sake, it won't handle it gracefully
         if isinstance(ids, six.string_types):
             LOGGER.debug('Getting record with id=%s', ids)
             return self._get_one(ids, _record_builder)
@@ -407,18 +409,32 @@ class RunDAO(object):
         """
         self.record_dao = record_dao
 
+    @abstractmethod
+    def _return_only_run_ids(self, ids):
+        """
+        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
+
+        :param ids: An id or iterable of ids to sort through
+
+        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
+                  if "ids" is an iterable, else returns a single value.
+        """
+        raise NotImplementedError
+
     def get(self, ids):
         """
-        Given a(n iterable of) Run id(s), return matching Run(s) from the DAO's backend.
+        Given a(n iterable of) id(s), return matching Run(s) from the DAO's backend.
 
-        :param ids: The Run id or an iterable of Run ids to find and return
+        :param ids: The id or an iterable of ids to find and return Runs for. If a
+                    Record with that id exists but is not a Run, it won't be returned.
 
         :returns: If provided an iterable, a generator containing either
                   a matching Run or None for each identifier provided. In the
                   case that an id (not an iterator of ids) is provided, will
                   return a Run or None.
         """
-        LOGGER.debug('Getting run with id(s): %s', ids)
+        LOGGER.debug('Getting Run(s) with id(s): %s', ids)
+        ids = self._return_only_run_ids(ids)
         return self.record_dao.get(ids, _record_builder=sina.model.generate_run_from_json)
 
     @abstractmethod
@@ -462,14 +478,10 @@ class RunDAO(object):
 
         :returns: A generator of run ids fitting the criteria
         """
-        run_gen = self.get_all(ids_only=True)
-        if run_gen is None:
-            return
-        matched_records = set(self.record_dao.data_query(**kwargs))
-        if matched_records:
-            for run in run_gen:
-                if run in matched_records:
-                    yield run
+        matched_runs = self._return_only_run_ids(self.record_dao.data_query(**kwargs))
+        for entry in matched_runs:
+            if entry is not None:
+                yield entry
 
     def get_given_data(self, **kwargs):
         """Alias data_query()."""
@@ -479,7 +491,7 @@ class RunDAO(object):
         """
         Return Runs associated with a document uri.
 
-        Really just calls Record's implementation.
+        Mostly identical to Record's implementation, also filters out non-Runs.
 
         :param uri: The uri to match.
         :param accepted_ids_list: A list of ids to restrict the search to.
@@ -492,7 +504,10 @@ class RunDAO(object):
         records = self.record_dao.get_given_document_uri(uri,
                                                          accepted_ids_list=accepted_ids_list,
                                                          ids_only=ids_only)
-        if records:
+        if ids_only:
+            for run_id in self._return_only_run_ids(records):
+                yield run_id
+        else:
             for record in records:
                 if record.type == "run":
-                    yield sina.model.convert_record_to_run(record)
+                    yield sina.model.generate_run_from_json(record.raw)
