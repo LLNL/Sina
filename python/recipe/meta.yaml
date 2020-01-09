@@ -1,0 +1,38 @@
+package:
+    name: sina
+    version: "1.6"
+
+source:
+    git_rev: develop
+    git_url: https://lc.llnl.gov/bitbucket/scm/sibo/sina.git
+
+build:
+  number: 0
+  noarch: python
+  script: python python/setup.py install
+
+ 
+requirements:
+  build:
+    - python
+    - setuptools
+    - six
+    - sqlalchemy
+  run:
+    - python
+    - six
+    - sqlalchemy
+
+
+about:
+    home:  https://lc.llnl.gov/workflow/docs/sina/index.html
+    summary: A command line interface for exploring and querying data stored using the Mnoda schema.
+    license: MIT
+    license_file: LICENSE
+
+extra:
+  maintainers:
+   - HaluskaR
+
+
+
