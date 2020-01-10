@@ -61,7 +61,7 @@ class RecordDAO(object):
 
     def get(self, ids, _record_builder=sina.model.generate_record_from_json):
         """
-        Given an id or iterable of ids, return matching Record or None.
+        Given an (iterable of) id(s), return matching Record(s).
 
         :param ids: The id(s) of the Record(s) to return.
         :param _record_builder: The function used to create a Record object
@@ -69,18 +69,16 @@ class RecordDAO(object):
                                 by DAOs calling get() (RecordDAO, RunDAO), does not
                                 need to be touched by the user.
 
-        :returns: If provided an iterable, a generator containing either
-                  a matching Record or None for each identifier provided. In the
-                  case that an id (not an iterator of ids) is provided, will
-                  return a Record or None.
+        :returns: If provided an iterable, a generator of Record objects, else a
+                  single Record object.
+
+        :raises ValueError: if no Record is found for some id.
         """
         def gen_records(ids):
             """Hack around the limitation of returning generators XOR non-gens."""
             for id in ids:
                 yield self._get_one(id, _record_builder)
 
-        if ids is None:
-            return ids  # This is mostly for Cassandra's sake, it won't handle it gracefully
         if isinstance(ids, six.string_types):
             LOGGER.debug('Getting record with id=%s', ids)
             return self._get_one(ids, _record_builder)
@@ -105,6 +103,8 @@ class RecordDAO(object):
                                 (or one of its children) from the raw.
 
         :returns: A Record if found, else None.
+
+        :raises ValueError: if no Record is found for the id.
         """
         raise NotImplementedError
 
@@ -432,10 +432,21 @@ class RunDAO(object):
                   a matching Run or None for each identifier provided. In the
                   case that an id (not an iterator of ids) is provided, will
                   return a Run or None.
+
+        :raises ValueError: if no Record is found for some id(s).
         """
-        LOGGER.debug('Getting Run(s) with id(s): %s', ids)
-        ids = self._return_only_run_ids(ids)
-        return self.record_dao.get(ids, _record_builder=sina.model.generate_run_from_json)
+        if isinstance(ids, six.string_types):
+            LOGGER.debug('Getting Run with id: %s', ids)
+            run_ids = self._return_only_run_ids(ids)
+            if run_ids is None:
+                raise ValueError("No Run found with id {}.".format(id))
+        else:
+            LOGGER.debug('Getting Runs with ids: %s', ids)
+            run_ids = list(self._return_only_run_ids(ids))  # Gen safety
+            if None in run_ids:
+                ids_not_found = set(ids).difference(run_ids)
+                raise ValueError("No Runs found with ids: {}".format(ids_not_found))
+        return self.record_dao.get(run_ids, _record_builder=sina.model.generate_run_from_json)
 
     @abstractmethod
     def insert(self, runs):

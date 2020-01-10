@@ -370,25 +370,22 @@ class TestModify(unittest.TestCase):
         run_1 = Run(id="spam", application="breakfast", data={"eggs": {"value": 12}})
         run_2 = Run(id="spam2", application="breakfast", data={"eggs": {"value": 32}})
         run_dao.insert((x for x in (run_1, run_2)))
-        returned_records = list(run_dao.get((x for x in ("spam", "spam2"))))
-        self.assertEqual(returned_records[0].data["eggs"]["value"],
+        returned_runs = list(run_dao.get(x for x in ("spam", "spam2")))
+        self.assertEqual(returned_runs[0].data["eggs"]["value"],
                          run_1["data"]["eggs"]["value"])
-        self.assertEqual(returned_records[1].data["eggs"]["value"],
+        self.assertEqual(returned_runs[1].data["eggs"]["value"],
                          run_2["data"]["eggs"]["value"])
 
     def test_rundao_delete(self):
         """Test that RunDAO is deleting correctly."""
         factory = self.create_dao_factory()
         run_dao = factory.create_run_dao()
-        record_dao = factory.create_record_dao()
         relationship_dao = factory.create_relationship_dao()
         run_1 = Run(id="run_1", application="eggs")
         run_2 = Run(id="run_2", application="spam")
         run_3 = Run(id="run_3", application="spam")
         run_4 = Run(id="run_4", application="spam")
-        not_a_run = Record(id="rec_1", type="not_a_run")
         run_dao.insert([run_1, run_2, run_3, run_4])
-        record_dao.insert(not_a_run)
         relationship_dao.insert(subject_id="run_1", object_id="run_2", predicate="dupes")
         # Ensure there's four entries in the Run table
         self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 4)
@@ -399,11 +396,26 @@ class TestModify(unittest.TestCase):
         # The Relationship should be removed as well
         self.assertFalse(relationship_dao.get(subject_id="rec_1"))
         # Delete several
-        run_dao.delete(("run_2", "run_3", "rec_1"))
+        run_dao.delete(("run_2", "run_3"))
         # Now there should be one Run
         self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
-        # and rec_1 should still exist
-        self.assertIsNotNone(record_dao.get("rec_1"))
+
+    def test_rundao_raise_error_deleting_non_runs(self):
+        """Test that RunDAO raises an error when asked to delete non-Runs."""
+        factory = self.create_dao_factory()
+        run_dao = factory.create_run_dao()
+        record_dao = factory.create_record_dao()
+        not_a_run = Record(id="rec_1", type="not_a_run")
+        also_not_a_run = Record(id="rec_2", type="not_a_run")
+        is_a_run = Run(id="run_1", application="bughunter")
+        record_dao.insert([not_a_run, also_not_a_run])
+        run_dao.insert(is_a_run)
+        with self.assertRaises(ValueError) as context:
+            run_dao.delete("rec_1")
+        self.assertIn('No Run found with id', str(context.exception))
+        with self.assertRaises(ValueError) as context:
+            run_dao.delete(["rec_1", "run_1", "rec_2"])
+        self.assertIn('No Runs found with ids', str(context.exception))
 
 
 # Disable the pylint check if and until the team decides to refactor the code
@@ -439,11 +451,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIsInstance(just_one, Record)
         self.assertEqual(just_one.type, "foo")
 
-    def test_recorddao_get_none(self):
-        """Test our ability to fetch None when a record doesn't exist."""
-        get_none = self.record_dao.get("Idontexist")
-        self.assertIsNone(get_none)
-
     def test_recorddao_get_many(self):
         """Test our ability to fetch several Records, in this case from a generator."""
         many_gen = (x for x in ("spam", "spam2", "spam3"))
@@ -452,18 +459,25 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(len(returned_types), 3)
         six.assertCountEqual(self, returned_types, assigned_types)
 
-    def test_recorddao_get_none_from_many(self):
-        """Test that we return None for nonexistant ids."""
-        get_none = list(self.record_dao.get(["Idontexist", "NeitherdoI"]))
-        self.assertEqual(get_none, [None, None])
+    def test_recorddao_raise_error_for_nonexistant(self):
+        """Test that we raise an error for nonexistant ids."""
+        with self.assertRaises(ValueError) as context:
+            list(self.record_dao.get(["Idontexist", "NeitherdoI"]))
+        self.assertIn('No Record found with id', str(context.exception))
 
     # ############################ get for Runs ##############################
     def test_rundao_get_only_runs(self):
-        """Test our ability to fetch several Records but return only Runs."""
-        many_gen = (x for x in ("spam", "spam2", "spam3"))
-        expected_ids = ["spam", "spam2", None]  # spam3 is not a Run.
-        returned_types = [x.id if x is not None else None for x in self.run_dao.get(many_gen)]
+        """Test our ability to fetch several Runs."""
+        many_gen = (x for x in ("spam", "spam2"))
+        expected_ids = ["spam", "spam2"]
+        returned_types = [x.id for x in self.run_dao.get(many_gen)]
         six.assertCountEqual(self, returned_types, expected_ids)
+
+    def test_rundao_raise_error_for_nonexistant(self):
+        """Test that we raise an error for non-Run ids."""
+        with self.assertRaises(ValueError) as context:
+            list(self.run_dao.get("spam3"))
+        self.assertIn('No Run found with id', str(context.exception))
 
     # ###################### get_given_document_uri ##########################
     def test_recorddao_uri_no_wildcards(self):
