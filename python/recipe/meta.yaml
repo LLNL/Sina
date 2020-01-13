@@ -1,10 +1,11 @@
 package:
     name: sina
-    version: "1.6"
+    version: 1.5
+
 
 source:
-    git_rev: develop
-    git_url: https://lc.llnl.gov/bitbucket/scm/sibo/sina.git
+    git_rev: master
+    git_url: https://github.com/LLNL/sina
 
 build:
   number: 0
@@ -22,11 +23,12 @@ requirements:
     - python
     - six
     - sqlalchemy
+    - enum34  # [ py<34 ]
 
 
 about:
-    home:  https://lc.llnl.gov/workflow/docs/sina/index.html
-    summary: A command line interface for exploring and querying data stored using the Mnoda schema.
+    home:  https://github.com/LLNL/sina
+    summary: A tool for storing Sina-format data to one or more backends (SQL, Cassandra) and querying it using a unified, beginner-friendly Python API.
     license: MIT
     license_file: LICENSE
 
