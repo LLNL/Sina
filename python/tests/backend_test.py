@@ -400,22 +400,18 @@ class TestModify(unittest.TestCase):
         # Now there should be one Run
         self.assertEqual(len(list(run_dao.get_all(ids_only=True))), 1)
 
-    def test_rundao_raise_error_deleting_non_runs(self):
-        """Test that RunDAO raises an error when asked to delete non-Runs."""
+    def test_rundao_do_not_delete_non_runs(self):
+        """Test that RunDAO will not delete non-Runs."""
         factory = self.create_dao_factory()
-        run_dao = factory.create_run_dao()
         record_dao = factory.create_record_dao()
+        run_dao = factory.create_run_dao()
         not_a_run = Record(id="rec_1", type="not_a_run")
-        also_not_a_run = Record(id="rec_2", type="not_a_run")
-        is_a_run = Run(id="run_1", application="bughunter")
-        record_dao.insert([not_a_run, also_not_a_run])
-        run_dao.insert(is_a_run)
-        with self.assertRaises(ValueError) as context:
-            run_dao.delete("rec_1")
-        self.assertIn('No Run found with id', str(context.exception))
-        with self.assertRaises(ValueError) as context:
-            run_dao.delete(["rec_1", "run_1", "rec_2"])
-        self.assertIn('No Runs found with ids', str(context.exception))
+        record_dao.insert(not_a_run)
+        run_dao.delete(not_a_run.id)
+        try:
+            record_dao.get(not_a_run.id)
+        except ValueError:
+            raise AssertionError("Record not_a_run incorrectly deleted by RunDAO")
 
 
 # Disable the pylint check if and until the team decides to refactor the code

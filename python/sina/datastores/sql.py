@@ -800,15 +800,14 @@ class RunDAO(dao.RunDAO):
         involving it/them, etc.
 
         :param ids: The id or iterator of ids of the Run to delete.
-
-        :raises ValueError: if no Run with the id can be found.
         """
         run_ids = self._return_only_run_ids(ids)
-        if run_ids is None:
-            raise ValueError("No Run found with id {}.".format(id))
-        elif not isinstance(run_ids, six.string_types) and None in run_ids:
-            raise ValueError("No Runs found with ids {}."
-                             .format(set(ids).difference(run_ids)))
+        if run_ids is None:  # We have nothing to do here
+            return
+        elif isinstance(run_ids, six.string_types):
+            run_ids = [run_ids]
+        else:
+            run_ids = [id for id in run_ids if id is not None]
         self.record_dao.delete(ids)
 
 

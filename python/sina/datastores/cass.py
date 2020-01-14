@@ -1074,14 +1074,11 @@ class RunDAO(dao.RunDAO):
         """
         run_ids = self._return_only_run_ids(ids)
         if run_ids is None:
-            raise ValueError("No Run found with id {}.".format(ids))
-        elif isinstance(run_ids, six.string_types):
-            ids = [ids]  # Good val, prep for batchquery
-        elif None in run_ids:
-            raise ValueError("No Runs found with ids {}."
-                             .format(set(ids).difference(run_ids)))
+            return
+        if isinstance(run_ids, six.string_types):
+            run_ids = [run_ids]
         with BatchQuery() as batch:
-            for id in ids:
+            for id in run_ids:
                 if id is not None:
                     schema.Run.objects(id=id).batch(batch).delete()
                     # In order to accomplish everything within one batch, we hand it off
