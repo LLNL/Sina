@@ -603,14 +603,14 @@ class RecordDAO(dao.RecordDAO):
                                 (or one of its children) from the raw.
 
         :returns: A Record if found, else None.
+
+        :raises ValueError: if a Record with the id can't be found.
         """
-        if id is None:
-            return id  # Cassandra will not do this automatically.
         try:
             query = schema.Record.objects.filter(id=id).get()
             return _record_builder(json_input=json.loads(query.raw))
-        except DoesNotExist:
-            pass
+        except DoesNotExist:  # Raise a more familiar, descriptive error.
+            raise ValueError("No Record found with id {}".format(id))
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -1031,7 +1031,7 @@ class RunDAO(dao.RunDAO):
                 run_id = schema.Run.objects(id=rec_id).get().id
                 return run_id
             except DoesNotExist:
-                pass
+                return None
         if isinstance(ids, six.string_types):
             return return_if_exists(ids)
         return (return_if_exists(rec_id) for rec_id in ids)
@@ -1072,11 +1072,13 @@ class RunDAO(dao.RunDAO):
 
         :param ids: The id or list of ids of the Run(s) to delete
         """
-        if isinstance(ids, six.string_types):
-            ids = [ids]
-        ids = self._return_only_run_ids(ids)
+        run_ids = self._return_only_run_ids(ids)
+        if run_ids is None:
+            return
+        if isinstance(run_ids, six.string_types):
+            run_ids = [run_ids]
         with BatchQuery() as batch:
-            for id in ids:
+            for id in run_ids:
                 if id is not None:
                     schema.Run.objects(id=id).batch(batch).delete()
                     # In order to accomplish everything within one batch, we hand it off

@@ -222,13 +222,13 @@ class RecordDAO(dao.RecordDAO):
         :param _record_builder: The function used to create a Record object
                                 (or one of its children) from the raw.
 
-        :returns: A Record if found, else None.
+        :returns: A Record object
         """
         result = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one_or_none())
-        if result is not None:
-            return _record_builder(json_input=json.loads(result.raw))
-        return result
+        if result is None:
+            raise ValueError("No Record found with id {}".format(id))
+        return _record_builder(json_input=json.loads(result.raw))
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -383,6 +383,8 @@ class RecordDAO(dao.RecordDAO):
                   generator of their ids. Returns distinct items.
         """
         LOGGER.debug('Getting all records related to uri=%s.', uri)
+        if accepted_ids_list:
+            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
         # Note: Mixed results on whether SQLAlchemy's optimizer is smart enough
         # to have %-less LIKE operate on par with ==, hence this:
         if '%' in uri:
@@ -392,7 +394,6 @@ class RecordDAO(dao.RecordDAO):
             query = (self.session.query(schema.Document.id)
                      .filter(schema.Document.uri == uri).distinct())
         if accepted_ids_list is not None:
-            LOGGER.debug('Restricting to %s ids.', accepted_ids_list)
             query = query.filter(schema.Document
                                  .id.in_(accepted_ids_list))
         if ids_only:
@@ -619,8 +620,7 @@ class RecordDAO(dao.RecordDAO):
         As seen in foo_3 above, if a piece of data is missing, it won't be
         included; think of this as a subset of a Record's own data. Similarly,
         if a Record ends up containing none of the requested data, it will be
-        omitted. No list-type data will be returned; this may change in the
-        future.
+        omitted.
 
         :param data_list: A list of the names of data fields to find
         :param id_list: A list of the record ids to find data for, None if
@@ -630,8 +630,9 @@ class RecordDAO(dao.RecordDAO):
                  keyed by record_id and then data field name.
         """
         if id_list is not None:
-            id_list = list(id_list)  # Safety cast for generators
-        LOGGER.debug('Getting data in %s for %s', data_list,
+            id_list = list(id_list)  # Generator safety
+        LOGGER.debug('Getting data in %s for %s',
+                     data_list,
                      'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = [schema.ScalarData, schema.StringData]
@@ -796,12 +797,17 @@ class RunDAO(dao.RunDAO):
         Given (a) Run id(s), delete all mention from the SQL database.
 
         This includes removing all related data, raw(s), any relationships
-        involving it/them, etc. Only Runs are deleted--if any other type of
-        Record is given, it's ignored.
+        involving it/them, etc.
 
         :param ids: The id or iterator of ids of the Run to delete.
         """
-        ids = self._return_only_run_ids(ids)
+        run_ids = self._return_only_run_ids(ids)
+        if run_ids is None:  # We have nothing to do here
+            return
+        elif isinstance(run_ids, six.string_types):
+            run_ids = [run_ids]
+        else:
+            run_ids = [id for id in run_ids if id is not None]
         self.record_dao.delete(ids)
 
 
