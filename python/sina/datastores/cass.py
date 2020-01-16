@@ -1134,6 +1134,14 @@ class DAOFactory(dao.DAOFactory):
         """
         return RunDAO(record_dao=self.create_record_dao())
 
+    def close(self):
+        """
+        Close resources being used by this factory.
+        """
+        # For now, we are using a single shared connection. If we change this in the future,
+        # we need to close the Cassandra connection here.
+        pass
+
     def __repr__(self):
         """Return a string representation of a Cassandra DAOFactory."""
         return ('Cassandra DAOFactory <keyspace={}, node_ip_list={}>'

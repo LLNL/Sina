@@ -2,7 +2,7 @@
 Contains toplevel, abstract DAOs used for accessing each type of object.
 
 This module describes the DAOs available, as well as the functions available to
-each DAO. While function availabiliy may differ between objects, e.g., Records
+each DAO. While function availability may differ between objects, e.g., Records
 and Relationships, it will not differ between backends, e.g., Cassandra and sql.
 """
 from abc import ABCMeta, abstractmethod
@@ -20,10 +20,9 @@ LOGGER = logging.getLogger(__name__)
 # Disable pylint checks due to ubiquitous use of id and type
 # pylint: disable=invalid-name,redefined-builtin
 
+@six.add_metaclass(ABCMeta)
 class DAOFactory(object):
-    """Builds DAOs used for interacting with Mnoda-based data objects."""
-
-    __metaclass__ = ABCMeta
+    """Builds DAOs used for interacting with Sina data objects."""
     supports_parallel_ingestion = False
 
     @abstractmethod
@@ -52,6 +51,34 @@ class DAOFactory(object):
         :returns: a RunDAO for the DAOFactory's backend
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def close(self):
+        """
+        Close any resources held by this DAO factory. This invalidates any DAOs created by the
+        factory.
+        """
+        raise NotImplementedError
+
+    def __enter__(self):
+        """
+        Use this factory as a context manager.
+
+        :return: this factory
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Call this factory's close() method.
+
+        :param exc_type: the type of any raised exception
+        :param exc_val: the value of any raised exception
+        :param exc_tb: the stack trace of any raised exception
+        :return: whether a raised exception should be suppressed
+        """
+        self.close()
+        return False
 
 
 class RecordDAO(object):

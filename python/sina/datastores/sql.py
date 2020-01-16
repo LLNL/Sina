@@ -885,3 +885,9 @@ class DAOFactory(dao.DAOFactory):
     def __repr__(self):
         """Return a string representation of a SQL DAOFactory."""
         return 'SQL DAOFactory <db_path={}>'.format(self.db_path)
+
+    def close(self):
+        """
+        Close the session for this factory and all created DAOs
+        """
+        self.session.close()
