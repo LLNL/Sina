@@ -4,9 +4,18 @@
 import os
 import time
 import unittest
+import mock  # pylint: disable=import-error
 
 import tests.backend_test
 import sina.datastores.sql as backend
+
+
+def test_close():
+    """Test that closing the factory closes the connection"""
+    factory = backend.DAOFactory()
+    with mock.patch.object(factory.session, 'close', wraps=factory.session.close) as close:
+        factory.close()
+        close.assert_called()
 
 
 # Disable pylint no-init check just on the Mixin class, since it has no use
