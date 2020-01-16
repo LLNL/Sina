@@ -11,7 +11,7 @@ python/tests/run_tests/
 python/tests/test_venv/
 cover/
 dist/
-examples/*/.ipynb_checkpoints/
+examples/**/.ipynb_checkpoints/
 
 # Ignore auto-generated doc files
 python/docs/source/generated_docs/
