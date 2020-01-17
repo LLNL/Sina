@@ -94,11 +94,11 @@ class TestSetup(CassandraMixin, unittest.TestCase):
     def test_factory_production(self, mock_form_conn):
         """Test to ensure Cassandra DAO can connect to non-local IPs."""
         ip_list = ['192.168.1.2:9042']
-        factory = self.create_dao_factory(test_db_dest=ip_list)
-        args, kwargs = mock_form_conn.call_args
-        self.assertEqual(args[0], TEMP_KEYSPACE_NAME)
-        self.assertEqual(kwargs['node_ip_list'], ip_list)
-        self.assertIsInstance(factory, self.backend.DAOFactory)
+        with self.create_dao_factory(test_db_dest=ip_list) as factory:
+            args, kwargs = mock_form_conn.call_args
+            self.assertEqual(args[0], TEMP_KEYSPACE_NAME)
+            self.assertEqual(kwargs['node_ip_list'], ip_list)
+            self.assertIsInstance(factory, self.backend.DAOFactory)
 
 
 @attr('cassandra')
@@ -114,10 +114,12 @@ class TestModify(CassandraMixin, tests.backend_test.TestModify):
     def setUp(self):
         """Create a keyspace to modify."""
         self.create_cass_keyspace()
+        super(TestModify, self).setUp()
 
     def tearDown(self):
         """Tear down the keyspace so we can start fresh."""
         self.teardown_cass_keyspace()
+        super(TestModify, self).tearDown()
 
 
 @attr('cassandra')
@@ -134,12 +136,12 @@ class TestQuery(CassandraMixin, tests.backend_test.TestQuery):
     def setUpClass(cls):
         """Create the connection and populate it."""
         cls.create_cass_keyspace()
-        tests.backend_test.create_daos(cls)
-        tests.backend_test.populate_database_with_data(cls.record_dao, cls.run_dao)
+        super(TestQuery, cls).setUpClass()
 
     @classmethod
     def tearDownClass(cls):
         """Remove connections and keyspaces as needed."""
+        super(TestQuery, cls).tearDownClass()
         cls.teardown_cass_keyspace()
 
 
@@ -154,9 +156,9 @@ class TestImportExport(CassandraMixin, tests.backend_test.TestImportExport):
     __test__ = True
 
     def setUp(self):
-        super(TestImportExport, self).setUp()
         self.create_cass_keyspace()
+        super(TestImportExport, self).setUp()
 
     def tearDown(self):
-        super(TestImportExport, self).tearDown()
         self.teardown_cass_keyspace()
+        super(TestImportExport, self).tearDown()
