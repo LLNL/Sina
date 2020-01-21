@@ -1098,17 +1098,21 @@ class DAOFactory(dao.DAOFactory):
 
     supports_parallel_ingestion = True
 
-    def __init__(self, keyspace, node_ip_list=None):
+    def __init__(self, keyspace, node_ip_list=None, sonar_cqlshrc_path=None):
         """
         Initialize a Factory with a path to its backend.
 
         :param keyspace: The keyspace to connect to.
         :param node_ip_list: A list of ips belonging to nodes on the target
                             Cassandra instance. If None, connects to localhost.
+        :param sonar_cqlshrc_path: Only used when connecting to LC Sonar machines.
+                                   The path to the desired cqlshrc file.
         """
         self.keyspace = keyspace
         self.node_ip_list = node_ip_list
-        schema.form_connection(keyspace, node_ip_list=self.node_ip_list)
+        self.sonar_cqlshrc_path = sonar_cqlshrc_path
+        schema.form_connection(keyspace, node_ip_list=self.node_ip_list,
+                               sonar_cqlshrc_path=self.sonar_cqlshrc_path)
 
     def create_record_dao(self):
         """

@@ -5,17 +5,21 @@ Based on Mnoda
 """
 import numbers
 import logging
+import os
+import getpass
 
 # Disable pylint checks due to ubiquitous use of id,
 #   cross_populate_object_and_subject, and the nature of the classes
 # pylint: disable=invalid-name,redefined-builtin,too-few-public-methods
 
-# Disable pylint check due to cassandra being optional
-from cassandra.cqlengine.management import sync_table  # pylint: disable=import-error
-
 try:
+    # Disable pylint check due to cassandra being optional
+    from cassandra.cqlengine.management import sync_table  # pylint: disable=import-error
     from cassandra.cqlengine.models import Model
     from cassandra.cqlengine import columns, connection
+    from cassandra.auth import PlainTextAuthProvider
+    from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
+    from cassandra.cluster import Cluster
 except ImportError:
     # Sphinx autodoc will import this file regardless of whether Cassandra is
     # installed. Ordinarily it can mock imports, but the type of usage
@@ -338,23 +342,8 @@ def cross_batch_delete_query_tables(name,
         rec_from_x.objects(id=id, name=name, value=value).batch(batch).delete()
 
 
-def form_connection(keyspace, node_ip_list=None):
-    """
-    Set up our connection info and prep our tables.
-
-    Note the lack of a "session" object. Looks like each cqlengine
-    create-statement lightly builds its own.
-
-    :param keyspace: The keyspace to connect to.
-    :param node_ip_list: A list of ips belonging to nodes on the target
-                         Cassandra instance. If None, connects to localhost.
-    """
-    if not node_ip_list:
-        node_ip_list = ['127.0.0.1']
-    LOGGER.info('Forming cassandra connection to ip_list=%s with keyspace=%s.',
-                node_ip_list, keyspace)
-    connection.setup(node_ip_list, keyspace)
-
+def sync_tables():
+    """Prep all tables, ensuring they're in our expected format."""
     sync_table(Record)
     sync_table(Run)
     sync_table(ObjectFromSubject)
@@ -367,3 +356,48 @@ def form_connection(keyspace, node_ip_list=None):
     sync_table(RecordFromScalarListDataMin)
     sync_table(RecordFromScalarListDataMax)
     sync_table(RecordFromStringListData)
+
+
+def form_connection(keyspace, node_ip_list=None, sonar_cqlshrc_path=None):
+    """
+    Set up our connection info and prep our tables.
+
+    :param keyspace: The keyspace to connect to.
+    :param node_ip_list: A list of ips belonging to nodes on the target
+                         Cassandra instance. If None, connects to localhost.
+    :param sonar_cqlshrc_path: Only used when connecting to LC Sonar machines.
+                               The path to the desired cqlshrc file.
+    """
+    if sonar_cqlshrc_path is not None:
+        if node_ip_list is None:
+            node_ip_list = ['sonar8']
+        LOGGER.info('Forming sonar cassandra connection to ip_list=%s with keyspace=%s.',
+                    node_ip_list, keyspace)
+        secret = None
+        sonar_cqlshrc_path = os.path.expanduser(sonar_cqlshrc_path)  # For notebook safety
+        with open(sonar_cqlshrc_path) as secret_file:
+            password_signifier = "password = "
+            for line in secret_file:
+                if line.startswith(password_signifier):
+                    secret = line[len(password_signifier):]
+                    break
+        if secret is None:
+            raise ValueError("{} does not contain a password. Ensure you've run cinit and"
+                             "added your password to your cqlshrc!".format(sonar_cqlshrc_path))
+        # The recommended load balancer. In newer Cassandra versions, one must be specified.
+        load_balancing_policy = TokenAwarePolicy(DCAwareRoundRobinPolicy())
+
+        auth_provider = PlainTextAuthProvider(username=getpass.getuser(), password=secret)
+        cluster = Cluster(node_ip_list, auth_provider=auth_provider,
+                          load_balancing_policy=load_balancing_policy)
+        session = cluster.connect()
+        session.set_keyspace(keyspace)
+        connection.set_session(session)
+        sync_tables()
+    else:
+        if not node_ip_list:
+            node_ip_list = ['127.0.0.1']
+        LOGGER.info('Forming cassandra connection to ip_list=%s with keyspace=%s.',
+                    node_ip_list, keyspace)
+        connection.setup(node_ip_list, keyspace)
+        sync_tables()
