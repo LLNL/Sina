@@ -40,7 +40,7 @@ LC Setup
 ========
 
 If you're on an LC machine, you can use a virtual environment with dependencies
-already installed
+already installed::
 
     $ source /collab/usr/gapps/wf/releases/sina/bin/activate
 
@@ -57,22 +57,22 @@ Local Setup
 ===========
 
 Standard installation, provided by the Makefile, is initiated by entering
-the following at the command line
+the following at the command line::
 
     $ make
 
 This command creates the virtual environment, installs \(missing\) dependencies,
 and installs Sina.
 
-You can build the documentation, which will appear in `build/docs`, using
+You can build the documentation, which will appear in `build/docs`, using::
 
     $ make docs
 
-Test are run by entering
+Test are run by entering::
 
     $ make tests
 
-Alternatively, you can run all of the above by entering the following
+Alternatively, you can run all of the above by entering the following::
 
     $ make all
 
@@ -80,11 +80,11 @@ This will install Sina with its default backend (SQL).
 
 Once installation is complete, you are ready to activate the environment -- see
 "Activating the Virtual Environment" -- and begin using Sina. You can also install
-the optional Cassandra backend with
+the optional Cassandra backend with::
 
     $ make cassandra
 
-Additional command line tools (such as diffing Records) are available with
+Additional command line tools (such as diffing Records) are available with::
 
     $ make cli-tools
 
@@ -98,14 +98,14 @@ environment.
 
 Creating the Environment
 ------------------------
-Enter the following command to set up your initial environment
+Enter the following command to set up your initial environment::
 
     $ python -m virtualenv venv   # venv can be any name you want
 
 Now activate the environment \(see "Activating the Virtual Environment"\).
 
 You need to be in the proper Sina directory before proceeding to install
-dependencies, so enter the following command
+dependencies, so enter the following command::
 
     (venv) $ cd $SINA_PYTHON
 
@@ -116,7 +116,7 @@ Installing Software Dependencies
 --------------------------------
 You first need to make sure there is a requirements/links.txt file that contains
 the appropriate link constraints.  There are two requirements files containing
-flags and links used in our supported environments
+flags and links used in our supported environments::
 
 - requirements/lc-links.txt
 - requirements/no-links.txt
@@ -128,7 +128,7 @@ The links.txt file is included in other requirements files to ensure the
 options are consistent for the build and testing processes.
 
 Once you have a suitable requirements/links.txt file, enter the following
-command to install basic Sina dependencies
+command to install basic Sina dependencies::
 
     $(venv) pip install -r requirements/development.txt
 
@@ -136,14 +136,14 @@ command to install basic Sina dependencies
 Completing the Installation
 ---------------------------
 The requirements file should install the package in editable mode but, if
-not, you can install the package via
+not, you can install the package via::
 
     $(venv) pip install -e .
 
 
 Activating the Virtual Environment
 ==================================
-Enter the following command to enter the virtual environment
+Enter the following command to enter the virtual environment::
 
     $ source $SINA_PYTHON/venv/bin/activate  # use activate.csh if in a [t]csh
 
@@ -154,7 +154,7 @@ virtual environment.
 
 Deactivating the Virtual Environment
 ====================================
-Enter the following command to deactivate the virtual environment
+Enter the following command to deactivate the virtual environment::
 
     (venv) $ deactivate
 
@@ -170,7 +170,7 @@ organized by dataset, with data_overview.rst containing descriptions of each
 set. To use the notebooks, you'll first need to run getting_started.ipynb
 (also in the examples directory) from the LC Jupyter server at
 lc.llnl.gov/jupyter. After that, you'll be ready to run the rest of the notebooks.
-To clean all output from the notebooks
+To clean all output from the notebooks::
 
     (venv) $ make clean-notebooks
 
@@ -179,12 +179,12 @@ Testing
 =======
 
 This package uses nosetests to run unit tests.  Enter the following while in
-your virtual environment
+your virtual environment::
 
     (venv) $ nosetests
 
 Additional tests, which include checks for PEP8 compliance and proper
-documentation, can be run my entering the following
+documentation, can be run my entering the following::
 
     $ make tests
 
@@ -211,15 +211,15 @@ Database Support
 Out-of-the-box, Sina does not install drivers for relational databases other
 than SQLite. If you wish to connect to other databases (e.g. MySQL, MariaDB,
 or Oracle), you need to install the appropriate drivers for that database.
-You can do this with our Makefile
+You can do this with our Makefile::
 
     $ make mysql 
 
 After you install the connector, you can connect to these types of databases
-from the command line tools
+from the command line tools::
 
     $ sina ingest --database-type=sql --database "mysql+mysqlconnector://host:port/?read_default_file=~/.my.cnf"
 
-You can also connect with the programmatic API
+You can also connect with the programmatic API::
 
     factory = DAOFactory("mysql+mysqlconnector://host:port/?read_default_file=~/.my.cnf")
