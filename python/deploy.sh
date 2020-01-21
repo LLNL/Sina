@@ -30,7 +30,7 @@ LC_DOCS_DIR=/usr/global/web-pages/lc/www/workflow/docs  # Workflow docs
 LC_EXAMPLES_LINK=/collab/usr/gapps/wf/examples  # Link to examples
 
 # Common names
-DOC_SYM_NAME=sina  # symlink for the documentation subdirectory
+DOC_LATEST_NAME=sina  # what we should call the most recent version of the docs
 VENV_SYM_NAME=sina  # symlink for venv
 PYTHON_3=${PYTHON_3:-`which python3`}  # Python used for the Python 3 virtual env
 PYTHON_2=${PYTHON_2:-`which python`}  # Python used for the Python 2 virtual env
@@ -66,7 +66,9 @@ checkDirectory() {
   fi
 }
 
+
 # Deploy the documentation to $DOCS_DIR
+# Creates both a versioned and unversioned ("latest") copy.
 deployDocs() {
   DOC_PATH=$DOCS_DIR/$VERSION_SUBDIR
   echo; echo "Deploying documentation into $DOC_PATH..."
@@ -87,12 +89,15 @@ deployDocs() {
   # Ensure permissions are set appropriately and the shortcut links to the latest
   chown -R :$PERM_GROUP $DOC_PATH
 
-  echo "Linking $DOCS_DIR/$DOC_SYM_NAME to $DOC_PATH..."
+  # LC webhosting seems to have issues with symlinks, so we copy instead
+  echo "Copying $DOC_PATH into $DOCS_DIR/$DOC_LATEST_NAME..."
 
-  # Explicitly remove the link to ensure it is replaced by the new symlink
-  rm -f $DOCS_DIR/$DOC_SYM_NAME
-  ln -sf $DOC_PATH $DOCS_DIR/$DOC_SYM_NAME
+  # Explicitly remove the old "default" vers to ensure it is replaced by the new
+  rm -f $DOCS_DIR/$DOC_LATEST_NAME
+  cp -r $DOC_PATH $DOCS_DIR/$DOC_LATEST_NAME
+
 }
+
 
 # Deploy the examples. Build within $DEPLOY_DIR/examples/<version>, then make
 # a link at $EXAMPLES_LINK
@@ -105,7 +110,7 @@ deployExamples() {
   if [ ! -d $EXAMPLES_DEST_ROOT ]; then
     mkdir -p $EXAMPLES_DEST_ROOT
     # Make sure we chown from the parent directory, which might also have been created
-    chown -R :$PERM_GROUP $DEPLOY_DIR/examples 
+    chown -R :$PERM_GROUP $DEPLOY_DIR/examples
   fi
 
   # Build the example databases
@@ -133,6 +138,9 @@ deployExamples() {
 
   # Copy the example notebooks
   for notebook in `find $EXAMPLES_SOURCE_DIR -name "*.ipynb"`; do
+    if [[ $notebook == *"-checkpoint.ipynb" ]]; then
+        continue  # Skip over any checkpoint files
+    fi
     DATASET_NAME=$(basename $(dirname "$notebook"))
     NOTEBOOK_NAME=$(basename "$notebook")
     if [ "$DATASET_NAME" == "examples" ]
@@ -147,17 +155,17 @@ deployExamples() {
 
   # Ensure permissions are set appropriately and the shortcut links to the latest
   chown -R :$PERM_GROUP $EXAMPLES_DEST_ROOT
-
   if [ "$EXAMPLES_DEST_ROOT" != "$EXAMPLES_LINK" ]; then
     echo "Linking $EXAMPLES_LINK to $EXAMPLES_DEST_ROOT..."
 
     # Explicitly remove the link to ensure it is replaced by the new symlink
-    rm -f $EXAMPLES_LINK
+    rm -rf $EXAMPLES_LINK
     ln -s $EXAMPLES_DEST_ROOT $EXAMPLES_LINK
   else
     echo "WARNING: Cannot create examples symlink $EXAMPLES_LINK to $EXAMPLES_DEST_ROOT"
   fi
 }
+
 
 # deployWheel:  Don't bother creating a shortcut or link to the latest wheel as
 # it appears python will complain that it's not a valid wheel name.
@@ -167,6 +175,7 @@ deployWheel() {
   mv -f ./dist/$WHEEL_FILENAME $WHEEL_DEST/$WHEEL_FILENAME
   chown :$PERM_GROUP $WHEEL_DEST/$WHEEL_FILENAME
 }
+
 
 # Usage: deployVenv <path to make venv at> <name for venv link> <python to use>
 # Links to created venvs are created in $DEPLOY_DIR, extras installed are
@@ -202,6 +211,7 @@ deployVenv() {
   chown :$PERM_GROUP $DEPLOY_DIR/$VENV_LINK_NAME
 }
 
+
 # Run whatever tests are associated with this deployment. Decided by
 # BUILD_OPTIONS, which defaults to nothing (just run "make tests")
 executeTests() {
@@ -232,6 +242,7 @@ executeTests() {
     done
   fi
 }
+
 
 # Provide command line options for deployment directories and optional features
 # Note the equals sign between flag and value.
