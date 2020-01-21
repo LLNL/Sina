@@ -29,7 +29,7 @@ class DBManager(object):
         self.db_name = None
 
     @staticmethod
-    def create_connection():
+    def _create_connection():
         """
         Create a connection to the database server.
         """
@@ -42,14 +42,14 @@ class DBManager(object):
         Create a test database.
         """
         self.db_name = 'test_db_' + uuid.uuid1().hex
-        with DBManager.create_connection() as connection:
+        with DBManager._create_connection() as connection:
             connection.execute(sqlalchemy.sql.text('create database {};'.format(self.db_name)))
 
     def delete_db(self):
         """
         Delete the test database created by create_db().
         """
-        with DBManager.create_connection() as connection:
+        with DBManager._create_connection() as connection:
             connection.execute(sqlalchemy.sql.text('drop database {};'.format(self.db_name)))
         self.db_name = None
 
@@ -68,7 +68,10 @@ class DBManager(object):
 # for an __init__ and there is no expectation of adding more public methods.
 @attr('mysql')
 class StaticSQLMixin(unittest.TestCase):  # pylint: disable=no-init,too-few-public-methods
-    """Contains the methods shared between all test classes."""
+    """
+    Contains setUpClass() and tearDownClass() methods for creating and populating a test
+    database. Should be used by test classes which only need a single database.
+    """
 
     __test__ = False
     # Ensure the selected backend is passed to child tests.
@@ -98,7 +101,10 @@ class StaticSQLMixin(unittest.TestCase):  # pylint: disable=no-init,too-few-publ
 
 @attr('mysql')
 class InstanceSQLMixin(unittest.TestCase):  # pylint: disable=no-init,too-few-public-methods
-    """Contains the methods shared between all test classes."""
+    """
+    Contains setUp() and tearDown() methods for creating and populating a test
+    database. Should be used by test classes which need a database per test method.
+    """
 
     __test__ = False
     # Ensure the selected backend is passed to child tests.
