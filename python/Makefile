@@ -128,6 +128,18 @@ cassandra: $(LINKS_FILE)
 	echo "Installing cassandra in $(VENV)"; \
 	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/cassandra.txt
 
+# Add mysql dependencies to an existing virtual environment, where one is
+# created through a recursive call to make if it does not exist.
+mysql: $(LINKS_FILE)
+	@if test ! -d $(VENV); then \
+	  echo "Making the test virtual environment in $(VENV)"; \
+	  make --no-print-directory install VENV=$(VENV); \
+	else \
+	  echo "You already have the test virtual environment $(VENV)"; \
+	fi; \
+	echo "Installing mysql in $(VENV)"; \
+	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/mysql.txt
+
 # Add command line tool dependencies to an existing virtual environment, where
 # one is created through a recursive call to make if it does not exist.
 #
@@ -235,6 +247,17 @@ test-cassandra:
 	else \
 	  echo "Running cassandra tests using $(TEST_VENV)"; \
 	  $(TEST_VENV)/bin/tox -e cassandra; \
+	fi
+
+# Run mysql tests, which depend on a suitably configured test virtual
+# environment.
+test-mysql: export PATH=$(TEST_PATH)
+test-mysql:
+	@if test ! -d $(TEST_VENV); then \
+	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add mysql if it is to be included."; \
+	else \
+	  echo "Running mysql tests using $(TEST_VENV)"; \
+	  $(TEST_VENV)/bin/tox -e mysql; \
 	fi
 
 # Run command line tools tests, which depend on a suitably configured test

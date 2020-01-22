@@ -211,9 +211,9 @@ Database Support
 Out-of-the-box, Sina does not install drivers for relational databases other
 than SQLite. If you wish to connect to other databases (e.g. MySQL, MariaDB,
 or Oracle), you need to install the appropriate drivers for that database.
-For example, for MySQL/MariaDB, you would need to do::
+You can do this with our Makefile::
 
-    (venv) $ pip install mysql-connector-python
+    $ make mysql 
 
 After you install the connector, you can connect to these types of databases
 from the command line tools::

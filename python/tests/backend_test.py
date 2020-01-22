@@ -47,6 +47,7 @@ def populate_database_with_data(record_dao, run_dao):
     Add test data to a database in a backend-independent way.
 
     :param record_dao: The RecordDAO used to insert records into a database.
+    :param run_dao: The RunDAO used to insert runs into a database.
     """
     spam_record = Run(id="spam", application="breakfast_maker")
     spam_record["user"] = "Bob"
@@ -127,9 +128,15 @@ class TestModify(unittest.TestCase):
         """
         raise NotImplementedError
 
+    def setUp(self):
+        self.factory = self.create_dao_factory()
+
+    def tearDown(self):
+        self.factory.close()
+
     def test_recorddao_insert_retrieve(self):
         """Test that RecordDAO is inserting and getting correctly."""
-        record_dao = self.create_dao_factory().create_record_dao()
+        record_dao = self.factory.create_record_dao()
         rec = Record(id="spam", type="eggs",
                      data={"eggs": {"value": 12, "units": None, "tags": ["runny"]}},
                      files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
@@ -146,7 +153,7 @@ class TestModify(unittest.TestCase):
 
     def test_recorddao_insert_many(self):
         """Test that RecordDAO is inserting a generator of several Records correctly."""
-        record_dao = self.create_dao_factory().create_record_dao()
+        record_dao = self.factory.create_record_dao()
         rec_1 = Record(id="spam", type="eggs",
                        data={"eggs": {"value": 12}})
         rec_2 = Record(id="spam2", type="eggs",
@@ -160,15 +167,14 @@ class TestModify(unittest.TestCase):
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
-        record_dao = self.create_dao_factory().create_record_dao()
+        record_dao = self.factory.create_record_dao()
         record_dao.insert(Record(id="rec_1", type="sample"))
         record_dao.delete("rec_1")
         self.assertEqual(list(record_dao.get_all_of_type("sample")), [])
 
     def test_recorddao_delete_data_cascade(self):
         """Test that deletion of a Record correctly cascades to data and files."""
-        factory = self.create_dao_factory()
-        record_dao = factory.create_record_dao()
+        record_dao = self.factory.create_record_dao()
         data = {"eggs": {"value": 12, "tags": ["breakfast"]},
                 "flavor": {"value": "tasty"}}
         files = {"justheretoexist.png": {}}
@@ -184,9 +190,8 @@ class TestModify(unittest.TestCase):
 
     def test_recorddao_delete_one_with_relationship(self):
         """Test that RecordDAO deletions include relationships."""
-        factory = self.create_dao_factory()
-        record_dao = factory.create_record_dao()
-        relationship_dao = factory.create_relationship_dao()
+        record_dao = self.factory.create_record_dao()
+        relationship_dao = self.factory.create_relationship_dao()
         record_1 = Record(id="rec_1", type="sample")
         record_2 = Record(id="rec_2", type="sample")
         record_dao.insert([record_1, record_2])
@@ -200,9 +205,8 @@ class TestModify(unittest.TestCase):
 
     def test_recorddao_delete_many(self):
         """Test that RecordDAO can delete many at once."""
-        factory = self.create_dao_factory()
-        record_dao = factory.create_record_dao()
-        relationship_dao = factory.create_relationship_dao()
+        record_dao = self.factory.create_record_dao()
+        relationship_dao = self.factory.create_relationship_dao()
         record_1 = Record(id="rec_1", type="sample")
         record_2 = Record(id="rec_2", type="sample")
         record_3 = Record(id="rec_3", type="sample")
@@ -235,9 +239,8 @@ class TestModify(unittest.TestCase):
     # TODO: There's no delete method for Relationships. SIBO-781
     def test_relationshipdao_insert_simple_retrieve(self):
         """Test that RelationshipDAO is inserting and getting correctly."""
-        factory = self.create_dao_factory()
-        relationship_dao = factory.create_relationship_dao()
-        record_dao = factory.create_record_dao()
+        relationship_dao = self.factory.create_relationship_dao()
+        record_dao = self.factory.create_record_dao()
 
         record_dao.insert(Record('spam', 'test_rec'))
         record_dao.insert(Record('eggs', 'test_rec'))
@@ -255,9 +258,8 @@ class TestModify(unittest.TestCase):
 
     def test_relationshipdao_insert_compound_retrieve(self):
         """Test that RelationshipDAO's multi-criteria getter is working correctly."""
-        factory = self.create_dao_factory()
-        relationship_dao = factory.create_relationship_dao()
-        record_dao = factory.create_record_dao()
+        relationship_dao = self.factory.create_relationship_dao()
+        record_dao = self.factory.create_record_dao()
 
         record_dao.insert(Record('spam', 'test_rec'))
         record_dao.insert(Record('eggs', 'test_rec'))
@@ -278,9 +280,8 @@ class TestModify(unittest.TestCase):
     def test_relationshipdao_get_uses_and(self):
         """Test that RelationshipDAO.get() users "and" to join restrictions."""
         # pylint: disable-msg=too-many-locals
-        factory = self.create_dao_factory()
-        record_dao = factory.create_record_dao()
-        relationship_dao = factory.create_relationship_dao()
+        record_dao = self.factory.create_record_dao()
+        relationship_dao = self.factory.create_relationship_dao()
 
         subjects = ['s' + str(i + 1) for i in range(0, 3)]
         predicates = ['p' + str(i + 1) for i in range(0, 4)]
@@ -336,7 +337,7 @@ class TestModify(unittest.TestCase):
 
     def test_relationshipdao_bad_insert(self):
         """Test that the RelationshipDAO refuses to insert malformed relationships."""
-        relationship_dao = self.create_dao_factory().create_relationship_dao()
+        relationship_dao = self.factory.create_relationship_dao()
         with self.assertRaises(ValueError) as context:
             relationship_dao.insert(subject_id="spam", object_id="eggs")
         self.assertIn('Must supply either', str(context.exception))
@@ -344,7 +345,7 @@ class TestModify(unittest.TestCase):
     # RunDAO
     def test_runddao_insert_retrieve(self):
         """Test that RunDAO is inserting and getting correctly."""
-        run_dao = self.create_dao_factory().create_run_dao()
+        run_dao = self.factory.create_run_dao()
         run = Run(id="spam", version="1.2.3",
                   application="bar", user="bep",
                   user_defined={"boop": "bep"},
@@ -366,7 +367,7 @@ class TestModify(unittest.TestCase):
 
     def test_rundao_insert_many(self):
         """Test that RunDAO is inserting and getting many Runs correctly."""
-        run_dao = self.create_dao_factory().create_run_dao()
+        run_dao = self.factory.create_run_dao()
         run_1 = Run(id="spam", application="breakfast", data={"eggs": {"value": 12}})
         run_2 = Run(id="spam2", application="breakfast", data={"eggs": {"value": 32}})
         run_dao.insert((x for x in (run_1, run_2)))
@@ -378,9 +379,8 @@ class TestModify(unittest.TestCase):
 
     def test_rundao_delete(self):
         """Test that RunDAO is deleting correctly."""
-        factory = self.create_dao_factory()
-        run_dao = factory.create_run_dao()
-        relationship_dao = factory.create_relationship_dao()
+        run_dao = self.factory.create_run_dao()
+        relationship_dao = self.factory.create_relationship_dao()
         run_1 = Run(id="run_1", application="eggs")
         run_2 = Run(id="run_2", application="spam")
         run_3 = Run(id="run_3", application="spam")
@@ -402,9 +402,8 @@ class TestModify(unittest.TestCase):
 
     def test_rundao_do_not_delete_non_runs(self):
         """Test that RunDAO will not delete non-Runs."""
-        factory = self.create_dao_factory()
-        record_dao = factory.create_record_dao()
-        run_dao = factory.create_run_dao()
+        record_dao = self.factory.create_record_dao()
+        run_dao = self.factory.create_run_dao()
         not_a_run = Record(id="rec_1", type="not_a_run")
         record_dao.insert(not_a_run)
         run_dao.delete(not_a_run.id)
@@ -424,6 +423,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     __test__ = False
 
+    factory = None
+
     @classmethod
     def setUpClass(cls):
         """
@@ -437,6 +438,13 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """
         cls.record_dao = None
         cls.run_dao = None
+        create_daos(cls)
+        populate_database_with_data(cls.record_dao, cls.run_dao)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.factory:
+            cls.factory.close()
 
     # Due to the length of this section of tests, tests dealing with specific
     # methods are separated by headers.
@@ -883,12 +891,14 @@ class TestImportExport(unittest.TestCase):
         Attributes must be set to appropriate (backend-specific) values by
         child.
         """
+        self.factory = self.create_dao_factory()
         self.test_file_path = tempfile.NamedTemporaryFile(
             suffix='.csv',
             delete=False,
             mode='w+b')
 
     def tearDown(self):
+        self.factory.close()
         remove_file(self.test_file_path.name)
 
     # Importing
@@ -898,13 +908,12 @@ class TestImportExport(unittest.TestCase):
 
         Also acts as a sanity check on all DAOs.
         """
-        factory = self.create_dao_factory()
         json_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                  "test_files/mnoda_1.json")
-        import_json(factory=factory, json_paths=json_path)
-        parent = factory.create_record_dao().get("parent_1")
-        relation = factory.create_relationship_dao().get(object_id="child_1")
-        run_factory = factory.create_run_dao()
+        import_json(factory=self.factory, json_paths=json_path)
+        parent = self.factory.create_record_dao().get("parent_1")
+        relation = self.factory.create_relationship_dao().get(object_id="child_1")
+        run_factory = self.factory.create_run_dao()
         child = run_factory.get("child_1")
         canonical = json.load(io.open(json_path, encoding='utf-8'))
         self.assertEqual(canonical['records'][0]['type'], parent.type)
@@ -929,12 +938,11 @@ class TestImportExport(unittest.TestCase):
         Test export with of one scalar from sql database to a csv file. Mock
         _export_csv() so we don't actually write to file.
         """
-        factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao(),
-                                    factory.create_run_dao())
+        populate_database_with_data(self.factory.create_record_dao(),
+                                    self.factory.create_run_dao())
         scalars = ['spam_scal']
         export(
-            factory=factory,
+            factory=self.factory,
             id_list=['spam_scal'],
             scalar_names=scalars,
             output_type='csv',
@@ -953,13 +961,12 @@ class TestImportExport(unittest.TestCase):
         _export_csv() so we don't actually write to file. Bad input in this
         case is an output_type that is not supported.
         """
-        factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao(),
-                                    factory.create_run_dao())
+        populate_database_with_data(self.factory.create_record_dao(),
+                                    self.factory.create_run_dao())
         scalars = ['spam_scal']
         with self.assertRaises(ValueError) as context:
             export(
-                factory=factory,
+                factory=self.factory,
                 id_list=['spam'],
                 scalar_names=scalars,
                 output_type='joes_output_type',
@@ -971,11 +978,10 @@ class TestImportExport(unittest.TestCase):
 
     def test_export_one_scalar_csv_good_input(self):
         """Test export one scalar correctly to csv from a sql database."""
-        factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao(),
-                                    factory.create_run_dao())
+        populate_database_with_data(self.factory.create_record_dao(),
+                                    self.factory.create_run_dao())
         export(
-            factory=factory,
+            factory=self.factory,
             id_list=['spam'],
             scalar_names=['spam_scal'],
             output_type='csv',
@@ -990,11 +996,10 @@ class TestImportExport(unittest.TestCase):
 
     def test_export_two_scalar_csv_good_input(self):
         """Test exporting two scalars & runs correctly to csv from sql."""
-        factory = self.create_dao_factory()
-        populate_database_with_data(factory.create_record_dao(),
-                                    factory.create_run_dao())
+        populate_database_with_data(self.factory.create_record_dao(),
+                                    self.factory.create_run_dao())
         export(
-            factory=factory,
+            factory=self.factory,
             id_list=['spam3', 'spam'],
             scalar_names=['spam_scal', 'spam_scal_2'],
             output_type='csv',
@@ -1018,7 +1023,7 @@ class TestImportExport(unittest.TestCase):
     def test_export_non_existent_scalar_csv(self):
         """Test export for a non existent scalar returns no scalars."""
         export(
-            factory=self.create_dao_factory(),
+            factory=self.factory,
             id_list=['child_1'],
             scalar_names=['bad-scalar'],
             output_type='csv',
