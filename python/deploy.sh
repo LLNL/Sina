@@ -93,7 +93,7 @@ deployDocs() {
   echo "Copying $DOC_PATH into $DOCS_DIR/$DOC_LATEST_NAME..."
 
   # Explicitly remove the old "default" vers to ensure it is replaced by the new
-  rm -f $DOCS_DIR/$DOC_LATEST_NAME
+  rm -rf $DOCS_DIR/$DOC_LATEST_NAME
   cp -r $DOC_PATH $DOCS_DIR/$DOC_LATEST_NAME
 
 }
@@ -295,10 +295,10 @@ done
 
 # Ensure arguments are reasonable
 checkDirectory deployment $DEPLOY_DIR
-DEPLOY_DIR=`readlink -f $DEPLOY_DIR`
+DEPLOY_DIR=`realpath $DEPLOY_DIR`
 
 checkDirectory documentation $DOCS_DIR
-DOCS_DIR=`readlink -f $DOCS_DIR`
+DOCS_DIR=`realpath $DOCS_DIR`
 
 HAVE_GROUP=`grep "^$PERM_GROUP:" /etc/group`
 if [ "$HAVE_GROUP" == "" ]; then
