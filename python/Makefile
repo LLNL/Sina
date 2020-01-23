@@ -38,8 +38,11 @@ export PYTHON
 PYVERSION=$(shell $(PYTHON) -c 'import sys; print(sys.version_info[0])')
 ifeq ($(PYVERSION),2)
   PYTHON_VENV_OPTION:=virtualenv
+  # Setuptools dropped Py2 support in 45
+  SETUPTOOLS_INSTALL="setuptools<45.0.0"
 else
   PYTHON_VENV_OPTION:=venv
+  SETUPTOOLS_INSTALL=--upgrade setuptools
 endif
 
 # TODO: Pylint issues must be addressed before including it in the normal CI
@@ -107,7 +110,8 @@ install: $(LINKS_FILE)
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
 	if test -d $(VENV); then \
-	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip setuptools; \
+	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip; \
+	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL); \
 	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/development.txt; \
 	    echo $(PR_ACT); \
 	else \
@@ -302,7 +306,8 @@ wheel:
 	@echo "Creating the sina wheel"; \
 	rm -rf ./wheel; \
 	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) ./wheel; \
-	wheel/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip setuptools wheel; \
+	wheel/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip wheel; \
+	wheel/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL); \
 	wheel/bin/python setup.py bdist_wheel --universal; \
 	rm -rf ./wheel
 
