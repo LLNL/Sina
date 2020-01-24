@@ -397,7 +397,8 @@ class RecordDAO(dao.RecordDAO):
         # We will always have at least one entry in one of scalar, string, scalarlist, etc.
         if not kwargs.items():
             raise ValueError("You must supply at least one criterion.")
-        scalar, string, scalarlist, stringlist = utils.sort_and_standardize_criteria(kwargs)
+        (scalar, string, scalarlist,
+         stringlist, universal) = utils.sort_and_standardize_criteria(kwargs)
         result_ids = []
 
         # String and scalar values can be passed directly to _apply_ranges_to_query
@@ -416,6 +417,10 @@ class RecordDAO(dao.RecordDAO):
                                                data_range=range_criteria.value,
                                                operation=range_criteria.operation)
                        for name, range_criteria in scalarlist]
+
+        # Universal values come in only one type for now.
+        if universal:
+            result_ids.append(self._universal_query(universal))
 
         # If we have more than one set of data, we need to find the intersect.
         for id in utils.intersect_lists(result_ids):
@@ -590,6 +595,32 @@ class RecordDAO(dao.RecordDAO):
                                   .values_list('id', flat=True)))
         for record_id in set.intersection(*record_ids):
             yield record_id
+
+    @staticmethod
+    def _universal_query(universal_criteria):
+        """
+        Pull back all record ids fulfilling universal criteria.
+
+        We currently need #criteria * #tables queries to do this due to the inability
+        to query across partitions ("for every Record" doesn't work as one query).
+
+        :param universal_criteria: List of tuples: (datum_name, UniversalCriteria)
+        :return: generator of ids of Records fulfilling all criteria.
+        """
+        tables = [schema.RecordFromScalarData, schema.RecordFromStringData,
+                  schema.RecordFromStringListData, schema.RecordFromScalarListDataMin]
+        desired_names = [x[0] for x in universal_criteria]
+        LOGGER.info('Finding Records where data in %s exist', desired_names)
+        result_counts = defaultdict(lambda: 0)
+        expected_result_count = len(universal_criteria)
+        for table in tables:  # We go through all the query tables
+            for name in desired_names:  # ...and every scalar
+                query = table.objects.filter(name=name).values_list('id', flat=True)
+                for rec_id in query:
+                    result_counts[rec_id] += 1
+        for entry, val in six.iteritems(result_counts):
+            if val == expected_result_count:
+                yield entry
 
     def _get_one(self, id, _record_builder):
         """

@@ -26,7 +26,7 @@ LOGGER = logging.getLogger(__name__)
 SQLITE_PREFIX = "sqlite:///"
 
 # Parameter offsets used when combining queries across tables
-# see _apply_ranges_to_query() for usage
+# see _apply_ranges_to_query() for usage. Also identifies our data tables.
 PARAM_OFFSETS = {schema.ScalarData: "",
                  schema.StringData: "_1",
                  schema.ListScalarData: "_2",
@@ -184,7 +184,8 @@ class RecordDAO(dao.RecordDAO):
         (scalar_criteria,
          string_criteria,
          scalarlist_criteria,
-         stringlist_criteria) = sort_and_standardize_criteria(kwargs)
+         stringlist_criteria,
+         universal_criteria) = sort_and_standardize_criteria(kwargs)
         result_ids = []
 
         # First handle scalar and string criteria
@@ -207,9 +208,13 @@ class RecordDAO(dao.RecordDAO):
                                                operation=list_criteria.operation)
                        for datum_name, list_criteria in scalarlist_criteria]
 
+        # Now any universal criteria.
+        if universal_criteria:
+            result_ids.append(self._universal_query(universal_criteria))
+
         # If we have more than one set of data, we need to find the intersection.
-        for id in utils.intersect_lists(result_ids):
-            yield id
+        for rec_id in utils.intersect_lists(result_ids):
+            yield rec_id
 
     def _get_one(self, id, _record_builder):
         """
@@ -271,7 +276,7 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.info('Finding Records where datum %s has %s in %s', datum_name,
                     operation.value.split('_')[0], data_range)
         table = schema.ListScalarData
-        query = self.session.query(table.id)
+        query = self.session.query(table.id).filter(table.name == datum_name)
         filters = []
         if operation == utils.ListQueryOperation.ALL_IN:
             # What must be [>,>=] the criterion's min
@@ -357,6 +362,32 @@ class RecordDAO(dao.RecordDAO):
             list_of_record_ids_sets.append(set(str(record_id[0])
                                                for record_id in records_list))
         return list_of_record_ids_sets
+
+    def _universal_query(self, universal_criteria):
+        """
+        Pull back all record ids fulfilling universal criteria.
+
+        We do all criteria in a single query per table, as there's only one
+        possible universal query right now.
+
+        :param universal_criteria: List of tuples: (datum_name, UniversalCriteria)
+        :return: generator of ids of Records fulfilling all criteria.
+        """
+        result_counts = defaultdict(lambda: 0)
+        desired_names = [x[0] for x in universal_criteria]
+        LOGGER.info('Finding Records where data in %s exist', desired_names)
+        expected_result_count = len(universal_criteria)
+        for table in PARAM_OFFSETS:  # We go through all the query tables
+            # We know that a single Record can never have more than one datum with
+            # a given name, so all we need to get is count.
+            query = (self.session.query(table.id, sqlalchemy.func.count(table.name))
+                     .filter(table.name.in_(desired_names))
+                     .group_by(table.id))
+            for result in query:
+                result_counts[result[0]] += result[1]  # Add the number of found names
+        for entry, val in six.iteritems(result_counts):
+            if val == expected_result_count:
+                yield entry
 
     def get_available_types(self):
         """

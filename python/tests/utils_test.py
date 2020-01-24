@@ -581,6 +581,11 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
         self.assertEqual(any_in.value, equiv.value)
         self.assertEqual(any_in.operation, equiv.operation)
 
+    def test_exists(self):
+        """Test that exists is simply returning the relevant operation."""
+        exists_op = sina.utils.exists()
+        self.assertEqual(exists_op, sina.utils.UniversalQueryOperation.EXISTS)
+
     def test_sort_and_standardizing(self):
         """Test the function for processing query criteria."""
         criteria = {"numra": DataRange(1, 2),
@@ -592,7 +597,8 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
                     "liststr": StringListCriteria(value=("foo", "bar"),
                                                   operation=sina.utils.ListQueryOperation.HAS_ANY),
                     "lex": "cat"}
-        scalar, string, scalar_list, string_list = sort_and_standardize_criteria(criteria)
+        (scalar, string, scalar_list,
+         string_list, _) = sort_and_standardize_criteria(criteria)
         num_equiv = DataRange(12, 12, max_inclusive=True)
         num2_equiv = DataRange(2, 2, max_inclusive=True)
         lex_equiv = DataRange("cat", "cat", max_inclusive=True)
