@@ -27,10 +27,10 @@ SQLITE_PREFIX = "sqlite:///"
 
 # Parameter offsets used when combining queries across tables
 # see _apply_ranges_to_query() for usage. Also identifies our data tables.
-PARAM_OFFSETS = {schema.ScalarData: "",
-                 schema.StringData: "_1",
-                 schema.ListScalarData: "_2",
-                 schema.ListStringDataEntry: "_3"}
+TABLES_WITH_OFFSETS = {schema.ScalarData: "",
+                       schema.StringData: "_1",
+                       schema.ListScalarData: "_2",
+                       schema.ListStringDataEntry: "_3"}
 
 
 class RecordDAO(dao.RecordDAO):
@@ -377,12 +377,12 @@ class RecordDAO(dao.RecordDAO):
         desired_names = [x[0] for x in universal_criteria]
         LOGGER.info('Finding Records where data in %s exist', desired_names)
         expected_result_count = len(universal_criteria)
-        for table in PARAM_OFFSETS:  # We go through all the query tables
+        for query_table in TABLES_WITH_OFFSETS:
             # We know that a single Record can never have more than one datum with
             # a given name, so all we need to get is count.
-            query = (self.session.query(table.id, sqlalchemy.func.count(table.name))
-                     .filter(table.name.in_(desired_names))
-                     .group_by(table.id))
+            query = (self.session.query(query_table.id, sqlalchemy.func.count(query_table.name))
+                     .filter(query_table.name.in_(desired_names))
+                     .group_by(query_table.id))
             for result in query:
                 result_counts[result[0]] += result[1]  # Add the number of found names
         for entry, val in six.iteritems(result_counts):
@@ -526,7 +526,7 @@ class RecordDAO(dao.RecordDAO):
         # Performing an intersection on two SQLAlchemy queries, as in data_query(),
         # causes their parameters to merge and overwrite any shared names.
         # Here, we guarantee our params will have unique names per table.
-        offset = PARAM_OFFSETS[table]
+        offset = TABLES_WITH_OFFSETS[table]
         for index, (name, criteria) in enumerate(data):
             range_components.append((name, criteria, index))
             search_args["name{}{}".format(index, offset)] = name
@@ -600,7 +600,7 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Building TextClause filter for data "%s" with criteria'
                      '<%s> and index=%s.', name, criteria, index)
-        offset = PARAM_OFFSETS[table]
+        offset = TABLES_WITH_OFFSETS[table]
         # SQLAlchemy's methods for substituting in table names are convoluted.
         # A much simpler, clearer method:
         if table == schema.ScalarData:

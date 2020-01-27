@@ -607,15 +607,15 @@ class RecordDAO(dao.RecordDAO):
         :param universal_criteria: List of tuples: (datum_name, UniversalCriteria)
         :return: generator of ids of Records fulfilling all criteria.
         """
-        tables = [schema.RecordFromScalarData, schema.RecordFromStringData,
-                  schema.RecordFromStringListData, schema.RecordFromScalarListDataMin]
+        query_tables = [schema.RecordFromScalarData, schema.RecordFromStringData,
+                        schema.RecordFromStringListData, schema.RecordFromScalarListDataMin]
         desired_names = [x[0] for x in universal_criteria]
         LOGGER.info('Finding Records where data in %s exist', desired_names)
         result_counts = defaultdict(lambda: 0)
         expected_result_count = len(universal_criteria)
-        for table in tables:  # We go through all the query tables
-            for name in desired_names:  # ...and every scalar
-                query = table.objects.filter(name=name).values_list('id', flat=True)
+        for query_table in query_tables:
+            for name in desired_names:
+                query = query_table.objects.filter(name=name).values_list('id', flat=True)
                 for rec_id in query:
                     result_counts[rec_id] += 1
         for entry, val in six.iteritems(result_counts):
