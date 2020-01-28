@@ -118,7 +118,7 @@ class ScalarData(Base):
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
 
-    Index('scalar_name_idx', name)
+    Index('scalar_name_val_idx', name, value)
 
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, name, value,   # pylint: disable=too-many-arguments

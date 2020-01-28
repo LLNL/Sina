@@ -4,7 +4,6 @@ import numbers
 import logging
 import json
 from collections import defaultdict
-from functools import reduce   # pylint: disable=redefined-builtin
 
 import six
 
@@ -183,74 +182,30 @@ class RecordDAO(dao.RecordDAO):
             raise ValueError("You must supply at least one criterion.")
         (scalar_criteria,
          string_criteria,
-         scalarlist_criteria,
-         stringlist_criteria) = sort_and_standardize_criteria(kwargs)
+         scalar_list_criteria,
+         string_list_criteria) = sort_and_standardize_criteria(kwargs)
         result_ids = []
 
         # First handle scalar and string criteria
         for criteria, table in ((scalar_criteria, schema.ScalarData),
                                 (string_criteria, schema.StringData)):
             if criteria:
-                query = self.session.query(table.id)
-                query = self._apply_ranges_to_query(query,
-                                                    criteria,
-                                                    table)
+                query = self._generate_data_table_query(criteria, table)
                 result_ids.append(str(x[0]) for x in query.all())
 
         # Move on to any list criteria
         result_ids += [self._string_list_query(datum_name=datum_name,
                                                string_list=list_criteria.value,
                                                operation=list_criteria.operation)
-                       for datum_name, list_criteria in stringlist_criteria]
+                       for datum_name, list_criteria in string_list_criteria]
         result_ids += [self._scalar_list_query(datum_name=datum_name,
                                                data_range=list_criteria.value,
                                                operation=list_criteria.operation)
-                       for datum_name, list_criteria in scalarlist_criteria]
+                       for datum_name, list_criteria in scalar_list_criteria]
 
         # If we have more than one set of data, we need to find the intersection.
         for id in utils.intersect_lists(result_ids):
             yield id
-
-    def _get_one(self, id, _record_builder):
-        """
-        Apply some "get" function to a single Record id.
-
-        Used by the parent get(), this is the SQL-specific implementation of
-        getting a single Record.
-
-        :param id: A Record id to return
-        :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw.
-
-        :returns: A Record object
-        """
-        result = (self.session.query(schema.Record)
-                  .filter(schema.Record.id == id).one_or_none())
-        if result is None:
-            raise ValueError("No Record found with id {}".format(id))
-        return _record_builder(json_input=json.loads(result.raw))
-
-    def get_all_of_type(self, type, ids_only=False):
-        """
-        Given a type of record, return all Records of that type.
-
-        :param type: The type of record to return, ex: run
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of Records of that type or (if ids_only) a
-                  generator of their ids
-        """
-        LOGGER.debug('Getting all records of type %s.', type)
-        query = (self.session.query(schema.Record.id)
-                 .filter(schema.Record.type == type))
-        if ids_only:
-            for record_id in query.all():
-                yield str(record_id[0])
-        else:
-            filtered_ids = (str(x[0]) for x in query.all())
-            for record in self.get(filtered_ids):
-                yield record
 
     def _scalar_list_query(self,
                            datum_name,
@@ -297,11 +252,7 @@ class RecordDAO(dao.RecordDAO):
         for record_id in record_ids:
             yield record_id[0]
 
-    # Disable the pylint check to if and until the team decides to refactor the method
-    def _string_list_query(self,  # pylint: disable=too-many-branches
-                           datum_name,
-                           string_list,
-                           operation):
+    def _string_list_query(self, datum_name, string_list, operation):
         """
         Return all Records where [datum_name] fulfills [operation] for [string_list].
 
@@ -309,7 +260,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param datum_name: The name of the datum
         :param string_list: A list of strings datum_name must contain.
-        :pram operation: What kind of ListQueryOperation to do.
+        :param operation: What kind of ListQueryOperation to do.
         :returns: A generator of ids of matching Records or the Records
                   themselves (see ids_only).
 
@@ -317,46 +268,116 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.info('Finding Records where datum %s contains %s: %s', datum_name,
                     operation.value.split('_')[1], string_list)
-        list_of_record_ids_sets = []
-        list_of_record_ids_sets.extend(
-            self._execute_string_list_query(datum_name=datum_name,
-                                            list_of_contents=string_list))
-
-        # This reduce "ands" together all the sets (one per criterion),
-        # creating one set that adheres to all our individual criterion sets.
+        criteria_tuples = [(datum_name, x) for x in string_list]
         if operation == utils.ListQueryOperation.HAS_ALL:
-            record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
+            query = self._generate_data_table_query(table=schema.ListStringDataEntry,
+                                                    criteria_pairs=criteria_tuples)
         elif operation == utils.ListQueryOperation.HAS_ANY:
-            record_ids = set.union(*list_of_record_ids_sets)
+            query = self._generate_data_table_query(table=schema.ListStringDataEntry,
+                                                    criteria_pairs=criteria_tuples,
+                                                    fulfill_all=False)
         else:
             # This can only happen if there's an operation that accepts a list
             # of strings but is not supported by string_list_query.
             raise ValueError("Given an invalid operation for a string list query: {}"
                              .format(operation.value))
-        for record_id in record_ids:
-            yield record_id
+        for query_result in query:
+            yield query_result[0]  # yield the id
 
-    def _execute_string_list_query(self, datum_name, list_of_contents):
+    @staticmethod
+    def _generate_criterion_filters(criterion_pair, table):
         """
-        For each string list criterion, execute a query and add the set result to a list.
+        Generate the AND filters fulfilling a single criterion pair.
 
-        :param datum_name: The name of the datum
-        :param list_of_contents: All the values datum_name must contain. Can be
-                                 single values ("egg", 12) or DataRanges.
-        :returns: A list of sets of record ids, where each set is the result
-                  set of one query with one criterion.
+        :param criterion_pair: A tuple of (datum_name, criterion). Criterion must be a DataRange
+                               or single value, ex: 6, "low_frequency"
+        :param table: The table the datum is expected to exist in
+        :return: a list of operations which, ANDed together, create the SQLAlchemy
+                 expression fulfilling the criteria.
         """
-        table = schema.ListStringDataEntry
-        criteria_tuples = [(datum_name, x) for x in list_of_contents]
-        list_of_record_ids_sets = []
-        for criterion in criteria_tuples:
-            scalar_list_query = self.session.query(table.id)
-            records_list = self._apply_ranges_to_query(query=scalar_list_query,
-                                                       table=table,
-                                                       data=[criterion]).all()
-            list_of_record_ids_sets.append(set(str(record_id[0])
-                                               for record_id in records_list))
-        return list_of_record_ids_sets
+        datum_name, criterion = criterion_pair
+        range_criteria = [table.name == datum_name]
+        if isinstance(criterion, utils.DataRange):
+            if not criterion.is_single_value():
+                if criterion.min:
+                    min_op = table.value.__ge__ if criterion.min_inclusive else table.value.__gt__
+                    range_criteria.append(min_op(criterion.min))
+                if criterion.max:
+                    max_op = table.value.__le__ if criterion.min_inclusive else table.value.__lt__
+                    range_criteria.append(max_op(criterion.max))
+            else:
+                range_criteria.append(table.value.__eq__(criterion.min))
+        else:
+            range_criteria.append(table.value.__eq__(criterion))
+        return range_criteria
+
+    def _generate_data_table_query(self, criteria_pairs, table, fulfill_all=True):
+        """
+        Generate a query that determines whether a Record fulfills a set of criteria.
+
+        All criteria must belong to a single table. This is used to generate a single
+        query rather than chaining together multiple queries--see "criteria"
+
+        :param criteria_pairs: A list of (datum_name, criterion) tuples. All datum_names are
+                               expected to correspond to entries in the same table.
+        :param table: The table the data are expected to exist in.
+        :param fulfill_all: Whether we should ensure every criteria_pair is fulfilled. If
+                            false, only one or more pairs need to be fulfilled
+                            (ex: has_any() list query)
+
+        :return: A query object representing <criterion> applied to <datum_name> in <table>.
+        """
+        query = self.session.query(table.id)
+        and_operations = []
+        for pair in criteria_pairs:
+            and_operations.append(sqlalchemy.and_(*self._generate_criterion_filters(pair,
+                                                                                    table)))
+        query = query.filter(sqlalchemy.or_(*and_operations))
+        if fulfill_all and len(criteria_pairs) > 1:
+            query = (query.group_by(table.id)
+                     .having(sqlalchemy.func.count(table.id) == len(criteria_pairs)))
+        return query
+
+    def _get_one(self, id, _record_builder):
+        """
+        Apply some "get" function to a single Record id.
+
+        Used by the parent get(), this is the SQL-specific implementation of
+        getting a single Record.
+
+        :param id: A Record id to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A Record object
+        """
+        result = (self.session.query(schema.Record)
+                  .filter(schema.Record.id == id).one_or_none())
+        if result is None:
+            raise ValueError("No Record found with id {}".format(id))
+        return _record_builder(json_input=json.loads(result.raw))
+
+    def get_all_of_type(self, type, ids_only=False):
+        """
+        Given a type of record, return all Records of that type.
+
+        :param type: The type of record to return, ex: run
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
+
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
+        """
+        LOGGER.debug('Getting all records of type %s.', type)
+        query = (self.session.query(schema.Record.id)
+                 .filter(schema.Record.type == type))
+        if ids_only:
+            for record_id in query.all():
+                yield str(record_id[0])
+        else:
+            filtered_ids = (str(x[0]) for x in query.all())
+            for record in self.get(filtered_ids):
+                yield record
 
     def get_available_types(self):
         """
@@ -459,150 +480,6 @@ class RecordDAO(dao.RecordDAO):
                   <count> smallest <scalar_name> values, ordered smallest first.
         """
         return self._get_with_max_min_helper(scalar_name, count, id_only, get_min=True)
-
-    def _apply_ranges_to_query(self, query, data, table):
-        """
-        Filter query object based on list of (name, criteria).
-
-        This is only meant to be used in conjunction with data_query() and
-        related. Criteria must be DataRanges.
-
-        Uses parameter substitution to get around limitations of SQLAlchemy OR
-        construct. Note that we still use AND logic; the "or" is used in
-        conjunction with a count statement because each data entry is its own
-        row, and we need to use AND across rows (and with respect to the record
-        id).
-
-        :param query: A SQLAlchemy query object
-        :param data: A list of (name, criteria) pairs to apply to the query object
-        :param table: The table to query against, either ScalarData,
-            StringData, ListScalarData, or ListStringDataEntry.
-
-        :returns: <query>, now filtering on <data>
-        :raises ValueError: If given an invalid table.
-        """
-        LOGGER.debug('Filtering <query=%s> with <data=%s>.', query, data)
-        if (table not in [schema.ScalarData,
-                          schema.StringData,
-                          schema.ListScalarData,
-                          schema.ListStringDataEntry]):
-            msg = 'Given invalid table to query: {}'.format(table)
-            LOGGER.error(msg)
-            raise ValueError(msg)
-
-        search_args = {}
-        range_components = []
-        # Performing an intersection on two SQLAlchemy queries, as in data_query(),
-        # causes their parameters to merge and overwrite any shared names.
-        # Here, we guarantee our params will have unique names per table.
-        offset = PARAM_OFFSETS[table]
-        for index, (name, criteria) in enumerate(data):
-            range_components.append((name, criteria, index))
-            search_args["name{}{}".format(index, offset)] = name
-            if not isinstance(criteria, utils.DataRange):
-                search_args["eq{}{}".format(index, offset)] = criteria
-            elif criteria.is_single_value():
-                search_args["eq{}{}".format(index, offset)] = criteria.min
-            else:
-                search_args["min{}{}".format(index, offset)] = criteria.min
-                search_args["max{}{}".format(index, offset)] = criteria.max
-        query = query.filter(sqlalchemy
-                             .or_(self._build_range_filter(name, criteria, table, index)
-                                  for (name, criteria, index) in range_components))
-
-        def _count_checker(is_list=False):
-            """
-            Check which count to use depending if we are checking a list.
-
-            If we are checking the count of a list of values, then we know the
-            list of criteria passed in is a list of one criterion. We check
-            that one or more rows came back satisfying said criterion. If we
-            are not a list, we must have equality between the length of the
-            list of criteria and the number of rows returned. This is because
-            only one row can come back if a criterion is satisified, so it is
-            one to one.
-
-            :param is_list: Whether or not we are checking a list of values.
-            :returns: Query that correctly checks count(s) of criteria.
-            """
-            if is_list:
-                text = "{} >= {}"
-                components_length = 1
-            else:
-                text = "{} = {}"
-                components_length = len(range_components)
-            return (query.group_by(table.id)
-                    .having(sqlalchemy.text(text
-                                            .format(sqlalchemy.func.count(table.id),
-                                                    components_length))))
-        if (table == schema.ListStringDataEntry or
-                table == schema.ListScalarData):
-            query = _count_checker(is_list=True)
-        else:
-            query = _count_checker(is_list=False)
-        query = query.params(search_args)
-        return query
-
-    @staticmethod
-    def _build_range_filter(name, criteria, table, index=0):
-        """
-        Build a TextClause to filter a SQL query using range parameters.
-
-        Helper method to _apply_scalar_ranges_to_query. Needed in order to use
-        parameter substitution and circumvent some filter limitations.
-
-        Example clause as raw SQL:
-
-        WHERE ScalarData.name=:scalar_name0 AND ScalarData.value<right_num0
-
-        :param name: The name of the value we apply the criteria to
-        :param criteria: The criteria used to build the query.
-        :param table: The table to query against, either ScalarData or
-                      StringData
-        :param index: optional offset of this criteria if using multiple
-                      criteria. Used for building var names for
-                      parameterization.
-
-        :returns: a TextClause object for use in a SQLAlchemy statement
-
-        :raises ValueError: if given a bad table to query against.
-        """
-        LOGGER.debug('Building TextClause filter for data "%s" with criteria'
-                     '<%s> and index=%s.', name, criteria, index)
-        offset = PARAM_OFFSETS[table]
-        # SQLAlchemy's methods for substituting in table names are convoluted.
-        # A much simpler, clearer method:
-        if table == schema.ScalarData:
-            tablename = "ScalarData"
-        elif table == schema.StringData:
-            tablename = "StringData"
-        elif table == schema.ListScalarData:
-            tablename = "ListScalarData"
-        elif table == schema.ListStringDataEntry:
-            tablename = "ListStringDataEntry"
-        else:
-            raise ValueError("Given a bad table for data query: {}".format(table))
-
-        conditions = ["({table}.name IS :name{index}{offset} AND {table}.value"
-                      .format(table=tablename, index=index, offset=offset)]
-        if not isinstance(criteria, utils.DataRange):
-            conditions.append(" = :eq{}{}".format(index, offset))
-        elif criteria.is_single_value():
-            conditions.append(" = :eq{}{}".format(index, offset))
-        else:
-            if criteria.min_is_finite():
-                conditions.append(" >= " if criteria.min_inclusive else " > ")
-                conditions.append(":min{}{}".format(index, offset))
-            # If two-sided range, begin preparing new condition
-            if (criteria.min_is_finite()) and (criteria.max_is_finite()):
-                conditions.append(" AND {}.value ".format(tablename))
-            if criteria.max_is_finite():
-                conditions.append(" <= " if criteria.max_inclusive else " < ")
-                conditions.append(":max{}{}".format(index, offset))
-        # This helper method should NEVER see a (None, None) range due to the
-        # special way they need handled (figuring out what table they belong to)
-        conditions.append(")")
-        return sqlalchemy.text(''.join(conditions))
 
     def get_data_for_records(self, data_list, id_list=None):
         """
