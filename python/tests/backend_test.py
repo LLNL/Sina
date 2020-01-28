@@ -18,7 +18,7 @@ import six
 from mock import patch  # pylint: disable=import-error
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
-                        has_any, all_in, any_in)
+                        has_any, all_in, any_in, exists)
 from sina.model import Run, Record, Relationship
 
 LOGGER = logging.getLogger(__name__)
@@ -78,12 +78,15 @@ def populate_database_with_data(record_dao, run_dao):
     spam_record_5 = Run(id="spam5", application="breakfast_maker")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
     spam_record_5.data["val_data_3"] = {"value": "sugar"}
+    spam_record_5.data["flex_data_1"] = {"value": [100, 200, 300]}
+    spam_record_5.data["flex_data_2"] = {"value": 6}
     spam_record_5.data["val_data_list_1"] = {"value": [0, 8]}
     spam_record_5.data["val_data_list_2"] = {"value": ['eggs', 'pancake']}
     spam_record_5.files = {"beep.wav": {"tags": ["output", "eggs"],
                                         "mimetype": 'audio/wav'}}
 
     spam_record_6 = Record(id="spam6", type="spamrec")
+    spam_record_6.data["flex_data_1"] = {"value": "orange juice"}
     spam_record_6.data["val_data_3"] = {"value": "syrup"}
     spam_record_6.data["val_data_list_1"] = {"value": [8, 20]}
     spam_record_6.data["val_data_list_2"] = {"value": ['eggs', 'pancake', 'yellow']}
@@ -712,15 +715,30 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertIn("spam5", just_5_and_6)
         self.assertIn("spam6", just_5_and_6)
 
+    def test_recorddao_exists(self):
+        """Test that the RecordDAO is retrieving on an exists() call."""
+        just_5_and_6 = list(self.record_dao.data_query(flex_data_1=exists()))  # 5 & 6
+        self.assertEqual(len(just_5_and_6), 2)
+        self.assertIn("spam5", just_5_and_6)
+        self.assertIn("spam6", just_5_and_6)
+
+    def test_recorddao_exists_many(self):
+        """Test that the RecordDAO is retrieving on multiple exists() calls."""
+        just_5 = list(self.record_dao.data_query(flex_data_1=exists(),  # 5 & 6
+                                                 flex_data_2=exists()))  # 5
+        self.assertEqual(len(just_5), 1)
+        self.assertIn("spam5", just_5)
+
     def test_recorddao_data_query_mixed_list_criteria(self):
         """
         Test that the RecordDAO is retrieving on mixed data criteria.
 
-        Test that we can mix searching on strings, lists of strings, and dataranges.
+        Test that we can mix searching on strings, lists of strings, existence, and dataranges.
         """
         just_6 = list(self.record_dao.data_query(
             val_data_list_2=has_all('eggs', 'pancake'),  # 5 & 6
             val_data_list_1=any_in(DataRange(0, 8, max_inclusive=True)),  # 5 & 6
+            flex_data_1=exists(),  # 5 & 6
             val_data_3='syrup'))  # 6 only
         self.assertEqual(len(just_6), 1)
         self.assertEqual(just_6[0], "spam6")

@@ -41,6 +41,17 @@ class ListQueryOperation(Enum):
     ALL_IN = "ALL_IN"
 
 
+class UniversalQueryOperation(Enum):
+    """
+    Describe operations possible on UniversalCriteria.
+
+    These operations can be used on data of any type. For descriptions
+    of their functionality, see their helper methods (exists(), etc.)
+    """
+
+    EXISTS = "EXISTS"  # Only one for now.
+
+
 def _import_tuple_args(unpack_tuple):
     """Unpack args to allow using import_json with ThreadPools in <Python3."""
     import_json(unpack_tuple[0], unpack_tuple[1])
@@ -447,8 +458,8 @@ def sort_and_standardize_criteria(criteria_dict):
 
     :param criteria_dict: A dictionary of the form {name_1: criterion_1}
     :returns: A tuple of lists of the form (scalar_criteria, string_criteria,
-              scalar_list_criteria, string_list_criteria). Each entry in each
-              list is (name, datarange_criterion)
+              scalar_list_criteria, string_list_criteria, universal_criteria). Each
+              entry in each list is (name, datarange_criterion)
     :raises ValueError: if passed any criterion that isn't a valid number,
                         string, DataRange, or ListCriteria.
     """
@@ -457,6 +468,7 @@ def sort_and_standardize_criteria(criteria_dict):
     string_criteria = []
     scalar_list_criteria = []
     string_list_criteria = []
+    universal_criteria = []
     for data_name, criterion in criteria_dict.items():
         if isinstance(criterion, Real):
             scalar_criteria.append((data_name, DataRange(min=criterion,
@@ -474,6 +486,8 @@ def sort_and_standardize_criteria(criteria_dict):
             scalar_list_criteria.append((data_name, criterion))
         elif isinstance(criterion, StringListCriteria):
             string_list_criteria.append((data_name, criterion))
+        elif isinstance(criterion, UniversalQueryOperation):
+            universal_criteria.append((data_name, criterion))
         else:
             # Probably a null range; we don't know what table to look in
             # While we may support this in the future, we don't now.
@@ -481,7 +495,8 @@ def sort_and_standardize_criteria(criteria_dict):
             raise ValueError("criteria must be a number, string, numerical"
                              "or lexographic DataRange, or numerical or lexographic"
                              "ListCriteria. Given {}:{}".format(data_name, criterion))
-    return (scalar_criteria, string_criteria, scalar_list_criteria, string_list_criteria)
+    return (scalar_criteria, string_criteria, scalar_list_criteria,
+            string_list_criteria, universal_criteria)
 
 
 def create_file(path):
@@ -562,6 +577,11 @@ def get_example_path(relpath,
                          .format(relpath, example_dirs))
 
     return filename
+
+
+def exists():
+    """QoL method mimicking has_all/etc. that returns the relevant UniversalQueryOperation."""
+    return UniversalQueryOperation.EXISTS
 
 
 def has_all(*values):
