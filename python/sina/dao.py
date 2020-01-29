@@ -163,9 +163,10 @@ class RecordDAO(object):
 
         Criteria are expressed as keyword arguments. Each keyword
         is the name of an entry in a Record's data field, and it's set
-        equal to either a single value or a DataRange (see utils.DataRanges
-        for more info) that expresses the desired value/range of values.
-        All criteria must be satisfied for an ID to be returned:
+        equal to a single value, a DataRange (see utils.DataRanges
+        for more info), or a special criteria (ex: ScalarListCriteria
+        from has_all(), see utils) that expresses the desired value/range of
+        values. All criteria must be satisfied for an ID to be returned:
 
             # Return ids of all Records with a volume of 12, a quadrant of
             # "NW", AND a max_height >=30 and <40.
