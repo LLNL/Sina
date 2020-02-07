@@ -16,3 +16,5 @@ string(CONCAT SINA_CXX_TEST_FLAGS "${SINA_CXX_FLAGS} "
         "-Wno-potentially-evaluated-expression "
         "-Wno-zero-as-null-pointer-constant "
         )
+
+string(CONCAT SINA_CXX_ADIAK_WRITER_EXTRA_FLAGS "-Wno-covered-switch-default")
