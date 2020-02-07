@@ -289,13 +289,12 @@ class RecordDAO(dao.RecordDAO):
     @staticmethod
     def _generate_criterion_filters(criterion_pair, table):
         """
-        Generate the AND filters fulfilling a single criterion pair.
+        Generate the AND expression fulfilling a single criterion pair.
 
         :param criterion_pair: A tuple of (datum_name, criterion). Criterion must be a DataRange
                                or single value, ex: 6, "low_frequency"
         :param table: The table the datum is expected to exist in
-        :return: a list of operations which, ANDed together, create the SQLAlchemy
-                 expression fulfilling the criteria.
+        :return: A SQLAlchemy AND expression fulfilling the criterion pair
         """
         datum_name, criterion = criterion_pair
         range_criteria = [table.name == datum_name]
@@ -311,7 +310,7 @@ class RecordDAO(dao.RecordDAO):
                 range_criteria.append(table.value.__eq__(criterion.min))
         else:
             range_criteria.append(table.value.__eq__(criterion))
-        return range_criteria
+        return sqlalchemy.and_(*range_criteria)
 
     def _generate_data_table_query(self, criteria_pairs, table, fulfill_all=True):
         """
@@ -330,12 +329,19 @@ class RecordDAO(dao.RecordDAO):
         :return: A query object representing <criterion> applied to <datum_name> in <table>.
         """
         query = self.session.query(table.id)
-        and_operations = []
-        for pair in criteria_pairs:
-            and_operations.append(sqlalchemy.and_(*self._generate_criterion_filters(pair,
-                                                                                    table)))
-        query = query.filter(sqlalchemy.or_(*and_operations))
-        if fulfill_all and len(criteria_pairs) > 1:
+        criteria_queries = [self._generate_criterion_filters(pair, table)
+                            for pair in criteria_pairs]
+
+        if not fulfill_all:
+            return query.filter(sqlalchemy.or_(*criteria_queries))
+
+        # Since we don't know the possible data names a priori, we have a row per datum
+        # and have to "or" them together and then group by record ID, selecting the records
+        # that have a matching row for each queried criterion (# rows == # criteria).
+        query = query.filter(sqlalchemy.or_(*criteria_queries))
+
+        # For performance reasons, we skip the "group by" stage when not needed
+        if len(criteria_pairs) > 1:
             query = (query.group_by(table.id)
                      .having(sqlalchemy.func.count(table.id) == len(criteria_pairs)))
         return query
