@@ -21,7 +21,7 @@ Overview
 ========
 
 Sina provides a command line interface for exploring and querying data stored
-using the Mnoda schema.  Once you install the software in a virtual environment,
+using the Sina schema.  Once you install the software in a virtual environment,
 using the standard or manual process described below, you are ready to use the
 tools.  Each time you log in you'll first need to activate the environment.
 When you're done, we recommend you deactivate the virtual environment to get

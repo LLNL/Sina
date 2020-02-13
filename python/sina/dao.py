@@ -16,9 +16,9 @@ from sina.utils import DataRange
 
 LOGGER = logging.getLogger(__name__)
 
-
 # Disable pylint checks due to ubiquitous use of id and type
 # pylint: disable=invalid-name,redefined-builtin
+
 
 @six.add_metaclass(ABCMeta)
 class DAOFactory(object):
@@ -291,7 +291,7 @@ class RecordDAO(object):
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
 
-        :returns: A list of scalar JSON objects matching the Mnoda specification
+        :returns: A list of scalar JSON objects matching the Sina specification
         """
         raise NotImplementedError
 

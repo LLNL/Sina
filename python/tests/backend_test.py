@@ -927,7 +927,7 @@ class TestImportExport(unittest.TestCase):
         Also acts as a sanity check on all DAOs.
         """
         json_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                 "test_files/mnoda_1.json")
+                                 "test_files/sample_doc_1.json")
         import_json(factory=self.factory, json_paths=json_path)
         parent = self.factory.create_record_dao().get("parent_1")
         relation = self.factory.create_relationship_dao().get(object_id="child_1")

@@ -1,4 +1,4 @@
-"""Contains toplevel, abstract objects mirroring the Mnoda schema."""
+"""Contains toplevel, abstract objects mirroring the Sina schema."""
 from __future__ import print_function
 import json
 import logging
@@ -38,7 +38,7 @@ class Record(object):
 
         Currently, data and files are expected to be lists of dicts.
         Lists of strings (ex: ['{"name":"foo"}']) won't be read correctly.
-        See the Mnoda section of the documentation for what data and
+        See the Sina schema section of the documentation for what data and
         files should contain.
 
         :param id: The id of the record. Should be unique within a dataset

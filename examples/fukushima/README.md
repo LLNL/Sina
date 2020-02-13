@@ -43,7 +43,7 @@ Dataset
 The CSV file contains data from observations collected on three different 
 dates: April 5th, April 18th, and May 9th.  Fields include a time stamp,
 location, altitude, and gross count.  The table below summarizes the types of
-data we added to the Mnoda file and, therefore, the database.
+data we added to the Sina file and, therefore, the database.
 
 | Entry Type | Record Type | Number | Record Name  |
 |:----------:|:-----------:|:------:|:-------------|
@@ -88,7 +88,7 @@ experiment-observation pair.
 Building the Database
 =====================
 
-The converter script - `fukushima_csv2mnoda.py` - creates the schema-compliant
+The converter script - `fukushima_csv_to_sina.py` - creates the schema-compliant
 JSON file from the example dataset for ingestion into the database using `sina`
 at the command line.  The script also creates and copies files into a `files` 
 target subdirectory to allow for examples that extract file paths from the 
@@ -105,7 +105,7 @@ These instructions make the following assumptions:
 
 Given the input file is in the current directory, enter the following:
 
-    (venv) $ python $SINA_SRC/examples/fukushima/fukushima_csv2mnoda.py \
+    (venv) $ python $SINA_SRC/examples/fukushima/fukushima_csv_to_sina.py \
               ./AMS\ C12\ Sea\ Data.csv $DEST_DIR
 
 Now you can ingest the data into an SQLite database as follows:

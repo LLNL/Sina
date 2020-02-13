@@ -43,9 +43,9 @@ class TestSQLIntegration(unittest.TestCase):
         self.location = os.path.dirname(os.path.realpath(__file__))
         self.created_db = os.path.join(self.location, TEMP_DB_NAME)
         self.test_files = [os.path.join(self.location,
-                                        "test_files/mnoda_1.json"),
+                                        "test_files/sample_doc_1.json"),
                            os.path.join(self.location,
-                                        "test_files/mnoda_2.json")]
+                                        "test_files/sample_doc_2.json")]
 
     def tearDown(self):
         """Clean up after each test by removing the created_db tempfile."""
@@ -55,9 +55,9 @@ class TestSQLIntegration(unittest.TestCase):
             pass
 
     def test_file_validity(self):
-        """Make sure the files we're importing are valid Mnoda."""
+        """Make sure the files we're importing follow the Sina schema."""
         schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                   '../../mnoda.json')
+                                   '../../sina_schema.json')
         with io.open(schema_file, 'r', encoding='utf-8') as schema:
             schema = json.load(schema)
             for test_file in self.test_files:
@@ -131,9 +131,9 @@ class TestCassIntegration(unittest.TestCase):
         connection.setup(['127.0.0.1'], INITIAL_KEYSPACE_NAME)
         management.create_keyspace_simple(TEMP_KEYSPACE_NAME, 1)
         self.args.source = ",".join([os.path.join(self.location,
-                                                  "test_files/mnoda_1.json"),
+                                                  "test_files/sample_doc_1.json"),
                                      os.path.join(self.location,
-                                                  "test_files/mnoda_2.json")])
+                                                  "test_files/sample_doc_2.json")])
         self.args.subparser_name = 'ingest'
         self.args.database = '127.0.0.1'
         self.args.database_type = 'cass'

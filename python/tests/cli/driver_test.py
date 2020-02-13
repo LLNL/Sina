@@ -88,7 +88,7 @@ class TestCLI(unittest.TestCase):
     def test_ingest_local_ids(self):
         """Verify importer is correctly substituting local IDs for globals."""
         test_json = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                 "../test_files/mnoda_1.json")
+                                 "../test_files/sample_doc_1.json")
         factory = sina_sql.DAOFactory()
         import_json(factory=factory, json_paths=test_json)
         local_rec = list(factory.create_record_dao().get_all_of_type("eggs"))

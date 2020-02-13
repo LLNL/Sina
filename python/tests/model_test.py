@@ -229,7 +229,7 @@ class TestModel(unittest.TestCase):
         Ensure we throw a ValueError when creating a Record from bad json.
 
         This is because we do not want to allow creation of Records that do not
-        adhere to the Mnoda schema.
+        adhere to the Sina schema.
         """
         json_input = {"type": "eggs",
                       "user_defined": {"water": "bread"},
@@ -270,7 +270,7 @@ class TestModel(unittest.TestCase):
         Ensure we throw a ValueError when creating a Run from bad json.
 
         This is because we do not want to allow creation of Runs that do not
-        adhere to the Mnoda schema.
+        adhere to the Sina schema.
         """
         json_input = {"id": "spam",
                       "type": "eggs",

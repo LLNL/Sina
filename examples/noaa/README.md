@@ -46,7 +46,7 @@ The CSV file contains rows with data that includes the experiment, observation
 information (e.g., location, time), measurements, and quality control ratings
 on selected measurements.  The meanings of the quality control ratings were
 described on the web site and records added for completeness.  The table below
-summarizes the types of data we added to the Mnoda file and, therefore, the
+summarizes the types of data we added to the Sina file and, therefore, the
 database.
 
 | Entry Type | Record Type | Number | Record Name     |
@@ -92,7 +92,7 @@ experiment-observation pair.
 Building the Database
 =====================
 
-The converter script - `noaa_csv2mnoda.py` - creates the schema-compliant JSON
+The converter script - `noaa_csv_to_sina.py` - creates the schema-compliant JSON
 file from the example dataset for ingestion into the database using `sina`
 at the command line. The script also creates and copies files into a `files`
 target subdirectory to allow for examples that extract file paths from the
@@ -117,7 +117,7 @@ file.
 
 Run the converter by entering the following:
 
-    (venv) $ python $SINA_SRC/examples/noaa/noaa_csv2mnoda.py \
+    (venv) $ python $SINA_SRC/examples/noaa/noaa_csv_to_sina.py \
              0123467/2.2/data/1-data/WCOA11-01-06-2015_data.csv $DEST_DIR
 
 Now you can ingest the data into an SQLite database as follows:
