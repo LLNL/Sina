@@ -1,8 +1,4 @@
-"""
-Cqlengine implementation of the minimal schema used in Cassandra imports.
-
-Based on Mnoda
-"""
+"""Cqlengine implementation of the minimal schema used in Cassandra imports."""
 import numbers
 import logging
 import os
@@ -55,7 +51,7 @@ LOGGER = logging.getLogger(__name__)
 
 class Record(Model):
     """
-    Toplevel object in the Mnoda schema.
+    Toplevel object in the Sina schema.
 
     Stores the raw form of the record.
     """

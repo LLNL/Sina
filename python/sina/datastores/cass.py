@@ -906,7 +906,7 @@ class RecordDAO(dao.RecordDAO):
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
 
-        :return: A dict of scalars matching the Mnoda data specification
+        :return: A dict of scalars matching the Sina data specification
         """
         LOGGER.warning("Using deprecated method get_scalars()."
                        "Consider using Record.data instead.")
@@ -1122,7 +1122,7 @@ class RunDAO(dao.RunDAO):
 
 class DAOFactory(dao.DAOFactory):
     """
-    Build Cassandra-backed DAOs for interacting with Mnoda-based objects.
+    Build Cassandra-backed DAOs for interacting with Sina-based objects.
 
     Includes Records, Relationships, etc.
     """

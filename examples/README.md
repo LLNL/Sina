@@ -62,16 +62,16 @@ ingestors, and example scripts shall start with the name of the dataset.
 Furthermore, the name of each converter script shall conform to the convention
 of `dataset_sourcetype2desttype.py`, where `dataset` is replaced with the name 
 of the dataset and `sourcetype` is replaced with the type of file being 
-converted (e.g., `csv`).  For example, `fukushima_csv2mnoda.py` identifies the 
+converted (e.g., `csv`).  For example, `fukushima_csv_to_sina.py` identifies the 
 script as a converter for the fukushima dataset.  It also indicates the data 
-extracted from a `CSV` file is converted to a `Mnoda` file.
+extracted from a `CSV` file is converted to a `Sina schema` file.
 
 
 Converter or Ingestor
 ---------------------
 
 There shall be a script that takes the raw source data and either converts it
-to a Mnoda file for subsequent ingestion into a database or performs the
+to a Sina schema file for subsequent ingestion into a database or performs the
 ingestion directly.  Be sure to comply with the naming convention described
 in the *Naming Conventions* section.
 
@@ -100,7 +100,7 @@ Build Script
 The build script is intended for automated deployment to a shared space on 
 Lawrence Livermore National Laboratory's Livermore Computing systems to 
 allow potential users to explore the data using the example notebooks.
-Each script shall automate the process of data extraction, Mnoda file
+Each script shall automate the process of data extraction, Sina file
 creation (optional), and database creation.
 
 

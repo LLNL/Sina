@@ -10,7 +10,7 @@ Sina documentation index
    :maxdepth: 2
 
    readme
-   mnoda
+   sina_schema
    cli_basics
    api_basics
    cpp

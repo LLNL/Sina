@@ -13,7 +13,7 @@ rm -rf files data.sqlite
 set -e
 
 tar -xzf $SOURCE_DIR/../raw_data/fukushima.tgz
-python $SOURCE_DIR/fukushima_csv2mnoda.py --show-status data/AMS\ C12\ Sea\ Data.csv .
+python $SOURCE_DIR/fukushima_csv_to_sina.py --show-status data/AMS\ C12\ Sea\ Data.csv .
 sina ingest files/AMS_C12_SeaData.json -d data.sqlite
 
 rm -rf data

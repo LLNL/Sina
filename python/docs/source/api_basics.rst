@@ -9,7 +9,7 @@ The Sina API is organized around Records and Relationships.
 A Record typically represents something like a run, msub, or experiment, while a
 Relationship represents a link between Records, such as which msub submitted which
 job. Records and Relationships are both valid JSON objects, and are documented
-further in the :ref:`mnoda`. Sina's API allows users to store, query, and retrieve
+further in the :ref:`sina_schema`. Sina's API allows users to store, query, and retrieve
 these objects from several backends, including SQL and Cassandra, using
 backend-agnostic Python.
 
@@ -219,7 +219,7 @@ accessed as object attributes::
  for file in run.files:
      print(file.get("mimetype"))
 
-You can also assign additional fields not officially supported by the Mnoda
+You can also assign additional fields not officially supported by the Sina
 schema and not "seen" by the DAOs. While this isn't normally recommended (in
 case we implement something with the same name), you may find it useful,
 particularly if you have a very specific name in mind::

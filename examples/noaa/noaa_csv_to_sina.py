@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-Example CSV-to-Mnoda converter using freely available data.
+Example CSV-to-Sina converter using freely available data.
 
-This module converts the NOAA data to a Mnoda file AND generates files, one
+This module converts the NOAA data to a file following the Sina schema AND generates files, one
 per observation, in order to support demonstrations of different capabilities
 using Jupyter Notebook examples.
 
@@ -69,8 +69,8 @@ MORE_FILES = [
 # Name of the data CSV file provided by NOAA
 DATA_FN = 'WCOA11-01-06-2015_data.csv'
 
-# Name of the Mnoda file we will generate
-MNODA_FN = 'WCOA11-01-06-2015.json'
+# Name of the Sina file we will generate
+sina_filename = 'WCOA11-01-06-2015.json'
 
 # Quality control values and meanings
 QC_DATA = [
@@ -216,7 +216,7 @@ def process_data(dataset_fn, dest_dn, show_status=False):
 # --------------------------------- CLASSES ---------------------------------
 class NoaaData(object):
     """
-    Mnoda data class for the NOAA metadata.
+    Sina data class for the NOAA metadata.
     """
     def __init__(self, files_dn):
         """
@@ -297,17 +297,17 @@ class NoaaData(object):
 
     def write(self):
         """
-        Write the data to the mnoda file.
+        Write the data to the Sina file.
         """
         if len(self.recs) > 0:
-            mnoda = {'records': self.recs}
+            raw_rec_obj = {'records': self.recs}
             if len(self.rels) > 0:
-                mnoda['relationships'] = self.rels
+                raw_rec_obj['relationships'] = self.rels
         else:
-            mnoda = {}
+            raw_rec_obj = {}
 
-        with open(os.path.join(self.files_dn, MNODA_FN), 'w') as ofd:
-            json.dump(mnoda, ofd, indent=4, separators=(',', ': '),
+        with open(os.path.join(self.files_dn, sina_filename), 'w') as ofd:
+            json.dump(raw_rec_obj, ofd, indent=4, separators=(',', ': '),
                       sort_keys=True)
 
 
@@ -319,7 +319,7 @@ def main():
     '''
     parser = argparse.ArgumentParser(
         description='Convert selected NOAA Ocean Archive System dataset from '
-                    'CSV to a Mnoda file. Full paths will be written to the '
+                    'CSV to a Sina file. Full paths will be written to the '
                     'file to facilitate subsequent access from Jupyter '
                     'notebooks.')
 
@@ -333,7 +333,7 @@ def main():
 
     parser.add_argument('dest_dirname',
                         help='The pathname to the destination noaa data '
-                             'directory to which the Mnoda and observation '
+                             'directory to which the Sina and observation '
                              'files are to be written.  The directory will be '
                              'created if it does not exist.')
 

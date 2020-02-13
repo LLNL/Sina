@@ -1,4 +1,4 @@
-"""SQLAlchemy implementations of Mnoda objects."""
+"""SQLAlchemy implementations of Sina objects."""
 from __future__ import print_function
 
 # Disable pylint checks due to its issue with virtual environments

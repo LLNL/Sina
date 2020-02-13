@@ -85,9 +85,9 @@ def setup_arg_parser():
 
 
 def add_ingest_subparser(subparsers):
-    """Add subparser for ingesting Mnoda-format contents into backends."""
+    """Add subparser for ingesting Sina-format contents into backends."""
     parser_ingest = subparsers.add_parser(
-        'ingest', help='ingest complete Mnoda-type information and insert into'
+        'ingest', help='ingest complete Sina-type information and insert into'
                        ' a specified database. See "sina ingest -h" for more '
                        'information.')
     _add_common_args(parser=parser_ingest)
@@ -99,7 +99,7 @@ def add_ingest_subparser(subparsers):
 
     parser_ingest.add_argument('source', type=str,
                                help='The URI or list of URIs to ingest from. '
-                               'Data must be compliant with the Mnoda schema, '
+                               'Data must be compliant with the Sina schema, '
                                'and can be in any of the supported backends. '
                                'Comma-separated.')
     # pylint: disable=fixme
@@ -119,10 +119,10 @@ def add_ingest_subparser(subparsers):
 def add_export_subparser(subparsers):
     """Add subparser for exporting from backends into various formats."""
     parser_export = subparsers.add_parser(
-        'export', help='export from a Mnoda-compliant backend into various, '
+        'export', help='export from a Sina-compliant backend into various, '
                        'subset-like formats. Allows for exporting '
                        'information that is not importable with this tool; if '
-                       'you want to produce complete Mnoda data, try '
+                       'you want to produce complete Sina schema, try '
                        '`sina import`ing to JSON or csv. See "sina export -h" '
                        'for more information.'
                        'Currently, the only supported export format is csv.')
@@ -146,7 +146,7 @@ def add_export_subparser(subparsers):
 def add_query_subparser(subparsers):
     """Add subparser for performing queries on backends."""
     parser_query = subparsers.add_parser(
-        'query', help='perform a query against a Mnoda-compliant backend. '
+        'query', help='perform a query against a Sina-compliant backend. '
                       'See "sina query -h" for more information.')
     _add_common_args(parser=parser_query)
     # pylint: disable=fixme
@@ -182,7 +182,7 @@ def add_query_subparser(subparsers):
                               help='Specify a raw query to perform. Use at '
                               'your own risk! This is not intended for '
                               'general use, as it requires knowledge of both '
-                              'Mnoda internal schema and backend queries. Not '
+                              'Sina internal schema and backend queries. Not '
                               'available for all backends.  Example:'
                               '\n\n'
                               '-r "Select * from Records where type="'

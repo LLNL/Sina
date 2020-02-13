@@ -16,9 +16,9 @@ Ingest
 The ingest subcommand is used for taking data from one source and inserting
 it into one of Sina's supported backends. Currently, this means taking from a
 JSON file and inserting it into either a sqlite file or a Cassandra instance.
-To be ingested correctly, a JSON file needs to conform to the Mnoda schema.
-For Mnoda examples and further information, see the
-`Confluence page <https://lc.llnl.gov/confluence/display/SIBO/Mnoda/>`_.
+To be ingested correctly, a JSON file needs to conform to the Sina schema.
+For Sina schema examples and further information, see the
+`Confluence page <https://lc.llnl.gov/confluence/display/SIBO/Sina+JSON+Schema/>`_.
 
 A basic import would look like this::
 
@@ -43,7 +43,7 @@ Query
 ~~~~~
 
 The query subcommand is used for querying data stored in a compatible backend.
-Any supported backend following the Mnoda schema is queryable. **This includes
+Any supported backend following the Sina schema is queryable. **This includes
 any backend created or updated using the ingest subcommand above.** Queries
 are performed against various selectors (scalar data, associated documents, etc),
 and are used to select entire records. For example::
