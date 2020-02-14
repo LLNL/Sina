@@ -1,13 +1,13 @@
-Sina Usage Examples
-===================
+Overview
+========
 
 Sina includes a collection of open data sets and related files (Jupyter notebooks,
 scripts, converters, etc) demonstrating how the tool and schema are used.
 
 To get started with notebooks, you'll need to run `getting_started.ipynb` or
-else manually create a Jupyter kernel. `basic_usage.ipynb` acts as an interactive
-tutorial not bound to any one set. From there you can explore the subdirectories and their
-related notebooks.
+else manually create a Jupyter kernel. For basic functionality, see `basic_usage.ipynb`, 
+which acts as an interactive tutorial not bound to a data set. From there you can explore 
+the example data sets and their related notebooks.
 
 
 Example Layout
@@ -16,10 +16,10 @@ Example Layout
 Each example set lives in its own `<dataset_name>/` subdirectory and includes a
 few basic parts:
 
-1. `README` file
-1. dataset converter(s) (`<dataset_name>_<orig_format>_to_<dest_format>.py`)
-1. database creation script (`build_db.sh`)
-1. one or more example Jupyter notebooks (`<dataset_name>_<notebook_topic>.ipynb`)
+ - `README` file
+ - dataset converter(s) (`<dataset_name>_<orig_format>_to_<dest_format>.py`)
+ - database creation script (`build_db.sh`)
+ - one or more example Jupyter notebooks (`<dataset_name>_<notebook_topic>.ipynb`)
 
 The raw data for each set lives separately in `raw_data/`. You shouldn't need to touch this--run
 the database creation script to turn it into something Sina can work with, then
@@ -28,83 +28,11 @@ the set itself (such as its source, layout, and background). The converter may b
 resource if you're interested in converting data into a Sina format.
 
 
-Adding More Sets
-================
+Included Sets
+=============
 
-If you plan to add another set, then in addition to making sure the aforementioned files
-are included and that the data is fine for general release, please keep the following
-in mind:
-
-
-Naming Conventions
-------------------
-
-Stick to the formats explained in the "Layout and Usage" section. When in doubt, check
-the existing sets. Leading with the dataset name is useful due to the existence of general
-notebooks/converters--most of the example files are only written to work with a specific dataset.
-
-
-README
-------
-
-Each example is required to have a README.md file that includes:
-
-1. a description of the dataset;
-1. a description of the records extracted from the dataset;
-1. a description of the process for building the database; and
-1. references that include attribution to the source of the data, including links and/or copyright information.
-
-*It is critical that the README.md file includes appropriate attribution.*
-For open datasets, this mean there's a URL to the data source. Data
-collected by running open source applications, such as LLNL's proxy applications,
-include the appropriate attribution. For 
-example, a dataset based on running Lulesh must have a README.md file that
-includes the LLNL-CODE-461231 release number.
-
-
-Converter
----------
-
-The converter should take the raw source data and convert it to a file that Sina can work
-with. Naming is important: the example name `fukushima_csv_to_sina.py` identifies the script
-as a converter for the Fukushima dataset.  It also indicates the data comes from a `CSV` file
-and is converted to a `Sina schema` file.
-
-
-Build Script
-------------
-
-The build script is primarily intended for automated deployment to a shared space on 
-LLNL's Livermore Computing systems to allow users to explore the data using the example
-notebooks, though it can also be used to build a local copy of the example database. Each script,
-in essence, uses the converter to transform raw data to something Sina recognizes, then uses
-Sina to ingest the data into a database.
-
-
-Notebooks
----------
-
-Any notebook created is automatically included in Sina's tests, though only as far as making sure
-no errors (or style issues) are found while running. Be sure to run the tests! Beyond this, take
-a look at the existing notebooks for an idea on how to create new ones--since each notebook is
-essentially a tutorial, adding explanations and plenty of comments is valuable.
-
-
-
-Example Data Sets
-=================
-
-We provide example data sets and Jupyter notebooks to illustrate use of our tools
-for different types of data.  All of our current data sets were found through the
-data.gov portal; however, we also plan to add examples using simple "simulations"
-in the near future.
-
-A snapshot of the original data is kept for reproducibility in the Sina source code
-repository in a suitably named subdirectory of *examples*.
-
-
-.. contents:: Examples
-   :depth: 1
+All of our current data sets were found through the data.gov portal; however, we also 
+plan to add examples using simple "simulations".
 
 
 Fukushima Incident Aerial Measurement System (AMS)
@@ -168,3 +96,65 @@ descriptions.
    https://catalog.data.gov/dataset/dissolved-inorganic-carbon-total-alkalinity-ph-temperature-salinity-and-other-variables-collect
  - NOAA National Centers for Environmental Information. (Download). (January 7, 2015).
    https://www.nodc.noaa.gov/cgi-bin/OAS/prd/accession/download/123467
+
+
+Adding More Sets
+================
+
+If you plan to add another set, then in addition to making sure the aforementioned files
+are included and that the data is fine for general release, please keep the following
+in mind:
+
+
+Naming Conventions
+------------------
+
+Stick to the formats explained in the "Layout and Usage" section. When in doubt, check
+the existing sets. Leading with the dataset name is useful due to the existence of general
+notebooks/converters--most of the example files are only written to work with a specific dataset.
+
+
+README
+------
+
+Each example is required to have a README.md file that includes:
+
+1. a description of the dataset;
+1. a description of the records extracted from the dataset;
+1. a description of the process for building the database; and
+1. references that include attribution to the source of the data, including links and/or copyright information.
+
+*It is critical that the README.md file includes appropriate attribution.*
+For open datasets, this mean there's a URL to the data source. Data
+collected by running open source applications, such as LLNL's proxy applications,
+include the appropriate attribution. For 
+example, a dataset based on running Lulesh must have a README.md file that
+includes the LLNL-CODE-461231 release number.
+
+
+Converter
+---------
+
+The converter should take the raw source data and convert it to a file that Sina can work
+with. Naming is important: the example name `fukushima_csv_to_sina.py` identifies the script
+as a converter for the Fukushima dataset.  It also indicates the data comes from a `CSV` file
+and is converted to a `Sina schema` file.
+
+
+Build Script
+------------
+
+The build script is primarily intended for automated deployment to a shared space on 
+LLNL's Livermore Computing systems to allow users to explore the data using the example
+notebooks, though it can also be used to build a local copy of the example database. Each script,
+in essence, uses the converter to transform raw data to something Sina recognizes, then uses
+Sina to ingest the data into a database.
+
+
+Notebooks
+---------
+
+Any notebook created is automatically included in Sina's tests, though only as far as making sure
+no errors (or style issues) are found while running. Be sure to run the tests! Beyond this, take
+a look at the existing notebooks for an idea on how to create new ones--since each notebook is
+essentially a tutorial, adding explanations and plenty of comments is valuable.
