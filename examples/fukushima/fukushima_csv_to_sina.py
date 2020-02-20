@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 """
-Example CSV-to-Sina converter using freely available data.
+Example CSV-to-Sina converter using freely available data and plain JSON writing.
 
 This module converts the Fukushima aerial radiolagical data to a file fitting the Sina schema.
 The data consists of multiple measurements taken for a period of over an hour
 on each of three separate days.
+
+Unlike the NOAA converter, this has no reliance on Sina--if you'd like an example of using
+Sina Records as Python objects, check out the NOAA converter!
 
 Record types are:
     exp     contain the path to a file containing observations for the flight

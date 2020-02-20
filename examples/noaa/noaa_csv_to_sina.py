@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 """
-Example CSV-to-Sina converter using freely available data.
+Example CSV-to-Sina converter using freely available data and Sina's model module.
 
 This module converts the NOAA data to a file following the Sina schema AND generates files, one
 per observation, in order to support demonstrations of different capabilities
 using Jupyter Notebook examples.
 
-The following is a list of the relevant column number-value pairings:
-    1: expocode (experiment?)
+Unlike the Fukushima converter, this one uses Sina objects directly--if you'd like an example of
+converting CSV to Sina's JSON format with no reliance on Sina, check out the Fukushima converter!
+
+The data we're most interested in and its column (count from 1) in the CSV:
+    1: experiment code
     2: section id
     3: line
     4: station
@@ -21,13 +24,11 @@ The following is a list of the relevant column number-value pairings:
    21: Bot_02_QC
    31: pH total meas 25 degrees C
    32: pH_QC
+
  where
       1 is the equivalent of a study/purpose of the database/root dir
    2- 6 form the observational equivalent of a run (so is the id)
-  19-21 are data values
-  31-32 are more data values
- and
-   each line becomes a separate file within the observation directory
+  19-21 and 31-32 are data values
 
  Note:
    CTD = Conductivity-Temperature-Depth
@@ -39,11 +40,7 @@ The following is a list of the relevant column number-value pairings:
       6 = mean of replicated measurements
       9 = sample not drawn
 
-Data Source: https://catalog.data.gov/dataset/\
-    dissolved-inorganic-carbon-total-alkalinity-ph-\
-    temperature-salinity-and-other-variables-collect
- with direct download link:
-    https://www.nodc.noaa.gov/cgi-bin/OAS/prd/accession/download/123467
+For more info about this dataset, see the README.
 """
 from __future__ import print_function
 
@@ -52,11 +49,11 @@ import csv
 import json
 import os
 import shutil
-import sys
-import traceback
+
+from sina.model import Record, Relationship
 
 # Relative paths and tags for additional files
-MORE_FILES = [
+SUPPLEMENTAL_FILES = [
     ('WCOA11-01-06-2015_metadata.csv', 'metadata', 'text/csv'),
     ('../../NODC-Readme.txt', 'readme', 'text/plain'),
     ('../../about/0-email.txt', 'email', 'text/plain'),
@@ -66,8 +63,8 @@ MORE_FILES = [
     ('../../about/0123467_map.jpg', 'map', 'image/jpeg'),
     ]
 
-# Name of the data CSV file provided by NOAA
-DATA_FN = 'WCOA11-01-06-2015_data.csv'
+# Expected name for the data CSV
+CSV_NAME = 'WCOA11-01-06-2015_data.csv'
 
 # Name of the Sina file we will generate
 sina_filename = 'WCOA11-01-06-2015.json'
@@ -82,135 +79,103 @@ QC_DATA = [
     ('9', 'sample not drawn')
 ]
 
-# Observation data file format
-DATA_FMT = """\
-obs_id      = {}
-depth       = {}
-depth_units = meters
-press       = {}
-press_units = decibars
-ctd_temp    = {}
-temp_units  = C
-ctd_oxy     = {}
-oxy_units   = micromol/kg
-o2          = {}
-o2_units    = micromol/kg
-o2_qc       = {}
-ph          = {}
-ph_qc       = {}
-"""
+STATUS_INTERVAL = 100  # How many runs between status updates if --show-status mode is on
+SEPARATOR_LENGTH = 12  # How much buffer whitespace to use when aligning our observation files
 
-# Status interval
-STATUS_INTERVAL = 100
+# There's a lot of extra information in each observation row. We take only what's specified here.
+# The source file uses ISO 8859-1 special characters in its header so, to keep things simple, we
+# use column number instead of name.
+# Values are a replacement name, hopefully more understandable.
+DESIRED_OBS_VALUES = {11: "depth", 12: "press", 13: "temp", 18: "ctd_oxy",
+                      19: "o2", 20: "o2_qc", 30: "ph", 31: "ph_qc"}
+
+# Some of the above have units:
+UNITS = {"depth": "meters", "press": "decibars", "temp": "C",
+         "ctd_oxy": "micromol/kg", "o2": "micromol/kg"}
 
 
-def process_data(dataset_fn, dest_dn, show_status=False):
+def process_data(dataset_csv, destination_dir, show_status=False):
     """
     Process the NOAA data.
 
-    :param dataset_fn: qualified name of the NOAA CSV file
-    :param dest_dn: destination data directory (i.e., path to where the NOAA
-                    files and data are to be written
-    :param show_status: True if status markers are to be displayed; False
-                           otherwise
+    :param dataset_csv: path to the NOAA CSV file. Make sure you don't move things after
+                        extracting the .tgz, as we're relying on its structure to grab some
+                        supplemental files.
+    :param destination_dir: destination data directory (i.e. path to where the NOAA
+                            files and data are to be written). Everything will be written to a
+                            "files" subdirectory.
+    :param show_status: Whether to print status markers
     """
-    if not os.path.exists(dataset_fn):
+    # Sanity checks
+    if not os.path.exists(dataset_csv):
         raise ValueError('Expected the data set filename ({}) to exist'.
-                         format(dataset_fn))
-    elif not os.path.isfile(dataset_fn):
+                         format(dataset_csv))
+    elif not os.path.isfile(dataset_csv):
         raise ValueError('Expected the data set filename ({}) to be a file'.
-                         format(dataset_fn))
-    elif not dataset_fn.endswith(DATA_FN):
+                         format(dataset_csv))
+    elif not dataset_csv.endswith(CSV_NAME):
         raise ValueError('Expected a CSV data set filename ({}) ending {}'.
-                         format(dataset_fn, DATA_FN))
+                         format(dataset_csv, CSV_NAME))
 
-    # Make sure the files subdirectory exists in the destination directory
-    files_dn = os.path.realpath(os.path.join(dest_dn, 'files'))
-    if not os.path.isdir(files_dn):
-        os.makedirs(files_dn)
+    input_csv_path = os.path.realpath(dataset_csv)
 
-    # Copy the data and metadata files to the destination so they will be
-    # available to the user in the destination directory
-    input_fn = os.path.realpath(dataset_fn)
-    shutil.copy(input_fn, files_dn)
-    for extra_fn, _tag, _mtype in MORE_FILES:
-        shutil.copy(os.path.realpath(os.path.join(os.path.dirname(input_fn),
-                                                  extra_fn)), files_dn)
+    # Create our output directory if it doesn't already exist
+    output_dir = os.path.realpath(os.path.join(destination_dir, 'files'))
+    if not os.path.isdir(output_dir):
+        os.makedirs(output_dir)
 
-    # Now process the NOAA data CSV file
-    mdata = NoaaData(files_dn)
+    # Make convenient copies of our source data and supplemental files
+    files_to_copy = [supplemental_file_info[0] for supplemental_file_info in SUPPLEMENTAL_FILES]
+    files_to_copy.append(input_csv_path)
+    for filename in files_to_copy:
+        shutil.copy(os.path.realpath(os.path.join(os.path.dirname(dataset_csv), filename)),
+                    output_dir)
 
+    # Process the NOAA CSV itself
+    sina_data = NoaaData(output_dir)
     try:
-        ifd = open(input_fn, "r", newline='', encoding='ISO-8859-1')  # Py3
-    except Exception:
-        ifd = open(input_fn, "rb")  # Py2
+        source_csv = open(input_csv_path, "r", newline='', encoding='ISO-8859-1')  # Py3
+    except TypeError:
+        source_csv = open(input_csv_path, "rb")  # Py2
 
-    with ifd as csv_file:
-        last_exp = ''
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        try:
-            for i, row in enumerate(csv_reader):
-                if i > 0 and len(row[0]) > 0:
-                    exp = row[0]
-                    if exp != last_exp:
-                        exp_dn = os.path.join(files_dn, exp)
-                        if not os.path.isdir(exp_dn):
-                            os.makedirs(exp_dn)
-                        last_exp = row[0]
-                        mdata.add_exp(exp)
+    with source_csv as csv_data:
+        csv_reader = csv.reader(csv_data)
+        next(source_csv) # Skip the header
+        if show_status:
+            print('Processing (. = {} rows): '.format(STATUS_INTERVAL), end='')
+        last_exp_id = ''  # If there was more than 1 experiment, we'd expect them to be sequential
+        for row_num, row in enumerate(csv_reader):
+            if len(row[0]) > 0:
+                exp_id = row[0]
+                obs_id = '-'.join(row[1:6])
+                if exp_id != last_exp_id:
+                    last_exp_id = exp_id
+                    exp_dir = os.path.join(destination_dir, exp_id)
+                    if not os.path.isdir(exp_dir):
+                        os.makedirs(exp_dir)
+                    sina_data.add_experiment(exp_id)
 
-                    oid = '-'.join(row[1:6])
+                sina_data.add_relationship(exp_id, obs_id)
 
-                    # Add the relation between the experiment and observation
-                    mdata.add_exp2obs(exp, oid)
+                data = {name: row[offset] for offset, name in DESIRED_OBS_VALUES.items()}
 
-                    # Extract the observation data
-                    depth, press, temp = row[11:14]
-                    oxy, o2, o2_qc = row[18:21]
-                    ph, ph_qc = row[30:32]
+                # Each observation gets its own file for use with the notebooks
+                # This is essentially a replica of the CSV row.
+                obs_filename = os.path.join(exp_dir, 'obs_{}_data.txt'.format(row_num))
+                with open(obs_filename, 'w') as obs_file:
+                    for name, value in data.items():
+                        units_str = " ({})".format(UNITS[name] if name in UNITS.keys() else "")
+                        obs_file.write("{name}{sep}= {val}{units}"
+                                       .format(name=name, sep=' '*(SEPARATOR_LENGTH-len(name)),
+                                               val=value, units=units_str))
 
-                    # Write the observation data to a file
-                    obs_dir = os.path.join(files_dn, exp, 'obs{:05d}'.format(i))
-                    if not os.path.isdir(obs_dir):
-                        os.makedirs(obs_dir)
+                sina_data.add_observation(obs_id, obs_filename, data)
 
-                    obs_fn = os.path.join(obs_dir, 'obs-data.txt')
-                    with open(os.path.join(obs_fn), 'w') as ofd:
-                        ofd.write(DATA_FMT.
-                                  format(oid, depth, press, temp, oxy, o2,
-                                         o2_qc, ph, ph_qc))
+            if show_status and (row_num % STATUS_INTERVAL) == 0:
+                print('.', end='')
+    source_csv.close()
 
-                    # Add the observation data (and create the example file)
-                    mdata.add_obs(oid, obs_fn, depth, press, temp, oxy, o2,
-                                  o2_qc, ph, ph_qc)
-
-                elif i == 0:
-                    # Let the user know the purpose of the dots
-                    if show_status:
-                        print('Processing (. = {} rows): '.
-                              format(STATUS_INTERVAL), end='')
-
-                # Provide status feedback during processing
-                if show_status and (i % STATUS_INTERVAL) == 0:
-                    print('.', end='')
-
-            # Generate a newline to ensure a clean status display
-            if show_status:
-                print('')
-
-        except csv.Error as csv_err:
-            print("ERROR: {}: line {}: {}".
-                  format(dataset_fn, csv_reader.line_num, str(csv_err)))
-            sys.exit(1)
-
-        except Exception as err:
-            print("ERROR: {}: line {}: {}: {}".
-                  format(dataset_fn, csv_reader.line_num,
-                         err.__class__.__name__, str(err)))
-            traceback.print_exc()
-            sys.exit(1)
-
-    mdata.write()
+    sina_data.dump()
 
 
 # --------------------------------- CLASSES ---------------------------------
@@ -218,105 +183,72 @@ class NoaaData(object):
     """
     Sina data class for the NOAA metadata.
     """
-    def __init__(self, files_dn):
+    def __init__(self, source_dir):
         """
-        Data constructor.
+        Get our first Records created and set up initial info.
 
-        :param files_dn: pathname to the root of the noaa data directory
+        :param source_dir: path to the "files" subdirectory we create during conversion.
+                           Because we've already copied important files into there, it acts as both
+                           source and destination.
         """
-        self.files_dn = files_dn
-        self.recs = []
-        self.rels = []
+        self.source_dir = source_dir
+        # We start off with a few Records detailing how the quality control numbers work.
+        self.records = [Record(qid, "qc", data={"desc": {"value": desc}}) for qid, desc in QC_DATA]
+        self.relationships = []
 
-        for (qid, desc) in QC_DATA:
-            self.recs.append({
-                "type": "qc",
-                "id": qid,
-                "data": {"desc": {"value": desc}},
-                })
-
-    def add_exp(self, exp):
+    def add_experiment(self, experiment_id):
         """
-        Add an experiment record.
+        Add an experiment Record.
 
-        :param exp: experiment id string
+        :param experiment_id: experiment id string
         """
-        lfiles = {}
-        lfiles[os.path.join(self.files_dn, DATA_FN)] = {"mimetype": "text/csv",
-                                                        "tags": ["data"]}
-        for extra_fn, tag, mtype in MORE_FILES:
-            lfiles[os.path.join(self.files_dn, os.path.basename(extra_fn))] = {"mimetype": mtype,
-                                                                               "tags": [tag]}
-        self.recs.append({"type": "exp", "id": exp, "files": lfiles})
+        exp_files = {os.path.join(self.source_dir, CSV_NAME): {"mimetype": "text/csv",
+                                                               "tags": ["data"]}}
+        for extra_file, tag, mimetype in SUPPLEMENTAL_FILES:
+            extra_path = os.path.join(self.source_dir, os.path.basename(extra_file))
+            exp_files[extra_path] = {"mimetype": mimetype, "tags": [tag]}
+        self.records.append(Record(experiment_id, "exp", files=exp_files))
 
-    def add_exp2obs(self, exp, obs):
+    def add_relationship(self, exp_id, obs_id):
         """
-        Add an experiment-to-observation relationship.
+        Add an experiment-to-observation Relationship (the only kind in this dataset).
 
-        :param exp: experiment id string
-        :param obs: observation id string
+        :param exp_id: experiment id string
+        :param obs_id: observation id string
         """
-        self.rels.append({
-            "subject": exp,
-            "predicate": "contains",
-            "object": obs,
-            })
+        self.relationships.append(Relationship(subject_id=exp_id,
+                                               predicate="contains",
+                                               object_id=obs_id))
 
-    def add_obs(self, oid, obs_fn, depth, press, temp, oxy, o2, o2_qc, ph,
-                ph_qc):
+    def add_observation(self, obs_id, obs_filename, data):
         """
-        Add the observation data.
+        Add an observation Record.
 
-        :param oid: observation id string
-        :param obs_fn: observation file name
-        :param depth: bottle depth string (in meters)
-        :param press: pressure (in decibars)
-        :param temp: CTD temperature (in C)
-        :param oxy:  CTD, or available, oxygen (in micromol/kg)
-        :param o2: bottle o2 (in micromol/kg)
-        :param o2_qc: bottle o2 quality control
-        :param ph:  pH total measured 25 degrees C
-        :param ph_qc: pH quality control
+        :param obs_id: the id of the observation to create
+        :param obs_filename: the file that contains its data (and only its data)
+        :param data: a dictionary of datum_name: val that we want to assign to this observation.
         """
-        # Add the observation record
-        self.recs.append({
-            "type": "obs",
-            "id": oid,
-            "files": {obs_fn: {"mimetype": "text/plain"}},
-            "data": {
-                "depth": {"value": float(depth), "units": "meters"},
-                "press": {"value": float(press), "units": "decibars"},
-                "temp": {"value": float(temp), "units": "C"},
-                "ctd_oxy": {"value": float(oxy), "units": "micromol/kg"},
-                "o2": {"value": float(o2), "units": "micromol/kg"},
-                "o2_qc": {"value": o2_qc, "tags": ["qc"]},
-                "ph": {"value": float(ph)},
-                "ph_qc": {"value": ph_qc, "tags": ["qc"]},
-                },
-            })
+        obs_record = Record(obs_id, "obs", files={obs_filename: {"mimetype": "text/plain"}})
+        for name, val in data.items():
+            if name in ("o2_qc", "ph_qc"):
+                obs_record.add_data(name, val, tags=["qc"])
+            else:
+                obs_record.add_data(name, float(val), units=UNITS.get(name, None))
+        self.records.append(obs_record)
 
-    def write(self):
+    def dump(self):
         """
-        Write the data to the Sina file.
+        Write the data to file.
         """
-        if len(self.recs) > 0:
-            raw_rec_obj = {'records': self.recs}
-            if len(self.rels) > 0:
-                raw_rec_obj['relationships'] = self.rels
-        else:
-            raw_rec_obj = {}
-
-        with open(os.path.join(self.files_dn, sina_filename), 'w') as ofd:
-            json.dump(raw_rec_obj, ofd, indent=4, separators=(',', ': '),
-                      sort_keys=True)
+        json_document = {"records": [rec.raw for rec in self.records],
+                         "relationships": [rel.to_json_dict() for rel in self.relationships]}
+        with open(os.path.join(self.source_dir, sina_filename), 'w') as outfile:
+            json.dump(json_document, outfile)
 
 
 # ----------------------------------- MAIN -----------------------------------
 def main():
-    '''
-    Allow the user to provide the dataset file name and destination data
-    directory name.
-    '''
+    """Collect args from user (like the destination for written files) and run."""
     parser = argparse.ArgumentParser(
         description='Convert selected NOAA Ocean Archive System dataset from '
                     'CSV to a Sina file. Full paths will be written to the '
@@ -332,14 +264,11 @@ def main():
                              'end in WCOA11-01-06-2015_data.csv.')
 
     parser.add_argument('dest_dirname',
-                        help='The pathname to the destination noaa data '
-                             'directory to which the Sina and observation '
-                             'files are to be written.  The directory will be '
-                             'created if it does not exist.')
+                        help='The directory to write the Sina file to. Will be created '
+                             'if it doesn\'t exist.')
 
     args = parser.parse_args()
 
-    # Process the NOAA data.
     process_data(args.csv_pathname, args.dest_dirname, args.show_status)
 
 

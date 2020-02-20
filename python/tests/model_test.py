@@ -3,11 +3,14 @@
 import unittest
 import json
 
-from sina.model import Record, Run
+from sina.model import Record, Run, Relationship
 import sina.model as model
 
 # Accessing "private" methods is necessary for testing them.
 # pylint: disable=protected-access
+
+# Our test classes, as with the other tests, have public methods *as* tests.
+# pylint: disable=too-many-public-methods
 
 
 class TestModel(unittest.TestCase):
@@ -35,6 +38,9 @@ class TestModel(unittest.TestCase):
                                  files={"ham.png": {"mimetype": "png"},
                                         "ham.curve": {"tags": ["hammy"]}},
                                  user_defined={})
+        self.relationship_one = Relationship(subject_id="spam",
+                                             predicate="supersedes",
+                                             object_id="spam2")
 
     # Record
     def test_is_valid(self):
@@ -311,3 +317,9 @@ class TestModel(unittest.TestCase):
             model.convert_record_to_run(record=rec)
         self.assertIn('Record must be of subtype Run to convert to Run. Given',
                       str(context.exception))
+
+    # Relationship
+    def test_relationship_to_json(self):
+        """Test that Relationship's to_json() is working as intended."""
+        expected_json = '{"subject": "spam", "predicate": "supersedes", "object": "spam2"}'
+        self.assertEqual(json.loads(expected_json), json.loads(self.relationship_one.to_json()))
