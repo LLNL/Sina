@@ -241,7 +241,7 @@ class NoaaData(object):
         Write the data to file.
         """
         json_document = {"records": [rec.raw for rec in self.records],
-                         "relationships": [rel.to_json_dump_str() for rel in self.relationships]}
+                         "relationships": [rel.to_json_dict() for rel in self.relationships]}
         with open(os.path.join(self.source_dir, sina_filename), 'w') as outfile:
             json.dump(json_document, outfile)
 

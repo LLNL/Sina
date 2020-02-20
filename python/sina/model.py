@@ -337,7 +337,7 @@ class Relationship(object):  # pylint: disable=too-few-public-methods
         return ('Model Relationship <object_id={}, subject_id={}, predicate={}>'
                 .format(self.object_id, self.subject_id, self.predicate))
 
-    def to_json_dump_str(self):
+    def to_json_dict(self):
         """
         Create an object ready to dump as JSON.
 
@@ -356,7 +356,7 @@ class Relationship(object):  # pylint: disable=too-few-public-methods
 
         :returns: A JSON string representing this Relationship
         """
-        return json.dumps(self.to_json_dump_str())
+        return json.dumps(self.to_json_dict())
 
 
 class Run(Record):

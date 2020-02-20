@@ -39,7 +39,7 @@ class TestModel(unittest.TestCase):
                                         "ham.curve": {"tags": ["hammy"]}},
                                  user_defined={})
         self.relationship_one = Relationship(subject_id="spam",
-                                             predicate="supercedes",
+                                             predicate="supersedes",
                                              object_id="spam2")
 
     # Record
@@ -321,5 +321,5 @@ class TestModel(unittest.TestCase):
     # Relationship
     def test_relationship_to_json(self):
         """Test that Relationship's to_json() is working as intended."""
-        expected_json = '{"subject": "spam", "predicate": "supercedes", "object": "spam2"}'
-        self.assertEqual(expected_json, self.relationship_one.to_json())
+        expected_json = '{"subject": "spam", "predicate": "supersedes", "object": "spam2"}'
+        self.assertEqual(json.loads(expected_json), json.loads(self.relationship_one.to_json()))
