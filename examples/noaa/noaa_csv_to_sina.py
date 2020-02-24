@@ -164,8 +164,8 @@ def process_data(dataset_csv, destination_dir, show_status=False):
                 obs_filename = os.path.join(exp_dir, 'obs_{}_data.txt'.format(row_num))
                 with open(obs_filename, 'w') as obs_file:
                     for name, value in data.items():
-                        units_str = " ({})".format(UNITS[name] if name in UNITS.keys() else "")
-                        obs_file.write("{name}{sep}= {val}{units}"
+                        units_str = " ({})".format(UNITS[name]) if name in UNITS.keys() else ""
+                        obs_file.write("{name}{sep}= {val}{units}\n"
                                        .format(name=name, sep=' '*(SEPARATOR_LENGTH-len(name)),
                                                val=value, units=units_str))
 
