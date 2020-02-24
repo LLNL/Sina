@@ -22,8 +22,8 @@ Overview
 Sina's Python component is a tool for making simulation (meta)data collection
 and exploration simple.
 
-It works by collecting information from code runs, logs, and similar into a
-"universal" schema which can then be passed off to one of Sina's supported
+It works by collecting information from code runs, logs, and other outputs into
+a common file format which can then be passed off to one of Sina's supported
 backends, all of which are queried using the same user-friendly Python API. To the
 end user, this means that important data can be accessed through Python scripts,
 GUIs (Jupyter notebooks) etc. with all the speed of a datastore and none of the
