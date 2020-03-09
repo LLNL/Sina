@@ -467,18 +467,11 @@ class RecordDAO(dao.RecordDAO):
                         or largest (False).
         :returns: Either an id or Record object fitting the criteria.
         """
-        if count == 1:
-            sort_by = sqlalchemy.func.min if get_min else sqlalchemy.func.max
-            query_set = (self.session.query(schema.ScalarData.id, sort_by(schema.ScalarData.value))
-                         .filter(schema.ScalarData.name == scalar_name)
-                         .one())
-            ids = [query_set[0]]
-        else:
-            sort_by = schema.ScalarData.value.asc() if get_min else schema.ScalarData.value.desc()
-            query_set = (self.session.query(schema.ScalarData.id)
-                         .filter(schema.ScalarData.name == scalar_name)
-                         .order_by(sort_by).limit(count).all())
-            ids = (x[0] for x in query_set)
+        sort_by = schema.ScalarData.value.asc() if get_min else schema.ScalarData.value.desc()
+        query_set = (self.session.query(schema.ScalarData.id)
+                     .filter(schema.ScalarData.name == scalar_name)
+                     .order_by(sort_by).limit(count).all())
+        ids = (x[0] for x in query_set)
         return ids if id_only else self.get(ids)
 
     def get_with_max(self, scalar_name, count=1, id_only=False):
