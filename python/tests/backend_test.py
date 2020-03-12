@@ -408,8 +408,10 @@ class TestModify(unittest.TestCase):
         record_dao = self.factory.create_record_dao()
         run_dao = self.factory.create_run_dao()
         not_a_run = Record(id="rec_1", type="not_a_run")
+        is_a_run = Run(id="run_1", application="is_a_run")
         record_dao.insert(not_a_run)
-        run_dao.delete(not_a_run.id)
+        run_dao.insert(is_a_run)
+        run_dao.delete([not_a_run.id, is_a_run.id])
         try:
             record_dao.get(not_a_run.id)
         except ValueError:
@@ -583,6 +585,12 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         just_right_range = DataRange(min=0, max=300, max_inclusive=True)
         just_right = self.record_dao.data_query(spam_scal=just_right_range)
         self.assertEqual(len(list(just_right)), 3)
+
+    def test_recorddao_scalar_datum_min_max(self):
+        """Test that the RecordDAO data query is respecting the inclusivity settings."""
+        restricted_range = DataRange(min=10, max=10.99999, min_inclusive=True, max_inclusive=False)
+        restricted_recs = self.record_dao.data_query(spam_scal=restricted_range)
+        six.assertCountEqual(self, list(restricted_recs), ["spam", "spam3"])
 
     def test_recorddao_data_query_returns_generator(self):
         """Test that the data-query method returns a generator."""
