@@ -304,7 +304,7 @@ class RecordDAO(dao.RecordDAO):
                     min_op = table.value.__ge__ if criterion.min_inclusive else table.value.__gt__
                     range_criteria.append(min_op(criterion.min))
                 if criterion.max:
-                    max_op = table.value.__le__ if criterion.min_inclusive else table.value.__lt__
+                    max_op = table.value.__le__ if criterion.max_inclusive else table.value.__lt__
                     range_criteria.append(max_op(criterion.max))
             else:
                 range_criteria.append(table.value.__eq__(criterion.min))
@@ -712,7 +712,7 @@ class RunDAO(dao.RunDAO):
             run_ids = [run_ids]
         else:
             run_ids = [id for id in run_ids if id is not None]
-        self.record_dao.delete(ids)
+        self.record_dao.delete(run_ids)
 
 
 class DAOFactory(dao.DAOFactory):
