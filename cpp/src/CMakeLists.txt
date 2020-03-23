@@ -1,9 +1,14 @@
 cmake_minimum_required (VERSION 3.7)
 
 find_package(nlohmann_json REQUIRED)
+find_package(Conduit REQUIRED)
 
 blt_register_library(NAME nlohmann_json
         INCLUDES "${nlohmann_json_DIR}/../../../include"
+        TREAT_INCLUDES_AS_SYSTEM ON
+        )
+blt_register_library(NAME Conduit
+        INCLUDES "${Conduit_DIR}/../../../include"
         TREAT_INCLUDES_AS_SYSTEM ON
         )
 
@@ -13,6 +18,11 @@ blt_register_library(NAME libdl
     TREAT_INCLUDES_AS_SYSTEM ON
     LINK_FLAGS -ldl
 )
+# As above with pthreads and Conduit
+#find_package(Threads REQUIRED)
+#blt_register_library(NAME Threads
+#    TREAT_INCLUDES_AS_SYSTEM ON
+#)
 
 set(OPTIONAL_SINA_DEPENDENCIES "")
 
@@ -54,6 +64,7 @@ blt_add_library(NAME sina
         AdiakWriter.cpp
     DEPENDS_ON
         nlohmann_json
+        Conduit
         ${OPTIONAL_SINA_DEPENDENCIES}
 )
 
