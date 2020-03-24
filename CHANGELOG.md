@@ -11,8 +11,8 @@ https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 - Improved support for Sonar machines
 - Updated tutorial resources and README
 - Overhauled storage of scalar lists
-- Merged functions with "*_many()" variants
-    - Instead of ex: insert_many(my_list), use insert(my_list))
+- Merged functions with "_many()" variants
+  - Instead of ex: insert_many(my_list), use insert(my_list))
 - Bugfixes
 
 1.6
