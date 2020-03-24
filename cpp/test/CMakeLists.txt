@@ -11,6 +11,13 @@ blt_register_library(NAME libdl
     LINK_FLAGS -ldl
 )
 
+find_package(Conduit REQUIRED)
+blt_register_library(NAME Conduit
+        TREAT_INCLUDES_AS_SYSTEM ON
+        INCLUDES "${Conduit_DIR}/../../../include"
+        LIBRARIES "${Conduit_DIR}/../../libconduit.a"
+        )
+
 if(${SINA_BUILD_ADIAK_BINDINGS})
     add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
     find_package(adiak REQUIRED)
@@ -37,7 +44,7 @@ blt_add_executable(NAME unittests
         src/Datum_test.cpp
         src/AdiakWriter_test.cpp
         src/TestRecord.cpp
-    DEPENDS_ON sina gtest gmock nlohmann_json libdl
+    DEPENDS_ON sina gtest gmock nlohmann_json Conduit libdl
 )
 
 blt_add_test(NAME unittests

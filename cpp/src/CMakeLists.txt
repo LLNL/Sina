@@ -9,6 +9,7 @@ blt_register_library(NAME nlohmann_json
         )
 blt_register_library(NAME Conduit
         INCLUDES "${Conduit_DIR}/../../../include"
+        LIBRARIES "${Conduit_DIR}/../../libconduit.a"
         TREAT_INCLUDES_AS_SYSTEM ON
         )
 
