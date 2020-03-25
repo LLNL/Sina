@@ -4,7 +4,6 @@ import numbers
 import logging
 import json
 from collections import defaultdict
-from functools import reduce   # pylint: disable=redefined-builtin
 
 import six
 
@@ -23,14 +22,11 @@ from sina import utils
 LOGGER = logging.getLogger(__name__)
 
 # String used to identify a sqlite database for SQLALchemy
-SQLITE = "sqlite:///"
+SQLITE_PREFIX = "sqlite:///"
 
-# Parameter offsets used when combining queries across tables
-# see _apply_ranges_to_query() for usage
-PARAM_OFFSETS = {schema.ScalarData: "",
-                 schema.StringData: "_1",
-                 schema.ListScalarDataEntry: "_2",
-                 schema.ListStringDataEntry: "_3"}
+# Identify the tables that store Record.data entries.
+DATA_TABLES = [schema.ScalarData, schema.StringData,
+               schema.ListScalarData, schema.ListStringDataEntry]
 
 
 class RecordDAO(dao.RecordDAO):
@@ -40,44 +36,49 @@ class RecordDAO(dao.RecordDAO):
         """Initialize RecordDAO with session for its SQL database."""
         self.session = session
 
-    # pylint: disable=arguments-differ
-    # Args differ because called_from_child is analogous to Cassandra's
-    # insert_many() _type_managed; this will be revisited in SIBO-661
-    def insert(self, record, called_from_child=False):
+    def insert(self, records):
         """
-        Given a Record, insert it into the current SQL database.
+        Given a(n iterable of) Record(s), insert into the current SQL database.
 
-        :param record: A Record to insert
-        :param called_from_child: Whether a child of Record (such as Run) is
-                                  calling this. Used to skip committing in
-                                  order to preserve atomicity.
+        :param records: Record or iterable of Records to insert
         """
-        LOGGER.debug('Inserting %s into SQL.', record)
-        is_valid, warnings = record.is_valid()
+        if isinstance(records, model.Record):
+            records = [records]
+        for record in records:
+            LOGGER.debug('Inserting record %s into SQL.', record.id or record.local_id)
+            sql_record = self.create_sql_record(record)
+            self.session.add(sql_record)
+        self.session.commit()
+
+    @staticmethod
+    def create_sql_record(sina_record):
+        """
+        Create a SQL record object for the given Sina Record.
+
+        :param sina_record: A Record to insert
+        :return: the created record
+        """
+        is_valid, warnings = sina_record.is_valid()
         if not is_valid:
             raise ValueError(warnings)
-        self.session.add(schema.Record(id=record.id,
-                                       type=record.type,
-                                       raw=json.dumps(record.raw)))
-        if record.data:
-            self._insert_data(record.id, record.data)
-        if record.files:
-            self._insert_files(record.id, record.files)
+        sql_record = schema.Record(id=sina_record.id, type=sina_record.type,
+                                   raw=json.dumps(sina_record.raw))
+        if sina_record.data:
+            RecordDAO._attach_data(sql_record, sina_record.data)
+        if sina_record.files:
+            RecordDAO._attach_files(sql_record, sina_record.files)
 
-        # If called from child, child is responsible for committing.
-        if not called_from_child:
-            self.session.commit()
+        return sql_record
 
-    def _insert_data(self, id, data):
+    @staticmethod
+    def _attach_data(record, data):
         """
-        Insert data entries into the ScalarData and StringData tables.
+        Attach the data entries to the given SQL record.
 
-        Does not commit(), caller needs to do that.
-
-        :param id: The Record ID to associate the data to.
+        :param record: The SQL schema record to associate the data to.
         :param data: The dictionary of data to insert.
         """
-        LOGGER.debug('Inserting %i data entries to Record ID %s.', len(data), id)
+        LOGGER.debug('Inserting %i data entries to Record ID %s.', len(data), record.id)
         for datum_name, datum in data.items():
             if isinstance(datum['value'], list):
                 # Store info such as units and tags in master table
@@ -86,89 +87,72 @@ class RecordDAO(dao.RecordDAO):
                 # Using json.dumps() instead of str() (or join()) gives
                 # valid JSON
                 tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
-                # Check if empty list
-                if datum:
-                    kind_master = (schema.ListScalarDataMaster
-                                   if isinstance(datum['value'][0],
-                                                 numbers.Real)
-                                   else schema.ListStringDataMaster)
+                # If we've been given an empty list or a list of numbers:
+                if not datum or isinstance(datum['value'][0], numbers.Real):
+                    record.scalar_lists.append(schema.ListScalarData(
+                        name=datum_name,
+                        min=min(datum['value']),
+                        max=max(datum['value']),
+                        units=datum.get('units'),  # units might be None, always use get()
+                        tags=tags))
                 else:
-                    # Default to Scalar table
-                    kind_master = schema.ListScalarDataMaster
-                self.session.add(kind_master(id=id,
-                                             name=datum_name,
-                                             # units might be None, always use
-                                             # get()
-                                             units=datum.get('units'),
-                                             tags=tags))
+                    # it's a list of strings
+                    record.string_lists_master.append(schema.ListStringDataMaster(
+                        name=datum_name, units=datum.get('units'), tags=tags))
 
-                # Store list entries in entry table
-                for index, entry in enumerate(datum['value']):
-                    # Check if it's a scalar
-                    kind = (schema.ListScalarDataEntry
-                            if isinstance(entry, numbers.Real)
-                            else schema.ListStringDataEntry)
-                    self.session.add(kind(id=id,
-                                          name=datum_name,
-                                          index=index,
-                                          value=entry))
+                    # Each entry in a list of strings requires its own row
+                    for index, entry in enumerate(datum['value']):
+                        record.string_lists_entry.append(schema.ListStringDataEntry(
+                            name=datum_name, index=index, value=entry))
             elif isinstance(datum['value'], (numbers.Number, six.string_types)):
                 tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
-                # Check if it's a scalar
-                kind = (schema.ScalarData if isinstance(datum['value'], numbers.Real)
-                        else schema.StringData)
-                self.session.add(kind(id=id,
-                                      name=datum_name,
-                                      value=datum['value'],
-                                      # units might be None, always use get()
-                                      units=datum.get('units'),
-                                      tags=tags))
+                if isinstance(datum['value'], numbers.Real):
+                    data_type = schema.ScalarData
+                    list_in_record = record.scalars
+                else:
+                    data_type = schema.StringData
+                    list_in_record = record.strings
+                list_in_record.append(data_type(name=datum_name,
+                                                value=datum['value'],
+                                                # units might be None, always use get()
+                                                units=datum.get('units'),
+                                                tags=tags))
 
-    def _insert_files(self, id, files):
+    @staticmethod
+    def _attach_files(record, files):
         """
-        Insert files into the Document table.
+        Attach the file entries to the given SQL record.
 
-        Does not commit(), caller needs to do that.
-
-        :param id: The Record ID to associate the files to.
+        :param record: The Record to associate the files to.
         :param files: The dictionary of files to insert.
         """
         LOGGER.debug('Inserting %i files to record id=%s.', len(files), id)
         for uri, file_info in six.iteritems(files):
             tags = (json.dumps(file_info['tags']) if 'tags' in file_info else None)
-            self.session.add(schema.Document(id=id,
-                                             uri=uri,
-                                             mimetype=file_info.get('mimetype'),
-                                             tags=tags))
+            record.documents.append(schema.Document(uri=uri,
+                                                    mimetype=file_info.get('mimetype'),
+                                                    tags=tags))
 
-    def delete(self, id):
+    def delete(self, ids):
         """
-        Given the id of a Record, delete all mention of it from the SQL database.
+        Given a(n iterable of) Record id(s), delete all mention from the SQL database.
 
-        This includes removing all its data, its raw, any relationships
-        involving it, etc. Because the id is a foreign key in every table
+        This includes removing all data, raw(s), relationships, etc.
+        Because the id is a foreign key in every table
         (besides Record itself but including Run, etc), we can rely on
         cascading to propogate the deletion.
 
-        :param id: The id of the Record to delete.
+        :param ids: The id or iterable of ids of the Record(s) to delete.
         """
-        LOGGER.debug('Deleting record with id: %s', id)
-        self.session.query(schema.Record).filter(schema.Record.id == id).delete()
-        self.session.commit()
-
-    def delete_many(self, ids_to_delete):
-        """
-        Given a list of Record ids, delete all mentions of them from the SQL database.
-
-        :param ids_to_delete: A list of the ids of Records to delete.
-        """
-        LOGGER.debug('Deleting records with ids in: %s', ids_to_delete)
-        (self.session.query(schema.Record).filter(schema.Record.id.in_(ids_to_delete))
+        if isinstance(ids, six.string_types):
+            ids = [ids]
+        LOGGER.debug('Deleting records with ids in: %s', ids)
+        (self.session.query(schema.Record)
+         .filter(schema.Record.id.in_(ids))
          .delete(synchronize_session='fetch'))
         self.session.commit()
 
-    # Disable pylint checks to if and until team decides to refactor the method
-    def data_query(self, **kwargs):  # pylint: disable=too-many-branches,too-many-locals
+    def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -195,68 +179,191 @@ class RecordDAO(dao.RecordDAO):
             raise ValueError("You must supply at least one criterion.")
         (scalar_criteria,
          string_criteria,
-         scalarlist,
-         stringlist) = sort_and_standardize_criteria(kwargs)
+         scalar_list_criteria,
+         string_list_criteria,
+         universal_criteria) = sort_and_standardize_criteria(kwargs)
         result_ids = []
 
-        if scalar_criteria:
-            scalar_query = self.session.query(schema.ScalarData.id)
-            scalar_query = self._apply_ranges_to_query(scalar_query,
-                                                       scalar_criteria,
-                                                       schema.ScalarData)
-        if string_criteria:
-            string_query = self.session.query(schema.StringData.id)
-            string_query = self._apply_ranges_to_query(string_query,
-                                                       string_criteria,
-                                                       schema.StringData)
-        #  If we have more than one set of data, we need to perform a union
-        if scalar_criteria and string_criteria:
-            and_query = scalar_query.intersect(string_query)
-            result_ids.append(str(x[0]) for x in and_query.all())
-        # Otherwise, just find which one has something to return
-        elif scalar_criteria:
-            result_ids.append(str(x[0]) for x in scalar_query.all())
-        elif string_criteria:
-            result_ids.append(str(x[0]) for x in string_query.all())
-        for criteria, _ in ((scalarlist, "scalarlist"),
-                            (stringlist, "stringlist")):
-            for criterion in criteria:
-                # Unpack the criterion
-                datum_name, list_criteria = criterion
-                # has_all queries are broken up and treated like a scalar or string
-                if (list_criteria.operation in
-                        [utils.ListQueryOperation.ALL,
-                         utils.ListQueryOperation.ANY,
-                         utils.ListQueryOperation.ONLY]):
-                    ids = self.get_list(datum_name=datum_name,
-                                        list_of_contents=list_criteria.entries,
-                                        ids_only=True,
-                                        operation=list_criteria.operation)
-                    result_ids.append(ids)
-                else:
-                    raise ValueError("Currently, only [{}, {}, {}] list "
-                                     "operations are supported. Given {}"
-                                     .format(utils.ListQueryOperation.ALL,
-                                             utils.ListQueryOperation.ANY,
-                                             utils.ListQueryOperation.ONLY,
-                                             list_criteria.operation))
-        # If we have more than one set of data, we need to find the intersect.
-        for id in utils.intersect_lists(result_ids):
-            yield id
+        # First handle scalar and string criteria
+        for criteria, table in ((scalar_criteria, schema.ScalarData),
+                                (string_criteria, schema.StringData)):
+            if criteria:
+                query = self._generate_data_table_query(criteria, table)
+                result_ids.append(str(x[0]) for x in query.all())
 
-    def get(self, id):
+        # Move on to any list criteria
+        result_ids += [self._string_list_query(datum_name=datum_name,
+                                               string_list=list_criteria.value,
+                                               operation=list_criteria.operation)
+                       for datum_name, list_criteria in string_list_criteria]
+        result_ids += [self._scalar_list_query(datum_name=datum_name,
+                                               data_range=list_criteria.value,
+                                               operation=list_criteria.operation)
+                       for datum_name, list_criteria in scalar_list_criteria]
+
+        # Now any universal criteria.
+        if universal_criteria:
+            result_ids.append(self._universal_query(universal_criteria))
+
+        # If we have more than one set of data, we need to find the intersection.
+        for rec_id in utils.intersect_lists(result_ids):
+            yield rec_id
+
+    def _scalar_list_query(self,
+                           datum_name,
+                           data_range,
+                           operation):
         """
-        Given a id, return match (if any) from SQL database.
+        Return all Records where [datum_name] fulfills [operation] for [data_range].
 
-        :param id: The id of the Record to return
+        Helper method for data_query.
 
-        :returns: A Record matching id or None
+        :param datum_name: The name of the datum
+        :param data_range: A datarange to be used with <operation>
+        :pram operation: What kind of ListQueryOperation to do.
+        :returns: A generator of ids of matching Records.
+
+        :raises ValueError: if given an invalid operation for a datarange
         """
-        LOGGER.debug('Getting record with id=%s', id)
-        query = (self.session.query(schema.Record)
-                 .filter(schema.Record.id == id).one())
-        return model.generate_record_from_json(
-            json_input=json.loads(query.raw))
+        LOGGER.info('Finding Records where datum %s has %s in %s', datum_name,
+                    operation.value.split('_')[0], data_range)
+        table = schema.ListScalarData
+        query = self.session.query(table.id).filter(table.name == datum_name)
+        filters = []
+        if operation == utils.ListQueryOperation.ALL_IN:
+            # What must be [>,>=] the criterion's min
+            # Note that "min" and "max" are columns (the min and max vals found in some list datum)
+            gt_crit_min = table.min
+            # What must be [<,<=] the criterion's max
+            lt_crit_max = table.max
+        elif operation == utils.ListQueryOperation.ANY_IN:
+            gt_crit_min = table.max
+            lt_crit_max = table.min
+        else:
+            raise ValueError("Given an invalid operation for a scalar range query: {}"
+                             .format(operation.value))
+        # Set whether it's > or >=, < or <=
+        if data_range.min is not None:
+            col_op = gt_crit_min.__ge__ if data_range.min_inclusive else gt_crit_min.__gt__
+            filters.append(col_op(data_range.min))
+        if data_range.max is not None:
+            col_op = lt_crit_max.__le__ if data_range.max_inclusive else lt_crit_max.__lt__
+            filters.append(col_op(data_range.max))
+
+        record_ids = query.filter(*filters)
+        for record_id in record_ids:
+            yield record_id[0]
+
+    def _string_list_query(self, datum_name, string_list, operation):
+        """
+        Return all Records where [datum_name] fulfills [operation] for [string_list].
+
+        Helper method for data_query.
+
+        :param datum_name: The name of the datum
+        :param string_list: A list of strings datum_name must contain.
+        :param operation: What kind of ListQueryOperation to do.
+        :returns: A generator of ids of matching Records or the Records
+                  themselves (see ids_only).
+
+        :raises ValueError: if given an invalid operation for a string list
+        """
+        LOGGER.info('Finding Records where datum %s contains %s: %s', datum_name,
+                    operation.value.split('_')[1], string_list)
+        criteria_tuples = [(datum_name, x) for x in string_list]
+        if operation == utils.ListQueryOperation.HAS_ALL:
+            query = self._generate_data_table_query(table=schema.ListStringDataEntry,
+                                                    criteria_pairs=criteria_tuples)
+        elif operation == utils.ListQueryOperation.HAS_ANY:
+            query = self._generate_data_table_query(table=schema.ListStringDataEntry,
+                                                    criteria_pairs=criteria_tuples,
+                                                    fulfill_all=False)
+        else:
+            # This can only happen if there's an operation that accepts a list
+            # of strings but is not supported by string_list_query.
+            raise ValueError("Given an invalid operation for a string list query: {}"
+                             .format(operation.value))
+        for query_result in query:
+            yield query_result[0]  # yield the id
+
+    @staticmethod
+    def _generate_criterion_filters(criterion_pair, table):
+        """
+        Generate the AND expression fulfilling a single criterion pair.
+
+        :param criterion_pair: A tuple of (datum_name, criterion). Criterion must be a DataRange
+                               or single value, ex: 6, "low_frequency"
+        :param table: The table the datum is expected to exist in
+        :return: A SQLAlchemy AND expression fulfilling the criterion pair
+        """
+        datum_name, criterion = criterion_pair
+        range_criteria = [table.name == datum_name]
+        if isinstance(criterion, utils.DataRange):
+            if not criterion.is_single_value():
+                if criterion.min:
+                    min_op = table.value.__ge__ if criterion.min_inclusive else table.value.__gt__
+                    range_criteria.append(min_op(criterion.min))
+                if criterion.max:
+                    max_op = table.value.__le__ if criterion.max_inclusive else table.value.__lt__
+                    range_criteria.append(max_op(criterion.max))
+            else:
+                range_criteria.append(table.value.__eq__(criterion.min))
+        else:
+            range_criteria.append(table.value.__eq__(criterion))
+        return sqlalchemy.and_(*range_criteria)
+
+    def _generate_data_table_query(self, criteria_pairs, table, fulfill_all=True):
+        """
+        Generate a query that determines whether a Record fulfills a set of criteria.
+
+        All criteria must belong to a single table. This is used to generate a single
+        query rather than chaining together multiple queries--see "criteria"
+
+        :param criteria_pairs: A list of (datum_name, criterion) tuples. All datum_names are
+                               expected to correspond to entries in the same table.
+        :param table: The table the data are expected to exist in.
+        :param fulfill_all: Whether we should ensure every criteria_pair is fulfilled. If
+                            false, only one or more pairs need to be fulfilled
+                            (ex: has_any() list query)
+
+        :return: A query object representing <criterion> applied to <datum_name> in <table>.
+        """
+        query = self.session.query(table.id)
+        criteria_queries = [self._generate_criterion_filters(pair, table)
+                            for pair in criteria_pairs]
+
+        if not fulfill_all:
+            return query.filter(sqlalchemy.or_(*criteria_queries))
+
+        # Since we don't know the possible data names a priori, we have a row per datum
+        # and have to "or" them together and then group by record ID, selecting the records
+        # that have a matching row for each queried criterion (# rows == # criteria).
+        query = query.filter(sqlalchemy.or_(*criteria_queries))
+
+        # For performance reasons, we skip the "group by" stage when not needed
+        if len(criteria_pairs) > 1:
+            query = (query.group_by(table.id)
+                     .having(sqlalchemy.func.count(table.id) == len(criteria_pairs)))
+        return query
+
+    def _get_one(self, id, _record_builder):
+        """
+        Apply some "get" function to a single Record id.
+
+        Used by the parent get(), this is the SQL-specific implementation of
+        getting a single Record.
+
+        :param id: A Record id to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A Record object
+        """
+        result = (self.session.query(schema.Record)
+                  .filter(schema.Record.id == id).one_or_none())
+        if result is None:
+            raise ValueError("No Record found with id {}".format(id))
+        return _record_builder(json_input=json.loads(result.raw))
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -277,114 +384,34 @@ class RecordDAO(dao.RecordDAO):
                 yield str(record_id[0])
         else:
             filtered_ids = (str(x[0]) for x in query.all())
-            for record in self.get_many(filtered_ids):
+            for record in self.get(filtered_ids):
                 yield record
 
-    # Disable the pylint check to if and until the team decides to refactor the method
-    def get_list(self,  # pylint: disable=too-many-branches
-                 datum_name,
-                 list_of_contents,
-                 operation,
-                 ids_only=False):
+    def _universal_query(self, universal_criteria):
         """
-        Given a list datum's name and values, return Records where the datum contains those values.
+        Pull back all record ids fulfilling universal criteria.
 
-        As an example, given "pizza_toppings", ["pineapple", "cheese"], and the
-        operation of ListQueryOperation.ALL, this method would return Records
-        where "pizza_toppings" is ["pineapple", "cheese"] or
-        ["pineapple", "cheese", "pepperoni"], but not just ["cheese"].
+        We do all criteria in a single query per table, as there's only one
+        possible universal query right now.
 
-        Note that if datum_name isn't found, no record_ids will be found, so be
-        sure datum_name is the name of a list-type datum (timeseries, etc).
-
-        :param datum_name: The name of the datum
-        :param list_of_contents: All the values datum_name must contain. Can be
-                                 single values ("egg", 12) or DataRanges.
-        :pram operation: What kind of ListQueryOperation to do.
-        :param ids_only: Whether to only return ids rather than full Records.
-        :returns: A generator of ids of matching Records or the Records
-                  themselves (see ids_only).
-        :raises ValueError: if given an empty list_of_contents
-        :raises TypeError: if given a list that isn't all strings xor scalars.
+        :param universal_criteria: List of tuples: (datum_name, UniversalCriteria)
+        :return: generator of ids of Records fulfilling all criteria.
         """
-        LOGGER.info('Finding Records where datum %s contains %s: %s', datum_name,
-                    operation.value.split('.')[0], list_of_contents)
-        if not list_of_contents:
-            raise ValueError("Must supply at least one entry in "
-                             "list_of_contents for {}".format(datum_name))
-
-        list_of_record_ids_sets = []
-
-        if all(isinstance(x, numbers.Real) or
-               (isinstance(x, utils.DataRange) and x.is_numeric_range())
-               for x in list_of_contents):
-            numeric = True
-            list_of_record_ids_sets.extend(
-                self._list_query(table=schema.ListScalarDataEntry,
-                                 datum_name=datum_name,
-                                 list_of_contents=list_of_contents))
-        elif all(isinstance(x, six.string_types) or
-                 (isinstance(x, utils.DataRange) and x.is_lexographic_range())
-                 for x in list_of_contents):
-            numeric = False
-            list_of_record_ids_sets.extend(
-                self._list_query(table=schema.ListStringDataEntry,
-                                 datum_name=datum_name,
-                                 list_of_contents=list_of_contents))
-        else:
-            raise TypeError("list_of_contents must be only strings or only scalars")
-        # This reduce "ands" together all the sets (one per criterion),
-        # creating one set that adheres to all our individual criterion sets.
-        if operation == utils.ListQueryOperation.ALL:
-            record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
-        elif operation == utils.ListQueryOperation.ANY:
-            record_ids = set.union(*list_of_record_ids_sets)
-        elif operation == utils.ListQueryOperation.ONLY:
-            record_ids = reduce((lambda x, y: x & y), list_of_record_ids_sets)
-            ranges = [x if isinstance(x, utils.DataRange)
-                      else utils.DataRange(x, x, max_inclusive=True)
-                      for x in list_of_contents]
-            if numeric:
-                excluded_ids = self._list_query(table=schema.ListScalarDataEntry,
-                                                datum_name=datum_name,
-                                                list_of_contents=utils.invert_ranges(ranges))
-            else:
-                excluded_ids = self._list_query(table=schema.ListStringDataEntry,
-                                                datum_name=datum_name,
-                                                list_of_contents=utils.invert_ranges(ranges))
-            for set_ids in excluded_ids:
-                for id_ in set_ids:
-                    if id_ in record_ids:
-                        record_ids.remove(id_)
-        if ids_only:
-            for record_id in record_ids:
-                yield record_id
-        else:
-            for record in self.get_many(record_ids):
-                yield record
-
-    def _list_query(self, table, datum_name, list_of_contents):
-        """
-        For each criterion, execute a query and add the set result to a list.
-
-        :param table: Which table to query on: ListScalarDataEntry or
-                      ListStringDataEntry.
-        :param datum_name: The name of the datum
-        :param list_of_contents: All the values datum_name must contain. Can be
-                                 single values ("egg", 12) or DataRanges.
-        :returns: A list of sets of record ids, where each set is the result
-                  set of one query with one criterion.
-        """
-        criteria_tuples = [(datum_name, x) for x in list_of_contents]
-        list_of_record_ids_sets = []
-        for criterion in criteria_tuples:
-            scalar_list_query = self.session.query(table.id)
-            records_list = self._apply_ranges_to_query(query=scalar_list_query,
-                                                       table=table,
-                                                       data=[criterion]).all()
-            list_of_record_ids_sets.append(set(str(record_id[0])
-                                               for record_id in records_list))
-        return list_of_record_ids_sets
+        result_counts = defaultdict(lambda: 0)
+        desired_names = [x[0] for x in universal_criteria]
+        LOGGER.info('Finding Records where data in %s exist', desired_names)
+        expected_result_count = len(universal_criteria)
+        for query_table in DATA_TABLES:
+            # We know that a single Record can never have more than one datum with
+            # a given name, so all we need to get is count.
+            query = (self.session.query(query_table.id, sqlalchemy.func.count(query_table.name))
+                     .filter(query_table.name.in_(desired_names))
+                     .group_by(query_table.id))
+            for result in query:
+                result_counts[result[0]] += result[1]  # Add the number of found names
+        for entry, val in six.iteritems(result_counts):
+            if val == expected_result_count:
+                yield entry
 
     def get_available_types(self):
         """
@@ -429,7 +456,7 @@ class RecordDAO(dao.RecordDAO):
                 yield record_id[0]
         else:
             filtered_ids = (x[0] for x in query.all())
-            for record in self.get_many(filtered_ids):
+            for record in self.get(filtered_ids):
                 yield record
 
     def _get_with_max_min_helper(self, scalar_name, count, id_only, get_min):
@@ -440,19 +467,12 @@ class RecordDAO(dao.RecordDAO):
                         or largest (False).
         :returns: Either an id or Record object fitting the criteria.
         """
-        if count == 1:
-            sort_by = sqlalchemy.func.min if get_min else sqlalchemy.func.max
-            query_set = (self.session.query(schema.ScalarData.id, sort_by(schema.ScalarData.value))
-                         .filter(schema.ScalarData.name == scalar_name)
-                         .one())
-            ids = [query_set[0]]
-        else:
-            sort_by = schema.ScalarData.value.asc() if get_min else schema.ScalarData.value.desc()
-            query_set = (self.session.query(schema.ScalarData.id)
-                         .filter(schema.ScalarData.name == scalar_name)
-                         .order_by(sort_by).limit(count).all())
-            ids = (x[0] for x in query_set)
-        return ids if id_only else self.get_many(ids)
+        sort_by = schema.ScalarData.value.asc() if get_min else schema.ScalarData.value.desc()
+        query_set = (self.session.query(schema.ScalarData.id)
+                     .filter(schema.ScalarData.name == scalar_name)
+                     .order_by(sort_by).limit(count).all())
+        ids = (x[0] for x in query_set)
+        return ids if id_only else self.get(ids)
 
     def get_with_max(self, scalar_name, count=1, id_only=False):
         """
@@ -488,150 +508,6 @@ class RecordDAO(dao.RecordDAO):
         """
         return self._get_with_max_min_helper(scalar_name, count, id_only, get_min=True)
 
-    def _apply_ranges_to_query(self, query, data, table):
-        """
-        Filter query object based on list of (name, criteria).
-
-        This is only meant to be used in conjunction with data_query() and
-        related. Criteria must be DataRanges.
-
-        Uses parameter substitution to get around limitations of SQLAlchemy OR
-        construct. Note that we still use AND logic; the "or" is used in
-        conjunction with a count statement because each data entry is its own
-        row, and we need to use AND across rows (and with respect to the record
-        id).
-
-        :param query: A SQLAlchemy query object
-        :param data: A list of (name, criteria) pairs to apply to the query object
-        :param table: The table to query against, either ScalarData,
-            StringData, ListScalarDataEntry, or ListStringDataEntry.
-
-        :returns: <query>, now filtering on <data>
-        :raises ValueError: If given an invalid table.
-        """
-        LOGGER.debug('Filtering <query=%s> with <data=%s>.', query, data)
-        if (table not in [schema.ScalarData,
-                          schema.StringData,
-                          schema.ListScalarDataEntry,
-                          schema.ListStringDataEntry]):
-            msg = 'Given invalid table to query: {}'.format(table)
-            LOGGER.error(msg)
-            raise ValueError(msg)
-
-        search_args = {}
-        range_components = []
-        # Performing an intersection on two SQLAlchemy queries, as in data_query(),
-        # causes their parameters to merge and overwrite any shared names.
-        # Here, we guarantee our params will have unique names per table.
-        offset = PARAM_OFFSETS[table]
-        for index, (name, criteria) in enumerate(data):
-            range_components.append((name, criteria, index))
-            search_args["name{}{}".format(index, offset)] = name
-            if not isinstance(criteria, utils.DataRange):
-                search_args["eq{}{}".format(index, offset)] = criteria
-            elif criteria.is_single_value():
-                search_args["eq{}{}".format(index, offset)] = criteria.min
-            else:
-                search_args["min{}{}".format(index, offset)] = criteria.min
-                search_args["max{}{}".format(index, offset)] = criteria.max
-        query = query.filter(sqlalchemy
-                             .or_(self._build_range_filter(name, criteria, table, index)
-                                  for (name, criteria, index) in range_components))
-
-        def _count_checker(is_list=False):
-            """
-            Check which count to use depending if we are checking a list.
-
-            If we are checking the count of a list of values, then we know the
-            list of criteria passed in is a list of one criterion. We check
-            that one or more rows came back satisfying said criterion. If we
-            are not a list, we must have equality between the length of the
-            list of criteria and the number of rows returned. This is because
-            only one row can come back if a criterion is satisified, so it is
-            one to one.
-
-            :param is_list: Whether or not we are checking a list of values.
-            :returns: Query that correctly checks count(s) of criteria.
-            """
-            if is_list:
-                text = "{} >= {}"
-                components_length = 1
-            else:
-                text = "{} = {}"
-                components_length = len(range_components)
-            return (query.group_by(table.id)
-                    .having(sqlalchemy.text(text
-                                            .format(sqlalchemy.func.count(table.id),
-                                                    components_length))))
-        if (table == schema.ListStringDataEntry or
-                table == schema.ListScalarDataEntry):
-            query = _count_checker(is_list=True)
-        else:
-            query = _count_checker(is_list=False)
-        query = query.params(search_args)
-        return query
-
-    @staticmethod
-    def _build_range_filter(name, criteria, table, index=0):
-        """
-        Build a TextClause to filter a SQL query using range parameters.
-
-        Helper method to _apply_scalar_ranges_to_query. Needed in order to use
-        parameter substitution and circumvent some filter limitations.
-
-        Example clause as raw SQL:
-
-        WHERE ScalarData.name=:scalar_name0 AND ScalarData.value<right_num0
-
-        :param name: The name of the value we apply the criteria to
-        :param criteria: The criteria used to build the query.
-        :param table: The table to query against, either ScalarData or
-                      StringData
-        :param index: optional offset of this criteria if using multiple
-                      criteria. Used for building var names for
-                      parameterization.
-
-        :returns: a TextClause object for use in a SQLAlchemy statement
-
-        :raises ValueError: if given a bad table to query against.
-        """
-        LOGGER.debug('Building TextClause filter for data "%s" with criteria'
-                     '<%s> and index=%s.', name, criteria, index)
-        offset = PARAM_OFFSETS[table]
-        # SQLAlchemy's methods for substituting in table names are convoluted.
-        # A much simpler, clearer method:
-        if table == schema.ScalarData:
-            tablename = "ScalarData"
-        elif table == schema.StringData:
-            tablename = "StringData"
-        elif table == schema.ListScalarDataEntry:
-            tablename = "ListScalarDataEntry"
-        elif table == schema.ListStringDataEntry:
-            tablename = "ListStringDataEntry"
-        else:
-            raise ValueError("Given a bad table for data query: {}".format(table))
-
-        conditions = ["({table}.name IS :name{index}{offset} AND {table}.value"
-                      .format(table=tablename, index=index, offset=offset)]
-        if not isinstance(criteria, utils.DataRange):
-            conditions.append(" = :eq{}{}".format(index, offset))
-        elif criteria.is_single_value():
-            conditions.append(" = :eq{}{}".format(index, offset))
-        else:
-            if criteria.min_is_finite():
-                conditions.append(" >= " if criteria.min_inclusive else " > ")
-                conditions.append(":min{}{}".format(index, offset))
-            # If two-sided range, begin preparing new condition
-            if (criteria.min_is_finite()) and (criteria.max_is_finite()):
-                conditions.append(" AND {}.value ".format(tablename))
-            if criteria.max_is_finite():
-                conditions.append(" <= " if criteria.max_inclusive else " < ")
-                conditions.append(":max{}{}".format(index, offset))
-        # This helper method should NEVER see a (None, None) range due to the
-        # special way they need handled (figuring out what table they belong to)
-        conditions.append(")")
-        return sqlalchemy.text(''.join(conditions))
-
     def get_data_for_records(self, data_list, id_list=None):
         """
         Retrieve a subset of data for Records (or optionally a subset of Records).
@@ -657,6 +533,8 @@ class RecordDAO(dao.RecordDAO):
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
+        if id_list is not None:
+            id_list = list(id_list)  # Generator safety
         LOGGER.debug('Getting data in %s for %s',
                      data_list,
                      'record ids in {}'.format(id_list) if id_list is not None else "all records")
@@ -694,7 +572,7 @@ class RecordDAO(dao.RecordDAO):
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
 
-        :return: A dict of scalars matching the Mnoda data specification
+        :return: A dict of scalars matching the Sina data specification
         """
         LOGGER.warning("Using deprecated method get_scalars()."
                        "Consider using Record.data instead.")
@@ -724,32 +602,41 @@ class RelationshipDAO(dao.RelationshipDAO):
         """Initialize RelationshipDAO with session for its SQL database."""
         self.session = session
 
-    def insert(self, relationship=None, subject_id=None,
+    def insert(self, relationships=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given some Relationship, import it into a SQL database.
+        Given some Relationship(s), import it/them into a SQL database.
 
         This can create an entry from either an existing relationship object
-        or from its components (subject id, object id, predicate). If all four
-        are provided, the Relationship will be used.
+        or from its components (subject id, object id, predicate). If all
+        are provided, the Relationship will be used. If inserting many
+        Relationships, a list of Relationships MUST be provided (no
+        other fields). If any field besides Relationships is provided, it's
+        assumed that only one Relationship is being inserted.
 
+        :param relationships: A Relationship object to build entry from or an iterable of them.
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
-        :param predicate: A string describing the relationship.
-        :param relationship: A Relationship object to build entry from.
+        :param predicate: A string describing the relationship between subject and object.
         """
-        subj, obj, pred = self._validate_insert(relationship=relationship,
-                                                subject_id=subject_id,
-                                                object_id=object_id,
-                                                predicate=predicate)
-        self.session.add(schema.Relationship(subject_id=subj,
-                                             object_id=obj,
-                                             predicate=pred))
+        if (isinstance(relationships, model.Relationship)
+                or any(x is not None for x in (subject_id, object_id, predicate))):
+            subj, obj, pred = self._validate_insert(relationship=relationships,
+                                                    subject_id=subject_id, object_id=object_id,
+                                                    predicate=predicate)
+            self.session.add(schema.Relationship(subject_id=subj,
+                                                 object_id=obj,
+                                                 predicate=pred))
+        else:
+            for rel in relationships:
+                self.session.add(schema.Relationship(subject_id=rel.subject_id,
+                                                     object_id=rel.object_id,
+                                                     predicate=rel.predicate))
         self.session.commit()
 
     # Note that get() is implemented by its parent.
-
     def get(self, subject_id=None, object_id=None, predicate=None):
+        """Retrieve relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)
@@ -765,7 +652,7 @@ class RelationshipDAO(dao.RelationshipDAO):
 
 
 class RunDAO(dao.RunDAO):
-    """DAO responsible for handling Runs, (Record subtype), in SQL."""
+    """DAO responsible for handling Runs (Record subtype) in SQL."""
 
     def __init__(self, session, record_dao):
         """Initialize RunDAO and assign a contained RecordDAO."""
@@ -773,55 +660,64 @@ class RunDAO(dao.RunDAO):
         self.session = session
         self.record_dao = record_dao
 
-    def insert(self, run):
+    def _return_only_run_ids(self, ids):
         """
-        Given a Run, import it into the current SQL database.
+        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
 
-        :param run: A Run to import
+        :param ids: An id or iterable of ids to sort through
+
+        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
+                  if "ids" is an iterable, else returns a single value.
         """
-        self.record_dao.insert(run, called_from_child=True)
-        self.session.add(schema.Run(id=run.id,
-                                    application=run.application,
-                                    user=run.user,
-                                    version=run.version))
+        if isinstance(ids, six.string_types):
+            val = self.session.query(schema.Run.id).filter(schema.Run.id == ids).one_or_none()
+            return val[0] if val is not None else None
+        ids = list(ids)
+        query = self.session.query(schema.Run.id).filter(schema.Run.id.in_(ids)).all()
+        run_ids = set(str(x[0]) for x in query)
+        # We do this in order to fulfill the "id or None" requirement
+        results = [x if x in run_ids else None for x in ids]
+        return results
+
+    def insert(self, runs):
+        """
+        Given a(n iterable of) Run(s), import into the SQL database.
+
+        :param runs: A Run or iterator of Runs to import
+        """
+        if isinstance(runs, model.Run):
+            runs = [runs]
+        for run in runs:
+            record = RecordDAO.create_sql_record(run)
+            run = schema.Run(application=run.application, user=run.user,
+                             version=run.version)
+            run.record = record
+            self.session.add(record)
+            self.session.add(run)
         self.session.commit()
 
-    def get(self, id):
+    def delete(self, ids):
         """
-        Given a run's id, return match (if any) from the SQL database.
+        Given (a) Run id(s), delete all mention from the SQL database.
 
-        :param id: The id of some run
+        This includes removing all related data, raw(s), any relationships
+        involving it/them, etc.
 
-        :returns: A run matching that identifier or None
+        :param ids: The id or iterator of ids of the Run to delete.
         """
-        LOGGER.debug('Getting run with id: %s', id)
-        record = (self.session.query(schema.Record)
-                  .filter(schema.Record.id == id).one())
-        return model.generate_run_from_json(json.loads(record.raw))
-
-    def delete(self, id):
-        """
-        Given the id of a Run, delete all mention of it from the SQL database.
-
-        This includes removing all its data, its raw, any relationships
-        involving it, etc.
-
-        :param id: The id of the Run to delete.
-        """
-        self.record_dao.delete(id)
-
-    def delete_many(self, ids_to_delete):
-        """
-        Given a list of Run ids, delete all mentions of them from the SQL database.
-
-        :param ids_to_delete: A list of the ids of Runs to delete.
-        """
-        self.record_dao.delete_many(ids_to_delete)
+        run_ids = self._return_only_run_ids(ids)
+        if run_ids is None:  # We have nothing to do here
+            return
+        elif isinstance(run_ids, six.string_types):
+            run_ids = [run_ids]
+        else:
+            run_ids = [id for id in run_ids if id is not None]
+        self.record_dao.delete(run_ids)
 
 
 class DAOFactory(dao.DAOFactory):
     """
-    Build SQL-backed DAOs for interacting with Mnoda-based objects.
+    Build SQL-backed DAOs for interacting with Sina-based objects.
 
     Includes Records, Relationships, etc.
     """
@@ -833,22 +729,35 @@ class DAOFactory(dao.DAOFactory):
         Currently supports only SQLite.
 
         :param db_path: Path to the database to use as a backend. If None, will
-                        use an in-memory database.
+                        use an in-memory database. If it contains a '://', it is assumed that
+                        this is a URL which can be used to connect to the database. Otherwise,
+                        this is treated as a path for a SQLite database.
         """
         self.db_path = db_path
+        use_sqlite = False
         if db_path:
-            engine = sqlalchemy.create_engine(SQLITE + db_path)
-            if not os.path.exists(db_path):
-                schema.Base.metadata.create_all(engine)
+            if '://' not in db_path:
+                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
+                create_db = not os.path.exists(db_path)
+                use_sqlite = True
+            else:
+                engine = sqlalchemy.create_engine(db_path)
+                create_db = True
         else:
-            engine = sqlalchemy.create_engine('sqlite:///')
+            engine = sqlalchemy.create_engine(SQLITE_PREFIX)
+            use_sqlite = True
+            create_db = True
+
+        if use_sqlite:
+            def configure_on_connect(connection, _):
+                """Activate foreign key support on connection creation."""
+                connection.execute('pragma foreign_keys=ON')
+
+            sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
+
+        if create_db:
             schema.Base.metadata.create_all(engine)
 
-        def configure_on_connect(connection, _):
-            """Activate foreign key support on connection creation."""
-            connection.execute('pragma foreign_keys=ON')
-
-        sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
         session = sqlalchemy.orm.sessionmaker(bind=engine)
         self.session = session()
 
@@ -880,3 +789,9 @@ class DAOFactory(dao.DAOFactory):
     def __repr__(self):
         """Return a string representation of a SQL DAOFactory."""
         return 'SQL DAOFactory <db_path={}>'.format(self.db_path)
+
+    def close(self):
+        """
+        Close the session for this factory and all created DAOs
+        """
+        self.session.close()

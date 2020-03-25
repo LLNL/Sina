@@ -1,21 +1,21 @@
-"""
-Cqlengine implementation of the minimal schema used in Cassandra imports.
-
-Based on Mnoda
-"""
+"""Cqlengine implementation of the minimal schema used in Cassandra imports."""
 import numbers
 import logging
+import os
+import getpass
 
 # Disable pylint checks due to ubiquitous use of id,
 #   cross_populate_object_and_subject, and the nature of the classes
 # pylint: disable=invalid-name,redefined-builtin,too-few-public-methods
 
-# Disable pylint check due to cassandra being optional
-from cassandra.cqlengine.management import sync_table  # pylint: disable=import-error
-
 try:
+    # Disable pylint check due to cassandra being optional
+    from cassandra.cqlengine.management import sync_table  # pylint: disable=import-error
     from cassandra.cqlengine.models import Model
     from cassandra.cqlengine import columns, connection
+    from cassandra.auth import PlainTextAuthProvider
+    from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
+    from cassandra.cluster import Cluster
 except ImportError:
     # Sphinx autodoc will import this file regardless of whether Cassandra is
     # installed. Ordinarily it can mock imports, but the type of usage
@@ -35,7 +35,7 @@ except ImportError:
             """Create a simple object that can take arbitrary attributes."""
             self.__dict__.update(kwargs)
             # Mock column types to behave analagously (as far as autodoc cares)
-            self.Text = lambda primary_key=True, required=False: 0
+            self.Text = lambda primary_key=True, required=False, index=False: 0
             self.Set = lambda a, primary_key=True, required=False: a
             self.Double = lambda primary_key=True, required=False: 0
             self.List = lambda a, primary_key=True, required=False: _AutodocFakeColumn()
@@ -51,13 +51,13 @@ LOGGER = logging.getLogger(__name__)
 
 class Record(Model):
     """
-    Toplevel object in the Mnoda schema.
+    Toplevel object in the Sina schema.
 
     Stores the raw form of the record.
     """
 
     id = columns.Text(primary_key=True)
-    type = columns.Text()
+    type = columns.Text(index=True)
     raw = columns.Text()
 
 
@@ -90,39 +90,32 @@ class ScalarDataFromRecord(Model):
     tags = columns.Set(columns.Text())
 
 
-class RecordFromScalarListData(Model):
+class RecordFromScalarListDataMin(Model):
     """
     Query table for finding records given scalar list criteria.
 
-    Each entry in a scalar list is given its own row in the database in this
-    table (not in its partner table) to facilitate the specific case of
-    "find Records where x contains (y, a value < y, etc.)" This is more efficient
-    for querying, but does mean that the arrangement of list members, as well as
-    any duplication within a list (rows overwrite) is lost. The partner table
-    is in charge of maintaining this order.
-
-    We store neither units nor tags since they're not required for this type of
-    query. Those are more for 'find me everything tagged "output" in "record_1"'
-    (tags) or simple retrieval (units), both of which use the partner table.
+    Because of how Cassandra restricts querying--you can't do two key ranges
+    in one query, essentially--we need to break min and max into different
+    tables. Min is used for range queries where only a min is specified,
+    Max for Max, both for both. If this runs into memory issues, it may be
+    possible to allow_filtering() and combine the tables.
     """
 
     name = columns.Text(primary_key=True)
-    value = columns.Double(primary_key=True)
+    min = columns.Double(primary_key=True)
     id = columns.Text(primary_key=True)
 
 
-class ScalarListDataFromRecord(Model):
-    """Query table for finding a scalar list-valued Record.data entry given record ID."""
+class RecordFromScalarListDataMax(Model):
+    """
+    Query table for finding records given scalar list criteria.
 
-    id = columns.Text(primary_key=True)
+    Companion table to RecordFromScalarListDataMin, see its note for explanation.
+    """
+
     name = columns.Text(primary_key=True)
-    # CQLEngine support for frozen collections isn't part of their API.
-    # Currently, _freeze_db_type() *is* the least hacky option.
-    # pylint: disable=protected-access
-    value = columns.List(columns.Double(), primary_key=True)
-    value._freeze_db_type()
-    units = columns.Text()
-    tags = columns.Set(columns.Text())
+    max = columns.Double(primary_key=True)
+    id = columns.Text(primary_key=True)
 
 
 class RecordFromStringData(Model):
@@ -154,25 +147,13 @@ class RecordFromStringListData(Model):
     """
     Query table for finding records given string list criteria.
 
-    Differs from its partner in the same ways as RecordFromScalarListData.
+    As with its partner, if you want to retrieve string lists for a record,
+    you do it from the raw, no dedicated query table.
     """
 
     name = columns.Text(primary_key=True)
     value = columns.Text(primary_key=True)
     id = columns.Text(primary_key=True)
-
-
-class StringListDataFromRecord(Model):
-    """Query table for finding a scalar list-valued Record.data entry given record ID."""
-
-    id = columns.Text(primary_key=True)
-    name = columns.Text(primary_key=True)
-    # Until freeze support is public-facing, this is the cleanest option
-    # pylint: disable=protected-access
-    value = columns.List(columns.Text(), primary_key=True)
-    value._freeze_db_type()
-    units = columns.Text()
-    tags = columns.Set(columns.Text())
 
 
 class Run(Model):
@@ -242,9 +223,10 @@ def _discover_tables_from_value(value):
     # Check if it's a list
     if isinstance(value, list):
         # Check if it's a scalar or empty
-        x_from_rec, rec_from_x = ((ScalarListDataFromRecord, RecordFromScalarListData)
-                                  if not value or isinstance(value[0], numbers.Real)
-                                  else (StringListDataFromRecord, RecordFromStringListData))
+        x_from_rec = None
+        rec_from_x = (RecordFromScalarListDataMin if not value or isinstance(value[0],
+                                                                             numbers.Real)
+                      else RecordFromStringListData)
     else:
         x_from_rec, rec_from_x = ((ScalarDataFromRecord, RecordFromScalarData)
                                   if isinstance(value, numbers.Real)
@@ -254,12 +236,12 @@ def _discover_tables_from_value(value):
 
 # Disable pylint check until the team decides to increase configuration limits or
 # refactor the code.
-def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
-                               value,
-                               id,
-                               tags=None,
-                               units=None,
-                               force_overwrite=False):
+def cross_populate_query_tables(name,  # pylint: disable=too-many-arguments
+                                value,
+                                id,
+                                tags=None,
+                                units=None,
+                                force_overwrite=False):
     """
     Simultaneously add data entries to a pair of tables.
 
@@ -287,16 +269,18 @@ def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
     x_from_rec, rec_from_x = _discover_tables_from_value(value)
 
     # Now that we know which tables to use, determine how to insert
-    x_from_rec_create = (x_from_rec.create if force_overwrite
-                         else x_from_rec.if_not_exists().create)
-    x_from_rec_create(id=id,
-                      name=name,
-                      value=value,
-                      tags=tags,
-                      units=units)
+    # Note that tables only have an "x_from_rec" if it's needed for queries
+    if x_from_rec is not None:
+        x_from_rec_create = (x_from_rec.create if force_overwrite
+                             else x_from_rec.if_not_exists().create)
+        x_from_rec_create(id=id,
+                          name=name,
+                          value=value,
+                          tags=tags,
+                          units=units)
 
-    if rec_from_x in (RecordFromStringListData, RecordFromScalarListData):
-        # We allow overwriting in the list tables, because we want only one
+    if rec_from_x is RecordFromStringListData:
+        # We allow overwriting in the string list table, because we want only one
         # entry per value (no duplicates tracking). So we rely on the partner
         # table to detect that first if not force_overwrite (hence the early
         # insert). Also, since we only want one value per entry, we loop.
@@ -304,6 +288,22 @@ def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
             rec_from_x.create(id=id,
                               name=name,
                               value=entry)
+
+    elif rec_from_x is RecordFromScalarListDataMin:
+        # We only store the min and max because that's all we need to perform
+        # supported queries.
+        rec_from_x_create = (rec_from_x.create if force_overwrite
+                             else rec_from_x.if_not_exists().create)
+        # There's a small supporting table we insert into as well.
+        rec_from_x_max_create = (RecordFromScalarListDataMax.create if force_overwrite
+                                 else RecordFromScalarListDataMax.if_not_exists().create)
+        rec_from_x_create(id=id,
+                          name=name,
+                          min=min(value))
+        rec_from_x_max_create(id=id,
+                              name=name,
+                              max=max(value))
+
     else:
         rec_from_x_create = (rec_from_x.create if force_overwrite
                              else rec_from_x.if_not_exists().create)
@@ -314,10 +314,10 @@ def cross_populate_data_tables(name,  # pylint: disable=too-many-arguments
                           units=units)
 
 
-def cross_batch_delete_data_tables(name,
-                                   value,
-                                   id,
-                                   batch):
+def cross_batch_delete_query_tables(name,
+                                    value,
+                                    id,
+                                    batch):
     """
     Simultaneously create batch deletion statements for a pair of tables.
 
@@ -334,30 +334,12 @@ def cross_batch_delete_data_tables(name,
 
     x_from_rec.objects(id=id, name=name, value=value).batch(batch).delete()
 
-    if rec_from_x in (RecordFromStringListData, RecordFromScalarListData):
-        for entry in value:
-            rec_from_x.objects(id=id, name=name, value=entry).batch(batch).delete()
-    else:
+    if rec_from_x is not None:
         rec_from_x.objects(id=id, name=name, value=value).batch(batch).delete()
 
 
-def form_connection(keyspace, node_ip_list=None):
-    """
-    Set up our connection info and prep our tables.
-
-    Note the lack of a "session" object. Looks like each cqlengine
-    create-statement lightly builds its own.
-
-    :param keyspace: The keyspace to connect to.
-    :param node_ip_list: A list of ips belonging to nodes on the target
-                         Cassandra instance. If None, connects to localhost.
-    """
-    if not node_ip_list:
-        node_ip_list = ['127.0.0.1']
-    LOGGER.info('Forming cassandra connection to ip_list=%s with keyspace=%s.',
-                node_ip_list, keyspace)
-    connection.setup(node_ip_list, keyspace)
-
+def sync_tables():
+    """Prep all tables, ensuring they're in our expected format."""
     sync_table(Record)
     sync_table(Run)
     sync_table(ObjectFromSubject)
@@ -367,7 +349,51 @@ def form_connection(keyspace, node_ip_list=None):
     sync_table(ScalarDataFromRecord)
     sync_table(StringDataFromRecord)
     sync_table(RecordFromStringData)
-    sync_table(RecordFromScalarListData)
+    sync_table(RecordFromScalarListDataMin)
+    sync_table(RecordFromScalarListDataMax)
     sync_table(RecordFromStringListData)
-    sync_table(ScalarListDataFromRecord)
-    sync_table(StringListDataFromRecord)
+
+
+def form_connection(keyspace, node_ip_list=None, sonar_cqlshrc_path=None):
+    """
+    Set up our connection info and prep our tables.
+
+    :param keyspace: The keyspace to connect to.
+    :param node_ip_list: A list of ips belonging to nodes on the target
+                         Cassandra instance. If None, connects to localhost.
+    :param sonar_cqlshrc_path: Only used when connecting to LC Sonar machines.
+                               The path to the desired cqlshrc file.
+    """
+    if sonar_cqlshrc_path is not None:
+        if node_ip_list is None:
+            node_ip_list = ['sonar8']
+        LOGGER.info('Forming sonar cassandra connection to ip_list=%s with keyspace=%s.',
+                    node_ip_list, keyspace)
+        secret = None
+        sonar_cqlshrc_path = os.path.expanduser(sonar_cqlshrc_path)  # For notebook safety
+        with open(sonar_cqlshrc_path) as secret_file:
+            password_signifier = "password = "
+            for line in secret_file:
+                if line.startswith(password_signifier):
+                    secret = line[len(password_signifier):]
+                    break
+        if secret is None:
+            raise ValueError("{} does not contain a password. Ensure you've run cinit and"
+                             "added your password to your cqlshrc!".format(sonar_cqlshrc_path))
+        # The recommended load balancer. In newer Cassandra versions, one must be specified.
+        load_balancing_policy = TokenAwarePolicy(DCAwareRoundRobinPolicy())
+
+        auth_provider = PlainTextAuthProvider(username=getpass.getuser(), password=secret)
+        cluster = Cluster(node_ip_list, auth_provider=auth_provider,
+                          load_balancing_policy=load_balancing_policy)
+        session = cluster.connect()
+        session.set_keyspace(keyspace)
+        connection.set_session(session)
+        sync_tables()
+    else:
+        if not node_ip_list:
+            node_ip_list = ['127.0.0.1']
+        LOGGER.info('Forming cassandra connection to ip_list=%s with keyspace=%s.',
+                    node_ip_list, keyspace)
+        connection.setup(node_ip_list, keyspace)
+        sync_tables()

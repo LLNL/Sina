@@ -38,6 +38,9 @@ setup(name='sina',
         'cli_tools': [
             'deepdiff',
             'texttable'
+        ],
+        'mysql': [
+            'mysql-connector-python',
         ]
       },
       install_requires=[

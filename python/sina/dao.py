@@ -2,24 +2,27 @@
 Contains toplevel, abstract DAOs used for accessing each type of object.
 
 This module describes the DAOs available, as well as the functions available to
-each DAO. While function availabiliy may differ between objects, e.g., Records
+each DAO. While function availability may differ between objects, e.g., Records
 and Relationships, it will not differ between backends, e.g., Cassandra and sql.
 """
 from abc import ABCMeta, abstractmethod
 import logging
+import numbers
+
+import six
 
 import sina.model
+from sina.utils import DataRange
 
 LOGGER = logging.getLogger(__name__)
-
 
 # Disable pylint checks due to ubiquitous use of id and type
 # pylint: disable=invalid-name,redefined-builtin
 
-class DAOFactory(object):
-    """Builds DAOs used for interacting with Mnoda-based data objects."""
 
-    __metaclass__ = ABCMeta
+@six.add_metaclass(ABCMeta)
+class DAOFactory(object):
+    """Builds DAOs used for interacting with Sina data objects."""
     supports_parallel_ingestion = False
 
     @abstractmethod
@@ -49,85 +52,109 @@ class DAOFactory(object):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def close(self):
+        """
+        Close any resources held by this DAO factory. This invalidates any DAOs created by the
+        factory.
+        """
+        raise NotImplementedError
+
+    def __enter__(self):
+        """
+        Use this factory as a context manager.
+
+        :return: this factory
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Call this factory's close() method.
+
+        :param exc_type: the type of any raised exception
+        :param exc_val: the value of any raised exception
+        :param exc_tb: the stack trace of any raised exception
+        :return: whether a raised exception should be suppressed
+        """
+        self.close()
+        return False
+
 
 class RecordDAO(object):
     """The DAO responsible for handling Records."""
 
     __metaclass__ = ABCMeta
 
-    @abstractmethod
-    def get(self, id):
+    def get(self, ids, _record_builder=sina.model.generate_record_from_json):
         """
-        Given the id of a Record, return matching Record or None.
+        Given an (iterable of) id(s), return matching Record(s).
 
-        :param id: The id of the Record to return.
+        :param ids: The id(s) of the Record(s) to return.
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw. Used
+                                by DAOs calling get() (RecordDAO, RunDAO), does not
+                                need to be touched by the user.
 
-        :returns: The matching Record or None.
+        :returns: If provided an iterable, a generator of Record objects, else a
+                  single Record object.
+
+        :raises ValueError: if no Record is found for some id.
+        """
+        def gen_records(ids):
+            """Hack around the limitation of returning generators XOR non-gens."""
+            for id in ids:
+                yield self._get_one(id, _record_builder)
+
+        if isinstance(ids, six.string_types):
+            LOGGER.debug('Getting record with id=%s', ids)
+            return self._get_one(ids, _record_builder)
+        ids = list(ids)
+        LOGGER.debug('Getting records with ids in=%s', ids)
+        return gen_records(ids)
+
+    @abstractmethod
+    def _get_one(self, id, _record_builder):
+        """
+        Apply some "get" function to a single Record id.
+
+        Because the overload needs to be invisible to the user, we need to
+        be able to return both a generator (from a list) and non-generator
+        (from a single ID). This is the framework for allowing it.
+
+        Currently, this makes sense because Cassandra can't batch reads. May
+        be worth revisiting.
+
+        :param id: A Record id to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A Record if found, else None.
+
+        :raises ValueError: if no Record is found for the id.
         """
         raise NotImplementedError
 
-    def get_many(self, iter_of_ids):
-        """
-        Given an iterable of ids, retrieve each corresponding Record.
-
-        If a given DAO's backend can bulk read more cleverly,
-        this should be reimplemented there.
-
-        :param iter_of_ids: An iterable object of ids to find.
-
-        :returns: A generator of found records
-        """
-        LOGGER.debug('Getting many records with iter: %s', iter_of_ids)
-        for id in iter_of_ids:
-            record = self.get(id)
-            yield record
-
     @abstractmethod
-    def insert(self, record):
+    def insert(self, records):
         """
-        Given a Record, insert it into the DAO's backend.
+        Given one or more Records, insert them into the DAO's backend.
 
-        :param record: A Record to insert
+        :param records: A Record or iter of Records to insert
         """
         raise NotImplementedError
 
-    def insert_many(self, list_to_insert):
-        """
-        Given a list of Records, insert each into the DAO's backend.
-
-        If a given DAO's backend can bulk insert more cleverly, this should be
-        reimplemented there.
-
-        :param list_to_insert: A list of Records to insert
-        """
-        LOGGER.debug('Inserting %s records.', len(list_to_insert))
-        for item in list_to_insert:
-            self.insert(item)
-
     @abstractmethod
-    def delete(self, id):
+    def delete(self, ids):
         """
-        Given the id of a Record, delete all mention of it from the DAO's backend.
+        Given one or more Record ids, delete all mention from the DAO's backend.
 
-        This includes removing all its data, its raw, any relationships
-        involving it, etc.
+        This includes removing all data, raw(s), any relationships
+        involving it/them, etc.
 
-        :param id: The id of the Record to delete.
+        :param ids: A Record id or iterable of Record ids to delete.
         """
         raise NotImplementedError
-
-    def delete_many(self, ids_to_delete):
-        """
-        Given a list of Record ids, delete all mentions of them from the DAO's backend.
-
-        If a given DAO's backend can bulk delete more cleverly, this should be
-        reimplemented there.
-
-        :param ids_to_delete: A list of the ids of Records to delete.
-        """
-        LOGGER.debug('Deleting %i records.', len(ids_to_delete))
-        for item in ids_to_delete:
-            self.delete(item)
 
     @abstractmethod
     def data_query(self, **kwargs):
@@ -136,9 +163,10 @@ class RecordDAO(object):
 
         Criteria are expressed as keyword arguments. Each keyword
         is the name of an entry in a Record's data field, and it's set
-        equal to either a single value or a DataRange (see utils.DataRanges
-        for more info) that expresses the desired value/range of values.
-        All criteria must be satisfied for an ID to be returned:
+        equal to a single value, a DataRange (see utils.DataRanges
+        for more info), or a special criteria (ex: ScalarListCriteria
+        from has_all(), see utils) that expresses the desired value/range of
+        values. All criteria must be satisfied for an ID to be returned:
 
             # Return ids of all Records with a volume of 12, a quadrant of
             # "NW", AND a max_height >=30 and <40.
@@ -156,6 +184,28 @@ class RecordDAO(object):
     def get_given_data(self, **kwargs):
         """Alias of data_query() to fit historical naming convention."""
         return self.data_query(**kwargs)
+
+    @staticmethod
+    def _criteria_are_for_scalars(criteria):
+        """
+        Determine whether criteria for a single datum describes scalars or strings.
+
+        If criteria are mixed (both scalar and string criteria), raise an error.
+
+        :param criteria: The criteria to check.
+        :returns: True if they're all scalar criteria, false if all string criteria.
+        :raises TypeError: if mixed-type criteria are provided.
+        """
+        criterion_is_for_scalars = []
+        for criterion in criteria:
+            if isinstance(criterion, DataRange):
+                criterion_is_for_scalars.append(criterion.is_numeric_range())
+            else:
+                criterion_is_for_scalars.append(isinstance(criterion, numbers.Real))
+        if not all(criterion_is_for_scalars[0] == x for x in criterion_is_for_scalars):
+            raise TypeError("String and scalar criteria cannot be mixed for one datum. Given: {}"
+                            .format(criteria))
+        return criterion_is_for_scalars[0]
 
     @abstractmethod
     def get_all_of_type(self, type, ids_only=False):
@@ -241,7 +291,7 @@ class RecordDAO(object):
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
 
-        :returns: A list of scalar JSON objects matching the Mnoda specification
+        :returns: A list of scalar JSON objects matching the Sina specification
         """
         raise NotImplementedError
 
@@ -296,12 +346,12 @@ class RelationshipDAO(object):
         return relationships
 
     @abstractmethod
-    def insert(self, relationship=None, subject_id=None,
+    def insert(self, relationships=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given a Relationship, insert it into the DAO's backend.
+        Given one or more Relationships, insert into the DAO's backend.
 
-        This can create an entry from either an existing relationship object
+        This can create an entry from either an existing Relationship object
         or from its components (subject id, object id, predicate). If all four
         are provided, the Relationship will be used.
 
@@ -313,7 +363,8 @@ class RelationshipDAO(object):
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
         :param predicate: A string describing the relationship.
-        :param relationship: A Relationship object to build entry from.
+        :param relationships: A Relationship object to build entry from, or an
+                             iterable of them
 
         :raises: A ValueError if neither Relationship nor the subject_id,
                  object_id, and predicate args are provided.
@@ -357,18 +408,6 @@ class RelationshipDAO(object):
             predicate = relationship.predicate
         return subject_id, object_id, predicate
 
-    def insert_many(self, list_to_insert):
-        """
-        Given a list of Relationships, insert each into the DAO's backend.
-
-        If a given DAO's backend can bulk insert more cleverly (bulk inserts),
-        this should be reimplemented there.
-
-        :param list_to_insert: A list of Relationships to insert
-        """
-        for item in list_to_insert:
-            self.insert(item)
-
     @abstractmethod
     def get(self, subject_id=None, object_id=None, predicate=None):
         """
@@ -399,75 +438,64 @@ class RunDAO(object):
         self.record_dao = record_dao
 
     @abstractmethod
-    def get(self, id):
+    def _return_only_run_ids(self, ids):
         """
-        Given id, return matching Run from the DAO's backend, or None.
+        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
 
-        :param id: The id of the run to return.
+        :param ids: An id or iterable of ids to sort through
 
-        :returns: The matching Run or None.
+        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
+                  if "ids" is an iterable, else returns a single value.
         """
         raise NotImplementedError
 
-    def get_many(self, iter_of_ids):
+    def get(self, ids):
         """
-        Given an iterable of ids, retrieve each corresponding run from backend.
+        Given a(n iterable of) id(s), return matching Run(s) from the DAO's backend.
 
-        If a given DAO's backend can bulk read more cleverly,
-        this should be reimplemented there.
+        :param ids: The id or an iterable of ids to find and return Runs for. If a
+                    Record with that id exists but is not a Run, it won't be returned.
 
-        :param iter_of_ids: An iterable object of ids to find.
+        :returns: If provided an iterable, a generator containing either
+                  a matching Run or None for each identifier provided. In the
+                  case that an id (not an iterator of ids) is provided, will
+                  return a Run or None.
 
-        :returns: A generator of found runs
+        :raises ValueError: if no Record is found for some id(s).
         """
-        for id in iter_of_ids:
-            yield self.get(id)
+        if isinstance(ids, six.string_types):
+            LOGGER.debug('Getting Run with id: %s', ids)
+            run_ids = self._return_only_run_ids(ids)
+            if run_ids is None:
+                raise ValueError("No Run found with id {}.".format(id))
+        else:
+            LOGGER.debug('Getting Runs with ids: %s', ids)
+            run_ids = list(self._return_only_run_ids(ids))  # Gen safety
+            if None in run_ids:
+                ids_not_found = set(ids).difference(run_ids)
+                raise ValueError("No Runs found with ids: {}".format(ids_not_found))
+        return self.record_dao.get(run_ids, _record_builder=sina.model.generate_run_from_json)
 
     @abstractmethod
-    def insert(self, run):
+    def insert(self, runs):
         """
-        Given a Run, insert it into the DAO's backend.
+        Given a(n iterable of) Run(s), insert them into the DAO's backend.
 
-        :param run: A run to insert
+        :param runs: A Run or iterable of Runs to insert
         """
         raise NotImplementedError
-
-    def insert_many(self, list_to_insert):
-        """
-        Given a list of Runs, insert each into the DAO's backend.
-
-        If a given DAO's backend can bulk insert more cleverly (bulk inserts),
-        this should be reimplemented there.
-
-        :param list_to_insert: A list of Runs to insert
-        """
-        for item in list_to_insert:
-            self.insert(item)
 
     @abstractmethod
-    def delete(self, id):
+    def delete(self, ids):
         """
-        Given the id of a Run, delete all mention of it from the DAO's backend.
+        Given a(n iterable of) Run id(s), delete all mention from the DAO's backend.
 
-        This includes removing all its data, its raw, any relationships
-        involving it, etc.
+        This includes removing all data, raw(s), any relationships
+        involving it/them, etc.
 
-        :param id: The id of the Run to delete.
+        :param ids: A Run id or iterable of Run ids to delete.
         """
         raise NotImplementedError
-
-    def delete_many(self, ids_to_delete):
-        """
-        Given a list of Run ids, delete all mentions of them from the DAO's backend.
-
-        If a given DAO's backend can bulk delete more cleverly, this should be
-        reimplemented there.
-
-        :param ids_to_delete: A list of the ids of Runs to delete.
-        """
-        LOGGER.debug('Deleting %i runs.', len(ids_to_delete))
-        for item in ids_to_delete:
-            self.delete(item)
 
     def get_all(self, ids_only=False):
         """
@@ -489,14 +517,10 @@ class RunDAO(object):
 
         :returns: A generator of run ids fitting the criteria
         """
-        run_gen = self.get_all(ids_only=True)
-        if run_gen is None:
-            return
-        matched_records = set(self.record_dao.data_query(**kwargs))
-        if matched_records:
-            for run in run_gen:
-                if run in matched_records:
-                    yield run
+        matched_runs = self._return_only_run_ids(self.record_dao.data_query(**kwargs))
+        for entry in matched_runs:
+            if entry is not None:
+                yield entry
 
     def get_given_data(self, **kwargs):
         """Alias data_query()."""
@@ -504,9 +528,9 @@ class RunDAO(object):
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
-        Return runs associated with a document uri.
+        Return Runs associated with a document uri.
 
-        Really just calls Record's implementation.
+        Mostly identical to Record's implementation, also filters out non-Runs.
 
         :param uri: The uri to match.
         :param accepted_ids_list: A list of ids to restrict the search to.
@@ -519,7 +543,10 @@ class RunDAO(object):
         records = self.record_dao.get_given_document_uri(uri,
                                                          accepted_ids_list=accepted_ids_list,
                                                          ids_only=ids_only)
-        if records:
+        if ids_only:
+            for run_id in self._return_only_run_ids(records):
+                yield run_id
+        else:
             for record in records:
                 if record.type == "run":
-                    yield sina.model.convert_record_to_run(record)
+                    yield sina.model.generate_run_from_json(record.raw)

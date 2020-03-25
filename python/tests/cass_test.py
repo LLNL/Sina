@@ -2,8 +2,7 @@
 """Test a Sina backend."""
 
 import logging
-import tempfile
-import time
+import unittest
 
 # Disable pylint checks due to its issue with virtual environments
 from nose.plugins.attrib import attr  # pylint: disable=import-error
@@ -81,34 +80,25 @@ class CassandraMixin(object):
 
 
 @attr('cassandra')
-class TestSetup(CassandraMixin, tests.backend_test.TestSetup):
+class TestSetup(CassandraMixin, unittest.TestCase):
     """
     Provides methods needed for setup-type tests on the Cassandra backend.
-
-    Also runs any setup-type tests that are unique to Cassandra.
     """
-
-    __test__ = True
-
     def setUp(self):
-        """Define a few shared variables, such as temp files, and builds a keyspace."""
-        self.test_db_dest = './test_{}_file.temp'.format(time.time())
         self.create_cass_keyspace()
 
     def tearDown(self):
-        """Remove any temp files created during test and tears down the keyspace."""
-        tests.backend_test.remove_file(self.test_db_dest)
         self.teardown_cass_keyspace()
 
     @patch('sina.datastores.cass_schema.form_connection', autospec=True)
     def test_factory_production(self, mock_form_conn):
         """Test to ensure Cassandra DAO can connect to non-local IPs."""
         ip_list = ['192.168.1.2:9042']
-        factory = self.create_dao_factory(test_db_dest=ip_list)
-        args, kwargs = mock_form_conn.call_args
-        self.assertEqual(args[0], TEMP_KEYSPACE_NAME)
-        self.assertEqual(kwargs['node_ip_list'], ip_list)
-        self.assertIsInstance(factory, self.backend.DAOFactory)
+        with self.create_dao_factory(test_db_dest=ip_list) as factory:
+            args, kwargs = mock_form_conn.call_args
+            self.assertEqual(args[0], TEMP_KEYSPACE_NAME)
+            self.assertEqual(kwargs['node_ip_list'], ip_list)
+            self.assertIsInstance(factory, self.backend.DAOFactory)
 
 
 @attr('cassandra')
@@ -123,13 +113,13 @@ class TestModify(CassandraMixin, tests.backend_test.TestModify):
 
     def setUp(self):
         """Create a keyspace to modify."""
-        # Deletion tests need a destination specified; Cassandra's default works.
-        self.test_db_dest = None
         self.create_cass_keyspace()
+        super(TestModify, self).setUp()
 
     def tearDown(self):
         """Tear down the keyspace so we can start fresh."""
         self.teardown_cass_keyspace()
+        super(TestModify, self).tearDown()
 
 
 @attr('cassandra')
@@ -146,12 +136,12 @@ class TestQuery(CassandraMixin, tests.backend_test.TestQuery):
     def setUpClass(cls):
         """Create the connection and populate it."""
         cls.create_cass_keyspace()
-        tests.backend_test.create_daos(cls)
-        tests.backend_test.populate_database_with_data(cls.record_dao)
+        super(TestQuery, cls).setUpClass()
 
     @classmethod
     def tearDownClass(cls):
         """Remove connections and keyspaces as needed."""
+        super(TestQuery, cls).tearDownClass()
         cls.teardown_cass_keyspace()
 
 
@@ -166,14 +156,9 @@ class TestImportExport(CassandraMixin, tests.backend_test.TestImportExport):
     __test__ = True
 
     def setUp(self):
-        """Define a few shared variables, such as temp files."""
-        self.test_file_path = tempfile.NamedTemporaryFile(
-            suffix='.csv',
-            delete=False,
-            mode='w+b')
         self.create_cass_keyspace()
+        super(TestImportExport, self).setUp()
 
     def tearDown(self):
-        """Remove any temp files or keyspaces created during test."""
-        tests.backend_test.remove_file(self.test_file_path.name)
         self.teardown_cass_keyspace()
+        super(TestImportExport, self).tearDown()

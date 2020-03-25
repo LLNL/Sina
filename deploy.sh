@@ -19,10 +19,10 @@ python-only deploy can take named args. Usage: <DEPLOY_DIR> <DOC_DIR> <EXAMPLE_L
 fi
 
 # Convert any relative paths to absolute and standardize ending in /
-DEPLOY_DIR=`readlink -f $1`/
-DOC_DIR=`readlink -f $2`/
+DEPLOY_DIR=`realpath $1`/
+DOC_DIR=`realpath $2`/
 # EXAMPLE_DIR is a symlink, so no ending /
-EXAMPLE_LINK=`readlink -f $3`
+EXAMPLE_LINK=`realpath --no-symlinks $3`
 CPP_DOCS=$DOC_DIR/sina/cpp
 PERM_GROUP=wciuser
 

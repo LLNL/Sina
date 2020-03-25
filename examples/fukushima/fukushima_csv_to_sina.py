@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 """
-Example CSV-to-Mnoda converter using freely available data.
+Example CSV-to-Sina converter using freely available data and plain JSON writing.
 
-This module converts the Fukushima aerial radiolagical data to a Mnoda file.
+This module converts the Fukushima aerial radiolagical data to a file fitting the Sina schema.
 The data consists of multiple measurements taken for a period of over an hour
 on each of three separate days.
+
+Unlike the NOAA converter, this has no reliance on Sina--if you'd like an example of using
+Sina Records as Python objects, check out the NOAA converter!
 
 Record types are:
     exp     contain the path to a file containing observations for the flight
@@ -92,8 +95,8 @@ MORE_FILES = [
         'presentation')
     ]
 
-# Name of the Mnoda file we will generate
-MNODA_FN = 'AMS_C12_SeaData.json'
+# Name of the Sina file we will generate
+sina_filename = 'AMS_C12_SeaData.json'
 
 # Status interval
 STATUS_INTERVAL = 100
@@ -223,7 +226,7 @@ def process_data(dataset_fn, dest_dn, show_status=False):
 # --------------------------------- CLASSES ---------------------------------
 class FukushimaData(object):
     """
-    Mnoda data class for the Fukushima metadata.
+    Sina data class for the Fukushima metadata.
     """
     def __init__(self, files_dn):
         """
@@ -327,17 +330,17 @@ class FukushimaData(object):
 
     def write(self):
         """
-        Write the data to the mnoda file.
+        Write the data to the Sina file.
         """
         if len(self.recs) > 0:
-            mnoda = {'records': self.recs}
+            raw_rec_doc = {'records': self.recs}
             if len(self.rels) > 0:
-                mnoda['relationships'] = self.rels
+                raw_rec_doc['relationships'] = self.rels
         else:
-            mnoda = {}
+            raw_rec_doc = {}
 
-        with open(os.path.join(self.files_dn, MNODA_FN), 'w') as ofd:
-            json.dump(mnoda, ofd, indent=4, separators=(',', ': '),
+        with open(os.path.join(self.files_dn, sina_filename), 'w') as ofd:
+            json.dump(raw_rec_doc, ofd, indent=4, separators=(',', ': '),
                       sort_keys=True)
 
     def write_exp(self, exp_id, obs):
@@ -359,7 +362,7 @@ def main():
     directory name.
     '''
     parser = argparse.ArgumentParser(
-        description='Convert Fukushima dataset from CSV to a Mnoda file.  Full'
+        description='Convert Fukushima dataset from CSV to a Sina file.  Full'
                     'paths will be written to the file to facilitate '
                     'subsequent access from Jupyter notebooks.')
 
@@ -373,7 +376,7 @@ def main():
 
     parser.add_argument('dest_dirname',
                         help='The pathname to the destination Fukushima data '
-                             'directory to which the Mnoda and observation '
+                             'directory to which the Sina-formatted and observation '
                              'files are to be written.  The directory will be '
                              'created if it does not exist.')
 

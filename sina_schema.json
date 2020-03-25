@@ -1,10 +1,14 @@
 {
-    "$id" : "https://llnl.gov/mnoda.schema.json",
+    "$id" : "https://llnl.gov/sina.schema.json",
     "$schema" : "http://json-schema.org/draft-07/schema#",
-    "title" : "Mnoda",
-    "description" : "Mnoda schema for simulation data",
+    "title" : "Sina Schema",
+    "description" : "Sina schema for simulation data",
     "type" : "object",
     "definitions" : {
+      "userDefDict" : {
+          "description": "Dictionary of additional misc. values not belonging elsewhere.",
+          "type": "object"
+        },
         "fileDict" : {
             "description": "Dictionary of files associated with Record",
             "type": "object",
@@ -63,7 +67,7 @@
             "properties": {
                 "files": { "$ref": "#/definitions/fileDict" },
                 "data": { "$ref": "#/definitions/dataDict" },
-                "user_defined": {}
+                "user_defined": { "$ref": "#/definitions/userDefDict"}
             }
         },
         "recordIdType" : {

@@ -17,7 +17,7 @@ char const GLOBAL_ID_FIELD[] = "id";
 char const DATA_FIELD[] = "data";
 char const TYPE_FIELD[] = "type";
 char const FILES_FIELD[] = "files";
-char const USER_DEFINED_KEY[] = "user_defined";
+char const USER_DEFINED_FIELD[] = "user_defined";
 
 }
 
@@ -47,7 +47,7 @@ nlohmann::json Record::toJson() const {
       asJson[DATA_FIELD] = datumRef;
     }
     if(!userDefined.is_null()){
-      asJson[USER_DEFINED_KEY] = userDefined;
+      asJson[USER_DEFINED_FIELD] = userDefined;
     }
     return asJson;
 }
@@ -68,8 +68,12 @@ Record::Record(nlohmann::json const &asJson) :
             files.insert(File(namedFile.key(), namedFile.value()));
         }
     }
-    auto userDefinedIter = asJson.find(USER_DEFINED_KEY);
+    auto userDefinedIter = asJson.find(USER_DEFINED_FIELD);
     if (userDefinedIter != asJson.end()) {
+        // Enforce that user_defined must be an object
+        if (!userDefinedIter->is_object()) {
+            throw std::invalid_argument("User_defined must be a JSON object");
+        }
         userDefined = *userDefinedIter;
     }
 }
@@ -82,7 +86,7 @@ void Record::add(File file) {
     files.insert(std::move(file));
 }
 
-void Record::setUserDefinedContent(nlohmann::json userDefined_) {
+void Record::setUserDefinedContent(nlohmann::json::object_t userDefined_) {
     userDefined = std::move(userDefined_);
 }
 

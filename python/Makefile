@@ -38,8 +38,11 @@ export PYTHON
 PYVERSION=$(shell $(PYTHON) -c 'import sys; print(sys.version_info[0])')
 ifeq ($(PYVERSION),2)
   PYTHON_VENV_OPTION:=virtualenv
+  # Setuptools dropped Py2 support in 45
+  SETUPTOOLS_INSTALL="setuptools<45.0.0"
 else
   PYTHON_VENV_OPTION:=venv
+  SETUPTOOLS_INSTALL=--upgrade setuptools
 endif
 
 # TODO: Pylint issues must be addressed before including it in the normal CI
@@ -107,7 +110,8 @@ install: $(LINKS_FILE)
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
 	if test -d $(VENV); then \
-	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip setuptools; \
+	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip; \
+	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL); \
 	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/development.txt; \
 	    echo $(PR_ACT); \
 	else \
@@ -127,6 +131,18 @@ cassandra: $(LINKS_FILE)
 	fi; \
 	echo "Installing cassandra in $(VENV)"; \
 	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/cassandra.txt
+
+# Add mysql dependencies to an existing virtual environment, where one is
+# created through a recursive call to make if it does not exist.
+mysql: $(LINKS_FILE)
+	@if test ! -d $(VENV); then \
+	  echo "Making the test virtual environment in $(VENV)"; \
+	  make --no-print-directory install VENV=$(VENV); \
+	else \
+	  echo "You already have the test virtual environment $(VENV)"; \
+	fi; \
+	echo "Installing mysql in $(VENV)"; \
+	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/mysql.txt
 
 # Add command line tool dependencies to an existing virtual environment, where
 # one is created through a recursive call to make if it does not exist.
@@ -170,6 +186,8 @@ jupyter: $(LINKS_FILE)
 	fi; \
 	echo "Installing jupyter in $(VENV)"; \
 	$(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/jupyter.txt
+	$(VENV)/bin/jupyter nbextension install widgetsnbextension --user --py
+	$(VENV)/bin/jupyter nbextension enable widgetsnbextension --user --py
 
 # Ensure the appropriate requirement links are established.  This is important
 # for building and testing purposes.
@@ -235,6 +253,17 @@ test-cassandra:
 	  $(TEST_VENV)/bin/tox -e cassandra; \
 	fi
 
+# Run mysql tests, which depend on a suitably configured test virtual
+# environment.
+test-mysql: export PATH=$(TEST_PATH)
+test-mysql:
+	@if test ! -d $(TEST_VENV); then \
+	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add mysql if it is to be included."; \
+	else \
+	  echo "Running mysql tests using $(TEST_VENV)"; \
+	  $(TEST_VENV)/bin/tox -e mysql; \
+	fi
+
 # Run command line tools tests, which depend on a suitably configured test
 # virtual environment.
 #
@@ -277,7 +306,8 @@ wheel:
 	@echo "Creating the sina wheel"; \
 	rm -rf ./wheel; \
 	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) ./wheel; \
-	wheel/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip setuptools wheel; \
+	wheel/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip wheel; \
+	wheel/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL); \
 	wheel/bin/python setup.py bdist_wheel --universal; \
 	rm -rf ./wheel
 

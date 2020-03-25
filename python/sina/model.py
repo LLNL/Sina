@@ -1,4 +1,4 @@
-"""Contains toplevel, abstract objects mirroring the Mnoda schema."""
+"""Contains toplevel, abstract objects mirroring the Sina schema."""
 from __future__ import print_function
 import json
 import logging
@@ -38,7 +38,7 @@ class Record(object):
 
         Currently, data and files are expected to be lists of dicts.
         Lists of strings (ex: ['{"name":"foo"}']) won't be read correctly.
-        See the Mnoda section of the documentation for what data and
+        See the Sina schema section of the documentation for what data and
         files should contain.
 
         :param id: The id of the record. Should be unique within a dataset
@@ -336,6 +336,27 @@ class Relationship(object):  # pylint: disable=too-few-public-methods
         """Return a string representation of a model Relationship."""
         return ('Model Relationship <object_id={}, subject_id={}, predicate={}>'
                 .format(self.object_id, self.subject_id, self.predicate))
+
+    def to_json_dict(self):
+        """
+        Create an object ready to dump as JSON.
+
+        Relationship's internal names don't match the schema (ex: we call object object_id to
+        avoid overwriting Python's "object".) This performs the necessary name-swaps.
+
+        You probably want to use to_json().
+
+        :return: A dictionary representing the relationship, ready to dump.
+        """
+        return {"subject": self.subject_id, "predicate": self.predicate, "object": self.object_id}
+
+    def to_json(self):
+        """
+        Create a JSON string from a Relationship.
+
+        :returns: A JSON string representing this Relationship
+        """
+        return json.dumps(self.to_json_dict())
 
 
 class Run(Record):

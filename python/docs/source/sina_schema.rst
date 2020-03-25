@@ -1,15 +1,15 @@
-.. _mnoda:
+.. _sina_schema:
 
-Mnoda Schema
+Sina Schema
 ============
 
 Overview
 --------
 
-The Mnoda schema is a generalized JSON format for representing experimental data.
+The Sina schema is a generalized JSON format for representing experimental data.
 It consists of two types of JSON objects: Records, which represent the components in
 an experiment (such as runs, msubs, and jobs) and Relationships, which represent
-the relationships between Records. Each Mnoda document consists of a single JSON
+the relationships between Records. Each Sina document consists of a single JSON
 object with arrays for Records and Relationships:
 
 .. code-block:: javascript
@@ -49,13 +49,11 @@ A more fleshed-out example, with field descriptions:
       // Local ID of the Record. Must be unique within JSON document. Will be
       // replaced by global id (or simply 'id') in db.
       "local_id": "obj1",
-      // A list of files associated with the Record
-      "files": [
-          // Each file must have a uri, and can optionally specify a mimetype and tags.
-          {"uri": "foo.png",
-           "mimetype": "image/png",
-           "tags": ["summary_image","output"]}
-      ],
+      // A dictionary of files associated with the Record
+      "files": {
+          // Each file can optionally specify a mimetype and tags.
+          "foo.png": {"mimetype": "image/png", "tags": ["summary_image","output"]}
+      },
       // A dictionary of data associated with the Record
       "data": {
           // Entries must have a value. Optionally, they can have tags and/or units.
@@ -68,8 +66,8 @@ A more fleshed-out example, with field descriptions:
           "revision": { "value": "12-4-11", "tags": ["pedigree"]},
           "presets": { "value": ["quickstart", "glass"]}
       },
+      // A dictionary of information that does not make sense as a data or file entry
       "user_defined": {
-          // Information that does not make sense as a data or file entry should be placed here.
           // None of this will be interpreted by Sina. Instead, it will simply
           // be saved as part of the Record.
           "display_string": "0x477265617420636174636821"
@@ -92,7 +90,7 @@ the :code:`subject`, "knows" is the :code:`predicate`, and "Bob" is the :code:`o
 
 To avoid confusion, try to use the grammatical active voice when assigning predicates.
 A "passive voice" :code:`predicate` like "contained by", "corrected by", or
-"launched by" reverses the normal direction of relations. In the Mnoda schema,
+"launched by" reverses the normal direction of relations. In the Sina schema,
 a Relationship always consists of exactly a :code:`subject`,
 :code:`predicate`, and :code:`object`, where the :code:`subject` and :code:`object`
 are each the :code:`id` of a Record:
@@ -133,7 +131,7 @@ Certain types of Records are expected to recur in data ingested by Sina.
 These types support additional fields in datastores created by Sina, and
 may also support additional queries. What follows is a list of Sina's
 special Record types and the fields they support. Note that **all
-fields supported by generic Mnoda Records are supported by the special types**,
+fields supported by generic Sina Records are supported by the special types**,
 such as :code:`local_id`, :code:`data`, etc.
 
 Run
@@ -151,9 +149,9 @@ a user and version:
       "application": "hydro",  // The application that produced the run
       "user": "John Doe",  // The user who ran the application
       "version": "1.5-dev2",  // The application's version
-      "files": [
-          {"uri": "run_image_1.png", "mimetype": "png"}
-      ],
+      "files": {
+          "run_image_1.png": {"mimetype": "png"}
+      },
       "data": {
           "final_energy": {"value": 4005.52, "units": "kJ"}
       }
@@ -163,7 +161,7 @@ a user and version:
 Complete, Empty Document
 ------------------------
 
-For convenience, below is a Mnoda document template with Relationship and generic
+For convenience, below is a Sina document template with Relationship and generic
 Record fields represented. Note that :code:`datum_name` should be replaced by the
 actual name of the datum (such as "density" or "max_volume").
 
@@ -185,9 +183,9 @@ actual name of the datum (such as "density" or "max_volume").
         {
           "type": "",
           "local_id": "",
-          "files": [
-              {"uri": "", "mimetype": "", "tags": []}
-          ],
+          "files": {
+              "uri": {"mimetype": "", "tags": []}
+          },
           "data": {
               "datum_name": {"value": [], "units": "", "tags": []}
           },

@@ -32,7 +32,7 @@ This depends mainly on whether you run then insert or run *and* insert.
 
 Run first, write JSON, insert when done
 #######################################
-You will need to modify your code to write Mnoda-compliant JSON. Use the Sina
+You will need to modify your code to write Sina schema-compliant JSON. Use the Sina
 CLI to ingest this JSON; it will handle setting up the backend (though you'll
 need a pre-existing keyspace for Cassandra). That's it! Once ingestion completes,
 you can begin querying your data.

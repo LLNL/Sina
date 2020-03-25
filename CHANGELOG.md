@@ -5,6 +5,16 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.7
+===
+- Added support for MySQL access
+- Improved support for Sonar machines
+- Updated tutorial resources and README
+- Overhauled storage of scalar lists
+- Merged functions with "_many()" variants
+  - Instead of ex: insert_many(my_list), use insert(my_list))
+- Bugfixes
+
 1.6
 ===
 - Added support for Adiak to Sina C++
@@ -40,22 +50,18 @@ https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 - Added ids_only mode for efficiency/filter combination
 - Began returning generators for get(), get_many(), etc.
 - Jupyter changes:
-
   - Improved Fukushima dataset documentation
   - Added new Fukushima example for subsecting large data sets
   - Various example notebook cleanups
   - Made many improvements to notebook testing/validation
-
 - Standardized using Sina virtual environment for non-bash shells
 
 1.2
 ===
 - Introduced Sina's Jupyter functionality
-
   - Added NOAA notebooks and converter
   - Added Fukushima notebooks and converter
   - Added getting_started notebook for kernel config
-
 - Added FAQ and reworked documentation
 - Renamed "values" to "data" for record (my_rec.data)
 

@@ -245,8 +245,8 @@ def _read_notebook(path):
                      attaches additional information.
     """
     try:
-        with open(path) as fout:
-            notebook = nbformat.read(fout, nbformat.current_nbformat)
+        with io.open(path, 'r', encoding='utf-8') as infile:
+            notebook = nbformat.read(infile, nbformat.current_nbformat)
     except IOError as exception:
         exception.args += ("reading {}".format(path),)
         raise

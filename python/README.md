@@ -1,38 +1,45 @@
 Contents
 ========
 - Overview
-- Software Dependencies
+- LC Setup
 - Standard Setup
 - Manual Setup
 
     - Creating the Environment
     - Installing Software Dependencies
-    - Completing the Installation
 
 - Activating the Virtual Environment
 - Deactivating the Virtual Environment
 - Using the Example Notebooks
 - Testing
 - Supported Environments
+- Database Support
 
 
 Overview
 ========
 
-Sina provides a command line interface for exploring and querying data stored
-using the Mnoda schema.  Once you install the software in a virtual environment,
-using the standard or manual process described below, you are ready to use the
-tools.  Each time you log in you'll first need to activate the environment.
-When you're done, we recommend you deactivate the virtual environment to get
+Sina's Python component is a tool for making simulation (meta)data collection
+and exploration simple.
+
+It works by collecting information from code runs, logs, and other outputs into
+a common file format which can then be passed off to one of Sina's supported
+backends, all of which are queried using the same user-friendly Python API. To the
+end user, this means that important data can be accessed through Python scripts,
+GUIs (Jupyter notebooks) etc. with all the speed of a datastore and none of the
+complexity (the user never has to interact with the datastore schema), nor any of
+the traditional headaches of parsing logs or remembering which file contains what.
+
+The instructions below will guide you through setting up a virtual environment for
+Sina (or installing it in one that already exists), running example notebooks, and
+getting dependencies for your backend(s) of choice. Note that SQL
+will always be available as the "default" backend. Once you're done with setup,
+a quickstart tutorial can be found in notebook form at
+<sina_root>/examples/basic_usage.ipynb.
+
+Remember that, if you're on LC, each time you log in you'll first need to activate the
+environment. When you're done, we recommend you deactivate the virtual environment to get
 back to your default environment or end your session.
-
-
-Software Dependencies
-=====================
-
-We have a requirements file for setting up the initial development virtual
-environment.  The file is called [development.txt](development.txt),
-which resides in the python requirements subdirectory.
 
 
 LC Setup
@@ -43,17 +50,20 @@ already installed::
 
     $ source /collab/usr/gapps/wf/releases/sina/bin/activate
 
-(The above is for bash; other activation scripts, e.g. activate.csh, can be found
-in the same directory.)
+The above is for bash; other activation scripts, e.g. activate.csh, can be found
+in the same directory.
 
 Sina will now be available for use via Python virtual environment, and can be
 tested with `sina -h` (which should display a help message). When you're done,
-use `deactivate` to exit the virtual environment. If you run into issues,
-please email us at siboka@llnl.gov.
+use `deactivate` to exit the virtual environment. Note that this will be the release
+(master) Sina version--if you want to use Sina Develop, you'll need to perform a local
+install.
+
+If you run into issues with the LC virtual environment, please email us at siboka@llnl.gov.
 
 
-Local Setup
-===========
+Standard Setup
+==============
 
 Standard installation, provided by the Makefile, is initiated by entering
 the following at the command line::
@@ -126,16 +136,15 @@ Lawrence Livermore National Laboratory.  The second file contains no flags.
 The links.txt file is included in other requirements files to ensure the
 options are consistent for the build and testing processes.
 
-Once you have a suitable requirements/links.txt file, enter the following
-command to install basic Sina dependencies::
+Once you've set up your requirements/links.txt, you can use our dev requirements
+file (<sina_root>/python/requirements/development.txt) to install
+basic Sina dependencies::
 
     $(venv) pip install -r requirements/development.txt
 
 
-Completing the Installation
----------------------------
 The requirements file should install the package in editable mode but, if
-not, you can install the package via::
+not, run::
 
     $(venv) pip install -e .
 
@@ -202,3 +211,23 @@ Sina is regularly tested in the following environments:
 - **TOSS 3, RedHat 7.5 (catalyst, rztopaz)**: Secondary development environment
 
 Absence is not an indication that Sina will not work; please consider expanding this list!
+
+
+Database Support
+================
+
+Out-of-the-box, Sina does not install drivers for relational databases other
+than SQLite. If you wish to connect to other databases (e.g. MySQL, MariaDB,
+or Oracle), you need to install the appropriate drivers for that database.
+You can do this with our Makefile::
+
+    $ make mysql 
+
+After you install the connector, you can connect to these types of databases
+from the command line tools::
+
+    $ sina ingest --database-type=sql --database "mysql+mysqlconnector://host:port/?read_default_file=~/.my.cnf"
+
+You can also connect with the programmatic API::
+
+    factory = DAOFactory("mysql+mysqlconnector://host:port/?read_default_file=~/.my.cnf")

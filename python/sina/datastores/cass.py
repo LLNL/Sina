@@ -26,15 +26,12 @@ import sina.utils as utils
 
 LOGGER = logging.getLogger(__name__)
 
+# Used to support data types with both "XFromRecord" and "RecordFromX" tables
 TABLE_LOOKUP = {
     "scalar": {"record_table": schema.RecordFromScalarData,
                "data_table": schema.ScalarDataFromRecord},
     "string": {"record_table": schema.RecordFromStringData,
-               "data_table": schema.StringDataFromRecord},
-    "stringlist": {"record_table": schema.RecordFromStringListData,
-                   "data_table": schema.StringListDataFromRecord},
-    "scalarlist": {"record_table": schema.RecordFromScalarListData,
-                   "data_table": schema.ScalarListDataFromRecord}
+               "data_table": schema.StringDataFromRecord}
 }
 
 
@@ -70,21 +67,35 @@ class RecordDAO(dao.RecordDAO):
     """The DAO specifically responsible for handling Records in Cassandra."""
 
     # pylint: disable=arguments-differ
-    # Args differ because SQL doesn't support force_overwrite yet, also because
-    # its insert() is functionally a helper to its insert_many, so it needs
-    # extra logic. SIBO-661 and SIBO-307
-    def insert(self, record, force_overwrite=False):
+    # Args differ because SQL doesn't support force_overwrite yet, SIBO-307
+    def insert(self, records, force_overwrite=False):
         """
-        Given a Record, insert it into the current Cassandra database.
+        Given a(n iterable of) Record(s), insert it into the current Cassandra database.
 
-        :param record: A Record to insert
+        :param records: A Record or iterable of Records to insert
         :param force_overwrite: Whether to forcibly overwrite a preexisting
                                 record that shares this record's id.
         :raises LWTException: If force_overwrite is False and an entry with the
                               id exists.
         """
         LOGGER.debug('Inserting %s into Cassandra with force_overwrite=%s.',
-                     record, force_overwrite)
+                     records, force_overwrite)
+
+        if isinstance(records, model.Record):
+            self._insert_one(records)
+        else:
+            self._insert_many(records, _type_managed=False)
+
+    def _insert_one(self, record, force_overwrite=False):
+        """
+        Given a single Record, insert it into the current Cassandra database.
+
+        :param records: A Record to insert
+        :param force_overwrite: Whether to forcibly overwrite a preexisting
+                                record that shares this record's id.
+        :raises LWTException: If force_overwrite is False and an entry with the
+                              id exists.
+        """
         is_valid, warnings = record.is_valid()
         if not is_valid:
             raise ValueError(warnings)
@@ -102,38 +113,46 @@ class RecordDAO(dao.RecordDAO):
                                files=record.files,
                                force_overwrite=force_overwrite)
 
-    # pylint: disable=arguments-differ,too-many-branches,too-many-locals
-    # This method is going away in SIBO-661
-    def insert_many(self, list_to_insert, force_overwrite=False, _type_managed=False):
+    # Disabled until rework, possibly splitting into the first and second batch types
+    # pylint: disable=too-many-locals, too-many-branches
+    @staticmethod
+    def _insert_many(list_to_insert, _type_managed, force_overwrite=False):
         """
-        Given a list of Records, insert each into Cassandra.
+        Given an iterable of Records, insert each into Cassandra.
 
         This method relies heavily on batching--if you're only inserting a few
         records, you may not see performance gains, and may even see some
         slowdowns due to batch logic overhead.
 
         :param list_to_insert: A list of Records to insert
+        :param _type_managed: Whether all records inserted are the same type
+                              AND _insert_many is called from a method that has
+                              special handling for this type. See Run's
+                              insert()
         :param force_overwrite: Whether to forcibly overwrite a preexisting run
                                 that shares this run's id.
-        :param _type_managed: Whether all records inserted are the same type
-                              AND insert_many is called from a method that has
-                              special handling for this type. See Run's
-                              insert_many()
         """
-        LOGGER.debug('Inserting %i records to Cassandra with'
+        LOGGER.debug('Inserting records %s to Cassandra with'
                      'force_overwrite=%s and _type_managed=%s.',
-                     len(list_to_insert), force_overwrite, _type_managed)
+                     list_to_insert, force_overwrite, _type_managed)
         # Because batch is done by partition key, we'll need to store info for
-        # tables whose full per-partition info isn't supplied by one Record
+        # tables whose full per-partition info isn't supplied by one Record.
+        # Thus, these rec_from_x dicts last for the full insert.
         from_scalar_batch = defaultdict(list)
         from_string_batch = defaultdict(list)
         from_scalar_list_batch = defaultdict(list)
         from_string_list_batch = defaultdict(list)
 
-        def _cross_populate_batch(batch_dict, batch_list):
-            """Insert data into a batch dict and list."""
+        def _cross_populate_batch(batch_dict, batch_list=None):
+            """
+            Insert data into a batch dict (rec_from_x) and list (x_from_rec).
+
+            Not all data types make sense for an x_from_rec table (ex: lists),
+            so in those cases, simply skip the list population.
+            """
             batch_dict[datum_name].append((value, id, units, tags))
-            batch_list.append((datum_name, value, units, tags))
+            if batch_list is not None:
+                batch_list.append((datum_name, value, units, tags))
 
         for record in list_to_insert:
             # Insert the Record itself
@@ -146,10 +165,10 @@ class RecordDAO(dao.RecordDAO):
                    type=record.type,
                    raw=json.dumps(record.raw))
             if record.data:
+                # Unlike the rec_from_x dictionaries, these have the scope of a
+                # single Record, since the record id acts as their partition key.
                 string_from_rec_batch = []
                 scalar_from_rec_batch = []
-                string_list_from_rec_batch = []
-                scalar_list_from_rec_batch = []
                 tags, units, value, datum_name, id = [None]*5
 
                 for datum_name, datum in record.data.items():
@@ -165,22 +184,16 @@ class RecordDAO(dao.RecordDAO):
                         # This is safe as long as future functionality involving
                         # modifying already-ingested data checks type on re-ingestion
                         if not value or isinstance(value[0], numbers.Real):
-                            _cross_populate_batch(from_scalar_list_batch,
-                                                  scalar_list_from_rec_batch)
+                            _cross_populate_batch(from_scalar_list_batch)
                         else:
-                            _cross_populate_batch(from_string_list_batch,
-                                                  string_list_from_rec_batch)
+                            _cross_populate_batch(from_string_list_batch)
                     else:
                         # It's a string (or it's something else and Cassandra will yell)
                         _cross_populate_batch(from_string_batch, string_from_rec_batch)
 
-                # We've finished this record's data--do the batch inserts
+                # We've finished this record's data--do the x_from_rec batch inserts
                 for table, data_list in ((schema.ScalarDataFromRecord, scalar_from_rec_batch),
-                                         (schema.StringDataFromRecord, string_from_rec_batch),
-                                         (schema.ScalarListDataFromRecord,
-                                          scalar_list_from_rec_batch),
-                                         (schema.StringListDataFromRecord,
-                                          string_list_from_rec_batch)):
+                                         (schema.StringDataFromRecord, string_from_rec_batch)):
                     with BatchQuery() as batch_query:
                         create = (table.batch(batch_query).create if force_overwrite
                                   else table.batch(batch_query).if_not_exists().create)
@@ -207,8 +220,8 @@ class RecordDAO(dao.RecordDAO):
                                mimetype=doc[1],
                                tags=doc[2])
 
-        # We've gone through every record we were given. The from_scalar_batch
-        # and from_string_batch dictionaries are ready for batch inserting.
+        # We've gone through every record we were given. The rec_from_x batch
+        # dictionaries are ready for inserting.
         for table, partition_data in ((schema.RecordFromScalarData, from_scalar_batch),
                                       (schema.RecordFromStringData, from_string_batch)):
             for partition, data_list in six.iteritems(partition_data):
@@ -222,18 +235,29 @@ class RecordDAO(dao.RecordDAO):
                                units=entry[2],
                                tags=entry[3])
         # The RecordFromList-type tables differ form their partners slightly more
-        # to support their associated queries
-        for table, partition_data in ((schema.RecordFromScalarListData, from_scalar_list_batch),
-                                      (schema.RecordFromStringListData, from_string_list_batch)):
-            for partition, data_list in six.iteritems(partition_data):
-                with BatchQuery() as batch_query:
-                    # We no longer worry about overriding, trusting the partner
-                    # table to catch it if necessary.
-                    for entry in data_list:
-                        for value in entry[0]:
-                            table.batch(batch_query).create(name=partition,
-                                                            value=value,
+        # to support their associated queries. They also differ from one another.
+        table = schema.RecordFromScalarListDataMin
+        support_table = schema.RecordFromScalarListDataMax
+        for partition, data_list in six.iteritems(from_scalar_list_batch):
+            with BatchQuery() as batch_query:
+                for entry in data_list:
+                    # We track only the min and max, that's all we need for queries
+                    table.batch(batch_query).create(name=partition,
+                                                    min=min(entry[0]),
+                                                    id=entry[1])
+                    support_table.batch(batch_query).create(name=partition,
+                                                            max=max(entry[0]),
                                                             id=entry[1])
+        table = schema.RecordFromStringListData
+        for partition, data_list in six.iteritems(from_string_list_batch):
+            with BatchQuery() as batch_query:
+                # We no longer worry about overriding, trusting the partner
+                # table to catch it if necessary.
+                for entry in data_list:
+                    for value in entry[0]:
+                        table.batch(batch_query).create(name=partition,
+                                                        value=value,
+                                                        id=entry[1])
 
     @staticmethod
     def _insert_data(data, id, force_overwrite=False):
@@ -252,12 +276,12 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting %i data entries to Record ID %s and force_overwrite=%s.',
                      len(data), id, force_overwrite)
         for datum_name, datum in data.items():
-            schema.cross_populate_data_tables(id=id,
-                                              name=datum_name,
-                                              value=datum['value'],
-                                              units=datum.get('units'),
-                                              tags=datum.get('tags'),
-                                              force_overwrite=force_overwrite)
+            schema.cross_populate_query_tables(id=id,
+                                               name=datum_name,
+                                               value=datum['value'],
+                                               units=datum.get('units'),
+                                               tags=datum.get('tags'),
+                                               force_overwrite=force_overwrite)
 
     @staticmethod
     def _insert_files(id, files, force_overwrite=False):
@@ -281,31 +305,23 @@ class RecordDAO(dao.RecordDAO):
                    mimetype=file_info.get('mimetype'),
                    tags=file_info.get('tags'))
 
-    def delete(self, id):
+    def delete(self, ids):
         """
-        Delete a single Record from the Cassandra backend.
+        Given a(n iterable of) Record id(s), delete the Record(s) from the current database.
 
-        Removes everything: its data, any relationships it's in, files. Relies on
-        Cassandra batching, one batch per Record.
+        Removes everything: data, related relationships, files. Relies on
+        Cassandra batching, one batch per Record if there's only one Record to
+        delete, else one batch overall.
 
-        :param id: The id of the Record to delete
+        :param ids: The id or list of ids of the Record(s) to delete
         """
-        with BatchQuery() as batch:
-            self._setup_batch_delete(batch, id)
-
-    def delete_many(self, ids_to_delete):
-        """
-        Delete a list of Records from the Cassandra backend.
-
-        Removes everything: their data, relationships, files. Relies on
-        Cassandra's batching, one batch encompassing all Records. If you want
-        to do one batch per Record, use delete() in a loop.
-
-        :param ids_to_delete: A list of ids of Records to delete
-        """
-        with BatchQuery() as batch:
-            for id in ids_to_delete:
-                self._setup_batch_delete(batch, id)
+        if isinstance(ids, six.string_types):
+            with BatchQuery() as batch:
+                self._setup_batch_delete(batch, ids)
+        else:
+            with BatchQuery() as batch:
+                for id in ids:
+                    self._setup_batch_delete(batch, id)
 
     def _setup_batch_delete(self, batch, record_id):
         """
@@ -328,10 +344,10 @@ class RecordDAO(dao.RecordDAO):
         # Delete every piece of data
         # Done a bit differently because record_id isn't always the partition key
         for name, datum in six.iteritems(record['data']):
-            schema.cross_batch_delete_data_tables(id=record_id,
-                                                  name=name,
-                                                  value=datum['value'],
-                                                  batch=batch)
+            schema.cross_batch_delete_query_tables(id=record_id,
+                                                   name=name,
+                                                   value=datum['value'],
+                                                   batch=batch)
 
         # Because Relationships are created separately from Records, we have to
         # manually discover all relationships. Because they are mirrored, we
@@ -355,10 +371,7 @@ class RecordDAO(dao.RecordDAO):
              .batch(batch).delete())
         schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
-    # Disable pylint checks -- including R0914=too-many-locals -- to if and
-    # until the team decides to refactor the code
-    def data_query(self,  # pylint: disable=too-many-branches,too-many-branches,R0914
-                   **kwargs):
+    def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
 
@@ -384,7 +397,8 @@ class RecordDAO(dao.RecordDAO):
         # We will always have at least one entry in one of scalar, string, scalarlist, etc.
         if not kwargs.items():
             raise ValueError("You must supply at least one criterion.")
-        scalar, string, scalarlist, stringlist = utils.sort_and_standardize_criteria(kwargs)
+        (scalar, string, scalarlist,
+         stringlist, universal) = utils.sort_and_standardize_criteria(kwargs)
         result_ids = []
 
         # String and scalar values can be passed directly to _apply_ranges_to_query
@@ -394,119 +408,23 @@ class RecordDAO(dao.RecordDAO):
                 result_ids.append(self._apply_ranges_to_query(criteria,
                                                               table_type))
 
-        # Different types of list criteria require different logic
-        for criteria, table_type in ((scalarlist, "scalarlist"),
-                                     (stringlist, "stringlist")):
-            for criterion in criteria:
-                # Unpack the criterion
-                datum_name, list_criteria = criterion
-                # Figure out which function to use
-                if list_criteria.operation == utils.ListQueryOperation.ALL:
-                    query_func = self._apply_has_all_to_query
-                elif list_criteria.operation == utils.ListQueryOperation.ANY:
-                    query_func = self._apply_has_any_to_query
-                elif list_criteria.operation == utils.ListQueryOperation.ONLY:
-                    query_func = self._apply_has_only_to_query
-                else:
-                    raise ValueError("Currently, only {} list operations are supported. "
-                                     "Given {}".format((utils.ListQueryOperation.ALL,
-                                                        utils.ListQueryOperation.ANY,
-                                                        utils.ListQueryOperation.ONLY),
-                                                       list_criteria.operation))
-                result_ids.append(query_func(table=table_type,
-                                             datum_name=datum_name,
-                                             datum_criteria=list_criteria.entries))
+        # List values have special logic per type
+        result_ids += [self._string_list_query(datum_name=name,
+                                               string_list=list_criteria.value,
+                                               operation=list_criteria.operation)
+                       for name, list_criteria in stringlist]
+        result_ids += [self._scalar_list_query(datum_name=name,
+                                               data_range=range_criteria.value,
+                                               operation=range_criteria.operation)
+                       for name, range_criteria in scalarlist]
+
+        # Universal values come in only one type for now.
+        if universal:
+            result_ids.append(self._universal_query(universal))
+
         # If we have more than one set of data, we need to find the intersect.
         for id in utils.intersect_lists(result_ids):
             yield id
-
-    def _apply_has_all_to_query(self, datum_name, datum_criteria, table):
-        """
-        Return the ids of all Records whose data fulfill table-specific has_all criteria.
-
-        Used with data_query(), specifically for the has_all list query, which is
-        documented further in sina.utils.has_all().
-
-        :param datum_name: The name of the datum the has_all is performed against.
-        :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
-
-        :returns: a generator of ids fitting the criteria
-        """
-        # Initially, it seemed as though _apply_ranges_to_query was all that was
-        # needed here, but there's an important caveat: _apply_ranges relies on
-        # both the DataFromRecord and RecordFromData tables, and the former
-        # looks much different for list data. And so:
-        rec_table = TABLE_LOOKUP[table]["record_table"]
-        result_sets = []
-        for criterion in datum_criteria:
-            result_sets.append(set(self._configure_query_for_criteria(rec_table.objects,
-                                                                      name=datum_name,
-                                                                      criteria=criterion)
-                                   .values_list('id', flat=True)))
-        return set.intersection(*result_sets)
-
-    def _apply_has_any_to_query(self, datum_name, datum_criteria, table):
-        """
-        Return the ids of all Records whose data fulfill table-specific has_any criteria.
-
-        Used with data_query(), specifically for the has_any list query, which is
-        documented further in sina.utils.has_any().
-
-        :param datum_name: The name of the datum the has_any is performed against.
-        :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
-
-        :returns: a set of ids fitting the criteria
-        """
-        rec_table = TABLE_LOOKUP[table]["record_table"]
-        # Cassandra has no OR operator. Ordinarily we'd chain queries as generators,
-        # but it's possible to get duplicate ids, so we do need to store all results
-        # in memory to filter dupes.
-        distinct_ids = set()
-        for criterion in datum_criteria:
-            ids = self._configure_query_for_criteria(rec_table.objects,
-                                                     datum_name,
-                                                     criterion).values_list('id', flat=True)
-            for id in ids:
-                distinct_ids.add(id)
-        return distinct_ids
-
-    def _apply_has_only_to_query(self, datum_name, datum_criteria, table):
-        """
-        Return the ids of all Records whose data fulfill table-specific has_only criteria.
-
-        Used with data_query(), specifically for the has_only list query, which is
-        documented further in sina.utils.has_only().
-
-        The simplest expression of this in query terms is something like::
-
-            has_only(n) = has_all(n) - has_any(anything not n)
-
-        where n is a list of criteria, but as cqlengine does not support negation
-        at time of writing, the logic here differs to accomodate.
-
-        :param datum_name: The name of the datum the has_only is performed against.
-        :param datum_criteria: The criteria to apply to the query
-        :param table: The name of the table, to look up in TABLE_LOOKUP (module-level var).
-
-        :returns: a set of ids fitting the criteria
-        """
-        included_ids = set(self._apply_has_all_to_query(datum_name, datum_criteria, table))
-        # If this query proves popular but nonperformant, we may want to make a
-        # dedicated query table that stores list data as a set (order and count are explicitly
-        # ignored for has_only). This will only work if has_only is invoked with no
-        # DataRanges. Until then, we convert simple equivalence (x="foo") to DataRanges.
-        ranges = [x if isinstance(x, utils.DataRange)
-                  else utils.DataRange(x, x, max_inclusive=True)
-                  for x in datum_criteria]
-        excluded_ids = self._apply_has_any_to_query(datum_name,
-                                                    utils.invert_ranges(ranges),
-                                                    table)
-        for id in excluded_ids:
-            if id in included_ids:
-                included_ids.remove(id)
-        return included_ids
 
     def _apply_ranges_to_query(self, data, table):
         """
@@ -514,7 +432,8 @@ class RecordDAO(dao.RecordDAO):
 
         Done per table, unlike data_query. This is only meant to be used in
         conjunction with data_query() and related. Criteria can be DataRanges
-        or single values (12, "dog", etc).
+        or single values (12, "dog", etc). As such, it is not used for the list
+        data tables.
 
         Because each piece of data is its own row and we need to compare between
         rows, we can't use a simple AND. In SQL, we get around this with
@@ -591,24 +510,144 @@ class RecordDAO(dao.RecordDAO):
                     query = query.filter(value__lt=criteria.max)
         return query
 
-    def get(self, id):
+    @staticmethod
+    def _string_list_query(datum_name, string_list, operation):
         """
-        Given a id, return match (if any) from Cassandra database.
+        Return all Records where [datum_name] fulfills [operation] for [string_list].
 
-        :param id: The id of the record to return
+        Helper method for data_query.
 
-        :returns: A record matching that id or None
+        :param datum_name: The name of the datum
+        :param string_list: A list of strings datum_name must contain.
+        :pram operation: What kind of ListQueryOperation to do.
+        :returns: A generator of ids of matching Records or the Records
+                  themselves (see ids_only).
+
+        :raises ValueError: if given an invalid operation for a string list
         """
-        LOGGER.debug('Getting record with id=%s', id)
-        query = schema.Record.objects.filter(id=id).get()
-        return model.generate_record_from_json(
-            json_input=json.loads(query.raw))
+        def get_list_rows_with_val(value):
+            """Return StringList ids with matching value for datum_name."""
+            query = schema.RecordFromStringListData.filter(name=datum_name, value=value)
+            return query.values_list('id', flat=True)
+
+        # Pre-populate. Necessary for ALL, harmless for ANY
+        distinct_ids = set(get_list_rows_with_val(string_list[0]))
+
+        if operation == utils.ListQueryOperation.HAS_ALL:
+            set_func = distinct_ids.intersection_update
+        elif operation == utils.ListQueryOperation.HAS_ANY:
+            set_func = distinct_ids.update
+        else:
+            # This can only happen if there's an operation that accepts a list
+            # of strings but is not supported by string_list_query.
+            raise ValueError("Given an invalid operation for a string list query: {}"
+                             .format(operation.value))
+
+        for string in string_list[1:]:
+            set_func(get_list_rows_with_val(string))
+
+        return distinct_ids
+
+    @staticmethod
+    def _scalar_list_query(datum_name, data_range, operation):
+        """
+        Return all Records where [datum_name] fulfills [operation] for [data_range].
+
+        Helper method for data_query.
+
+        :param datum_name: The name of the datum
+        :param data_range: A datarange to be used with <operation>
+        :pram operation: What kind of ListQueryOperation to do.
+        :returns: A generator of ids of matching Records.
+
+        :raises ValueError: if given an invalid operation for a datarange
+        """
+        LOGGER.info('Finding Records where datum %s has %s in %s', datum_name,
+                    operation.value.split('_')[0], data_range)
+
+        # Because Cassandra won't let us filter sequential keys, we need to use 2 tables.
+        query_tables = {"min": schema.RecordFromScalarListDataMin,
+                        "max": schema.RecordFromScalarListDataMax}
+
+        # Cassandra's filters use kwargs. We'll have to build names then unpack.
+        if operation == utils.ListQueryOperation.ALL_IN:
+            # (What must be [>,>=] the criterion's min, [<,<=] the criterion's max)
+            op_cols = ("min", "max")
+        elif operation == utils.ListQueryOperation.ANY_IN:
+            op_cols = ("max", "min")
+        else:
+            raise ValueError("Given an invalid operation for a scalar range query: {}"
+                             .format(operation.value))
+
+        # Set whether it's > or >=, < or <=
+        record_ids = []
+        if data_range.min is not None:
+            op_desc = op_cols[0]+"__gte" if data_range.min_inclusive else op_cols[0]+"__gt"
+            record_ids.append(set(query_tables[op_cols[0]].objects
+                                  .filter(name=datum_name)
+                                  .filter(**{op_desc: data_range.min})
+                                  .values_list('id', flat=True)))
+        if data_range.max is not None:
+            op_desc = op_cols[1]+"__lte" if data_range.max_inclusive else op_cols[1]+"__lt"
+            record_ids.append(set(query_tables[op_cols[1]].objects
+                                  .filter(name=datum_name)
+                                  .filter(**{op_desc: data_range.max})
+                                  .values_list('id', flat=True)))
+        for record_id in set.intersection(*record_ids):
+            yield record_id
+
+    @staticmethod
+    def _universal_query(universal_criteria):
+        """
+        Pull back all record ids fulfilling universal criteria.
+
+        We currently need #criteria * #tables queries to do this due to the inability
+        to query across partitions ("for every Record" doesn't work as one query).
+
+        :param universal_criteria: List of tuples: (datum_name, UniversalCriteria)
+        :return: generator of ids of Records fulfilling all criteria.
+        """
+        query_tables = [schema.RecordFromScalarData, schema.RecordFromStringData,
+                        schema.RecordFromStringListData, schema.RecordFromScalarListDataMin]
+        desired_names = [x[0] for x in universal_criteria]
+        LOGGER.info('Finding Records where data in %s exist', desired_names)
+        result_counts = defaultdict(lambda: 0)
+        expected_result_count = len(universal_criteria)
+        for query_table in query_tables:
+            for name in desired_names:
+                query = query_table.objects.filter(name=name).values_list('id', flat=True)
+                for rec_id in query:
+                    result_counts[rec_id] += 1
+        for entry, val in six.iteritems(result_counts):
+            if val == expected_result_count:
+                yield entry
+
+    def _get_one(self, id, _record_builder):
+        """
+        Apply some "get" function to a single Record id.
+
+        Used by the parent get(), this is the Cassandra-specific implementation of
+        getting a single Record.
+
+        :param id: A Record id to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A Record if found, else None.
+
+        :raises ValueError: if a Record with the id can't be found.
+        """
+        try:
+            query = schema.Record.objects.filter(id=id).get()
+            return _record_builder(json_input=json.loads(query.raw))
+        except DoesNotExist:  # Raise a more familiar, descriptive error.
+            raise ValueError("No Record found with id {}".format(id))
 
     def get_all_of_type(self, type, ids_only=False):
         """
-        Given a type of record, return all Records of that type.
+        Given a type of Record, return all Records of that type.
 
-        :param type: The type of record to return, ex: run
+        :param type: The type of Record to return, ex: run
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
@@ -616,15 +655,14 @@ class RecordDAO(dao.RecordDAO):
                   generator of their ids
         """
         LOGGER.debug('Getting all records of type %s.', type)
-        # Allow_filtering() is, as a rule, inadvisable; if speed becomes a
-        # concern, an id - type query table should be easy to set up.
-        query = (schema.Record.objects.filter(type=type)
-                 .allow_filtering().values_list('id', flat=True))
+        # There's an index on type, which should be alright as type is expected
+        # to have low cardinality. If speed becomes an issue, a dedicated query table might help.
+        query = (schema.Record.objects.filter(type=type).values_list('id', flat=True))
         if ids_only:
             for id in query:
                 yield str(id)
         else:
-            for record in self.get_many(query):
+            for record in self.get(query):
                 yield record
 
     def get_available_types(self):
@@ -701,7 +739,7 @@ class RecordDAO(dao.RecordDAO):
             for id in set(match_ids):
                 yield id
         else:
-            for record in self.get_many(set(match_ids)):
+            for record in self.get(set(match_ids)):
                 yield record
 
     def _get_with_max_min_helper(self, scalar_name, count, id_only, sort_ascending):
@@ -715,7 +753,7 @@ class RecordDAO(dao.RecordDAO):
         order_by = 'value' if sort_ascending else '-value'
         ids = (schema.RecordFromScalarData.objects.filter(name=scalar_name)
                .order_by(order_by).limit(count).all().values_list('id', flat=True))
-        return ids if id_only else self.get_many(ids)
+        return ids if id_only else self.get(ids)
 
     def get_with_max(self, scalar_name, count=1, id_only=False):
         """
@@ -758,8 +796,12 @@ class RecordDAO(dao.RecordDAO):
         """
         Retrieve a subset of data for Records (or optionally a subset of Records).
 
-        For example, it might get "debugger_version" and "volume" for the
-        Records with ids "foo_1" and "foo_3". It's returned in a dictionary of
+        NOTE: This is not for list-type data! If you have a use case involving
+        getting list-type data for large numbers of Records at once, please
+        let us know. For now, list-type data is ignored.
+
+        This method might, for example, get "debugger_version" and "volume" for the
+        Records with ids "foo_1" and "foo_3". Results are returned in a dictionary of
         dictionaries; the outer key is the record_id, the inner key is the
         name of the data piece (ex: "volume"). So::
 
@@ -785,8 +827,10 @@ class RecordDAO(dao.RecordDAO):
         :returns: a dictionary of dictionaries containing the requested data,
                  keyed by record_id and then data field name.
         """
-        LOGGER.debug('Getting data in %s for %s',
-                     data_list,
+        if id_list is not None:
+            # Cassandra-driver doesn't handle a gen for id_list safely. Cast early for nice logs.
+            id_list = list(id_list)
+        LOGGER.debug('Getting data in %s for %s', data_list,
                      'record ids in {}'.format(id_list) if id_list is not None else "all records")
         data = defaultdict(lambda: defaultdict(dict))
         query_tables = ([schema.ScalarDataFromRecord, schema.StringDataFromRecord]
@@ -819,8 +863,10 @@ class RecordDAO(dao.RecordDAO):
         """
         Given a specific datum for a specific Record, return its tags.
 
-        We'll go through our query tables until we find the data entry, so this
-        works for strings/scalars/lists thereof, but not non-data entries (files, etc).
+        Helper method for get_data_for_records.
+
+        We'll go through our data tables until we find the entry, so this
+        works for strings and scalars, but not lists or files.
 
         Cassandra has a limitation wherein any "IN" query stops working
         if one of the columns requested contains collections. 'tags' is a
@@ -837,8 +883,8 @@ class RecordDAO(dao.RecordDAO):
 
         :raises ValueError: if given a name or id not found in the database.
         """
-        query_tables = [TABLE_LOOKUP[x]["data_table"] for x in TABLE_LOOKUP]
-        for table in query_tables:
+        data_tables = [TABLE_LOOKUP[x]["data_table"] for x in ("scalar", "string")]
+        for table in data_tables:
             tags = (table.objects
                     .filter(table.id == id)
                     .filter(table.name == name)
@@ -860,7 +906,7 @@ class RecordDAO(dao.RecordDAO):
         :param id: The record id to find scalars for
         :param scalar_names: A list of the names of scalars to return
 
-        :return: A dict of scalars matching the Mnoda data specification
+        :return: A dict of scalars matching the Sina data specification
         """
         LOGGER.warning("Using deprecated method get_scalars()."
                        "Consider using Record.data instead.")
@@ -887,79 +933,71 @@ class RecordDAO(dao.RecordDAO):
 class RelationshipDAO(dao.RelationshipDAO):
     """The DAO responsible for handling Relationships in Cassandra."""
 
-    def insert(self, relationship=None, subject_id=None,
+    def insert(self, relationships=None, subject_id=None,
                object_id=None, predicate=None):
         """
-        Given some Relationship, import it into a Cassandra database.
+        Given some Relationship(s), import into a Cassandra database.
 
         This can create an entry from either an existing relationship object
         or from its components (subject id, object id, predicate). If all four
-        are provided, the Relationship will be used.
+        are provided, the Relationship will be used. If inserting many
+        Relationships, a list of Relationships MUST be provided (and no
+        other fields).
 
-        This method doesn't make use of Cassandra's batching. See insert_many()
-        for inserting large sets of Relationships.
-
-        :param relationship: A Relationship object to build entry from.
+        :param relationships: A Relationship object to build entry from or iterable of them.
         :param subject_id: The id of the subject.
         :param object_id: The id of the object.
-        :param predicate: A string describing the relationship.
+        :param predicate: A string describing the relationship between subject and oject.
         """
-        subj, obj, pred = self._validate_insert(relationship=relationship,
-                                                subject_id=subject_id,
-                                                object_id=object_id,
-                                                predicate=predicate)
-        schema.cross_populate_object_and_subject(subject_id=subj,
-                                                 object_id=obj,
-                                                 predicate=pred)
+        if (isinstance(relationships, model.Relationship)
+                or any(x is not None for x in (subject_id, object_id, predicate))):
+            subj, obj, pred = self._validate_insert(relationship=relationships,
+                                                    subject_id=subject_id,
+                                                    object_id=object_id,
+                                                    predicate=predicate)
+            schema.cross_populate_object_and_subject(subject_id=subj,
+                                                     object_id=obj,
+                                                     predicate=pred)
+        else:
+            LOGGER.debug('Inserting %i relationships.', len(relationships))
+            # Batching is done per partition key--we won't know per-partition
+            # contents until we've gone through the full list of Relationships.
+            from_subject_batch = defaultdict(list)
+            from_object_batch = defaultdict(list)
 
-    def insert_many(self, list_to_insert):
-        """
-        Given a list of Relationships, insert each into Cassandra.
-
-        This method relies heavily on batching--if you're only inserting a few
-        Relationships, you may not see performance gains, and may even see some
-        slowdowns due to batch logic overhead.
-
-        :param list_to_insert: A list of Relationships to insert
-        """
-        LOGGER.debug('Inserting %i relationships.', len(list_to_insert))
-        # Batching is done per partition key--we won't know per-partition
-        # contents until we've gone through the full list of Relationships.
-        from_subject_batch = defaultdict(list)
-        from_object_batch = defaultdict(list)
-
-        for rel in list_to_insert:
-            from_subject_batch[rel.subject_id].append((rel.predicate,
-                                                       rel.object_id))
-            from_object_batch[rel.object_id].append((rel.predicate,
-                                                     rel.subject_id))
-        # Our dictionaries are populated and ready for batch insertion
-        for object_id, insert_info in six.iteritems(from_object_batch):
-            # Only having one entry is a common use case. Skip the overhead!
-            if len(insert_info) == 1:
-                schema.cross_populate_object_and_subject(subject_id=insert_info[0][1],
-                                                         object_id=object_id,
-                                                         predicate=insert_info[0][0])
-            else:
-                with BatchQuery() as batch_query:
-                    for entry in insert_info:
-                        (schema.SubjectFromObject
-                         .batch(batch_query).create(object_id=object_id,
-                                                    predicate=entry[0],
-                                                    subject_id=entry[1]))
-        for subject_id, insert_info in six.iteritems(from_subject_batch):
-            # We already handled this use case with the cross_populate above
-            if len(insert_info) == 1:
-                pass
-            else:
-                with BatchQuery() as batch_query:
-                    for entry in insert_info:
-                        (schema.ObjectFromSubject
-                         .batch(batch_query).create(subject_id=subject_id,
-                                                    predicate=entry[0],
-                                                    object_id=entry[1]))
+            for rel in relationships:
+                from_subject_batch[rel.subject_id].append((rel.predicate,
+                                                           rel.object_id))
+                from_object_batch[rel.object_id].append((rel.predicate,
+                                                         rel.subject_id))
+            # Our dictionaries are populated and ready for batch insertion
+            for obj, insert_info in six.iteritems(from_object_batch):
+                # Only having one entry is a common use case. Skip the overhead!
+                if len(insert_info) == 1:
+                    schema.cross_populate_object_and_subject(subject_id=insert_info[0][1],
+                                                             object_id=obj,
+                                                             predicate=insert_info[0][0])
+                else:
+                    with BatchQuery() as batch_query:
+                        for entry in insert_info:
+                            (schema.SubjectFromObject
+                             .batch(batch_query).create(obj=obj,
+                                                        predicate=entry[0],
+                                                        subject_id=entry[1]))
+            for subj, insert_info in six.iteritems(from_subject_batch):
+                # We already handled this use case with the cross_populate above
+                if len(insert_info) == 1:
+                    pass
+                else:
+                    with BatchQuery() as batch_query:
+                        for entry in insert_info:
+                            (schema.ObjectFromSubject
+                             .batch(batch_query).create(subject_id=subj,
+                                                        predicate=entry[0],
+                                                        object_id=entry[1]))
 
     def get(self, subject_id=None, object_id=None, predicate=None):
+        """Retrieve relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)
@@ -1000,139 +1038,112 @@ class RelationshipDAO(dao.RelationshipDAO):
 class RunDAO(dao.RunDAO):
     """DAO responsible for handling Runs, (Record subtype), in Cassandra."""
 
-    # pylint: disable=arguments-differ
+    def _return_only_run_ids(self, ids):
+        """
+        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
+
+        Note that Cassandra doesn't allow __in queries on partition keys, so we're
+        forced to use a number of queries equal to the number of record ids. If this
+        becomes a performance issue, a dedicated query table should help.
+
+        The driver also tries to be clever about deferring certain fields, even
+        ignoring our own defer([]), which is why we don't use the standard
+        values_list call here. This means we're returning an entire Record but
+        discarding most fields.
+
+        :param ids: An id or iterable of ids to sort through
+
+        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
+                  if "ids" is an iterable, else returns a single value.
+        """
+        def return_if_exists(rec_id):
+            """If a Record exists as a Run, return its id."""
+            try:
+                run_id = schema.Run.objects(id=rec_id).get().id
+                return run_id
+            except DoesNotExist:
+                return None
+        if isinstance(ids, six.string_types):
+            return return_if_exists(ids)
+        return (return_if_exists(rec_id) for rec_id in ids)
+
     # Args differ because SQL doesn't support force_overwrite yet, SIBO-307
-    def insert(self, run, force_overwrite=False):
+    # Protected access is to a Record-bound helper method we want to hide from users
+    # pylint: disable=arguments-differ, protected-access
+    def insert(self, runs, force_overwrite=False):
         """
-        Given a Run, import it into the current Cassandra database.
+        Given a(n iterable of) Run(s), import into the current Cassandra database.
 
-        :param run: A Run to import
-        :param force_overwrite: Whether to forcibly overwrite a preexisting
-                                run that shares this run's id.
-        """
-        LOGGER.debug('Inserting %s into Cassandra with force_overwrite=%s', run, force_overwrite)
-        create = (schema.Run.create if force_overwrite
-                  else schema.Run.if_not_exists().create)
-        create(id=run.id,
-               application=run.application,
-               user=run.user,
-               version=run.version)
-        self.record_dao.insert(record=run, force_overwrite=force_overwrite)
-
-    @staticmethod
-    def _insert_sans_rec(run, force_overwrite=False):
-        """
-        Given a Run, import it into the Run table only.
-
-        Skips the call to record_dao's insert--this is a helper to be called
-        from within insert_many()s, which implement special logic that Run
-        metadata doesn't benefit from. Relies on Cassandra table schema.
-
-        :param run: A Run to import
+        :param runs: A Run or iterator of Runs to import
         :param force_overwrite: Whether to forcibly overwrite a preexisting
                                 run that shares this run's id.
         """
         LOGGER.debug('Inserting %s into Cassandra with force_overwrite=%s. '
-                     'Run table only.', run, force_overwrite)
-        create = (schema.Run.create if force_overwrite
-                  else schema.Run.if_not_exists().create)
-        create(id=run.id,
-               application=run.application,
-               user=run.user,
-               version=run.version)
+                     'Run table only.', runs, force_overwrite)
+        if isinstance(runs, model.Run):
+            self.record_dao._insert_one(runs, force_overwrite=force_overwrite)
+            runs = [runs]
+        else:
+            runs = list(runs)  # We'll need to use it twice
+            self.record_dao._insert_many(runs, _type_managed=True,
+                                         force_overwrite=force_overwrite)
+        # This spans partitions, it can't be batched.
+        create = (schema.Run.create if force_overwrite else schema.Run.if_not_exists().create)
+        for run in runs:
+            create(id=run.id,
+                   application=run.application,
+                   user=run.user,
+                   version=run.version)
 
-    # pylint: disable=arguments-differ
-    # Args differ because SQL doesn't support force_overwrite yet, SIBO-307.
-    # This method will be going away in SIBO-661
-    def insert_many(self, list_to_insert, force_overwrite=False):
+    def delete(self, ids):
         """
-        Given a list of Runs, insert each into Cassandra.
+        Given a(n iterable of) id(s), delete those belonging to Runs from the Cassandra database.
 
-        Uses Record's special insert_many() for efficiency, then re-inserts
-        the metadata on its own (as the metadata doesn't benefit from batching
-        and is comparitively lightweight).
+        Does all the same work as the Record one, but also removes from the Run table.
 
-        :param list_to_insert: A list of Records to insert
-
-        :param force_overwrite: Whether to forcibly overwrite a preexisting run
-                                that shares this run's id.
+        :param ids: The id or list of ids of the Run(s) to delete
         """
-        LOGGER.debug('Inserting %i runs into Cassandra with '
-                     'force_overwrite=%s.', len(list_to_insert), force_overwrite)
-        self.record_dao.insert_many(list_to_insert=list_to_insert,
-                                    force_overwrite=force_overwrite,
-                                    _type_managed=True)
-        for item in list_to_insert:
-            self._insert_sans_rec(item, force_overwrite)
-
-    def delete(self, id):
-        """
-        Delete a single Run from the Cassandra backend.
-
-        Removes everything: its data, any relationships it's in, files. Relies on
-        Cassandra batching, one batch per Run.
-
-        :param id: The id of the Run to delete
-        """
+        run_ids = self._return_only_run_ids(ids)
+        if run_ids is None:
+            return
+        if isinstance(run_ids, six.string_types):
+            run_ids = [run_ids]
         with BatchQuery() as batch:
-            schema.Run.objects(id=id).batch(batch).delete()
-            # In order to accomplish everything within one batch, we hand it off
-            # to a record_dao. However, we do not want to expose this part of
-            # Record deletion to users; it's wrapped by two friendlier functions instead.
-            # The method's "private" status is to avoid confusion with them.
-            # pylint: disable=protected-access
-            self.record_dao._setup_batch_delete(batch, id)
-
-    def delete_many(self, ids_to_delete):
-        """
-        Delete a list of Runs from the Cassandra backend.
-
-        Removes everything: their data, relationships, files. Relies on
-        Cassandra's batching, one batch encompassing all Runs. If you want
-        to do one batch per Run, use delete() in a loop.
-
-        :param ids_to_delete: A list of ids of Runs to delete
-        """
-        with BatchQuery() as batch:
-            for id in ids_to_delete:
-                schema.Run.objects(id=id).batch(batch).delete()
-                # See delete() above for explanation of this:
-                # pylint: disable=protected-access
-                self.record_dao._setup_batch_delete(batch, id)
-
-    def get(self, id):
-        """
-        Given a run's id, return match (if any) from Cassandra database.
-
-        :param id: The id of some run
-
-        :returns: A run matching that identifier or None
-        """
-        LOGGER.debug('Getting run with id: %s', id)
-        record = schema.Record.filter(id=id).get()
-        return model.generate_run_from_json(json_input=json.loads(record.raw))
+            for id in run_ids:
+                if id is not None:
+                    schema.Run.objects(id=id).batch(batch).delete()
+                    # In order to accomplish everything within one batch, we hand it off
+                    # to a record_dao. However, we do not want to expose this part of
+                    # Record deletion to users; it's wrapped by two friendlier functions instead.
+                    # The method's "private" status is to avoid confusion with them.
+                    # pylint: disable=protected-access
+                    self.record_dao._setup_batch_delete(batch, id)
 
 
 class DAOFactory(dao.DAOFactory):
     """
-    Build Cassandra-backed DAOs for interacting with Mnoda-based objects.
+    Build Cassandra-backed DAOs for interacting with Sina-based objects.
 
     Includes Records, Relationships, etc.
     """
 
     supports_parallel_ingestion = True
 
-    def __init__(self, keyspace, node_ip_list=None):
+    def __init__(self, keyspace, node_ip_list=None, sonar_cqlshrc_path=None):
         """
         Initialize a Factory with a path to its backend.
 
         :param keyspace: The keyspace to connect to.
         :param node_ip_list: A list of ips belonging to nodes on the target
                             Cassandra instance. If None, connects to localhost.
+        :param sonar_cqlshrc_path: Only used when connecting to LC Sonar machines.
+                                   The path to the desired cqlshrc file.
         """
         self.keyspace = keyspace
         self.node_ip_list = node_ip_list
-        schema.form_connection(keyspace, node_ip_list=self.node_ip_list)
+        self.sonar_cqlshrc_path = sonar_cqlshrc_path
+        schema.form_connection(keyspace, node_ip_list=self.node_ip_list,
+                               sonar_cqlshrc_path=self.sonar_cqlshrc_path)
 
     def create_record_dao(self):
         """
@@ -1157,6 +1168,14 @@ class DAOFactory(dao.DAOFactory):
         :returns: a RunDAO
         """
         return RunDAO(record_dao=self.create_record_dao())
+
+    def close(self):
+        """
+        Close resources being used by this factory.
+        """
+        # For now, we are using a single shared connection. If we change this in the future,
+        # we need to close the Cassandra connection here.
+        pass
 
     def __repr__(self):
         """Return a string representation of a Cassandra DAOFactory."""
