@@ -221,7 +221,7 @@ class StringData(Base):
                 ForeignKey(Record.id, ondelete='CASCADE'),
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
-    value = Column(String(255), nullable=False)
+    value = Column(String(2**14), nullable=False)
     tags = Column(Text(), nullable=True)
     units = Column(String(255), nullable=True)
     Index('string_name_idx', name)
@@ -320,7 +320,7 @@ class ListStringDataEntry(Base):
                 primary_key=True)
     name = Column(String(255), nullable=False, primary_key=True)
     index = Column(Integer(), nullable=False, primary_key=True, autoincrement=False)
-    value = Column(String(255), nullable=False)
+    value = Column(String(2**14), nullable=False)
     Index('stringlist_name_idx', name)
 
     def __init__(self, name, index, value):
