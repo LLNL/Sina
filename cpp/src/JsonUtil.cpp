@@ -1,8 +1,11 @@
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #include "sina/JsonUtil.hpp"
+#include "conduit/conduit.hpp"
 
 namespace sina {
 
@@ -17,7 +20,7 @@ namespace {
  * @return the avlue of the field
  * @throws std::invalid_argument if the field is not a string
  */
-std::string getExpectedString(nlohmann::json const &field,
+std::string getExpectedString(conduit::Node const &field,
         std::string const &fieldName,
         std::string const &parentType) {
     if (!field.is_string()) {
@@ -31,10 +34,9 @@ std::string getExpectedString(nlohmann::json const &field,
 }
 }
 
-nlohmann::json const &getRequiredField(std::string const &fieldName,
-        nlohmann::json const &parent, std::string const &parentType) {
-    auto fieldIter = parent.find(fieldName);
-    if (fieldIter == parent.end()) {
+conduit::Node const &getRequiredField(std::string const &fieldName,
+        conduit::Node const &parent, std::string const &parentType) {
+    if (!parent.has_child(fieldName)) {
         std::ostringstream message;
         message << "The field '" << fieldName
                 << "' is required for objects of type '" << parentType << "'";
@@ -44,24 +46,24 @@ nlohmann::json const &getRequiredField(std::string const &fieldName,
 }
 
 std::string getRequiredString(std::string const &fieldName,
-        nlohmann::json const &parent, std::string const &parentType) {
-    nlohmann::json const &ref = getRequiredField(fieldName, parent, parentType);
+        conduit::Node const &parent, std::string const &parentType) {
+    conduit::Node const &ref = getRequiredField(fieldName, parent, parentType);
     return getExpectedString(ref, fieldName, parentType);
 }
 
 std::string getOptionalString(std::string const &fieldName,
-        nlohmann::json const &parent, std::string const &parentType) {
+        conduit::Node const &parent, std::string const &parentType) {
     auto fieldPtr = parent.find(fieldName);
-    if (fieldPtr == parent.end() || fieldPtr->is_null()) {
+    if (!parent.has_child(fieldName)) {
         return "";
     }
     return getExpectedString(*fieldPtr, fieldName, parentType);
 }
 
 double getRequiredDouble(std::string const &fieldName,
-        nlohmann::json const &parent, std::string const &parentType) {
+        conduit::Node const &parent, std::string const &parentType) {
     auto &ref = getRequiredField(fieldName, parent, parentType);
-    if (!ref.is_number()) {
+    if (!ref.dtype().is_number()) {
         std::ostringstream message;
         message << "The field '" << fieldName
                 << "' for objects of type '" << parentType
@@ -69,6 +71,15 @@ double getRequiredDouble(std::string const &fieldName,
         throw std::invalid_argument(message.str());
     }
     return ref;
+}
+
+void addStringsToNode(conduit::Node &parent, std::string child_name,
+      std::vector<std::string> string_values){
+  for(std::string value : string_values)
+  {
+      conduit::Node &list_entry = parent[child_name].append();
+      list_entry.set(std::move(value));
+  }
 }
 
 }

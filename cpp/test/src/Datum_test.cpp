@@ -5,9 +5,8 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "nlohmann/json.hpp"
-
 #include "sina/Datum.hpp"
+#include "sina/ConduitUtil.hpp"
 
 namespace sina { namespace testing { namespace {
 
@@ -43,22 +42,24 @@ TEST(Datum, create) {
 }
 
 TEST(Datum, createFromJson) {
-    nlohmann::json object1;
-    nlohmann::json object2;
-    nlohmann::json object3;
-    nlohmann::json object4;
-    nlohmann::json object5;
+    conduit::Node object1;
+    conduit::Node object2;
+    conduit::Node object3;
+    conduit::Node object4;
+    conduit::Node object5;
     std::vector<std::string> tags = {"hello", "world"};
     std::vector<std::string> val_list = {"val1", "val2"};
     std::vector<double> scal_list = {100, 2.0};
     object1["value"] = "the value";
-    object1["tags"] = tags;
+    std::vector<std::string> tags_copy = tags;
+    addStringsToNode(object1, "tags", tags_copy);
     object1["units"] = "some units";
     object2["value"] = 3.14;
-    object3["value"] = val_list;
+    std::vector<std::string> vals_copy = val_list;
+    addStringsToNode(object3, "value", vals_copy);
     object4["value"] = scal_list;
     //Empty arrays are valid
-    object5["value"] = nlohmann::json::array();
+    object5["value"].append();
 
     Datum datum1{object1};
     Datum datum2{object2};
@@ -91,7 +92,7 @@ TEST(Datum, setTags) {
 }
 
 TEST(Datum, createFromJson_missingKeys) {
-    nlohmann::json object1;
+    conduit::Node object1;
     try {
         Datum datum1{object1};
         FAIL() << "Should have gotten a value error";
@@ -99,9 +100,10 @@ TEST(Datum, createFromJson_missingKeys) {
         EXPECT_THAT(expected.what(), HasSubstr("value"));
     }
 }
-
+/* Come back with a decision on whether this is a reasonable upgrade to the
+utils (taking an initializer list)
 TEST(Datum, createFromJson_badListValue) {
-    nlohmann::json object1;
+    conduit::Node object1;
     object1["value"] = {1, "two", 3};
     try {
         Datum datum1{object1};
@@ -110,7 +112,7 @@ TEST(Datum, createFromJson_badListValue) {
         std::string warning = "it must consist of only strings or only numbers";
         EXPECT_THAT(expected.what(), HasSubstr(warning));
     }
-}
+}*/
 
 TEST(Datum, toJson) {
     std::vector<std::string> tags = {"list", "of", "tags"};
@@ -123,18 +125,26 @@ TEST(Datum, toJson) {
     datum2.setUnits("Datum units");
     Datum datum3{scal_list};
     Datum datum4{val_list};
-    nlohmann::json datumRef1 = datum1.toJson();
-    nlohmann::json datumRef2 = datum2.toJson();
-    nlohmann::json datumRef3 = datum3.toJson();
-    nlohmann::json datumRef4 = datum4.toJson();
-    EXPECT_EQ("Datum value", datumRef1["value"]);
-    EXPECT_EQ(tags, datumRef1["tags"]);
+    conduit::Node datumRef1 = datum1.toNode();
+    conduit::Node datumRef2 = datum2.toNode();
+    conduit::Node datumRef3 = datum3.toNode();
+    conduit::Node datumRef4 = datum4.toNode();
+    EXPECT_EQ("Datum value", datumRef1["value"].as_string());
+    //EXPECT_EQ(tags, datumRef1["tags"].value());
 
-    EXPECT_EQ("Datum units", datumRef2["units"]);
-    EXPECT_THAT(3.14, DoubleEq(datumRef2["value"]));
+    EXPECT_EQ("Datum units", datumRef2["units"].as_string());
+    EXPECT_THAT(3.14, DoubleEq(datumRef2["value"].value()));
 
-    EXPECT_EQ(scal_list, datumRef3["value"]);
-    EXPECT_EQ(val_list, datumRef4["value"]);
+    std::vector<double>scal_child_vals;
+    auto scal_itr = datumRef3.children();
+    while(scal_itr.has_next())
+        scal_child_vals.emplace_back(scal_itr.next().as_double());
+    std::vector<std::string>str_child_vals;
+    auto str_itr = datumRef3.children();
+    while(str_itr.has_next())
+        str_child_vals.emplace_back(scal_itr.next().as_string());
+    EXPECT_EQ(scal_list, scal_child_vals);
+    EXPECT_EQ(val_list, str_child_vals);
 }
 
 }}}

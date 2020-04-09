@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "nlohmann/json.hpp"
+#include "conduit/conduit.hpp"
 
 namespace sina {
 /**
@@ -39,7 +39,8 @@ public:
      * @param uri the location of the file
      */
     // Note: without this, the constructors taking a std::string and a
-    // nlohmann::json are ambiguous if a string literal is used
+    // conduit::Node are ambiguous if a string literal is used
+    // (TODO: is this still true?)
     explicit File(char const *uri);
 
     /**
@@ -48,7 +49,7 @@ public:
      * @param uri the uri for a file
      * @param asJson the JSON representation of the file's additional info
      */
-    File(std::string uri, nlohmann::json const &asJson);
+    File(std::string uri, conduit::Node const &asNode);
 
     /**
      * Get the File's URI.
@@ -96,7 +97,7 @@ public:
      *
      * @return the File in its JSON representation
      */
-    nlohmann::json toJson() const;
+    conduit::Node toNode() const;
 
 private:
     std::string uri;

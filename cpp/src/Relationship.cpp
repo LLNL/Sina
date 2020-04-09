@@ -4,7 +4,7 @@
 
 #include <utility>
 
-#include "sina/JsonUtil.hpp"
+#include "sina/ConduitUtil.hpp"
 
 namespace sina {
 
@@ -21,17 +21,17 @@ Relationship::Relationship(ID subject_, std::string predicate_, ID object_) :
         object{std::move(object_), LOCAL_OBJECT_KEY, GLOBAL_OBJECT_KEY},
         predicate{std::move(predicate_)} {}
 
-Relationship::Relationship(nlohmann::json const &asJson) :
-        subject{asJson, LOCAL_SUBJECT_KEY, GLOBAL_SUBJECT_KEY},
-        object{asJson, LOCAL_OBJECT_KEY, GLOBAL_OBJECT_KEY},
-        predicate{getRequiredString(PREDICATE_KEY, asJson, "Relationship")} {}
+Relationship::Relationship(conduit::Node const &asNode) :
+        subject{asNode, LOCAL_SUBJECT_KEY, GLOBAL_SUBJECT_KEY},
+        object{asNode, LOCAL_OBJECT_KEY, GLOBAL_OBJECT_KEY},
+        predicate{getRequiredString(PREDICATE_KEY, asNode, "Relationship")} {}
 
-nlohmann::json Relationship::toJson() const {
-    nlohmann::json value;
-    value[PREDICATE_KEY] = predicate;
-    subject.addTo(value);
-    object.addTo(value);
-    return value;
+conduit::Node Relationship::toNode() const {
+    conduit::Node relationshipNode;
+    relationshipNode[PREDICATE_KEY] = predicate;
+    subject.addTo(relationshipNode);
+    object.addTo(relationshipNode);
+    return relationshipNode;
 }
 
 }

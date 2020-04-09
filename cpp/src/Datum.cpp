@@ -1,6 +1,7 @@
 /// @file
 
 #include "sina/Datum.hpp"
+#include "conduit/conduit.hpp"
 
 #include <utility>
 #include <sstream>
@@ -41,26 +42,26 @@ Datum::Datum(std::vector<double> value_) :
     type = ValueType::ScalarArray;
 }
 
-Datum::Datum(nlohmann::json const &asJson) {
+Datum::Datum(conduit::Node const &asNode) {
     //Need to determine what type of Datum we have: Scalar (double), String,
     //or list of one of those two.
-    nlohmann::json valueField = getRequiredField(VALUE_FIELD, asJson, DATA_PARENT_TYPE);
-    if(valueField.is_string()){
-        stringValue = valueField.get<std::string>();
+    conduit::Node valueNode = getRequiredField(VALUE_FIELD, asNode, DATA_PARENT_TYPE);
+    if(valueNode.dtype().is_string()){
+        stringValue = std::string(valueNode.value());
     }
-    else if(valueField.is_number()){
-        scalarValue = valueField.get<double>();
+    else if(valueNode.dtype().is_number()){
+        scalarValue = double(valueNode.value());
     }
-    else if(valueField.is_array()){
+    else if(valueNode.dtype().is_list()){
         //An empty list is assumed to be an empty list of doubles.
         //This only works because this field is immutable!
         //If this ever changes, or if Datum's type is used directly to make
         //decisions (ex: Sina deciding where to store data), this logic
         //should be revisited.
-        if(valueField.size() == 0 || valueField.at(0).is_number()){
+        if(valueNode.number_of_children() == 0 || valueNode[0].dtype().is_number()){
             type = ValueType::ScalarArray;
         }
-        else if(valueField.at(0).is_string()){
+        else if(valueNode[0].dtype().is_string()){
             type = ValueType::StringArray;
         }
         else {
@@ -70,12 +71,15 @@ Datum::Datum(nlohmann::json const &asJson) {
             throw std::invalid_argument(message.str());
         }
 
-        for(auto &entry : valueField){
-            if(entry.is_string() && type == ValueType::StringArray){
-                stringArrayValue.emplace_back(entry.get<std::string>());
+        auto itr = asNode.children();
+        while(itr.has_next())
+        {
+            conduit::Node const &entry = itr.next();
+            if(entry.dtype().is_string() && type == ValueType::StringArray){
+                stringArrayValue.emplace_back(std::string(entry.value()));
             }
-            else if(entry.is_number() && type == ValueType::ScalarArray){
-                scalarArrayValue.emplace_back(entry.get<double>());
+            else if(entry.dtype().is_number() && type == ValueType::ScalarArray){
+                scalarArrayValue.emplace_back(double(entry.value()));
             }
             else {
                 std::ostringstream message;
@@ -93,23 +97,24 @@ Datum::Datum(nlohmann::json const &asJson) {
     }
 
     //Get the units, if there are any
-    units = getOptionalString(UNITS_FIELD, asJson, DATA_PARENT_TYPE);
+    units = getOptionalString(UNITS_FIELD, asNode, DATA_PARENT_TYPE);
 
     //Need to grab the tags and add them to a vector of strings
-    auto tagsIter = asJson.find(TAGS_FIELD);
-    if(tagsIter != asJson.end()){
-        for(auto &tag : *tagsIter){
-            if(tag.is_string())
-                tags.emplace_back(tag.get<std::string>());
-            else {
-                std::ostringstream message;
-                message << "The optional field '" << TAGS_FIELD
-                        << "' must be an array of strings. Found '"
-                        << tag.type_name() << "' instead.";
-                throw std::invalid_argument(message.str());
-            }
-        }
-    }
+    if(asNode.has_child(TAGS_FIELD)){
+      auto tagNodeIter = asNode[TAGS_FIELD].children();
+      while(tagNodeIter.has_next()){
+        auto tag = tagNodeIter.next();
+        if(tag.dtype().is_string()){
+          tags.emplace_back(std::string(tag.value()));
+        } else {
+          std::ostringstream message;
+          message << "The optional field '" << TAGS_FIELD
+                  << "' must be an array of strings. Found '"
+                  << tag.dtype().name() << "' instead.";
+          throw std::invalid_argument(message.str());
+         }
+      }
+   }
 }
 
 void Datum::setUnits(std::string units_) {
@@ -120,27 +125,30 @@ void Datum::setTags(std::vector<std::string> tags_){
     tags = std::move(tags_);
 }
 
-nlohmann::json Datum::toJson() const {
-    nlohmann::json asJson;
+conduit::Node Datum::toNode() const {
+    conduit::Node asNode;
     switch(type){
         case ValueType::Scalar:
-            asJson[VALUE_FIELD] = scalarValue;
+            asNode[VALUE_FIELD] = scalarValue;
             break;
         case ValueType::String:
-            asJson[VALUE_FIELD] = stringValue;
+            asNode[VALUE_FIELD] = stringValue;
             break;
         case ValueType::ScalarArray:
-            asJson[VALUE_FIELD] = scalarArrayValue;
+            asNode[VALUE_FIELD] = scalarArrayValue;
             break;
         case ValueType::StringArray:
-            asJson[VALUE_FIELD] = stringArrayValue;
+            std::vector<std::string> stringArrayValCopy(stringArrayValue);
+            addStringsToNode(asNode, VALUE_FIELD, stringArrayValCopy);
             break;
     }
-    if(tags.size() > 0)
-        asJson[TAGS_FIELD] = tags;
+    if(tags.size() > 0){
+        std::vector<std::string> stringArrayValCopy(stringArrayValue);
+        addStringsToNode(asNode, TAGS_FIELD, stringArrayValCopy);
+    }
     if(!units.empty())
-        asJson[UNITS_FIELD] = units;
-    return asJson;
+        asNode[UNITS_FIELD] = units;
+    return asNode;
 };
 
 

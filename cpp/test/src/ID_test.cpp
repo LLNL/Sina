@@ -3,13 +3,16 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "nlohmann/json.hpp"
+#include "conduit/conduit.hpp"
 
 #include "sina/ID.hpp"
 
 namespace sina { namespace testing { namespace {
 
 using ::testing::HasSubstr;
+
+conduit::Node test_node;
+auto EXPECTED_EMPTY_DTYPE = test_node.dtype().name().c_str();
 
 TEST(ID, create) {
     ID id1{"the name", IDType::Local};
@@ -31,10 +34,9 @@ TEST(IDField, create) {
     EXPECT_EQ("global name", field.getGlobalName());
 }
 
-TEST(IDField, createFromJson_local) {
-    nlohmann::json object{
-            {"local id key", "the id"}
-    };
+TEST(IDField, createFromNode_local) {
+    conduit::Node object;
+    object["local id key"] = "the id";
     internal::IDField field{object, "local id key", "global id key"};
     EXPECT_EQ("the id", field.getID().getId());
     EXPECT_EQ(IDType::Local, field.getID().getType());
@@ -42,12 +44,11 @@ TEST(IDField, createFromJson_local) {
     EXPECT_EQ("global id key", field.getGlobalName());
 }
 
-TEST(IDField, createFromJson_global) {
-    nlohmann::json object{
-            // should be ignored in the presence of a global ID
-            {"local id key", "local id"},
-            {"global id key", "global id"}
-    };
+TEST(IDField, createFromNode_global) {
+    conduit::Node object;
+    object["local id key"] = "local id";
+    object["global id key"] = "global id";
+
     internal::IDField field{object, "local id key", "global id key"};
     EXPECT_EQ("global id", field.getID().getId());
     EXPECT_EQ(IDType::Global, field.getID().getType());
@@ -55,8 +56,8 @@ TEST(IDField, createFromJson_global) {
     EXPECT_EQ("global id key", field.getGlobalName());
 }
 
-TEST(IDField, createFromJson_missingKeys) {
-    nlohmann::json object;
+TEST(IDField, createFromNode_missingKeys) {
+    conduit::Node object;
     try {
         internal::IDField field{object, "local id key", "global id key"};
         FAIL() << "Should have gotten a value error";
@@ -66,22 +67,22 @@ TEST(IDField, createFromJson_missingKeys) {
     }
 }
 
-TEST(IDField, toJson_local) {
+TEST(IDField, toNode_local) {
     ID id{"the id", IDType::Local};
     internal::IDField field{id, "local name", "global name"};
-    nlohmann::json value;
+    conduit::Node value;
     field.addTo(value);
-    EXPECT_EQ("the id", value["local name"]);
-    EXPECT_EQ(0, value.count("global name"));
+    EXPECT_EQ("the id", value["local name"].value());
+    EXPECT_EQ(EXPECTED_EMPTY_DTYPE, value["global name"].dtype().name());
 }
 
-TEST(IDField, toJson_global) {
+TEST(IDField, toNode_global) {
     ID id{"the id", IDType::Global};
     internal::IDField field{id, "local name", "global name"};
-    nlohmann::json value;
+    conduit::Node value;
     field.addTo(value);
-    EXPECT_EQ("the id", value["global name"]);
-    EXPECT_EQ(0, value.count("local name"));
+    EXPECT_EQ("the id", value["global name"].value());
+    EXPECT_EQ(EXPECTED_EMPTY_DTYPE, value["local name"].dtype().name());
 }
 
 }}}

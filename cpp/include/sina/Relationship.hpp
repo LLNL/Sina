@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "nlohmann/json.hpp"
+#include "conduit/conduit.hpp"
 
 #include "sina/ID.hpp"
 
@@ -33,7 +33,7 @@ namespace sina {
  *
  * Note that Relationships are described in the active voice. **Avoiding the passive voice
  * in predicates is recommended**, as this keeps the "direction" of the relationship constant.
- * An example of a passively-voiced Relationship is "Dani is emailed by Carlos". 
+ * An example of a passively-voiced Relationship is "Dani is emailed by Carlos".
  *
  * If assembling Relationships programatically, it may be useful to reference the
  * ID documentation.
@@ -78,11 +78,11 @@ public:
     Relationship(ID subject, std::string predicate, ID object);
 
     /**
-     * Create a Relationship object from its representation in JSON.
+     * Create a Relationship object from its representation as a conduit Node.
      *
-     * @param asJson the relationship as a JSON object
+     * @param asJson the relationship as a Node
      */
-    explicit Relationship(nlohmann::json const &asJson);
+    explicit Relationship(conduit::Node const &asNode);
 
     /**
      * Get the subject.
@@ -112,11 +112,11 @@ public:
     }
 
     /**
-     * Convert this Relationship to its JSON representation.
+     * Convert this Relationship to its Node representation.
      *
-     * @return this relationship as JSON
+     * @return this relationship as a conduit Node
      */
-    nlohmann::json toJson() const;
+    conduit::Node toNode() const;
 
 private:
     internal::IDField subject;

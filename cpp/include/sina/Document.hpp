@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-#include "nlohmann/json.hpp"
+#include "conduit/conduit.hpp"
 
 #include "sina/Record.hpp"
 #include "sina/Relationship.hpp"
@@ -74,13 +74,13 @@ public:
     Document &operator=(Document &&) = default;
 
     /**
-     * Create a Document from its JSON representation
+     * Create a Document from its Conduit Node representation
      *
-     * @param asJson the Document as a JSON object
+     * @param asJson the Document as a Node
      * @param recordLoader an RecordLoader to use to load the different
      * types of records which may be in the document
      */
-    Document(nlohmann::json const &asJson, RecordLoader const &recordLoader);
+    Document(conduit::Node const &asNode, RecordLoader const &recordLoader);
 
     /**
      * Add the given record to this document.
@@ -116,11 +116,11 @@ public:
 
 
     /**
-     * Convert this document to its JSON representation.
+     * Convert this document to a conduit Node.
      *
-     * @return the contents of the document as JSON
+     * @return the contents of the document as a Node
      */
-    nlohmann::json toJson() const;
+    conduit::Node toNode() const;
 
 private:
     RecordList records;

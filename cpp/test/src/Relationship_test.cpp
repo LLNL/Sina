@@ -12,6 +12,8 @@ char const EXPECTED_LOCAL_OBJECT_ID_KEY[] = "local_object";
 char const EXPECTED_GLOBAL_SUBJECT_ID_KEY[] = "subject";
 char const EXPECTED_LOCAL_SUBJECT_ID_KEY[] = "local_subject";
 char const EXPECTED_PREDICATE_KEY[] = "predicate";
+conduit::Node test_node;
+auto EXPECTED_EMPTY_DTYPE = test_node.dtype().name().c_str();
 
 using ::testing::HasSubstr;
 
@@ -30,18 +32,17 @@ TEST(Relationship, create) {
     EXPECT_EQ(predicate, relationship.getPredicate());
 }
 
-TEST(Relationship, create_fromJson_validGlobalIDs) {
+TEST(Relationship, create_fromNode_validGlobalIDs) {
     std::string subjectID = "the subject";
     std::string objectID = "the object";
     std::string predicate = "is somehow related to";
 
-    nlohmann::json asJson{
-            {EXPECTED_GLOBAL_SUBJECT_ID_KEY, subjectID},
-            {EXPECTED_GLOBAL_OBJECT_ID_KEY, objectID},
-            {EXPECTED_PREDICATE_KEY, predicate}
-    };
+    conduit::Node asNode;
+    asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY] = subjectID;
+    asNode[EXPECTED_LOCAL_OBJECT_ID_KEY] = objectID;
+    asNode[EXPECTED_PREDICATE_KEY] = predicate;
 
-    Relationship relationship{asJson};
+    Relationship relationship{asNode};
 
     EXPECT_EQ(subjectID, relationship.getSubject().getId());
     EXPECT_EQ(IDType::Global, relationship.getSubject().getType());
@@ -50,18 +51,17 @@ TEST(Relationship, create_fromJson_validGlobalIDs) {
     EXPECT_EQ(predicate, relationship.getPredicate());
 }
 
-TEST(Relationship, create_fromJson_validLocalIDs) {
+TEST(Relationship, create_from_validLocalIDs) {
     std::string subjectID = "the subject";
     std::string objectID = "the object";
     std::string predicate = "is somehow related to";
 
-    nlohmann::json asJson{
-            {EXPECTED_LOCAL_SUBJECT_ID_KEY, subjectID},
-            {EXPECTED_LOCAL_OBJECT_ID_KEY, objectID},
-            {EXPECTED_PREDICATE_KEY, predicate}
-    };
+    conduit::Node asNode;
+    asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY] = subjectID;
+    asNode[EXPECTED_LOCAL_OBJECT_ID_KEY] = objectID;
+    asNode[EXPECTED_PREDICATE_KEY] = predicate;
 
-    Relationship relationship{asJson};
+    Relationship relationship{asNode};
 
     EXPECT_EQ(subjectID, relationship.getSubject().getId());
     EXPECT_EQ(IDType::Local, relationship.getSubject().getType());
@@ -70,14 +70,12 @@ TEST(Relationship, create_fromJson_validLocalIDs) {
     EXPECT_EQ(predicate, relationship.getPredicate());
 }
 
-TEST(Relationship, create_fromJson_missingSubect) {
-    nlohmann::json asJson{
-            {EXPECTED_LOCAL_OBJECT_ID_KEY, "the object"},
-            {EXPECTED_PREDICATE_KEY, "some predicate"}
-    };
-
+TEST(Relationship, create_fromNode_missingSubect) {
+    conduit::Node asNode;
+    asNode[EXPECTED_LOCAL_OBJECT_ID_KEY] = "the object";
+    asNode[EXPECTED_PREDICATE_KEY] = "some predicate";
     try {
-        Relationship relationship{asJson};
+        Relationship relationship{asNode};
         FAIL() << "Should have gotten an exception about a missing subject";
     } catch (std::invalid_argument const &expected) {
         EXPECT_THAT(expected.what(), HasSubstr(EXPECTED_LOCAL_SUBJECT_ID_KEY));
@@ -85,14 +83,13 @@ TEST(Relationship, create_fromJson_missingSubect) {
     }
 }
 
-TEST(Relationship, create_fromJson_missingObject) {
-    nlohmann::json asJson{
-            {EXPECTED_LOCAL_SUBJECT_ID_KEY, "the subject"},
-            {EXPECTED_PREDICATE_KEY, "some predicate"}
-    };
+TEST(Relationship, create_fromNode_missingObject) {
+  conduit::Node asNode;
+  asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY] = "the subject";
+  asNode[EXPECTED_PREDICATE_KEY] = "some predicate";
 
     try {
-        Relationship relationship{asJson};
+        Relationship relationship{asNode};
         FAIL() << "Should have gotten an exception about a missing object";
     } catch (std::invalid_argument const &expected) {
         EXPECT_THAT(expected.what(), HasSubstr(EXPECTED_LOCAL_OBJECT_ID_KEY));
@@ -100,14 +97,13 @@ TEST(Relationship, create_fromJson_missingObject) {
     }
 }
 
-TEST(Relationship, create_fromJson_missingPredicate) {
-    nlohmann::json asJson{
-            {EXPECTED_LOCAL_SUBJECT_ID_KEY, "the subject"},
-            {EXPECTED_LOCAL_OBJECT_ID_KEY, "the object"}
-    };
+TEST(Relationship, create_fromNode_missingPredicate) {
+  conduit::Node asNode;
+  asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY] = "the subject";
+  asNode[EXPECTED_LOCAL_OBJECT_ID_KEY] = "the object";
 
     try {
-        Relationship relationship{asJson};
+        Relationship relationship{asNode};
         FAIL() << "Should have gotten an exception about a missing predicate";
     } catch (std::invalid_argument const &expected) {
         EXPECT_THAT(expected.what(), HasSubstr(EXPECTED_PREDICATE_KEY));
@@ -115,7 +111,7 @@ TEST(Relationship, create_fromJson_missingPredicate) {
     }
 }
 
-TEST(Relationship, toJson_localIds) {
+TEST(Relationship, toNode_localIds) {
     std::string subjectID = "the subject";
     std::string objectID = "the object";
     std::string predicate = "is somehow related to";
@@ -123,16 +119,16 @@ TEST(Relationship, toJson_localIds) {
     Relationship relationship{ID{subjectID, IDType::Local}, predicate,
                               ID{objectID, IDType::Local}};
 
-    nlohmann::json asJson = relationship.toJson();
+    conduit::Node asNode = relationship.toNode();
 
-    EXPECT_EQ(subjectID, asJson[EXPECTED_LOCAL_SUBJECT_ID_KEY]);
-    EXPECT_EQ(objectID, asJson[EXPECTED_LOCAL_OBJECT_ID_KEY]);
-    EXPECT_EQ(predicate, asJson[EXPECTED_PREDICATE_KEY]);
-    EXPECT_EQ(0, asJson.count(EXPECTED_GLOBAL_SUBJECT_ID_KEY));
-    EXPECT_EQ(0, asJson.count(EXPECTED_GLOBAL_OBJECT_ID_KEY));
+    EXPECT_EQ(subjectID, asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY].as_string());
+    EXPECT_EQ(objectID, asNode[EXPECTED_LOCAL_OBJECT_ID_KEY].as_string());
+    EXPECT_EQ(predicate, asNode[EXPECTED_PREDICATE_KEY].as_string());
+    EXPECT_TRUE(asNode[EXPECTED_GLOBAL_SUBJECT_ID_KEY].dtype().is_empty());
+    EXPECT_TRUE(asNode[EXPECTED_GLOBAL_OBJECT_ID_KEY].dtype().is_empty());
 }
 
-TEST(Relationship, toJson_globalIds) {
+TEST(Relationship, toNode_globalIds) {
     std::string subjectID = "the subject";
     std::string objectID = "the object";
     std::string predicate = "is somehow related to";
@@ -140,13 +136,15 @@ TEST(Relationship, toJson_globalIds) {
     Relationship relationship{ID{subjectID, IDType::Global}, predicate,
                               ID{objectID, IDType::Global}};
 
-    nlohmann::json asJson = relationship.toJson();
+    conduit::Node asNode = relationship.toNode();
 
-    EXPECT_EQ(subjectID, asJson[EXPECTED_GLOBAL_SUBJECT_ID_KEY]);
-    EXPECT_EQ(objectID, asJson[EXPECTED_GLOBAL_OBJECT_ID_KEY]);
-    EXPECT_EQ(predicate, asJson[EXPECTED_PREDICATE_KEY]);
-    EXPECT_EQ(0, asJson.count(EXPECTED_LOCAL_SUBJECT_ID_KEY));
-    EXPECT_EQ(0, asJson.count(EXPECTED_LOCAL_OBJECT_ID_KEY));
+    EXPECT_EQ(subjectID, asNode[EXPECTED_GLOBAL_SUBJECT_ID_KEY].as_string());
+    EXPECT_EQ(objectID, asNode[EXPECTED_GLOBAL_OBJECT_ID_KEY].as_string());
+    EXPECT_EQ(predicate, asNode[EXPECTED_PREDICATE_KEY].as_string());
+    EXPECT_EQ(EXPECTED_EMPTY_DTYPE,
+              asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY].dtype().name());
+    EXPECT_EQ(EXPECTED_EMPTY_DTYPE,
+              asNode[EXPECTED_LOCAL_OBJECT_ID_KEY].dtype().name());
 }
 
 }}}

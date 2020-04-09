@@ -7,7 +7,6 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "nlohmann/json.hpp"
 #include "adiak.hpp"
 extern "C" {
 #include "adiak_tool.h"
@@ -35,9 +34,9 @@ class AdiakWriterTest : public ::testing::Test {
     adiak::init(nullptr);
     adiak_register_cb(1, adiak_category_all, AdiakWriterTest::callbackWrapper, 0, &current_test);
   }
- 
+
   void SetUp() {
-     current_test=this; 
+     current_test=this;
   }
 
   static void callbackWrapper(const char *name, adiak_category_t category, const char *subcategory, adiak_value_t *val, adiak_datatype_t *adiak_type, void *adiakwriter){
@@ -141,4 +140,3 @@ TEST_F(AdiakWriterTest, files_list){
 }}}
 
 #endif //SINA_BUILD_ADIAK_BINDINGS
-

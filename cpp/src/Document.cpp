@@ -26,47 +26,49 @@ void Document::add(Relationship relationship) {
     relationships.emplace_back(std::move(relationship));
 }
 
-nlohmann::json Document::toJson() const {
+conduit::Node Document::toNode() const {
     // note nlohmann::json::array is a function, not a type
-    nlohmann::json recordsList = nlohmann::json::array({});
-    for (auto &record : records) {
-        recordsList.emplace_back(record->toJson());
+    conduit::Node document;
+    for(auto &record : records)
+    {
+        conduit::Node &list_entry = document[RECORDS_KEY].append();
+        list_entry.set_node(record->toNode());
     }
-
-    nlohmann::json relationshipsList = nlohmann::json::array({});
-    for (auto &relationship : relationships) {
-        relationshipsList.emplace_back(relationship.toJson());
+    for(auto &relationship : relationships)
+    {
+        conduit::Node &list_entry = document[RELATIONSHIPS_KEY].append();
+        list_entry = relationship.toNode();
     }
-
-    return nlohmann::json{
-            {RECORDS_KEY, recordsList},
-            {RELATIONSHIPS_KEY, relationshipsList},
-    };
+    return document;
 }
 
-Document::Document(nlohmann::json const &asJson,
+Document::Document(conduit::Node const &asNode,
         RecordLoader const &recordLoader) {
-    auto recordsIter = asJson.find(RECORDS_KEY);
-    if (recordsIter != asJson.end()) {
-        if (recordsIter->is_array()) {
-            for (auto const &record : *recordsIter) {
+    conduit::Node records = asNode[RECORDS_KEY];
+    if (!records.dtype().is_empty()) {
+        if (records.dtype().is_list()) {
+            auto recordIter = records.children();
+            while (recordIter.has_next()){
+                auto record = recordIter.next();
                 add(recordLoader.load(record));
             }
-        } else if (!recordsIter->is_null()) {
-            std::ostringstream message;
-            message << "The '" << RECORDS_KEY
-                    << "' element of a document must be an array";
-            throw std::invalid_argument(message.str());
-        }
+    } else {
+        std::ostringstream message;
+        message << "The '" << RECORDS_KEY
+                << "' element of a document must be an array";
+        throw std::invalid_argument(message.str());
+    }
     }
 
-    auto relationshipsIter = asJson.find(RELATIONSHIPS_KEY);
-    if (relationshipsIter != asJson.end()) {
-        if (relationshipsIter->is_array()) {
-            for (auto const &relationship : *relationshipsIter) {
-                add(Relationship{relationship});
-            }
-        } else if (!relationshipsIter->is_null()){
+    conduit::Node relationships = asNode[RELATIONSHIPS_KEY];
+    if (!relationships.dtype().is_empty()) {
+        if (relationships.dtype().is_list()) {
+          auto relationshipsIter = relationships.children();
+          while (relationshipsIter.has_next()){
+              auto relationship = relationshipsIter.next();
+              add(Relationship{relationship});
+          }
+        } else {
             std::ostringstream message;
             message << "The '" << RELATIONSHIPS_KEY
                     << "' element of a document must be an array";
@@ -85,7 +87,7 @@ void saveDocument(Document const &document, std::string const &fileName) {
     // file system as the destination file so that the move operation is
     // atomic.
     std::string tmpFileName = fileName + SAVE_TMP_FILE_EXTENSION;
-    auto asJson = document.toJson();
+    auto asJson = document.toNode().to_json();
     std::ofstream fout{tmpFileName};
     fout.exceptions(std::ostream::failbit | std::ostream::badbit);
     fout << asJson;
@@ -105,10 +107,13 @@ Document loadDocument(std::string const &path) {
 
 Document loadDocument(std::string const &path,
         RecordLoader const &recordLoader) {
-    nlohmann::json documentAsJson;
-    std::ifstream fin{path};
-    fin >> documentAsJson;
-    return Document{documentAsJson, recordLoader};
+    conduit::Node nodeFromJson;
+    std::ifstream file_in{path};
+    std::ostringstream file_contents;
+    file_contents << file_in.rdbuf();
+    file_in.close();
+    nodeFromJson.parse(file_contents.str(), "json");
+    return Document{nodeFromJson, recordLoader};
 }
 
 }
