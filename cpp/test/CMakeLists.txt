@@ -12,11 +12,12 @@ blt_register_library(NAME libdl
 )
 
 find_package(Conduit REQUIRED)
+
 blt_register_library(NAME Conduit
-        TREAT_INCLUDES_AS_SYSTEM ON
-        INCLUDES "${Conduit_DIR}/../../../include"
-        LIBRARIES "${Conduit_DIR}/../../libconduit.a"
-        )
+    TREAT_INCLUDES_AS_SYSTEM ON
+    INCLUDES "${Conduit_DIR}/../../../include"
+    LIBRARIES "${Conduit_DIR}/../../libconduit.a"
+)
 
 if(${SINA_BUILD_ADIAK_BINDINGS})
     add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
@@ -37,7 +38,7 @@ blt_add_executable(NAME unittests
         src/Document_test.cpp
         src/File_test.cpp
         src/ID_test.cpp
-        src/JsonUtil_test.cpp
+        src/ConduitUtil_test.cpp
         src/Record_test.cpp
         src/Relationship_test.cpp
         src/Run_test.cpp

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "sina/JsonUtil.hpp"
+#include "sina/ConduitUtil.hpp"
 #include "conduit/conduit.hpp"
 
 namespace sina {
@@ -23,14 +23,14 @@ namespace {
 std::string getExpectedString(conduit::Node const &field,
         std::string const &fieldName,
         std::string const &parentType) {
-    if (!field.is_string()) {
+    if (!field.dtype().is_string()) {
         std::ostringstream message;
         message << "The field '" << fieldName
                 << "' for objects of type '" << parentType
                 << "' must be a string";
         throw std::invalid_argument(message.str());
     }
-    return field;
+    return field.as_string();
 }
 }
 
@@ -42,7 +42,7 @@ conduit::Node const &getRequiredField(std::string const &fieldName,
                 << "' is required for objects of type '" << parentType << "'";
         throw std::invalid_argument(message.str());
     }
-    return *fieldIter;
+    return parent[fieldName];
 }
 
 std::string getRequiredString(std::string const &fieldName,
@@ -53,11 +53,10 @@ std::string getRequiredString(std::string const &fieldName,
 
 std::string getOptionalString(std::string const &fieldName,
         conduit::Node const &parent, std::string const &parentType) {
-    auto fieldPtr = parent.find(fieldName);
     if (!parent.has_child(fieldName)) {
         return "";
     }
-    return getExpectedString(*fieldPtr, fieldName, parentType);
+    return getExpectedString(parent, fieldName, parentType);
 }
 
 double getRequiredDouble(std::string const &fieldName,
@@ -70,7 +69,7 @@ double getRequiredDouble(std::string const &fieldName,
                 << "' must be a double";
         throw std::invalid_argument(message.str());
     }
-    return ref;
+    return ref.as_double();
 }
 
 void addStringsToNode(conduit::Node &parent, std::string child_name,

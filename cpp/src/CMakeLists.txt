@@ -46,7 +46,7 @@ blt_add_library(NAME sina
         ../include/sina/Document.hpp
         ../include/sina/File.hpp
         ../include/sina/ID.hpp
-        ../include/sina/JsonUtil.hpp
+        ../include/sina/ConduitUtil.hpp
         ../include/sina/sina.hpp
         ../include/sina/Record.hpp
         ../include/sina/Relationship.hpp
@@ -57,7 +57,7 @@ blt_add_library(NAME sina
         Document.cpp
         File.cpp
         ID.cpp
-        JsonUtil.cpp
+        ConduitUtil.cpp
         Record.cpp
         Relationship.cpp
         Run.cpp
