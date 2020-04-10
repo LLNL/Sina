@@ -8,10 +8,9 @@
 #include <string>
 #include <type_traits>
 
-#include "sina/JsonUtil.hpp"
+#include "sina/ConduitUtil.hpp"
 #include "sina/Record.hpp"
 #include "sina/Run.hpp"
-#include "nlohmann/json.hpp"
 
 extern "C" {
 #include "adiak_tool.h"

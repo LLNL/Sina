@@ -44,10 +44,10 @@ conduit::Node Document::toNode() const {
 
 Document::Document(conduit::Node const &asNode,
         RecordLoader const &recordLoader) {
-    conduit::Node records = asNode[RECORDS_KEY];
-    if (!records.dtype().is_empty()) {
-        if (records.dtype().is_list()) {
-            auto recordIter = records.children();
+    conduit::Node record_nodes = asNode[RECORDS_KEY];
+    if (!record_nodes.dtype().is_empty()) {
+        if (record_nodes.dtype().is_list()) {
+            auto recordIter = record_nodes.children();
             while (recordIter.has_next()){
                 auto record = recordIter.next();
                 add(recordLoader.load(record));
@@ -60,10 +60,10 @@ Document::Document(conduit::Node const &asNode,
     }
     }
 
-    conduit::Node relationships = asNode[RELATIONSHIPS_KEY];
-    if (!relationships.dtype().is_empty()) {
-        if (relationships.dtype().is_list()) {
-          auto relationshipsIter = relationships.children();
+    conduit::Node relationship_nodes = asNode[RELATIONSHIPS_KEY];
+    if (!relationship_nodes.dtype().is_empty()) {
+        if (relationship_nodes.dtype().is_list()) {
+          auto relationshipsIter = relationship_nodes.children();
           while (relationshipsIter.has_next()){
               auto relationship = relationshipsIter.next();
               add(Relationship{relationship});

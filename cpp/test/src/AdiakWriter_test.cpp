@@ -24,7 +24,8 @@ using ::testing::HasSubstr;
 using ::testing::DoubleEq;
 using ::testing::ElementsAre;
 
-char const EXPECTED_DATA_KEY[] = "data";
+//TODO: These tests won't make sense until the Json's added back in
+/*char const EXPECTED_DATA_KEY[] = "data";
 char const EXPECTED_FILES_KEY[] = "files";
 
 class AdiakWriterTest : public ::testing::Test {
@@ -55,7 +56,6 @@ class AdiakWriterTest : public ::testing::Test {
 };
 
 AdiakWriterTest *AdiakWriterTest::current_test;
-
 
 TEST_F(AdiakWriterTest, basic_assignment) {
   //adiak::init(nullptr);
@@ -135,7 +135,7 @@ TEST_F(AdiakWriterTest, files_list){
   auto asJson = record.toJson();
   EXPECT_FALSE(asJson[EXPECTED_FILES_KEY][fileListVal1].is_null());
   EXPECT_EQ(std::vector<std::string>{fileListName}, asJson[EXPECTED_FILES_KEY][fileListVal2]["tags"]);
-}
+}*/
 
 }}}
 

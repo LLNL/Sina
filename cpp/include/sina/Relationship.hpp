@@ -80,7 +80,7 @@ public:
     /**
      * Create a Relationship object from its representation as a conduit Node.
      *
-     * @param asJson the relationship as a Node
+     * @param asNode the relationship as a Node
      */
     explicit Relationship(conduit::Node const &asNode);
 

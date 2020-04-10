@@ -31,6 +31,7 @@ namespace sina {
  *
  * Documents can be assembled programatically and/or generated from existing JSON. An example of an assembled
  * Document is provided on the main page. To load a Document from an existing JSON file:
+ * TODO: Redo this in the commit that adds json functionality, and check the other headers!
  * \code
  * sina::Document myDocument = sina::loadDocument("path/to/infile.json");
  * \endcode
@@ -76,7 +77,7 @@ public:
     /**
      * Create a Document from its Conduit Node representation
      *
-     * @param asJson the Document as a Node
+     * @param asNode the Document as a Node
      * @param recordLoader an RecordLoader to use to load the different
      * types of records which may be in the document
      */

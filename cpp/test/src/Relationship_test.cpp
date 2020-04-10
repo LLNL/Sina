@@ -12,8 +12,6 @@ char const EXPECTED_LOCAL_OBJECT_ID_KEY[] = "local_object";
 char const EXPECTED_GLOBAL_SUBJECT_ID_KEY[] = "subject";
 char const EXPECTED_LOCAL_SUBJECT_ID_KEY[] = "local_subject";
 char const EXPECTED_PREDICATE_KEY[] = "predicate";
-conduit::Node test_node;
-auto EXPECTED_EMPTY_DTYPE = test_node.dtype().name().c_str();
 
 using ::testing::HasSubstr;
 
@@ -124,8 +122,8 @@ TEST(Relationship, toNode_localIds) {
     EXPECT_EQ(subjectID, asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY].as_string());
     EXPECT_EQ(objectID, asNode[EXPECTED_LOCAL_OBJECT_ID_KEY].as_string());
     EXPECT_EQ(predicate, asNode[EXPECTED_PREDICATE_KEY].as_string());
-    EXPECT_TRUE(asNode[EXPECTED_GLOBAL_SUBJECT_ID_KEY].dtype().is_empty());
-    EXPECT_TRUE(asNode[EXPECTED_GLOBAL_OBJECT_ID_KEY].dtype().is_empty());
+    EXPECT_FALSE(asNode.has_child(EXPECTED_GLOBAL_SUBJECT_ID_KEY));
+    EXPECT_FALSE(asNode.has_child(EXPECTED_GLOBAL_OBJECT_ID_KEY));
 }
 
 TEST(Relationship, toNode_globalIds) {
@@ -141,10 +139,8 @@ TEST(Relationship, toNode_globalIds) {
     EXPECT_EQ(subjectID, asNode[EXPECTED_GLOBAL_SUBJECT_ID_KEY].as_string());
     EXPECT_EQ(objectID, asNode[EXPECTED_GLOBAL_OBJECT_ID_KEY].as_string());
     EXPECT_EQ(predicate, asNode[EXPECTED_PREDICATE_KEY].as_string());
-    EXPECT_EQ(EXPECTED_EMPTY_DTYPE,
-              asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY].dtype().name());
-    EXPECT_EQ(EXPECTED_EMPTY_DTYPE,
-              asNode[EXPECTED_LOCAL_OBJECT_ID_KEY].dtype().name());
+    EXPECT_FALSE(asNode.has_child(EXPECTED_LOCAL_SUBJECT_ID_KEY));
+    EXPECT_FALSE(asNode.has_child(EXPECTED_LOCAL_OBJECT_ID_KEY));
 }
 
 }}}

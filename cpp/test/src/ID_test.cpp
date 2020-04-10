@@ -11,9 +11,6 @@ namespace sina { namespace testing { namespace {
 
 using ::testing::HasSubstr;
 
-conduit::Node test_node;
-auto EXPECTED_EMPTY_DTYPE = test_node.dtype().name().c_str();
-
 TEST(ID, create) {
     ID id1{"the name", IDType::Local};
     ID id2{"another name", IDType::Global};
@@ -73,7 +70,7 @@ TEST(IDField, toNode_local) {
     conduit::Node value;
     field.addTo(value);
     EXPECT_EQ("the id", value["local name"].value());
-    EXPECT_EQ(EXPECTED_EMPTY_DTYPE, value["global name"].dtype().name());
+    EXPECT_TRUE(value["global name"].dtype().is_empty());
 }
 
 TEST(IDField, toNode_global) {
@@ -82,7 +79,7 @@ TEST(IDField, toNode_global) {
     conduit::Node value;
     field.addTo(value);
     EXPECT_EQ("the id", value["global name"].value());
-    EXPECT_EQ(EXPECTED_EMPTY_DTYPE, value["local name"].dtype().name());
+    EXPECT_FALSE(value.has_child("local name"));
 }
 
 }}}

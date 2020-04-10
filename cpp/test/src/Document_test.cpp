@@ -114,10 +114,10 @@ TEST(Document, toNode_records) {
 
     auto asNode = document.toNode();
 
-    auto records = asNode[EXPECTED_RECORDS_KEY];
-    ASSERT_EQ(numRecords, records.number_of_children());
-    for (std::size_t i = 0; i < numRecords; ++i) {
-        auto &actualNode = records[i];
+    auto record_nodes = asNode[EXPECTED_RECORDS_KEY];
+    ASSERT_EQ(numRecords, record_nodes.number_of_children());
+    for (auto i = 0; i < record_nodes.number_of_children(); ++i) {
+        auto &actualNode = record_nodes[i];
         EXPECT_EQ(expectedIds[i], actualNode["id"].as_string());
         EXPECT_EQ(TEST_RECORD_TYPE, actualNode["type"].as_string());
         EXPECT_EQ(expectedValues[i],
@@ -132,7 +132,7 @@ TEST(Document, toNode_relationships) {
     std::string expectedPredicates[] = {"predicate 1", "predicate 2"};
 
     auto numRecords = sizeof(expectedSubjects) / sizeof(expectedSubjects[0]);
-    for (std::size_t i = 0; i < numRecords; ++i) {
+    for (unsigned long i = 0; i < numRecords; ++i) {
         document.add(Relationship{
                 ID{expectedSubjects[i], IDType::Global},
                 expectedPredicates[i],
@@ -142,10 +142,10 @@ TEST(Document, toNode_relationships) {
 
     auto asNode = document.toNode();
 
-    auto relationships = asNode[EXPECTED_RELATIONSHIPS_KEY];
-    ASSERT_EQ(numRecords, relationships.number_of_children());
-    for (std::size_t i = 0; i < numRecords; ++i) {
-        auto &actualRelationship = relationships[i];
+    auto relationship_nodes = asNode[EXPECTED_RELATIONSHIPS_KEY];
+    ASSERT_EQ(numRecords, relationship_nodes.number_of_children());
+    for (auto i = 0; i < relationship_nodes.number_of_children(); ++i) {
+        auto &actualRelationship = relationship_nodes[i];
         EXPECT_EQ(expectedSubjects[i], actualRelationship["subject"].as_string());
         EXPECT_EQ(expectedObjects[i], actualRelationship["object"].as_string());
         EXPECT_EQ(expectedPredicates[i], actualRelationship["predicate"].as_string());

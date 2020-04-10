@@ -47,7 +47,7 @@ public:
      * Construct a new File.
      *
      * @param uri the uri for a file
-     * @param asJson the JSON representation of the file's additional info
+     * @param asNode the Node representation of the file's additional info
      */
     File(std::string uri, conduit::Node const &asNode);
 
