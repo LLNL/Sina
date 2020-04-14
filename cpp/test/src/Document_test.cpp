@@ -248,8 +248,8 @@ TEST(Document, load_specifiedRecordLoader) {
         return internal::make_unique<RecordType>(
                 getRequiredString("id", asNode, "Test type"),
                 getRequiredString("type", asNode, "Test type"),
-                getRequiredField(TEST_RECORD_VALUE_KEY, asNode,
-                        "Test type").value());
+                int(getRequiredField(TEST_RECORD_VALUE_KEY, asNode,
+                        "Test type").as_int64()));
     });
     Document loadedDocument = loadDocument(file.getName(), loader);
     ASSERT_EQ(1u, loadedDocument.getRecords().size());

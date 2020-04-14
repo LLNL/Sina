@@ -32,7 +32,7 @@ TEST(File, setTags) {
 
 TEST(File, create_fromNode_basic) {
     std::string uri = "the URI";
-    conduit::Node basic_file;
+    conduit::Node basic_file(conduit::DataType::object());
     File file{uri, basic_file};
     EXPECT_EQ(uri, file.getUri());
     EXPECT_EQ("", file.getMimeType());
@@ -42,9 +42,10 @@ TEST(File, create_fromNode_basic) {
 TEST(File, create_fromNode_complete) {
     std::string uri = "another/uri.txt";
     std::vector<std::string> tags = {"tags", "are", "fun"};
-    conduit::Node full_file;
+    conduit::Node full_file(conduit::DataType::object());
     full_file[EXPECTED_MIMETYPE_KEY] = "the mime type";
-    addStringsToNode(full_file, EXPECTED_TAGS_KEY, std::move(tags));
+    std::vector<std::string> tags_copy = tags;
+    addStringsToNode(full_file, EXPECTED_TAGS_KEY, tags_copy);
     File file{uri, full_file};
     EXPECT_EQ(uri, file.getUri());
     EXPECT_EQ("the mime type", file.getMimeType());
@@ -54,9 +55,8 @@ TEST(File, create_fromNode_complete) {
 TEST(File, toNode_basic) {
     File file{"the URI"};
     auto asNode = file.toNode();
-    conduit::Node emptyNode;
-    EXPECT_EQ(emptyNode.dtype().name(), asNode[EXPECTED_MIMETYPE_KEY].dtype().name());
-    EXPECT_EQ(emptyNode.dtype().name(), asNode[EXPECTED_TAGS_KEY].dtype().name());
+    EXPECT_FALSE(asNode.has_child(EXPECTED_MIMETYPE_KEY));
+    EXPECT_FALSE(asNode.has_child(EXPECTED_TAGS_KEY));
 }
 
 TEST(File, toNode_complete) {
@@ -65,7 +65,7 @@ TEST(File, toNode_complete) {
     file.setMimeType("the mime type");
     file.setTags(tags);
     auto asNode = file.toNode();
-    EXPECT_EQ("the mime type", asNode[EXPECTED_MIMETYPE_KEY].value());
+    EXPECT_EQ("the mime type", asNode[EXPECTED_MIMETYPE_KEY].as_string());
     EXPECT_EQ(tags, file.getTags());
 }
 

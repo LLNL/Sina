@@ -15,7 +15,7 @@ TEST(ConduitUtil, getRequiredField_present) {
     parent["fieldName"] = "field value";
     auto &field = getRequiredField("fieldName", parent, "parent name");
     EXPECT_TRUE(field.dtype().is_string());
-    EXPECT_EQ("field value", field.value());
+    EXPECT_EQ("field value", field.as_string());
 }
 
 TEST(ConduitUtil, getRequiredField_missing) {
@@ -31,9 +31,9 @@ TEST(ConduitUtil, getRequiredField_missing) {
 
 TEST(ConduitUtil, getRequiredString_valid) {
     conduit::Node parent;
-    parent["fieldname"] = "field value";
+    parent["fieldName"] = "field value";
     EXPECT_EQ("field value",
-            getRequiredString("fieldName", parent, "parent name"));
+              getRequiredString("fieldName", parent, "parent name"));
 }
 
 TEST(ConduitUtil, getRequiredString_missing) {
@@ -80,7 +80,7 @@ TEST(ConduitUtil, getRequiredDouble_missing) {
 
 TEST(ConduitUtil, getRequiredDouble_wrongType) {
     conduit::Node parent;
-    parent["fieldname"] = "field value";
+    parent["fieldName"] = "field value";
     try {
         auto value = getRequiredDouble("fieldName", parent, "parent name");
         FAIL() << "Should not have found double, but got " << value;
@@ -93,7 +93,7 @@ TEST(ConduitUtil, getRequiredDouble_wrongType) {
 
 TEST(ConduitUtil, getOptionalString_valid) {
     conduit::Node parent;
-    parent["the value"] = "field value";
+    parent["fieldName"] = "the value";
     EXPECT_EQ("the value",
               getOptionalString("fieldName", parent, "parent name"));
 }
@@ -103,11 +103,12 @@ TEST(ConduitUtil, getOptionalString_missing) {
     EXPECT_EQ("", getOptionalString("fieldName", parent, "parent name"));
 }
 
+/* TODO: Didn't find any references to handling of nullptr in conduit
 TEST(ConduitUtil, getOptionalString_explicitNullValue) {
     conduit::Node parent;
-    parent["fieldname"] = nullptr;
+    parent["fieldName"] = nullptr;
     EXPECT_EQ("", getOptionalString("fieldName", parent, "parent name"));
-}
+}*/
 
 TEST(ConduitUtil, getOptionalString_wrongType) {
     conduit::Node parent;

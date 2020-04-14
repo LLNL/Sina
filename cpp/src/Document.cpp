@@ -27,8 +27,9 @@ void Document::add(Relationship relationship) {
 }
 
 conduit::Node Document::toNode() const {
-    // note nlohmann::json::array is a function, not a type
-    conduit::Node document;
+    conduit::Node document(conduit::DataType::object());
+    document[RECORDS_KEY] = conduit::Node(conduit::DataType::list());
+    document[RELATIONSHIPS_KEY] = conduit::Node(conduit::DataType::list());
     for(auto &record : records)
     {
         conduit::Node &list_entry = document[RECORDS_KEY].append();
@@ -44,8 +45,8 @@ conduit::Node Document::toNode() const {
 
 Document::Document(conduit::Node const &asNode,
         RecordLoader const &recordLoader) {
-    conduit::Node record_nodes = asNode[RECORDS_KEY];
-    if (!record_nodes.dtype().is_empty()) {
+    if (asNode.has_child(RECORDS_KEY)) {
+        conduit::Node record_nodes = asNode[RECORDS_KEY];
         if (record_nodes.dtype().is_list()) {
             auto recordIter = record_nodes.children();
             while (recordIter.has_next()){
@@ -60,8 +61,8 @@ Document::Document(conduit::Node const &asNode,
     }
     }
 
-    conduit::Node relationship_nodes = asNode[RELATIONSHIPS_KEY];
-    if (!relationship_nodes.dtype().is_empty()) {
+    if (asNode.has_child(RELATIONSHIPS_KEY)){
+        conduit::Node relationship_nodes = asNode[RELATIONSHIPS_KEY];
         if (relationship_nodes.dtype().is_list()) {
           auto relationshipsIter = relationship_nodes.children();
           while (relationshipsIter.has_next()){

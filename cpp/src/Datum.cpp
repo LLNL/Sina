@@ -47,10 +47,18 @@ Datum::Datum(conduit::Node const &asNode) {
     //or list of one of those two.
     conduit::Node valueNode = getRequiredField(VALUE_FIELD, asNode, DATA_PARENT_TYPE);
     if(valueNode.dtype().is_string()){
-        stringValue = std::string(valueNode.value());
+        stringValue = valueNode.as_string();
     }
+    else if(valueNode.dtype().is_number() && valueNode.dtype().number_of_elements() == 1){
+        scalarValue = valueNode.as_double();
+    }
+    // There are two different ways to end up with a "list" of numbers in conduit, but
+    // only one of them tests True for is_list. This handles the other.
     else if(valueNode.dtype().is_number()){
-        scalarValue = double(valueNode.value());
+        type = ValueType::ScalarArray;
+        std::vector<double> array_as_vect(valueNode.as_double_ptr(),
+                                          valueNode.as_double_ptr() + valueNode.dtype().number_of_elements());
+        scalarArrayValue = array_as_vect;
     }
     else if(valueNode.dtype().is_list()){
         //An empty list is assumed to be an empty list of doubles.
@@ -67,24 +75,25 @@ Datum::Datum(conduit::Node const &asNode) {
         else {
             std::ostringstream message;
             message << "The only valid types for an array '" << VALUE_FIELD
-                    << "' are strings and numbers.";
+                    << "' are strings and numbers. Got '" << valueNode.to_json() << "'";
             throw std::invalid_argument(message.str());
         }
 
-        auto itr = asNode.children();
+        auto itr = valueNode.children();
         while(itr.has_next())
         {
             conduit::Node const &entry = itr.next();
             if(entry.dtype().is_string() && type == ValueType::StringArray){
-                stringArrayValue.emplace_back(std::string(entry.value()));
+                stringArrayValue.emplace_back(entry.as_string());
             }
             else if(entry.dtype().is_number() && type == ValueType::ScalarArray){
-                scalarArrayValue.emplace_back(double(entry.value()));
+                scalarArrayValue.emplace_back(entry.as_double());
             }
             else {
                 std::ostringstream message;
                 message << "If the required field '" << VALUE_FIELD
-                        << "' is an array, it must consist of only strings or only numbers.";
+                        << "' is an array, it must consist of only strings or only numbers, "
+                        << "but got '" << entry.dtype().name() << "' (" << entry.to_json() << ")";
                 throw std::invalid_argument(message.str());
             }
         }
@@ -105,7 +114,7 @@ Datum::Datum(conduit::Node const &asNode) {
       while(tagNodeIter.has_next()){
         auto tag = tagNodeIter.next();
         if(tag.dtype().is_string()){
-          tags.emplace_back(std::string(tag.value()));
+          tags.emplace_back(std::string(tag.as_string()));
         } else {
           std::ostringstream message;
           message << "The optional field '" << TAGS_FIELD
@@ -143,8 +152,8 @@ conduit::Node Datum::toNode() const {
             break;
     }
     if(tags.size() > 0){
-        std::vector<std::string> stringArrayValCopy(stringArrayValue);
-        addStringsToNode(asNode, TAGS_FIELD, stringArrayValCopy);
+        std::vector<std::string> tagsCopy(tags);
+        addStringsToNode(asNode, TAGS_FIELD, tagsCopy);
     }
     if(!units.empty())
         asNode[UNITS_FIELD] = units;

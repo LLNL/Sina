@@ -24,13 +24,11 @@ namespace {
  */
 ID extractIDFromObject(conduit::Node const &parentObject,
         std::string const &localName, std::string const &globalName) {
-    conduit::Node globalNameNode = parentObject[globalName];
-    if (!globalNameNode.dtype().is_empty()) {
-        return ID{std::string(globalNameNode.value()), IDType::Global};
+    if (parentObject.has_child(globalName)) {
+        return ID{std::string(parentObject[globalName].as_string()), IDType::Global};
     }
-    conduit::Node localNameNode = parentObject[localName];
-    if (!globalNameNode.dtype().is_empty()) {
-        return ID{std::string(localNameNode.value()), IDType::Local};
+    if (parentObject.has_child(localName)) {
+        return ID{std::string(parentObject[localName].as_string()), IDType::Local};
     }
     std::string message{
             "Could not find either of the required ID fields '"};

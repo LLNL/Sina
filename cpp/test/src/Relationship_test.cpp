@@ -36,8 +36,8 @@ TEST(Relationship, create_fromNode_validGlobalIDs) {
     std::string predicate = "is somehow related to";
 
     conduit::Node asNode;
-    asNode[EXPECTED_LOCAL_SUBJECT_ID_KEY] = subjectID;
-    asNode[EXPECTED_LOCAL_OBJECT_ID_KEY] = objectID;
+    asNode[EXPECTED_GLOBAL_SUBJECT_ID_KEY] = subjectID;
+    asNode[EXPECTED_GLOBAL_OBJECT_ID_KEY] = objectID;
     asNode[EXPECTED_PREDICATE_KEY] = predicate;
 
     Relationship relationship{asNode};

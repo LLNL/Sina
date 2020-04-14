@@ -27,7 +27,8 @@ std::string getExpectedString(conduit::Node const &field,
         std::ostringstream message;
         message << "The field '" << fieldName
                 << "' for objects of type '" << parentType
-                << "' must be a string";
+                << "' must be a string, was '"
+                << field.dtype().name() << "'";
         throw std::invalid_argument(message.str());
     }
     return field.as_string();
@@ -47,8 +48,8 @@ conduit::Node const &getRequiredField(std::string const &fieldName,
 
 std::string getRequiredString(std::string const &fieldName,
         conduit::Node const &parent, std::string const &parentType) {
-    conduit::Node const &ref = getRequiredField(fieldName, parent, parentType);
-    return getExpectedString(ref, fieldName, parentType);
+    conduit::Node const &field = getRequiredField(fieldName, parent, parentType);
+    return getExpectedString(field, fieldName, parentType);
 }
 
 std::string getOptionalString(std::string const &fieldName,
@@ -56,7 +57,7 @@ std::string getOptionalString(std::string const &fieldName,
     if (!parent.has_child(fieldName)) {
         return "";
     }
-    return getExpectedString(parent, fieldName, parentType);
+    return getExpectedString(parent[fieldName], fieldName, parentType);
 }
 
 double getRequiredDouble(std::string const &fieldName,

@@ -35,8 +35,7 @@ conduit::Node Record::toNode() const {
     if(!files.empty()){
       conduit::Node fileRef;
       for (auto &file : files) {
-          conduit::Node fileNode = fileRef[file.getUri()].append();
-          fileNode.set_node(file.toNode());
+          fileRef[file.getUri()] = file.toNode();
       asNode[FILES_FIELD] = fileRef;
       }
     }
@@ -44,8 +43,7 @@ conduit::Node Record::toNode() const {
       //Loop through vector of data and append Json
       conduit::Node datumRef;
       for(auto &datum : data){
-          conduit::Node datumNode = datumRef[datum.first];
-          datumNode.set_node(datum.second.toNode());
+          datumRef[datum.first] = datum.second.toNode(); 
       }
       asNode[DATA_FIELD] = datumRef;
     }
@@ -58,24 +56,30 @@ conduit::Node Record::toNode() const {
 Record::Record(conduit::Node const &asNode) :
         id{asNode, LOCAL_ID_FIELD, GLOBAL_ID_FIELD},
         type{getRequiredString(TYPE_FIELD, asNode, "record")} {
-    auto dataIter = asNode[DATA_FIELD].children();
-    //Loop through DATA_FIELD objects and add them to data:
-    while(dataIter.has_next()){
-        conduit::Node namedDatum = dataIter.next();
-        data.emplace(std::make_pair(namedDatum.name(), Datum(namedDatum.value())));
-    }
-    auto filesIter = asNode[FILES_FIELD].children();
-    while(filesIter.has_next()){
-        conduit::Node namedFile = filesIter.next();
-        files.insert(File(namedFile.name(), namedFile));
-    }
-    auto userDefinedNode = asNode[USER_DEFINED_FIELD];
-    if (!userDefinedNode.dtype().is_empty()) {
-        // Enforce that user_defined must be an object
-        if (!userDefinedNode.dtype().is_object()) {
-            throw std::invalid_argument("User_defined must be an object Node");
+    if(asNode.has_child(DATA_FIELD)){
+        auto dataIter = asNode[DATA_FIELD].children();
+        //Loop through DATA_FIELD objects and add them to data:
+        while(dataIter.has_next()){
+            conduit::Node namedDatum = dataIter.next();
+            data.emplace(std::make_pair(dataIter.name(), Datum(namedDatum)));
         }
-        userDefined = userDefinedNode;
+    }
+    if(asNode.has_child(FILES_FIELD)){
+        auto filesIter = asNode[FILES_FIELD].children();
+        while(filesIter.has_next()){
+            conduit::Node namedFile = filesIter.next();
+            files.insert(File(filesIter.name(), namedFile));
+        }
+    }
+    if(asNode.has_child(USER_DEFINED_FIELD)){
+        auto userDefinedNode = asNode[USER_DEFINED_FIELD];
+        if (!userDefinedNode.dtype().is_empty()) {
+            // Enforce that user_defined must be an object
+            if (!userDefinedNode.dtype().is_object()) {
+                throw std::invalid_argument("User_defined must be an object Node");
+            }
+            userDefined = userDefinedNode;
+        }
     }
 }
 
@@ -97,7 +101,7 @@ void RecordLoader::addTypeLoader(std::string const &type, TypeLoader loader) {
 
 std::unique_ptr<Record>
 RecordLoader::load(conduit::Node const &recordAsNode) const {
-    auto loaderIter = typeLoaders.find(recordAsNode[TYPE_FIELD].name());
+    auto loaderIter = typeLoaders.find(recordAsNode[TYPE_FIELD].as_string());
     if (loaderIter != typeLoaders.end()) {
         return loaderIter->second(recordAsNode);
     }

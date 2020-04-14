@@ -41,7 +41,7 @@ TEST(Datum, create) {
     EXPECT_EQ(scal_list, datum4.getScalarArray());
 }
 
-TEST(Datum, createFromJson) {
+TEST(Datum, createFromNode) {
     conduit::Node object1;
     conduit::Node object2;
     conduit::Node object3;
@@ -59,7 +59,10 @@ TEST(Datum, createFromJson) {
     addStringsToNode(object3, "value", vals_copy);
     object4["value"] = scal_list;
     //Empty arrays are valid
-    object5["value"].append();
+    conduit::Node empty_list(conduit::DataType::list());
+    object5["value"] = empty_list;
+    // TODO more cases: chars, actual list-type of
+    // numbers from conduit's pov
 
     Datum datum1{object1};
     Datum datum2{object2};
@@ -130,19 +133,22 @@ TEST(Datum, toJson) {
     conduit::Node datumRef3 = datum3.toNode();
     conduit::Node datumRef4 = datum4.toNode();
     EXPECT_EQ("Datum value", datumRef1["value"].as_string());
+    //TODO: Given the below and the final 2 tests, is there a
+    //more elegant way to access?
     //EXPECT_EQ(tags, datumRef1["tags"].value());
 
     EXPECT_EQ("Datum units", datumRef2["units"].as_string());
     EXPECT_THAT(3.14, DoubleEq(datumRef2["value"].value()));
 
-    std::vector<double>scal_child_vals;
-    auto scal_itr = datumRef3.children();
-    while(scal_itr.has_next())
-        scal_child_vals.emplace_back(scal_itr.next().as_double());
+    // Conduit will pack vectors of numbers into arrays, but
+    // strings can only live as lists of Nodes
+    auto doub_array = datumRef3["value"].as_double_ptr();
+    std::vector<double>scal_child_vals(doub_array, doub_array+datumRef3["value"].dtype().number_of_elements());
+
     std::vector<std::string>str_child_vals;
-    auto str_itr = datumRef3.children();
+    auto str_itr = datumRef4["value"].children();
     while(str_itr.has_next())
-        str_child_vals.emplace_back(scal_itr.next().as_string());
+        str_child_vals.emplace_back(str_itr.next().as_string());
     EXPECT_EQ(scal_list, scal_child_vals);
     EXPECT_EQ(val_list, str_child_vals);
 }

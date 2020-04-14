@@ -21,20 +21,23 @@ File::File(std::string uri_) : uri{std::move(uri_)} {}
 
 File::File(char const *uri_) : uri{uri_} {}
 
+// TODO: No real reason to still require the uri separately?
 File::File(std::string uri_, conduit::Node const &asNode) :
     uri{std::move(uri_)},
     mimeType{getOptionalString(MIMETYPE_KEY, asNode, FILE_TYPE_NAME)} {
-        auto tagsIter = asNode[TAGS_KEY].children();
-        while(tagsIter.has_next()){
-            conduit::Node tag = tagsIter.next();
-            if(tag.dtype().is_string())
-                tags.emplace_back(tag.value());
-            else {
-                std::ostringstream message;
-                message << "The optional field '" << TAGS_KEY
-                    << "' must be an array of strings. Found '"
-                    << tag.dtype().name() << "' instead.";
-                throw std::invalid_argument(message.str());
+        if (asNode.has_child(TAGS_KEY)){
+            auto tagsIter = asNode[TAGS_KEY].children();
+            while(tagsIter.has_next()){
+                conduit::Node tag = tagsIter.next();
+                if(tag.dtype().is_string())
+                    tags.emplace_back(tag.as_string());
+                else {
+                    std::ostringstream message;
+                    message << "The optional field '" << TAGS_KEY
+                        << "' must be an array of strings. Found '"
+                        << tag.dtype().name() << "' instead.";
+                    throw std::invalid_argument(message.str());
+                }
             }
         }
 

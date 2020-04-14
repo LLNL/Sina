@@ -54,7 +54,7 @@ TEST(IDField, createFromNode_global) {
 }
 
 TEST(IDField, createFromNode_missingKeys) {
-    conduit::Node object;
+    conduit::Node object(conduit::DataType::object());
     try {
         internal::IDField field{object, "local id key", "global id key"};
         FAIL() << "Should have gotten a value error";
@@ -69,8 +69,8 @@ TEST(IDField, toNode_local) {
     internal::IDField field{id, "local name", "global name"};
     conduit::Node value;
     field.addTo(value);
-    EXPECT_EQ("the id", value["local name"].value());
-    EXPECT_TRUE(value["global name"].dtype().is_empty());
+    EXPECT_EQ("the id", value["local name"].as_string());
+    EXPECT_FALSE(value.has_child("global name"));
 }
 
 TEST(IDField, toNode_global) {
@@ -78,7 +78,7 @@ TEST(IDField, toNode_global) {
     internal::IDField field{id, "local name", "global name"};
     conduit::Node value;
     field.addTo(value);
-    EXPECT_EQ("the id", value["global name"].value());
+    EXPECT_EQ("the id", value["global name"].as_string());
     EXPECT_FALSE(value.has_child("local name"));
 }
 
