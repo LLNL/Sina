@@ -1,9 +1,3 @@
-set(CMAKE_SYSTEM_NAME Linux)
-
-set(DOXYGEN_EXECUTABLE "doxygen" CACHE PATH "")
-
-set(CMAKE_CXX_COMPILER clang++)
-
 string(CONCAT SINA_BASE_CXX_FLAGS "-std=c++11")
 
 string(CONCAT SINA_CXX_FLAGS "${SINA_BASE_CXX_FLAGS} "
@@ -19,4 +13,5 @@ string(CONCAT SINA_CXX_TEST_FLAGS "${SINA_CXX_FLAGS} "
         "-Wno-used-but-marked-unused "
         "-Wno-global-constructors "
         "-Wno-potentially-evaluated-expression "
+        "-Wno-zero-as-null-pointer-constant "
         )
