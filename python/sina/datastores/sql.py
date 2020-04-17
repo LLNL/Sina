@@ -594,6 +594,19 @@ class RecordDAO(dao.RecordDAO):
                                  'tags': tags}
         return scalars
 
+    def get_mimetype(self, mimetype):
+        """
+        Return all records associated with documents whose mimetype  match some arg
+
+        :param mimetype: The mimetype to use as a search term
+
+        :returns: Record object fitting the criteria.
+        """
+        query_set = (self.session.query(schema.Document.id)
+                     .filter(schema.Document.mimetype == mimetype))
+        ids = (x[0] for x in query_set)
+        return self.get(ids)
+
 
 class RelationshipDAO(dao.RelationshipDAO):
     """The DAO responsible for handling Relationships in SQL."""

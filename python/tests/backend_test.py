@@ -68,12 +68,12 @@ def populate_database_with_data(record_dao, run_dao):
     spam_record_3.data["spam_scal_2"] = {"value": 10.5}
     spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
     spam_record_3.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_3.files = {"beeq.png": {}}
+    spam_record_3.files = {"beeq.png": {"mimetype": 'image/png'}}
 
     spam_record_4 = Record(id="spam4", type="bar")
     spam_record_4.data["val_data_list_1"] = {"value": [-11, -9]}
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_4.files = {"beep.png": {}}
+    spam_record_4.files = {"beep.png": {"mimetype": 'image/png'}}
 
     spam_record_5 = Run(id="spam5", application="breakfast_maker")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
@@ -891,6 +891,21 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         get_norec = self.record_dao.get_scalars(id="wheeee",
                                                 scalar_names=["value-1"])
         self.assertFalse(get_norec)
+
+    def test_get_mimetype_single(self):
+        """Test that the RecordDAO mimetype query retrieves only one Record."""
+        just_5 = list(self.record_dao.get_mimetype(mimetype="audio/wav"))
+        self.assertEqual(len(just_5), 1)
+
+    def test_get_mimetype_multi(self):
+        """Test that the RecordDAO mimetype query retrieves multiple Records."""
+        just_3_and_4 = list(self.record_dao.get_mimetype(mimetype="image/png"))
+        self.assertEqual(len(just_3_and_4), 2)
+
+    def test_get_mimetype_no_match(self):
+        """Test that the RecordDAO mimetype query retrieves no Records when there is no match."""
+        get_none = list(self.record_dao.get_mimetype(mimetype="nope/nonexist"))
+        self.assertFalse(get_none)
 
 
 class TestImportExport(unittest.TestCase):
