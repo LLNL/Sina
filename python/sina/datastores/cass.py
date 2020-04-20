@@ -929,6 +929,17 @@ class RecordDAO(dao.RecordDAO):
                 pass
         return scalars
 
+    def get_with_mime_type(self, mimetype, ids_only=False):
+        """
+        Return all records or IDs associated with documents whose mimetype match some arg
+
+        :param mimetype: The mimetype to use as a search term
+        :param ids_only: Whether to only return the ids
+
+        :returns: Record object or IDs fitting the criteria.
+        """
+        raise NotImplementedError
+
 
 class RelationshipDAO(dao.RelationshipDAO):
     """The DAO responsible for handling Relationships in Cassandra."""
