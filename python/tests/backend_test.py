@@ -904,8 +904,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         just_3_and_4 = list(self.record_dao.get_with_mime_type(mimetype="image/png",
                                                                ids_only=False))
         self.assertEqual(len(just_3_and_4), 2)
-        self.assertEqual(just_3_and_4[0].id, "spam3")
-        self.assertEqual(just_3_and_4[1].id, "spam4")
+        six.assertCountEqual(self, [just_3_and_4[0].id, just_3_and_4[1].id],
+                             ["spam3", "spam4"])
 
     def test_get_with_mime_type_no_match(self):
         """Test that the RecordDAO mimetype query retrieves no Records when there is no match."""
@@ -925,8 +925,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         just_3_and_4_ids = list(self.record_dao.get_with_mime_type(mimetype="image/png",
                                                                    ids_only=True))
         self.assertEqual(len(just_3_and_4_ids), 2)
-        self.assertEqual(just_3_and_4_ids[0], "spam3")
-        self.assertEqual(just_3_and_4_ids[1], "spam4")
+        six.assertCountEqual(self, just_3_and_4_ids, ["spam3", "spam4"])
 
     def test_get_with_mime_type_no_match_id_only(self):
         """Test that the RecordDAO mimetype query retrieves no IDs when there is no match."""
