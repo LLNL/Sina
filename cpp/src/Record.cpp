@@ -43,7 +43,7 @@ conduit::Node Record::toNode() const {
       //Loop through vector of data and append Json
       conduit::Node datumRef;
       for(auto &datum : data){
-          datumRef[datum.first] = datum.second.toNode(); 
+          datumRef[datum.first] = datum.second.toNode();
       }
       asNode[DATA_FIELD] = datumRef;
     }
@@ -60,14 +60,14 @@ Record::Record(conduit::Node const &asNode) :
         auto dataIter = asNode[DATA_FIELD].children();
         //Loop through DATA_FIELD objects and add them to data:
         while(dataIter.has_next()){
-            conduit::Node namedDatum = dataIter.next();
+            auto &namedDatum = dataIter.next();
             data.emplace(std::make_pair(dataIter.name(), Datum(namedDatum)));
         }
     }
     if(asNode.has_child(FILES_FIELD)){
         auto filesIter = asNode[FILES_FIELD].children();
         while(filesIter.has_next()){
-            conduit::Node namedFile = filesIter.next();
+            auto &namedFile = filesIter.next();
             files.insert(File(filesIter.name(), namedFile));
         }
     }

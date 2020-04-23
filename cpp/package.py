@@ -20,7 +20,6 @@ class SinaCpp(CMakePackage):
     depends_on('adiak', when='+adiak')
     depends_on('doxygen', type='build', when='+docs')
     depends_on('zlib@1.2.11:')
-    depends_on('nlohmann-json')
     depends_on('conduit')
 
     def configure_args(self):

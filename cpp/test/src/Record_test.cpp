@@ -95,7 +95,7 @@ TEST(Record, create_globalId_files) {
     originalNode[EXPECTED_FILES_KEY].add_child(uri3);
     Record record{originalNode};
     auto &files = record.getFiles();
-    //ASSERT_EQ(3u, files.size());
+    ASSERT_EQ(3u, files.size());
     EXPECT_EQ(1, files.count(File{uri1}));
     EXPECT_EQ(1, files.count(File{uri2}));
     EXPECT_EQ(1, files.count(File{uri3}));
@@ -114,7 +114,7 @@ TEST(Record, create_fromNode_userDefined) {
     auto const &userDefined = record.getUserDefinedContent();
     EXPECT_EQ("v1", userDefined["k1"].as_string());
     EXPECT_EQ(123, userDefined["k2"].as_int());
-    //EXPECT_THAT(userDefined["k3"], ElementsAre(1, 2, 3));
+    EXPECT_THAT(userDefined["k3"].as_int_ptr(), ElementsAre(1, 2, 3));
 }
 
 TEST(Record, getUserDefined_initialConst) {
@@ -255,8 +255,6 @@ TEST(RecordLoader, load_loaderPresent) {
     asNode[TEST_RECORD_VALUE_KEY] = "The value";
     auto loaded = loader.load(asNode);
     auto testObjPointer = dynamic_cast<TestRecord<std::string> *>(loaded.get());
-    // TODO: This NE, like its sister-case in Run_test, fails?
-    // actual: 8-byte object <00-00 00-00 00-00 00-00> vs NULL
     ASSERT_NE(nullptr, testObjPointer);
     EXPECT_EQ("The value", testObjPointer->getValue());
     EXPECT_EQ("TestString", testObjPointer->getType());

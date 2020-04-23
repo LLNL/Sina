@@ -24,8 +24,7 @@ using ::testing::HasSubstr;
 using ::testing::DoubleEq;
 using ::testing::ElementsAre;
 
-//TODO: These tests won't make sense until the Json's added back in
-/*char const EXPECTED_DATA_KEY[] = "data";
+char const EXPECTED_DATA_KEY[] = "data";
 char const EXPECTED_FILES_KEY[] = "files";
 
 class AdiakWriterTest : public ::testing::Test {
@@ -69,7 +68,7 @@ TEST_F(AdiakWriterTest, basic_assignment) {
   auto result1 = adiak::value(name1, value1);
   auto result2 = adiak::value(name2, value2);
   EXPECT_TRUE(result1 && result2);
-  auto asJson = record.toJson();
+  auto asJson = record.toNode().to_json();
   EXPECT_EQ(value1, asJson[EXPECTED_DATA_KEY][name1]["value"]);
   EXPECT_EQ(value2, asJson[EXPECTED_DATA_KEY][name2]["value"]);
   EXPECT_EQ(tags1, asJson[EXPECTED_DATA_KEY][name1]["tags"]);
@@ -84,7 +83,7 @@ TEST_F(AdiakWriterTest, scalar_types) {
   auto result1 = adiak::value(name1, value1);
   auto result2 = adiak::value(name2, value2);
   EXPECT_TRUE(result1 && result2);
-  auto asJson = record.toJson();
+  auto asJson = record.toNode().to_json();
   EXPECT_EQ(value1, asJson[EXPECTED_DATA_KEY][name1]["value"]);
   EXPECT_EQ(value2, asJson[EXPECTED_DATA_KEY][name2]["value"]);
 }
@@ -94,7 +93,7 @@ TEST_F(AdiakWriterTest, date_type) {
   std::string name1 = "my_date";
   auto result = adiak::value(name1, adiak::date(1568397849));
   EXPECT_TRUE(result);
-  auto asJson = record.toJson();
+  auto asJson = record.toNode().to_json();
   EXPECT_EQ("Fri, 13 Sep 2019 11:04:09 -0700", asJson[EXPECTED_DATA_KEY][name1]["value"]);
 }
 
@@ -106,7 +105,7 @@ TEST_F(AdiakWriterTest, list_types) {
   auto result1 = adiak::value(name1, value1);
   auto result2 = adiak::value(name2, value2);
   EXPECT_TRUE(result1 && result2);
-  auto asJson = record.toJson();
+  auto asJson = record.toNode().to_json();
   EXPECT_EQ(value1, asJson[EXPECTED_DATA_KEY][name1]["value"]);
   EXPECT_EQ(value2, asJson[EXPECTED_DATA_KEY][name2]["value"]);
 }
@@ -120,7 +119,7 @@ TEST_F(AdiakWriterTest, files) {
   auto result1 = adiak::value(name1, adiak::path(value1));
   auto result2 = adiak::value(name2, adiak::path(value2));
   EXPECT_TRUE(result1 && result2);
-  auto asJson = record.toJson();
+  auto asJson = record.toNode().to_json();
   EXPECT_FALSE(asJson[EXPECTED_FILES_KEY][value1].is_null());
   EXPECT_EQ(tags2, asJson[EXPECTED_FILES_KEY][value2]["tags"]);
 }
@@ -132,10 +131,10 @@ TEST_F(AdiakWriterTest, files_list){
   std::vector<adiak::path> fileListAdiak{adiak::path(fileListVal1), adiak::path(fileListVal2)};
   std::vector<std::string> tags = {"string"};
   EXPECT_TRUE(adiak::value(fileListName, fileListAdiak));
-  auto asJson = record.toJson();
+  auto asJson = record.toNode().to_json();
   EXPECT_FALSE(asJson[EXPECTED_FILES_KEY][fileListVal1].is_null());
   EXPECT_EQ(std::vector<std::string>{fileListName}, asJson[EXPECTED_FILES_KEY][fileListVal2]["tags"]);
-}*/
+}
 
 }}}
 

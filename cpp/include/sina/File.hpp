@@ -36,16 +36,6 @@ public:
     /**
      * Construct a new File.
      *
-     * @param uri the location of the file
-     */
-    // Note: without this, the constructors taking a std::string and a
-    // conduit::Node are ambiguous if a string literal is used
-    // (TODO: is this still true?)
-    explicit File(char const *uri);
-
-    /**
-     * Construct a new File.
-     *
      * @param uri the uri for a file
      * @param asNode the Node representation of the file's additional info
      */
@@ -93,9 +83,9 @@ public:
     void setTags(std::vector<std::string> tags);
 
     /**
-     * Convert this File to its JSON representation.
+     * Convert this File to its conduit Node representation.
      *
-     * @return the File in its JSON representation
+     * @return the File in its Node representation
      */
     conduit::Node toNode() const;
 

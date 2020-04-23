@@ -76,7 +76,6 @@ TEST(Run, addRunLoader) {
 
     auto record = loader.load(originNode);
     auto run = dynamic_cast<sina::Run *>(record.get());
-    // TODO: How is this next case failing, but the rest succeeding?
     ASSERT_NE(nullptr, run);
     EXPECT_EQ("run", run->getType());
     EXPECT_EQ("the id", run->getId().getId());

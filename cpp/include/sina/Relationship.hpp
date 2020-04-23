@@ -33,7 +33,8 @@ namespace sina {
  *
  * Note that Relationships are described in the active voice. **Avoiding the passive voice
  * in predicates is recommended**, as this keeps the "direction" of the relationship constant.
- * An example of a passively-voiced Relationship is "Dani is emailed by Carlos".
+ * An example of a passively-voiced Relationship is "Dani is emailed by Carlos". Instead,
+ * this should be phrased as "Carlos emails Dani".
  *
  * If assembling Relationships programatically, it may be useful to reference the
  * ID documentation.
@@ -42,7 +43,7 @@ namespace sina {
  * sina::ID task22{"Task_22", sina::IDType::Global};
  * sina::ID run1024{"Run_1024", sina::IDType::Global};
  * sina::Relationship myRelationship{task22, "contains", run1024};
- * std::cout << myRelationship.toJson() << std::endl;
+ * std::cout << myRelationship.toNode().to_json() << std::endl;
  * \endcode
  *
  * This would output:
@@ -51,7 +52,7 @@ namespace sina {
  * \endcode
  *
  * As with any other Sina ID, the subject or object may be either local (uniquely refer to one object
- * in a JSON file) or global (uniquely refer to one object in a database). Local IDs are replaced with
+ * in a Sina file) or global (uniquely refer to one object in a database). Local IDs are replaced with
  * global ones upon ingestion; all Relationships referring to that Local ID (as well as the Record possessing
  * that ID) will be updated to use the same global ID.
  *

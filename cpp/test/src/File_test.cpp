@@ -44,8 +44,7 @@ TEST(File, create_fromNode_complete) {
     std::vector<std::string> tags = {"tags", "are", "fun"};
     conduit::Node full_file(conduit::DataType::object());
     full_file[EXPECTED_MIMETYPE_KEY] = "the mime type";
-    std::vector<std::string> tags_copy = tags;
-    addStringsToNode(full_file, EXPECTED_TAGS_KEY, tags_copy);
+    addStringsToNode(full_file, EXPECTED_TAGS_KEY, tags);
     File file{uri, full_file};
     EXPECT_EQ(uri, file.getUri());
     EXPECT_EQ("the mime type", file.getMimeType());

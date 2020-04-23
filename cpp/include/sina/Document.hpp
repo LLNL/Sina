@@ -31,16 +31,15 @@ namespace sina {
  *
  * Documents can be assembled programatically and/or generated from existing JSON. An example of an assembled
  * Document is provided on the main page. To load a Document from an existing JSON file:
- * TODO: Redo this in the commit that adds json functionality, and check the other headers!
  * \code
  * sina::Document myDocument = sina::loadDocument("path/to/infile.json");
  * \endcode
  *
  * To generate a Document from a JSON string and vice versa:
  * \code
- * nhlohmann::json jObj = "{\"records\":[{\"type\":\"run\",\"id\":\"test\"}],\"relationships\":[]}"_json;
- * sina::Document myDocument = sina::Document(jObj, sina::createRecordLoaderWithAllKnownTypes());
- * std::cout << myDocument.toJson().dump(4) << std::endl;);
+ * std::string my_json = "{\"records\":[{\"type\":\"run\",\"id\":\"test\"}],\"relationships\":[]}";
+ * sina::Document myDocument = sina::Document(my_json, sina::createRecordLoaderWithAllKnownTypes());
+ * std::cout << myDocument.toJson() << std::endl;);
  * \endcode
  *
  * You can add further entries to the Document using add():
@@ -84,6 +83,15 @@ public:
     Document(conduit::Node const &asNode, RecordLoader const &recordLoader);
 
     /**
+     * Create a Document from a JSON string representation
+     *
+     * @param asJson the Document as a JSON string
+     * @param recordLoader an RecordLoader to use to load the different
+     * types of records which may be in the document
+     */
+    Document(std::string const &asJson, RecordLoader const &recordLoader);
+
+    /**
      * Add the given record to this document.
      *
      * @param record the record to add
@@ -122,6 +130,13 @@ public:
      * @return the contents of the document as a Node
      */
     conduit::Node toNode() const;
+
+    /**
+     * Convert this document to a JSON string.
+     *
+     * @return the contents of the document as a JSON string
+     */
+    std::string toJson() const;
 
 private:
     RecordList records;

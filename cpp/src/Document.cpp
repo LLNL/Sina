@@ -32,12 +32,12 @@ conduit::Node Document::toNode() const {
     document[RELATIONSHIPS_KEY] = conduit::Node(conduit::DataType::list());
     for(auto &record : records)
     {
-        conduit::Node &list_entry = document[RECORDS_KEY].append();
+        auto &list_entry = document[RECORDS_KEY].append();
         list_entry.set_node(record->toNode());
     }
     for(auto &relationship : relationships)
     {
-        conduit::Node &list_entry = document[RELATIONSHIPS_KEY].append();
+        auto &list_entry = document[RELATIONSHIPS_KEY].append();
         list_entry = relationship.toNode();
     }
     return document;
@@ -66,7 +66,7 @@ Document::Document(conduit::Node const &asNode,
         if (relationship_nodes.dtype().is_list()) {
           auto relationshipsIter = relationship_nodes.children();
           while (relationshipsIter.has_next()){
-              auto relationship = relationshipsIter.next();
+              auto &relationship = relationshipsIter.next();
               add(Relationship{relationship});
           }
         } else {

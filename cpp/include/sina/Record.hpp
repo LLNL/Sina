@@ -74,11 +74,11 @@ public:
     Record(ID id, std::string type);
 
     /**
-     * Construct a Record from its JSON representation.
+     * Construct a Record from its conduit Node representation.
      *
-     * @param asJson the Record as JSON
+     * @param asNode the Record as a Node
      */
-    explicit Record(conduit::Node const &asJson);
+    explicit Record(conduit::Node const &asNode);
 
     Record(Record const &) = delete;
 
@@ -161,9 +161,9 @@ public:
     void setUserDefinedContent(conduit::Node userDefined);
 
     /**
-     * Convert this record to its JSON representation.
+     * Convert this record to its conduit Node representation.
      *
-     * @return the JSON representation of this record.
+     * @return the Node representation of this record.
      */
     virtual conduit::Node toNode() const;
 
@@ -179,7 +179,7 @@ private:
 
 
 /**
- * A RecordLoader is used to convert Json::Value instances which represent
+ * A RecordLoader is used to convert conduit::Node instances which represent
  * Sina Records into instances of their corresponding sina::Record
  * subclasses. For convenience, a RecordLoader capable of handling Records of all known
  * types can be created using createRecordLoaderWithAllKnownTypes:
@@ -206,12 +206,12 @@ public:
     void addTypeLoader(std::string const &type, TypeLoader loader);
 
     /**
-     * Load a sina::Record from its JSON representation.
+     * Load a sina::Record from its conduit Node representation.
      *
-     * @param recordAsJson the Record in its JSON representation
+     * @param recordAsNode the Record as a Node
      * @return the Record
      */
-    std::unique_ptr<Record> load(conduit::Node const &recordAsJson) const;
+    std::unique_ptr<Record> load(conduit::Node const &recordAsNode) const;
 
     /**
      * Check whether this loader can load records of the given type.

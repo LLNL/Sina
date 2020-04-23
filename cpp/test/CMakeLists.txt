@@ -5,7 +5,7 @@ add_definitions(${SINA_CXX_TEST_FLAGS})
 include_directories("${PROJECT_SOURCE_DIR}/test/include")
 
 # libdl is a requirement of Adiak, not Sina, but conditional inclusion
-# creates issues on CZ. Delete this when Adiak includes libdl 
+# creates issues on CZ. Delete this when Adiak includes libdl
 blt_register_library(NAME libdl
     TREAT_INCLUDES_AS_SYSTEM ON
     LINK_FLAGS -ldl
@@ -45,7 +45,7 @@ blt_add_executable(NAME unittests
         src/Datum_test.cpp
         src/AdiakWriter_test.cpp
         src/TestRecord.cpp
-    DEPENDS_ON sina gtest gmock nlohmann_json Conduit libdl
+    DEPENDS_ON sina gtest gmock Conduit libdl
 )
 
 blt_add_test(NAME unittests

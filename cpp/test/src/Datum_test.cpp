@@ -51,12 +51,10 @@ TEST(Datum, createFromNode) {
     std::vector<std::string> val_list = {"val1", "val2"};
     std::vector<double> scal_list = {100, 2.0};
     object1["value"] = "the value";
-    std::vector<std::string> tags_copy = tags;
-    addStringsToNode(object1, "tags", tags_copy);
+    addStringsToNode(object1, "tags", tags);
     object1["units"] = "some units";
     object2["value"] = 3.14;
-    std::vector<std::string> vals_copy = val_list;
-    addStringsToNode(object3, "value", vals_copy);
+    addStringsToNode(object3, "value", val_list);
     object4["value"] = scal_list;
     //Empty arrays are valid
     conduit::Node empty_list(conduit::DataType::list());
@@ -103,8 +101,7 @@ TEST(Datum, createFromJson_missingKeys) {
         EXPECT_THAT(expected.what(), HasSubstr("value"));
     }
 }
-/* Come back with a decision on whether this is a reasonable upgrade to the
-utils (taking an initializer list)
+
 TEST(Datum, createFromJson_badListValue) {
     conduit::Node object1;
     object1["value"] = {1, "two", 3};
@@ -115,7 +112,7 @@ TEST(Datum, createFromJson_badListValue) {
         std::string warning = "it must consist of only strings or only numbers";
         EXPECT_THAT(expected.what(), HasSubstr(warning));
     }
-}*/
+}
 
 TEST(Datum, toJson) {
     std::vector<std::string> tags = {"list", "of", "tags"};
@@ -133,9 +130,11 @@ TEST(Datum, toJson) {
     conduit::Node datumRef3 = datum3.toNode();
     conduit::Node datumRef4 = datum4.toNode();
     EXPECT_EQ("Datum value", datumRef1["value"].as_string());
-    //TODO: Given the below and the final 2 tests, is there a
-    //more elegant way to access?
-    //EXPECT_EQ(tags, datumRef1["tags"].value());
+    std::vector<std::string> node_tags;
+    auto tags_itr = datumRef1["tags"].children();
+    while(tags_itr.has_next())
+        node_tags.emplace_back(str_itr.next().as_string());
+    EXPECT_EQ(tags, node_tags);
 
     EXPECT_EQ("Datum units", datumRef2["units"].as_string());
     EXPECT_THAT(3.14, DoubleEq(datumRef2["value"].value()));
@@ -144,7 +143,6 @@ TEST(Datum, toJson) {
     // strings can only live as lists of Nodes
     auto doub_array = datumRef3["value"].as_double_ptr();
     std::vector<double>scal_child_vals(doub_array, doub_array+datumRef3["value"].dtype().number_of_elements());
-
     std::vector<std::string>str_child_vals;
     auto str_itr = datumRef4["value"].children();
     while(str_itr.has_next())

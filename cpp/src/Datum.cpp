@@ -112,7 +112,7 @@ Datum::Datum(conduit::Node const &asNode) {
     if(asNode.has_child(TAGS_FIELD)){
       auto tagNodeIter = asNode[TAGS_FIELD].children();
       while(tagNodeIter.has_next()){
-        auto tag = tagNodeIter.next();
+        auto &tag = tagNodeIter.next();
         if(tag.dtype().is_string()){
           tags.emplace_back(std::string(tag.as_string()));
         } else {
@@ -147,14 +147,11 @@ conduit::Node Datum::toNode() const {
             asNode[VALUE_FIELD] = scalarArrayValue;
             break;
         case ValueType::StringArray:
-            std::vector<std::string> stringArrayValCopy(stringArrayValue);
             addStringsToNode(asNode, VALUE_FIELD, stringArrayValCopy);
             break;
     }
-    if(tags.size() > 0){
-        std::vector<std::string> tagsCopy(tags);
+    if(tags.size() > 0)
         addStringsToNode(asNode, TAGS_FIELD, tagsCopy);
-    }
     if(!units.empty())
         asNode[UNITS_FIELD] = units;
     return asNode;

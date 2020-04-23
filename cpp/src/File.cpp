@@ -21,14 +21,13 @@ File::File(std::string uri_) : uri{std::move(uri_)} {}
 
 File::File(char const *uri_) : uri{uri_} {}
 
-// TODO: No real reason to still require the uri separately?
 File::File(std::string uri_, conduit::Node const &asNode) :
     uri{std::move(uri_)},
     mimeType{getOptionalString(MIMETYPE_KEY, asNode, FILE_TYPE_NAME)} {
         if (asNode.has_child(TAGS_KEY)){
             auto tagsIter = asNode[TAGS_KEY].children();
             while(tagsIter.has_next()){
-                conduit::Node tag = tagsIter.next();
+                auto &tag = tagsIter.next();
                 if(tag.dtype().is_string())
                     tags.emplace_back(tag.as_string());
                 else {

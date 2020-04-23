@@ -90,6 +90,16 @@ TEST(Document, create_fromNode_withRelationships) {
     EXPECT_EQ("is related to", relationships[0].getPredicate());
 }
 
+TEST(Document, create_fromJson) {
+  std::string orig_json = "{\"records\":[{\"type\":\"run\",\"id\":\"test\"}],\"relationships\":[]}";
+  sina::Document myDocument = Document(orig_json, createRecordLoaderWithAllKnownTypes());
+  EXPECT_EQ(0, myDocument.getRelationships().size());
+  EXPECT_EQ(1, myDocument.getRecords().size());
+  EXPECT_EQ("run", myDocument.getRecords()[0].getType());
+  std::string returned_json = myDocument.toJson();
+  EXPECT_EQ(orig_json, returned_json);
+}
+
 TEST(Document, toNode_empty) {
     // A sina document should always have, at minimum, both records and
     // relationships as empty arrays.

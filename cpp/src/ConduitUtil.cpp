@@ -73,12 +73,12 @@ double getRequiredDouble(std::string const &fieldName,
     return ref.as_double();
 }
 
-void addStringsToNode(conduit::Node &parent, std::string child_name,
+void addStringsToNode(const conduit::Node &parent, const std::string &child_name,
       std::vector<std::string> string_values){
-  for(std::string value : string_values)
+  for(auto &value : string_values)
   {
-      conduit::Node &list_entry = parent[child_name].append();
-      list_entry.set(std::move(value));
+      auto &list_entry = parent[child_name].append();
+      list_entry.set(value);
   }
 }
 
