@@ -19,8 +19,6 @@ char const TAGS_KEY[] = "tags";
 
 File::File(std::string uri_) : uri{std::move(uri_)} {}
 
-File::File(char const *uri_) : uri{uri_} {}
-
 File::File(std::string uri_, conduit::Node const &asNode) :
     uri{std::move(uri_)},
     mimeType{getOptionalString(MIMETYPE_KEY, asNode, FILE_TYPE_NAME)} {

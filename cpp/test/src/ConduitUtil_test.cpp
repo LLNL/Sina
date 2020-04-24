@@ -103,12 +103,11 @@ TEST(ConduitUtil, getOptionalString_missing) {
     EXPECT_EQ("", getOptionalString("fieldName", parent, "parent name"));
 }
 
-/* TODO: Didn't find any references to handling of nullptr in conduit
 TEST(ConduitUtil, getOptionalString_explicitNullValue) {
     conduit::Node parent;
-    parent["fieldName"] = nullptr;
+    parent["fieldName"];
     EXPECT_EQ("", getOptionalString("fieldName", parent, "parent name"));
-}*/
+}
 
 TEST(ConduitUtil, getOptionalString_wrongType) {
     conduit::Node parent;

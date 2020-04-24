@@ -91,14 +91,26 @@ TEST(Document, create_fromNode_withRelationships) {
 }
 
 TEST(Document, create_fromJson) {
-  std::string orig_json = "{\"records\":[{\"type\":\"run\",\"id\":\"test\"}],\"relationships\":[]}";
+  std::string orig_json = "{\"records\": [{\"type\": \"test_rec\",\"id\": \"test\"}],\"relationships\": []}";
   sina::Document myDocument = Document(orig_json, createRecordLoaderWithAllKnownTypes());
   EXPECT_EQ(0, myDocument.getRelationships().size());
-  EXPECT_EQ(1, myDocument.getRecords().size());
-  EXPECT_EQ("run", myDocument.getRecords()[0].getType());
-  std::string returned_json = myDocument.toJson();
+  ASSERT_EQ(1, myDocument.getRecords().size());
+  EXPECT_EQ("test_rec", myDocument.getRecords()[0]->getType());
+  std::string returned_json = myDocument.toJson(0,0,"","");
   EXPECT_EQ(orig_json, returned_json);
 }
+
+/** Still some troubleshooting left
+  TEST(Document, create_fromJson_full) {
+  std::string long_json = "{\"records\": [{\"type\": \"foo\",\"id\": \"test_1\",\"data\":{\"scalar\": {\"value\": 123.0}}}],\"relationships\": [{\"predicate\": \"completes\",\"subject\": \"test_2\",\"object\": \"test_1\"}]}";
+  //std::string long_json = "{\"records\": [{\"type\": \"foo\",\"id\": \"test_1\",\"data\":{\"scalar\": {\"value\": 123}, \"scalar_list\": {\"value\": [1,2,3.0,4]}}}],\"relationships\": [{\"subject\": \"test_2\", \"predicate\": \"completes\", \"object\": \"test_1\"}]}";
+  //std::string long_json = "{\"records\": [{\"type\": \"foo\",\"id\": \"test_1\",\"data\":{\"scalar\": {\"value\": 123, \"units\": \"g/s\", \"tags\": [\"hi\"]}, \"scalar_list\": {\"value\": [1,2,3.0,4]}}}, {\"type\": \"bar\",\"id\": \"test_2\",\"data\":{\"string\": {\"value\": \"yarr\"}, \"string_list\": {\"value\": [\"yarr\",\"harr\",\"harr\"]}}, \"files\":{\"test/test.png\":{}}, \"user_defined\":{\"hello\":\"there\"}}],\"relationships\": [{\"subject\": \"test_2\", \"predicate\": \"completes\", \"object\": \"test_1\"}]}";
+  sina::Document myDocument = Document(long_json, createRecordLoaderWithAllKnownTypes());
+  EXPECT_EQ(1, myDocument.getRelationships().size());
+  EXPECT_EQ(2, myDocument.getRecords().size());
+  std::string returned_json = myDocument.toJson(0,0,"","");
+  EXPECT_EQ(long_json, returned_json);
+}*/
 
 TEST(Document, toNode_empty) {
     // A sina document should always have, at minimum, both records and

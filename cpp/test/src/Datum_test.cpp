@@ -104,7 +104,10 @@ TEST(Datum, createFromJson_missingKeys) {
 
 TEST(Datum, createFromJson_badListValue) {
     conduit::Node object1;
-    object1["value"] = {1, "two", 3};
+    auto &mixed_scal = object1["value"].append();
+    mixed_scal.set(double(1));
+    auto &mixed_val = object1["value"].append();
+    mixed_val.set("two");
     try {
         Datum datum1{object1};
         FAIL() << "Should have gotten a value error";
@@ -133,7 +136,7 @@ TEST(Datum, toJson) {
     std::vector<std::string> node_tags;
     auto tags_itr = datumRef1["tags"].children();
     while(tags_itr.has_next())
-        node_tags.emplace_back(str_itr.next().as_string());
+        node_tags.emplace_back(tags_itr.next().as_string());
     EXPECT_EQ(tags, node_tags);
 
     EXPECT_EQ("Datum units", datumRef2["units"].as_string());

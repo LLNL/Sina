@@ -79,7 +79,7 @@ std::string getOptionalString(std::string const &fieldName,
  * @param child_name the name of the child (aka the name of the field)
  * @param string_values the data values for the field
  */
-void addStringsToNode(conduit::Node &parent, std::string child_name,
+void addStringsToNode(conduit::Node &parent, const std::string &child_name,
       std::vector<std::string> string_values);
 }
 

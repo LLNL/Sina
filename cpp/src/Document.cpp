@@ -43,7 +43,7 @@ conduit::Node Document::toNode() const {
     return document;
 }
 
-Document::Document(conduit::Node const &asNode,
+void Document::createFromNode(conduit::Node const &asNode,
         RecordLoader const &recordLoader) {
     if (asNode.has_child(RECORDS_KEY)) {
         conduit::Node record_nodes = asNode[RECORDS_KEY];
@@ -76,7 +76,22 @@ Document::Document(conduit::Node const &asNode,
             throw std::invalid_argument(message.str());
         }
     }
+}
 
+Document::Document(conduit::Node const &asNode,
+        RecordLoader const &recordLoader) {
+    this->createFromNode(asNode, recordLoader);
+}
+
+Document::Document(std::string const &asJson, RecordLoader const &recordLoader) {
+  conduit::Node asNode;
+  asNode.parse(asJson, "json");
+  this->createFromNode(asNode, recordLoader);
+}
+
+std::string Document::toJson(conduit::index_t indent, conduit::index_t depth,
+        const std::string &pad, const std::string &eoe) const{
+  return this->toNode().to_json("json", indent, depth, pad, eoe);
 }
 
 void saveDocument(Document const &document, std::string const &fileName) {

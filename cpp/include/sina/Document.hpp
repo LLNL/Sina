@@ -136,9 +136,15 @@ public:
      *
      * @return the contents of the document as a JSON string
      */
-    std::string toJson() const;
+    std::string toJson(conduit::index_t indent=2, conduit::index_t depth=0,
+        const std::string &pad=" ", const std::string &eoe="\n") const;
 
 private:
+    /**
+     * Constructor helper method, extracts info from a conduit Node.
+     */
+    void createFromNode(conduit::Node const &asNode,
+          RecordLoader const &recordLoader);
     RecordList records;
     RelationshipList relationships;
 };

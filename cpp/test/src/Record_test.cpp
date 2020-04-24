@@ -114,7 +114,9 @@ TEST(Record, create_fromNode_userDefined) {
     auto const &userDefined = record.getUserDefinedContent();
     EXPECT_EQ("v1", userDefined["k1"].as_string());
     EXPECT_EQ(123, userDefined["k2"].as_int());
-    EXPECT_THAT(userDefined["k3"].as_int_ptr(), ElementsAre(1, 2, 3));
+    auto int_array = userDefined["k3"].as_int_ptr();
+    std::vector<double>udef_ints(int_array, int_array+userDefined["k3"].dtype().number_of_elements());
+    EXPECT_THAT(udef_ints, ElementsAre(1, 2, 3));
 }
 
 TEST(Record, getUserDefined_initialConst) {
@@ -164,23 +166,25 @@ TEST(Record, toNode_default_values) {
     EXPECT_FALSE(asNode.has_child(EXPECTED_USER_DEFINED_KEY));
 }
 
-/* Not sure how to rework this one yet
 TEST(Record, toNode_userDefined) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
-    record.setUserDefinedContent(R"({
-        "k1": "v1",
-        "k2": 123,
-        "k3": [1, 2, 3]
-    })"_json);
+    conduit::Node userDef;
+    userDef["k1"] = "v1";
+    userDef["k2"] = 123;
+    std::vector<int> int_vals{1, 2, 3};
+    userDef["k3"] = int_vals;
+    record.setUserDefinedContent(userDef);
 
     auto asNode = record.toNode();
 
     auto userDefined = asNode[EXPECTED_USER_DEFINED_KEY];
-    EXPECT_EQ("v1", userDefined["k1"]);
-    EXPECT_EQ(123, userDefined["k2"]);
-    EXPECT_THAT(userDefined["k3"], ElementsAre(1, 2, 3));
-}*/
+    EXPECT_EQ("v1", userDefined["k1"].as_string());
+    EXPECT_EQ(123, userDefined["k2"].as_int());
+    auto int_array = userDefined["k3"].as_int_ptr();
+    std::vector<double>udef_ints(int_array, int_array+userDefined["k3"].dtype().number_of_elements());
+    EXPECT_THAT(udef_ints, ElementsAre(1, 2, 3));
+}
 
 TEST(Record, toNode_data) {
     ID id{"the id", IDType::Local};

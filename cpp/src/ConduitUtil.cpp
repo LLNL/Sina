@@ -54,7 +54,7 @@ std::string getRequiredString(std::string const &fieldName,
 
 std::string getOptionalString(std::string const &fieldName,
         conduit::Node const &parent, std::string const &parentType) {
-    if (!parent.has_child(fieldName)) {
+    if (!parent.has_child(fieldName) || parent[fieldName].dtype().is_empty()) {
         return "";
     }
     return getExpectedString(parent[fieldName], fieldName, parentType);
@@ -73,7 +73,7 @@ double getRequiredDouble(std::string const &fieldName,
     return ref.as_double();
 }
 
-void addStringsToNode(const conduit::Node &parent, const std::string &child_name,
+void addStringsToNode(conduit::Node &parent, const std::string &child_name,
       std::vector<std::string> string_values){
   for(auto &value : string_values)
   {

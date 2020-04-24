@@ -147,11 +147,11 @@ conduit::Node Datum::toNode() const {
             asNode[VALUE_FIELD] = scalarArrayValue;
             break;
         case ValueType::StringArray:
-            addStringsToNode(asNode, VALUE_FIELD, stringArrayValCopy);
+            addStringsToNode(asNode, VALUE_FIELD, stringArrayValue);
             break;
     }
     if(tags.size() > 0)
-        addStringsToNode(asNode, TAGS_FIELD, tagsCopy);
+        addStringsToNode(asNode, TAGS_FIELD, tags);
     if(!units.empty())
         asNode[UNITS_FIELD] = units;
     return asNode;
