@@ -80,20 +80,7 @@ std::string getOptionalString(std::string const &fieldName,
  * @param string_values the data values for the field
  */
 void addStringsToNode(conduit::Node &parent, const std::string &child_name,
-      std::vector<std::string> string_values);
+      std::vector<std::string> const &string_values);
 }
-
-/**
- * Get the children of a Node as a list of strings.
- *
- * This is meant to be used to get ex: tags back. If the children aren't
- * all nameless nodes storing strings, don't use this method, it's just a
- * convenience for conduit not handling this case.
- * @param parent the node to add the strings to
- * @param child_name the name of the child (aka the name of the field)
- * @param string_values the data values for the field
-void addStringsToNode(conduit::Node &parent, std::string child_name,
-      std::vector<std::string> string_values);
-}*/
 
 #endif //SINA_JSONUTIL_HPP

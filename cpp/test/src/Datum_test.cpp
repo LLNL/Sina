@@ -105,7 +105,7 @@ TEST(Datum, createFromJson_missingKeys) {
 TEST(Datum, createFromJson_badListValue) {
     conduit::Node object1;
     auto &mixed_scal = object1["value"].append();
-    mixed_scal.set(double(1));
+    mixed_scal.set(1.0);
     auto &mixed_val = object1["value"].append();
     mixed_val.set("two");
     try {
