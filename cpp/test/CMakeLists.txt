@@ -13,12 +13,6 @@ blt_register_library(NAME libdl
 
 find_package(Conduit REQUIRED)
 
-blt_register_library(NAME Conduit
-    TREAT_INCLUDES_AS_SYSTEM ON
-    INCLUDES "${Conduit_DIR}/../../../include"
-    LIBRARIES "${Conduit_DIR}/../../libconduit.a"
-)
-
 if(${SINA_BUILD_ADIAK_BINDINGS})
     add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
     find_package(adiak REQUIRED)
