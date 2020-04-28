@@ -5,7 +5,7 @@
 #include <utility>
 
 #include "sina/CppBridge.hpp"
-#include "sina/JsonUtil.hpp"
+#include "sina/ConduitUtil.hpp"
 
 namespace sina {
 
@@ -22,22 +22,22 @@ Run::Run(sina::ID id, std::string application_, std::string version_,
                              version{std::move(version_)},
                              user{std::move(user_)} {}
 
-Run::Run(nlohmann::json const &asJson) :
-        Record(asJson),
-        application{getRequiredString(APPLICATION_FIELD, asJson, RUN_TYPE)},
-        version{getOptionalString(VERSION_FIELD, asJson, RUN_TYPE)},
-        user{getOptionalString(USER_FIELD, asJson, RUN_TYPE)} {}
+Run::Run(conduit::Node const &asNode) :
+        Record(asNode),
+        application{getRequiredString(APPLICATION_FIELD, asNode, RUN_TYPE)},
+        version{getOptionalString(VERSION_FIELD, asNode, RUN_TYPE)},
+        user{getOptionalString(USER_FIELD, asNode, RUN_TYPE)} {}
 
-nlohmann::json Run::toJson() const {
-    auto asJson = Record::toJson();
-    asJson[APPLICATION_FIELD] = application;
-    asJson[VERSION_FIELD] = version;
-    asJson[USER_FIELD] = user;
-    return asJson;
+conduit::Node Run::toNode() const {
+    auto asNode = Record::toNode();
+    asNode[APPLICATION_FIELD] = application;
+    asNode[VERSION_FIELD] = version;
+    asNode[USER_FIELD] = user;
+    return asNode;
 }
 
 void addRunLoader(RecordLoader &loader) {
-    loader.addTypeLoader(RUN_TYPE, [](nlohmann::json const &value) {
+    loader.addTypeLoader(RUN_TYPE, [](conduit::Node const &value) {
         return internal::make_unique<Run>(value);
     });
 }

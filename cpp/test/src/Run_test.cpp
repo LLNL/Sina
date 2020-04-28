@@ -19,15 +19,14 @@ char const EXPECTED_USER_KEY[] = "user";
 // Throughout, we have to use "sina::Run" instead of just "Run" due to
 // a conflict with the Run() function in gtest
 
-TEST(Run, create_fromJson_valid) {
-    nlohmann::json originJson{
-            {EXPECTED_TYPE_KEY, "run"},
-            {EXPECTED_GLOBAL_ID_KEY, "the id"},
-            {EXPECTED_APPLICATION_KEY, "the app"},
-            {EXPECTED_VERSION_KEY, "1.2.3"},
-            {EXPECTED_USER_KEY, "jdoe"}
-    };
-    sina::Run run{originJson};
+TEST(Run, create_fromnode_valid) {
+    conduit::Node originNode;
+    originNode[EXPECTED_TYPE_KEY] = "run";
+    originNode[EXPECTED_GLOBAL_ID_KEY] = "the id";
+    originNode[EXPECTED_APPLICATION_KEY] = "the app";
+    originNode[EXPECTED_VERSION_KEY] = "1.2.3";
+    originNode[EXPECTED_USER_KEY] = "jdoe";
+    sina::Run run{originNode};
     EXPECT_EQ("run", run.getType());
     EXPECT_EQ("the id", run.getId().getId());
     EXPECT_EQ(IDType::Global, run.getId().getType());
@@ -36,15 +35,14 @@ TEST(Run, create_fromJson_valid) {
     EXPECT_EQ("jdoe", run.getUser());
 }
 
-TEST(Run, create_fromJson_missingApplication) {
-    nlohmann::json originJson{
-            {EXPECTED_TYPE_KEY, "run"},
-            {EXPECTED_GLOBAL_ID_KEY, "the id"},
-            {EXPECTED_VERSION_KEY, "1.2.3"},
-            {EXPECTED_USER_KEY, "jdoe"}
-    };
+TEST(Run, create_fromNode_missingApplication) {
+    conduit::Node originNode;
+    originNode[EXPECTED_TYPE_KEY] = "run";
+    originNode[EXPECTED_GLOBAL_ID_KEY] = "the id";
+    originNode[EXPECTED_VERSION_KEY] = "1.2.3";
+    originNode[EXPECTED_USER_KEY] = "jdoe";
     try {
-        sina::Run run{originJson};
+        sina::Run run{originNode};
         FAIL() << "Application should be missing, but is "
                << run.getApplication();
     } catch (std::invalid_argument const &expected) {
@@ -52,32 +50,31 @@ TEST(Run, create_fromJson_missingApplication) {
     }
 }
 
-TEST(Run, toJson) {
+TEST(Run, toNode) {
     ID id{"the id", IDType::Global};
     sina::Run run{id, "the app", "1.2.3", "jdoe"};
-    auto asJson = run.toJson();
-    EXPECT_TRUE(asJson.is_object());
-    EXPECT_EQ("run", asJson[EXPECTED_TYPE_KEY]);
-    EXPECT_EQ("the id", asJson[EXPECTED_GLOBAL_ID_KEY]);
-    EXPECT_EQ(0, asJson.count(EXPECTED_LOCAL_ID_KEY));
-    EXPECT_EQ("the app", asJson[EXPECTED_APPLICATION_KEY]);
-    EXPECT_EQ("1.2.3", asJson[EXPECTED_VERSION_KEY]);
-    EXPECT_EQ("jdoe", asJson[EXPECTED_USER_KEY]);
+    auto asNode = run.toNode();
+    EXPECT_TRUE(asNode.dtype().is_object());
+    EXPECT_EQ("run", asNode[EXPECTED_TYPE_KEY].as_string());
+    EXPECT_EQ("the id", asNode[EXPECTED_GLOBAL_ID_KEY].as_string());
+    EXPECT_TRUE(asNode[EXPECTED_LOCAL_ID_KEY].dtype().is_empty());
+    EXPECT_EQ("the app", asNode[EXPECTED_APPLICATION_KEY].as_string());
+    EXPECT_EQ("1.2.3", asNode[EXPECTED_VERSION_KEY].as_string());
+    EXPECT_EQ("jdoe", asNode[EXPECTED_USER_KEY].as_string());
 }
 
 TEST(Run, addRunLoader) {
-    nlohmann::json originJson{
-            {EXPECTED_TYPE_KEY, "run"},
-            {EXPECTED_GLOBAL_ID_KEY, "the id"},
-            {EXPECTED_APPLICATION_KEY, "the app"},
-            {EXPECTED_VERSION_KEY, "1.2.3"},
-            {EXPECTED_USER_KEY, "jdoe"}
-    };
+    conduit::Node originNode;
+    originNode[EXPECTED_TYPE_KEY] = "run";
+    originNode[EXPECTED_GLOBAL_ID_KEY] = "the id";
+    originNode[EXPECTED_APPLICATION_KEY] = "the app";
+    originNode[EXPECTED_VERSION_KEY] = "1.2.3";
+    originNode[EXPECTED_USER_KEY] = "jdoe";
 
     RecordLoader loader;
     addRunLoader(loader);
 
-    auto record = loader.load(originJson);
+    auto record = loader.load(originNode);
     auto run = dynamic_cast<sina::Run *>(record.get());
     ASSERT_NE(nullptr, run);
     EXPECT_EQ("run", run->getType());

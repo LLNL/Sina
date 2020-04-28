@@ -4,32 +4,32 @@
 /**
  * @file
  *
- * This file contains utility methods to make working with the JSON library
+ * This file contains utility methods to make working with conduit
  * easier. The functions here also include error reporting with user-friendly
  * messages.
  */
 
 #include <string>
 
-#include "nlohmann/json.hpp"
+#include "conduit/conduit.hpp"
 
 namespace sina {
 
 /**
- * Get a required field from the a JSON value.
+ * Get a required field from a conduit Node.
  *
  * @param fieldName the name of the field to get
  * @param parent the parent object from which to get the field
  * @param parentType a user-friendly name of the type of the parent to use
  * in an error message if the field doesn't exist.
- * @return the requested field
+ * @return the requested field as a Node
  * @throws std::invalid_argument if the field does not exist
  */
-nlohmann::json const &getRequiredField(std::string const &fieldName,
-        nlohmann::json const &parent, std::string const &parentType);
+conduit::Node const &getRequiredField(std::string const &fieldName,
+        conduit::Node const &parent, std::string const &parentType);
 
 /**
- * Get the value of a required field from the a JSON value. The field value
+ * Get the value of a required field from a conduit Node. The field value
  * must be a string.
  *
  * @param fieldName the name of the field to get
@@ -40,10 +40,10 @@ nlohmann::json const &getRequiredField(std::string const &fieldName,
  * @throws std::invalid_argument if the field does not exist or is not a string
  */
 std::string getRequiredString(std::string const &fieldName,
-        nlohmann::json const &parent, std::string const &parentType);
+        conduit::Node const &parent, std::string const &parentType);
 
 /**
- * Get the value of a required field from the a JSON value. The field value
+ * Get the value of a required field from a conduit Node. The field value
  * must be a double.
  *
  * @param fieldName the name of the field to get
@@ -54,10 +54,10 @@ std::string getRequiredString(std::string const &fieldName,
  * @throws std::invalid_argument if the field does not exist or is not a double
  */
 double getRequiredDouble(std::string const &fieldName,
-        nlohmann::json const &parent, std::string const &parentType);
+        conduit::Node const &parent, std::string const &parentType);
 
 /**
- * Get the value of an optional field from the a JSON value. The field value
+ * Get the value of an optional field from a conduit Node. The field value
  * must be a string if it is present.
  *
  * @param fieldName the name of the field to get
@@ -69,7 +69,18 @@ double getRequiredDouble(std::string const &fieldName,
  * @throws std::invalid_argument if the field exists but is not a string
  */
 std::string getOptionalString(std::string const &fieldName,
-        nlohmann::json const &parent, std::string const &parentType);
+        conduit::Node const &parent, std::string const &parentType);
+
+/**
+ * Add a vector of strings to a Node. This operation's not natively
+ * part of Conduit.
+ *
+ * @param parent the node to add the strings to
+ * @param child_name the name of the child (aka the name of the field)
+ * @param string_values the data values for the field
+ */
+void addStringsToNode(conduit::Node &parent, const std::string &child_name,
+      std::vector<std::string> const &string_values);
 }
 
 #endif //SINA_JSONUTIL_HPP

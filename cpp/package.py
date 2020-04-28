@@ -19,7 +19,8 @@ class SinaCpp(CMakePackage):
     depends_on('cmake@3.8.0:', type='build')
     depends_on('adiak', when='+adiak')
     depends_on('doxygen', type='build', when='+docs')
-    depends_on('nlohmann-json -test')
+    depends_on('zlib@1.2.11:')
+    depends_on('conduit')
 
     def configure_args(self):
         spec = self.spec if self.spec is not None else ""

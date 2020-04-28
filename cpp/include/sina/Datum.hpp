@@ -6,8 +6,8 @@
 #include <string>
 #include <type_traits>
 
-#include "sina/JsonUtil.hpp"
-#include "nlohmann/json.hpp"
+#include "sina/ConduitUtil.hpp"
+#include "conduit/conduit.hpp"
 
 namespace sina {
 
@@ -84,11 +84,11 @@ public:
     Datum(std::vector<double> value);
 
     /**
-     * Construct a Datum from its JSON representation.
+     * Construct a Datum from its Node representation.
      *
-     * @param asJson the Datum as JSON
+     * @param asNode the Datum as conduit Node
      */
-    explicit Datum(nlohmann::json const &asJson);
+    explicit Datum(conduit::Node const &asNode);
 
     /**
      * Get the string value of the Datum.
@@ -169,11 +169,11 @@ public:
     }
 
     /**
-     * Convert this Datum to its JSON representation.
+     * Convert this Datum to its conduit Node representation.
      *
-     * @return the JSON representation of this Datum.
+     * @return the Node representation of this Datum.
      */
-    nlohmann::json toJson() const;
+    conduit::Node toNode() const;
 
 private:
     std::string stringValue;

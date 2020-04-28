@@ -1,14 +1,15 @@
 cmake_minimum_required (VERSION 3.7)
 
-find_package(nlohmann_json REQUIRED)
+find_package(Conduit REQUIRED)
 
-blt_register_library(NAME nlohmann_json
-        INCLUDES "${nlohmann_json_DIR}/../../../include"
+blt_register_library(NAME Conduit
+        INCLUDES "${Conduit_DIR}/../../../include"
+        LIBRARIES "${Conduit_DIR}/../../libconduit.a"
         TREAT_INCLUDES_AS_SYSTEM ON
         )
 
 # libdl is a requirement of Adiak, not Sina, but conditional inclusion
-# creates issues on CZ. Delete this when Adiak includes libdl 
+# creates issues on CZ. Delete this when Adiak includes libdl
 blt_register_library(NAME libdl
     TREAT_INCLUDES_AS_SYSTEM ON
     LINK_FLAGS -ldl
@@ -35,7 +36,7 @@ blt_add_library(NAME sina
         ../include/sina/Document.hpp
         ../include/sina/File.hpp
         ../include/sina/ID.hpp
-        ../include/sina/JsonUtil.hpp
+        ../include/sina/ConduitUtil.hpp
         ../include/sina/sina.hpp
         ../include/sina/Record.hpp
         ../include/sina/Relationship.hpp
@@ -46,14 +47,14 @@ blt_add_library(NAME sina
         Document.cpp
         File.cpp
         ID.cpp
-        JsonUtil.cpp
+        ConduitUtil.cpp
         Record.cpp
         Relationship.cpp
         Run.cpp
         Datum.cpp
         AdiakWriter.cpp
     DEPENDS_ON
-        nlohmann_json
+        Conduit
         ${OPTIONAL_SINA_DEPENDENCIES}
 )
 
