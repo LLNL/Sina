@@ -87,8 +87,10 @@ class RecordDAO(dao.RecordDAO):
                 # Using json.dumps() instead of str() (or join()) gives
                 # valid JSON
                 tags = (json.dumps(datum['tags']) if 'tags' in datum else None)
-                # If we've been given an empty list or a list of numbers:
-                if not datum or isinstance(datum['value'][0], numbers.Real):
+                if not datum['value']:  # empty list
+                    continue  # An empty list can't be queried
+                # If we've been given a list of numbers:
+                elif isinstance(datum['value'][0], numbers.Real):
                     record.scalar_lists.append(schema.ListScalarData(
                         name=datum_name,
                         min=min(datum['value']),

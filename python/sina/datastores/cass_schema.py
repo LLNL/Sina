@@ -292,6 +292,8 @@ def cross_populate_query_tables(name,  # pylint: disable=too-many-arguments
     elif rec_from_x is RecordFromScalarListDataMin:
         # We only store the min and max because that's all we need to perform
         # supported queries.
+        if not value:
+            return  # Empty lists can't be queried
         rec_from_x_create = (rec_from_x.create if force_overwrite
                              else rec_from_x.if_not_exists().create)
         # There's a small supporting table we insert into as well.
