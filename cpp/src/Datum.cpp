@@ -1,7 +1,7 @@
 /// @file
 
 #include "sina/Datum.hpp"
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 #include <utility>
 #include <sstream>

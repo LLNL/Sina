@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.7)
 find_package(Conduit REQUIRED)
 
 blt_register_library(NAME Conduit
-        INCLUDES "${Conduit_DIR}/../../../include"
+        INCLUDES "${Conduit_DIR}/../../../include/conduit"
         LIBRARIES "${Conduit_DIR}/../../libconduit.so"
         TREAT_INCLUDES_AS_SYSTEM ON
         )

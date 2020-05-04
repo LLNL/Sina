@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 #include "sina/Record.hpp"
 #include "sina/Relationship.hpp"

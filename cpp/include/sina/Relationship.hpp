@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 #include "sina/ID.hpp"
 

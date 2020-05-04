@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 #include "sina/ID.hpp"
 

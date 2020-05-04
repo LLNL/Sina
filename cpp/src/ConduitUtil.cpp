@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "sina/ConduitUtil.hpp"
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 namespace sina {
 
