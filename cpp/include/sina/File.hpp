@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 namespace sina {
 /**

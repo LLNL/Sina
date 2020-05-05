@@ -7,7 +7,7 @@
 #include <utility>
 #include <sstream>
 
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 namespace sina {
 

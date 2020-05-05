@@ -11,7 +11,7 @@
 
 #include <string>
 
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 namespace sina {
 

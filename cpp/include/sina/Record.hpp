@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "conduit/conduit.hpp"
+#include "conduit.hpp"
 
 #include "sina/ID.hpp"
 #include "sina/Datum.hpp"
