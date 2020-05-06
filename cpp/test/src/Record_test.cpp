@@ -212,7 +212,7 @@ TEST(Record, toNode_data) {
 TEST(Record, toNode_files) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
-    std::string uri1 = "uri1";
+    std::string uri1 = "a/file/path/foo.png";
     std::string uri2 = "uri2";
     File file{uri1};
     file.setMimeType("mt1");
@@ -222,7 +222,8 @@ TEST(Record, toNode_files) {
     record.add(File{uri2});
     auto asNode = record.toNode();
     ASSERT_EQ(2u, asNode[EXPECTED_FILES_KEY].number_of_children());
-    EXPECT_EQ("mt1", asNode[EXPECTED_FILES_KEY][uri1]["mimetype"].as_string());
+    auto &child_with_slashes = asNode[EXPECTED_FILES_KEY].child(uri1);
+    EXPECT_EQ("mt1", child_with_slashes["mimetype"].as_string());
     EXPECT_TRUE(asNode[EXPECTED_FILES_KEY][uri2]["mimetype"].dtype().is_empty());
 }
 

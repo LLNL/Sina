@@ -126,9 +126,9 @@ TEST_F(AdiakWriterTest, files) {
   auto result2 = adiak::value(name2, adiak::path(value2));
   EXPECT_TRUE(result1 && result2);
   auto asNode = record.toNode();
-  EXPECT_FALSE(asNode[EXPECTED_FILES_KEY][value1].dtype().is_empty());
-  EXPECT_EQ(1, asNode[EXPECTED_FILES_KEY][value2]["tags"].number_of_children());
-  EXPECT_EQ(tags2[0], asNode[EXPECTED_FILES_KEY][value2]["tags"][0].as_string());
+  EXPECT_FALSE(asNode[EXPECTED_FILES_KEY].child(value1).dtype().is_empty());
+  EXPECT_EQ(1, asNode[EXPECTED_FILES_KEY].child(value2)["tags"].number_of_children());
+  EXPECT_EQ(tags2[0], asNode[EXPECTED_FILES_KEY].child(value2)["tags"][0].as_string());
 }
 
 TEST_F(AdiakWriterTest, files_list){
@@ -139,9 +139,9 @@ TEST_F(AdiakWriterTest, files_list){
   std::vector<std::string> tags = {"string"};
   EXPECT_TRUE(adiak::value(fileListName, fileListAdiak));
   auto asNode = record.toNode();
-  EXPECT_FALSE(asNode[EXPECTED_FILES_KEY][fileListVal1].dtype().is_empty());
-  EXPECT_EQ(1, asNode[EXPECTED_FILES_KEY][fileListVal2]["tags"].number_of_children());
-  EXPECT_EQ(fileListName, asNode[EXPECTED_FILES_KEY][fileListVal2]["tags"][0].as_string());
+  EXPECT_FALSE(asNode[EXPECTED_FILES_KEY].child(fileListVal1).dtype().is_empty());
+  EXPECT_EQ(1, asNode[EXPECTED_FILES_KEY].child(fileListVal2)["tags"].number_of_children());
+  EXPECT_EQ(fileListName, asNode[EXPECTED_FILES_KEY].child(fileListVal2)["tags"][0].as_string());
 }
 
 }}}

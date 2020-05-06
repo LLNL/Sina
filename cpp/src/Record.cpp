@@ -35,7 +35,8 @@ conduit::Node Record::toNode() const {
     if(!files.empty()){
       conduit::Node fileRef;
       for (auto &file : files) {
-          fileRef[file.getUri()] = file.toNode();
+          auto &n = fileRef.add_child(file.getUri());
+          n.set(file.toNode());
       asNode[FILES_FIELD] = fileRef;
       }
     }

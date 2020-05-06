@@ -90,7 +90,7 @@ TEST(Document, create_fromNode_withRelationships) {
     EXPECT_EQ("is related to", relationships[0].getPredicate());
 }
 
-TEST(Document, create_fromJson) {
+TEST(Document, create_fromJson_roundtrip) {
   std::string orig_json = "{\"records\": [{\"type\": \"test_rec\",\"id\": \"test\"}],\"relationships\": []}";
   sina::Document myDocument = Document(orig_json, createRecordLoaderWithAllKnownTypes());
   EXPECT_EQ(0, myDocument.getRelationships().size());
@@ -100,17 +100,26 @@ TEST(Document, create_fromJson) {
   EXPECT_EQ(orig_json, returned_json);
 }
 
-/** Still some troubleshooting left
-  TEST(Document, create_fromJson_full) {
-  std::string long_json = "{\"records\": [{\"type\": \"foo\",\"id\": \"test_1\",\"data\":{\"scalar\": {\"value\": 123.0}}}],\"relationships\": [{\"predicate\": \"completes\",\"subject\": \"test_2\",\"object\": \"test_1\"}]}";
-  //std::string long_json = "{\"records\": [{\"type\": \"foo\",\"id\": \"test_1\",\"data\":{\"scalar\": {\"value\": 123}, \"scalar_list\": {\"value\": [1,2,3.0,4]}}}],\"relationships\": [{\"subject\": \"test_2\", \"predicate\": \"completes\", \"object\": \"test_1\"}]}";
-  //std::string long_json = "{\"records\": [{\"type\": \"foo\",\"id\": \"test_1\",\"data\":{\"scalar\": {\"value\": 123, \"units\": \"g/s\", \"tags\": [\"hi\"]}, \"scalar_list\": {\"value\": [1,2,3.0,4]}}}, {\"type\": \"bar\",\"id\": \"test_2\",\"data\":{\"string\": {\"value\": \"yarr\"}, \"string_list\": {\"value\": [\"yarr\",\"harr\",\"harr\"]}}, \"files\":{\"test/test.png\":{}}, \"user_defined\":{\"hello\":\"there\"}}],\"relationships\": [{\"subject\": \"test_2\", \"predicate\": \"completes\", \"object\": \"test_1\"}]}";
+TEST(Document, create_fromJson_full) {
+  std::string long_json = "{\"records\": [{\"type\": \"foo\",\"id\": \"test_1\",\"user_defined\":{\"name\":\"bob\"},\"files\":{\"foo/bar.png\":{\"mimetype\":\"image\"}},\"data\":{\"scalar\": {\"value\": 500,\"units\": \"miles\"}}},{\"type\":\"bar\",\"id\": \"test_2\",\"data\": {\"scalar_list\": {\"value\": [1, 2, 3]}, \"string_list\": {\"value\": [\"a\",\"wonderful\",\"world\"], \"tags\":[\"observation\"]}}},{\"type\": \"run\",\"application\":\"sina_test\",\"id\": \"test_3\",\"data\":{\"scalar\": {\"value\": 12.3, \"units\": \"g/s\", \"tags\": [\"hi\"]}, \"scalar_list\": {\"value\": [1,2,3.0,4]}}}, {\"type\": \"bar\",\"id\": \"test_4\",\"data\":{\"string\": {\"value\": \"yarr\"}, \"string_list\": {\"value\": [\"y\",\"a\",\"r\"]}}, \"files\":{\"test/test.png\":{}}, \"user_defined\":{\"hello\":\"there\"}}],\"relationships\": [{\"predicate\": \"completes\",\"subject\": \"test_2\",\"object\": \"test_1\"},{\"subject\": \"test_3\", \"predicate\": \"overrides\", \"object\": \"test_4\"}]}";
   sina::Document myDocument = Document(long_json, createRecordLoaderWithAllKnownTypes());
-  EXPECT_EQ(1, myDocument.getRelationships().size());
-  EXPECT_EQ(2, myDocument.getRecords().size());
-  std::string returned_json = myDocument.toJson(0,0,"","");
-  EXPECT_EQ(long_json, returned_json);
-}*/
+  EXPECT_EQ(2, myDocument.getRelationships().size());
+  auto &records = myDocument.getRecords();
+  EXPECT_EQ(4, records.size());
+}
+
+TEST(Document, create_fromJson_value_check) {
+  std::string data_json = "{\"records\": [{\"type\": \"run\", \"application\":\"test\", \"id\": \"test_1\",\"data\":{\"int\": {\"value\": 500,\"units\": \"miles\"}, \"char\": {\"value\":\"z\"}}, \"files\":{\"test/test.png\":{}}}]}";
+  sina::Document myDocument = Document(data_json, createRecordLoaderWithAllKnownTypes());
+  EXPECT_EQ(0, myDocument.getRelationships().size());
+  auto &records = myDocument.getRecords();
+  EXPECT_EQ(1, records.size());
+  EXPECT_EQ(records[0]->getType(), "run");
+  auto &data = records[0]->getData();
+  EXPECT_EQ(data.at("int").getScalar(), 500.0);
+  EXPECT_EQ(data.at("char").getValue(), "z");
+  EXPECT_EQ(records[0]->getFiles().count(File{"test/test.png"}), 1);
+}
 
 TEST(Document, toNode_empty) {
     // A sina document should always have, at minimum, both records and
