@@ -136,8 +136,8 @@ public:
      *
      * @return the contents of the document as a JSON string
      */
-    std::string toJson(conduit::index_t indent=2, conduit::index_t depth=0,
-        const std::string &pad=" ", const std::string &eoe="\n") const;
+    std::string toJson(conduit::index_t indent=0, conduit::index_t depth=0,
+        const std::string &pad="", const std::string &eoe="") const;
 
 private:
     /**

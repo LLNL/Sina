@@ -58,9 +58,10 @@ Datum::Datum(conduit::Node const &asNode) {
     // only one of them tests True for is_list. This handles the other.
     else if(valueNode.dtype().is_number()){
         type = ValueType::ScalarArray;
+        // What's passed in could be an array of any numeric type
+        // We pass a cast copy into captureNode 
         conduit::Node captureNode;
         valueNode.to_float64_array(captureNode);
-        // We can't be sure what we'll get, or even that it's all of one type
         std::vector<double> array_as_vect(captureNode.as_double_ptr(),
                                           captureNode.as_double_ptr() + captureNode.dtype().number_of_elements());
         scalarArrayValue = array_as_vect;
