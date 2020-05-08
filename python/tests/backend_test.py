@@ -141,7 +141,8 @@ class TestModify(unittest.TestCase):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = self.factory.create_record_dao()
         rec = Record(id="spam", type="eggs",
-                     data={"eggs": {"value": 12, "units": None, "tags": ["runny"]}},
+                     data={"eggs": {"value": 12, "units": None, "tags": ["runny"]},
+                           "recipes": {"value": []}},
                      files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
                      user_defined={})
         record_dao.insert(rec)
