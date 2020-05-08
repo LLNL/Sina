@@ -103,7 +103,7 @@ void saveDocument(Document const &document, std::string const &fileName) {
     // file system as the destination file so that the move operation is
     // atomic.
     std::string tmpFileName = fileName + SAVE_TMP_FILE_EXTENSION;
-    auto asJson = document.toNode().to_json();
+    auto asJson = document.toJson();
     std::ofstream fout{tmpFileName};
     fout.exceptions(std::ostream::failbit | std::ostream::badbit);
     fout << asJson;

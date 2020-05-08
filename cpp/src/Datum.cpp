@@ -48,16 +48,22 @@ Datum::Datum(conduit::Node const &asNode) {
     conduit::Node valueNode = getRequiredField(VALUE_FIELD, asNode, DATA_PARENT_TYPE);
     if(valueNode.dtype().is_string()){
         stringValue = valueNode.as_string();
+        type = ValueType::String;
     }
     else if(valueNode.dtype().is_number() && valueNode.dtype().number_of_elements() == 1){
-        scalarValue = valueNode.as_double();
+        scalarValue = valueNode.to_double();
+        type = ValueType::Scalar;
     }
     // There are two different ways to end up with a "list" of numbers in conduit, but
     // only one of them tests True for is_list. This handles the other.
     else if(valueNode.dtype().is_number()){
         type = ValueType::ScalarArray;
-        std::vector<double> array_as_vect(valueNode.as_double_ptr(),
-                                          valueNode.as_double_ptr() + valueNode.dtype().number_of_elements());
+        // What's passed in could be an array of any numeric type
+        // We pass a cast copy into captureNode 
+        conduit::Node captureNode;
+        valueNode.to_float64_array(captureNode);
+        std::vector<double> array_as_vect(captureNode.as_double_ptr(),
+                                          captureNode.as_double_ptr() + captureNode.dtype().number_of_elements());
         scalarArrayValue = array_as_vect;
     }
     else if(valueNode.dtype().is_list()){
@@ -87,7 +93,7 @@ Datum::Datum(conduit::Node const &asNode) {
                 stringArrayValue.emplace_back(entry.as_string());
             }
             else if(entry.dtype().is_number() && type == ValueType::ScalarArray){
-                scalarArrayValue.emplace_back(entry.as_double());
+                scalarArrayValue.emplace_back(entry.to_double());
             }
             else {
                 std::ostringstream message;
