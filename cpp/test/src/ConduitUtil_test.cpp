@@ -29,6 +29,16 @@ TEST(ConduitUtil, getRequiredField_missing) {
     }
 }
 
+TEST(ConduitUtil, getRequiredField_slashes) {
+    conduit::Node parent;
+    // Conduit by default parses /, creating parent["some"]["name"]
+    parent["some/name"] = 24;
+    // This is how we provide a literal name with slashes
+    parent.add_child("some/name") = 42;
+    EXPECT_EQ(42,
+              getRequiredField("some/name", parent, "parent name").to_int64());
+}
+
 TEST(ConduitUtil, getRequiredString_valid) {
     conduit::Node parent;
     parent["fieldName"] = "field value";
@@ -58,6 +68,14 @@ TEST(ConduitUtil, getRequiredString_wrongType) {
         EXPECT_THAT(expected.what(), HasSubstr("parent name"));
         EXPECT_THAT(expected.what(), HasSubstr("string"));
     }
+}
+
+TEST(ConduitUtil, getRequiredString_slashes) {
+    conduit::Node parent;
+    parent["some/name"] = "undesired value";
+    parent.add_child("some/name") = "desired value";
+    EXPECT_EQ("desired value",
+              getRequiredString("some/name", parent, "parent name"));
 }
 
 TEST(ConduitUtil, getRequiredDouble_valid) {
@@ -120,6 +138,13 @@ TEST(ConduitUtil, getOptionalString_wrongType) {
         EXPECT_THAT(expected.what(), HasSubstr("parent name"));
         EXPECT_THAT(expected.what(), HasSubstr("string"));
     }
+}
+
+TEST(ConduitUtil, getOptionalField_slashes) {
+    conduit::Node parent;
+    parent["some/name"] = "undesired value";
+    EXPECT_EQ("",
+              getOptionalString("some/name", parent, "parent name"));
 }
 
 }}}

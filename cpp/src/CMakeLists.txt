@@ -4,7 +4,7 @@ find_package(Conduit REQUIRED)
 
 blt_register_library(NAME Conduit
         INCLUDES "${Conduit_DIR}/../../../include/conduit"
-        LIBRARIES "${Conduit_DIR}/../../libconduit.a"
+        LIBRARIES "conduit"
         TREAT_INCLUDES_AS_SYSTEM ON
         )
 

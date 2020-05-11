@@ -109,7 +109,7 @@ TEST(Document, create_fromJson_full) {
 }
 
 TEST(Document, create_fromJson_value_check) {
-  std::string data_json = "{\"records\": [{\"type\": \"run\", \"application\":\"test\", \"id\": \"test_1\",\"data\":{\"int\": {\"value\": 500,\"units\": \"miles\"}, \"char\": {\"value\":\"z\"}}, \"files\":{\"test/test.png\":{}}}]}";
+  std::string data_json = "{\"records\": [{\"type\": \"run\", \"application\":\"test\", \"id\": \"test_1\",\"data\":{\"int\": {\"value\": 500,\"units\": \"miles\"}, \"str/ings\": {\"value\":[\"z\", \"o\", \"o\"]}}, \"files\":{\"test/test.png\":{}}}]}";
   sina::Document myDocument = Document(data_json, createRecordLoaderWithAllKnownTypes());
   EXPECT_EQ(0, myDocument.getRelationships().size());
   auto &records = myDocument.getRecords();
@@ -117,7 +117,8 @@ TEST(Document, create_fromJson_value_check) {
   EXPECT_EQ(records[0]->getType(), "run");
   auto &data = records[0]->getData();
   EXPECT_EQ(data.at("int").getScalar(), 500.0);
-  EXPECT_EQ(data.at("char").getValue(), "z");
+  std::vector<std::string> expected_string_vals = {"z", "o", "o"};
+  EXPECT_EQ(data.at("str/ings").getStringArray(), expected_string_vals);
   EXPECT_EQ(records[0]->getFiles().count(File{"test/test.png"}), 1);
 }
 
@@ -279,8 +280,8 @@ TEST(Document, load_specifiedRecordLoader) {
         return internal::make_unique<RecordType>(
                 getRequiredString("id", asNode, "Test type"),
                 getRequiredString("type", asNode, "Test type"),
-                int(getRequiredField(TEST_RECORD_VALUE_KEY, asNode,
-                        "Test type").as_int64()));
+                static_cast<int>(getRequiredField(TEST_RECORD_VALUE_KEY, asNode,
+                                 "Test type").as_int64()));
     });
     Document loadedDocument = loadDocument(file.getName(), loader);
     ASSERT_EQ(1u, loadedDocument.getRecords().size());

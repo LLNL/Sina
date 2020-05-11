@@ -42,40 +42,51 @@ TEST(Datum, create) {
 }
 
 TEST(Datum, createFromNode) {
-    conduit::Node object1;
-    conduit::Node object2;
-    conduit::Node object3;
-    conduit::Node object4;
-    conduit::Node object5;
+    conduit::Node val_with_tags;
+    conduit::Node scalar_with_units;
+    conduit::Node val_list_node;
+    conduit::Node scal_list_node;
+    conduit::Node empty_list_node;
+    conduit::Node int_array_node;
+    conduit::Node char_array_node;
+
     std::vector<std::string> tags = {"hello", "world"};
     std::vector<std::string> val_list = {"val1", "val2"};
     std::vector<double> scal_list = {100, 2.0};
-    object1["value"] = "the value";
-    addStringsToNode(object1, "tags", tags);
-    object1["units"] = "some units";
-    object2["value"] = 3.14;
-    addStringsToNode(object3, "value", val_list);
-    object4["value"] = scal_list;
-    //Empty arrays are valid
+    // Conduit has some special treatment of arrays
+    int int_array [] = {-2, 2, 4, 8};
+    std::vector<double> array_equiv = {-2, 2, 4, 8};
+    char coerced_to_string [] = {'a', 'b', 'c'};
+    //Empty lists are valid
     conduit::Node empty_list(conduit::DataType::list());
-    object5["value"] = empty_list;
-    // TODO more cases: chars, actual list-type of
-    // numbers from conduit's pov
 
-    Datum datum1{object1};
-    Datum datum2{object2};
-    Datum datum3{object3};
-    Datum datum4{object4};
-    Datum datum5{object5};
+    val_with_tags["value"] = "the value";
+    addStringsToNode(val_with_tags, "tags", tags);
+    scalar_with_units["units"] = "some units";
+    scalar_with_units["value"] = 3.14;
+    addStringsToNode(val_list_node, "value", val_list);
+    scal_list_node["value"] = scal_list;
+    empty_list_node["value"] = empty_list;
+    int_array_node["value"].set(int_array, 4);
+    char_array_node["value"] = coerced_to_string;
+
+    Datum datum1{val_with_tags};
+    Datum datum2{scalar_with_units};
+    Datum datum3{val_list_node};
+    Datum datum4{scal_list_node};
+    Datum datum5{empty_list_node};
+    Datum datum6{int_array_node};
+    Datum datum7{char_array_node};
 
     EXPECT_EQ("the value", datum1.getValue());
-    EXPECT_EQ("some units", datum1.getUnits());
     EXPECT_EQ(tags, datum1.getTags());
+    EXPECT_THAT(3.14, DoubleEq(datum2.getScalar()));
+    EXPECT_EQ("some units", datum2.getUnits());
     EXPECT_EQ(val_list, datum3.getStringArray());
     EXPECT_EQ(scal_list, datum4.getScalarArray());
     EXPECT_EQ(ValueType::ScalarArray, datum5.getType());
-
-    EXPECT_THAT(3.14, DoubleEq(datum2.getScalar()));
+    EXPECT_EQ(array_equiv, datum6.getScalarArray());
+    EXPECT_EQ("abc", datum7.getValue());
 }
 
 TEST(Datum, setUnits) {
