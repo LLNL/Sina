@@ -22,15 +22,13 @@ namespace {
  * @param globalName the global variant of the ID field
  * @return the ID from the object
  */
-ID extractIDFromObject(nlohmann::json const &parentObject,
+ID extractIDFromObject(conduit::Node const &parentObject,
         std::string const &localName, std::string const &globalName) {
-    auto globalIter = parentObject.find(globalName);
-    if (globalIter != parentObject.end()) {
-        return ID{*globalIter, IDType::Global};
+    if (parentObject.has_child(globalName)) {
+        return ID{std::string(parentObject[globalName].as_string()), IDType::Global};
     }
-    auto localIter = parentObject.find(localName);
-    if (localIter != parentObject.end()) {
-        return ID{*localIter, IDType::Local};
+    if (parentObject.has_child(localName)) {
+        return ID{std::string(parentObject[localName].as_string()), IDType::Local};
     }
     std::string message{
             "Could not find either of the required ID fields '"};
@@ -43,12 +41,12 @@ IDField::IDField(ID value_, std::string localName_, std::string globalName_)
         : value{std::move(value_)}, localName{std::move(localName_)},
           globalName{std::move(globalName_)} {}
 
-IDField::IDField(nlohmann::json const &parentObject, std::string localName_,
+IDField::IDField(conduit::Node const &parentObject, std::string localName_,
         std::string globalName_) : IDField{
         extractIDFromObject(parentObject, localName_, globalName_),
         std::move(localName_), std::move(globalName_)} {}
 
-void IDField::addTo(nlohmann::json &object) const {
+void IDField::addTo(conduit::Node &object) const {
     auto &key = value.getType() == IDType::Global ? globalName : localName;
     object[key] = value.getId();
 }

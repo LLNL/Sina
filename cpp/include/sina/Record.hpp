@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "nlohmann/json.hpp"
+#include "conduit.hpp"
 
 #include "sina/ID.hpp"
 #include "sina/Datum.hpp"
@@ -52,7 +52,7 @@ struct FileHashByURI {
  * std::vector<std::string> myTags{"input"};
  * sina::Datum myDatum{12, myTags};
  * myRecord->add("my_scalar",std::move(myDatum));
- * std::cout << myRecord->toJson() << std::endl;
+ * std::cout << myRecord->toNode().to_json() << std::endl;
  * \endcode
  *
  * The output would be:
@@ -74,11 +74,11 @@ public:
     Record(ID id, std::string type);
 
     /**
-     * Construct a Record from its JSON representation.
+     * Construct a Record from its conduit Node representation.
      *
-     * @param asJson the Record as JSON
+     * @param asNode the Record as a Node
      */
-    explicit Record(nlohmann::json const &asJson);
+    explicit Record(conduit::Node const &asNode);
 
     Record(Record const &) = delete;
 
@@ -140,7 +140,7 @@ public:
      *
      * @return the user-defined content
      */
-    nlohmann::json const &getUserDefinedContent() const noexcept {
+    conduit::Node const &getUserDefinedContent() const noexcept {
         return userDefined;
     }
 
@@ -149,7 +149,7 @@ public:
      *
      * @return the user-defined content
      */
-    nlohmann::json &getUserDefinedContent() noexcept {
+    conduit::Node &getUserDefinedContent() noexcept {
         return userDefined;
     }
 
@@ -158,14 +158,14 @@ public:
      *
      * @param userDefined the user-defined content. Must be an object (key/value pairs)
      */
-    void setUserDefinedContent(nlohmann::json::object_t userDefined);
+    void setUserDefinedContent(conduit::Node userDefined);
 
     /**
-     * Convert this record to its JSON representation.
+     * Convert this record to its conduit Node representation.
      *
-     * @return the JSON representation of this record.
+     * @return the Node representation of this record.
      */
-    virtual nlohmann::json toJson() const;
+    virtual conduit::Node toNode() const;
 
     virtual ~Record() = default;
 
@@ -174,12 +174,12 @@ private:
     std::string type;
     DatumMap data;
     FileSet files;
-    nlohmann::json userDefined;
+    conduit::Node userDefined;
 };
 
 
 /**
- * A RecordLoader is used to convert Json::Value instances which represent
+ * A RecordLoader is used to convert conduit::Node instances which represent
  * Sina Records into instances of their corresponding sina::Record
  * subclasses. For convenience, a RecordLoader capable of handling Records of all known
  * types can be created using createRecordLoaderWithAllKnownTypes:
@@ -195,7 +195,7 @@ public:
      * to their corresponding sub classes.
      */
     using TypeLoader = std::function<std::unique_ptr<Record>(
-            nlohmann::json const &)>;
+            conduit::Node const &)>;
 
     /**
      * Add a function for loading records of the specified type.
@@ -206,12 +206,12 @@ public:
     void addTypeLoader(std::string const &type, TypeLoader loader);
 
     /**
-     * Load a sina::Record from its JSON representation.
+     * Load a sina::Record from its conduit Node representation.
      *
-     * @param recordAsJson the Record in its JSON representation
+     * @param recordAsNode the Record as a Node
      * @return the Record
      */
-    std::unique_ptr<Record> load(nlohmann::json const &recordAsJson) const;
+    std::unique_ptr<Record> load(conduit::Node const &recordAsNode) const;
 
     /**
      * Check whether this loader can load records of the given type.

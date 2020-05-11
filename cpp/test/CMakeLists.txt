@@ -5,11 +5,13 @@ add_definitions(${SINA_CXX_TEST_FLAGS})
 include_directories("${PROJECT_SOURCE_DIR}/test/include")
 
 # libdl is a requirement of Adiak, not Sina, but conditional inclusion
-# creates issues on CZ. Delete this when Adiak includes libdl 
+# creates issues on CZ. Delete this when Adiak includes libdl
 blt_register_library(NAME libdl
     TREAT_INCLUDES_AS_SYSTEM ON
     LINK_FLAGS -ldl
 )
+
+find_package(Conduit REQUIRED)
 
 if(${SINA_BUILD_ADIAK_BINDINGS})
     add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
@@ -30,14 +32,14 @@ blt_add_executable(NAME unittests
         src/Document_test.cpp
         src/File_test.cpp
         src/ID_test.cpp
-        src/JsonUtil_test.cpp
+        src/ConduitUtil_test.cpp
         src/Record_test.cpp
         src/Relationship_test.cpp
         src/Run_test.cpp
         src/Datum_test.cpp
         src/AdiakWriter_test.cpp
         src/TestRecord.cpp
-    DEPENDS_ON sina gtest gmock nlohmann_json libdl
+    DEPENDS_ON sina gtest gmock Conduit libdl
 )
 
 blt_add_test(NAME unittests

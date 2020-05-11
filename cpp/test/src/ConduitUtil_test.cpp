@@ -3,43 +3,51 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "sina/JsonUtil.hpp"
+#include "sina/ConduitUtil.hpp"
 
 namespace sina { namespace testing { namespace {
 
 using ::testing::HasSubstr;
 using ::testing::DoubleEq;
 
-TEST(JsonUtil, getRequiredField_present) {
-    nlohmann::json parent{
-            {"fieldName", "field value"}
-    };
+TEST(ConduitUtil, getRequiredField_present) {
+    conduit::Node parent;
+    parent["fieldName"] = "field value";
     auto &field = getRequiredField("fieldName", parent, "parent name");
-    EXPECT_TRUE(field.is_string());
-    EXPECT_EQ("field value", field);
+    EXPECT_TRUE(field.dtype().is_string());
+    EXPECT_EQ("field value", field.as_string());
 }
 
-TEST(JsonUtil, getRequiredField_missing) {
-    nlohmann::json parent;
+TEST(ConduitUtil, getRequiredField_missing) {
+    conduit::Node parent;
     try {
         auto &field = getRequiredField("fieldName", parent, "parent name");
-        FAIL() << "Should not have found field, but got " << field;
+        FAIL() << "Should not have found field, but got " << field.name();
     } catch (std::invalid_argument const &expected) {
         EXPECT_THAT(expected.what(), HasSubstr("fieldName"));
         EXPECT_THAT(expected.what(), HasSubstr("parent name"));
     }
 }
 
-TEST(JsonUtil, getRequiredString_valid) {
-    nlohmann::json parent{
-            {"fieldName", "field value"}
-    };
-    EXPECT_EQ("field value",
-            getRequiredString("fieldName", parent, "parent name"));
+TEST(ConduitUtil, getRequiredField_slashes) {
+    conduit::Node parent;
+    // Conduit by default parses /, creating parent["some"]["name"]
+    parent["some/name"] = 24;
+    // This is how we provide a literal name with slashes
+    parent.add_child("some/name") = 42;
+    EXPECT_EQ(42,
+              getRequiredField("some/name", parent, "parent name").to_int64());
 }
 
-TEST(JsonUtil, getRequiredString_missing) {
-    nlohmann::json parent;
+TEST(ConduitUtil, getRequiredString_valid) {
+    conduit::Node parent;
+    parent["fieldName"] = "field value";
+    EXPECT_EQ("field value",
+              getRequiredString("fieldName", parent, "parent name"));
+}
+
+TEST(ConduitUtil, getRequiredString_missing) {
+    conduit::Node parent;
     try {
         auto value = getRequiredString("fieldName", parent, "parent name");
         FAIL() << "Should not have found string, but got " << value;
@@ -49,10 +57,9 @@ TEST(JsonUtil, getRequiredString_missing) {
     }
 }
 
-TEST(JsonUtil, getRequiredString_wrongType) {
-    nlohmann::json parent{
-            {"fieldName", 123}
-    };
+TEST(ConduitUtil, getRequiredString_wrongType) {
+    conduit::Node parent;
+    parent["fieldName"] = 123;
     try {
         auto value = getRequiredString("fieldName", parent, "parent name");
         FAIL() << "Should not have found string, but got " << value;
@@ -63,16 +70,23 @@ TEST(JsonUtil, getRequiredString_wrongType) {
     }
 }
 
-TEST(JsonUtil, getRequiredDouble_valid) {
-    nlohmann::json parent{
-        {"fieldName", 3.14}
-    };
-    EXPECT_THAT(3.14, 
+TEST(ConduitUtil, getRequiredString_slashes) {
+    conduit::Node parent;
+    parent["some/name"] = "undesired value";
+    parent.add_child("some/name") = "desired value";
+    EXPECT_EQ("desired value",
+              getRequiredString("some/name", parent, "parent name"));
+}
+
+TEST(ConduitUtil, getRequiredDouble_valid) {
+    conduit::Node parent;
+    parent["fieldName"] = 3.14;
+    EXPECT_THAT(3.14,
         DoubleEq(getRequiredDouble("fieldName", parent, "parent name")));
 }
 
-TEST(JsonUtil, getRequiredDouble_missing) {
-    nlohmann::json parent;
+TEST(ConduitUtil, getRequiredDouble_missing) {
+    conduit::Node parent;
     try {
         auto value = getRequiredDouble("fieldName", parent, "parent name");
         FAIL() << "Should not have found double, but got " << value;
@@ -82,10 +96,9 @@ TEST(JsonUtil, getRequiredDouble_missing) {
     }
 }
 
-TEST(JsonUtil, getRequiredDouble_wrongType) {
-    nlohmann::json parent{
-        {"fieldName", "field value"}
-    };
+TEST(ConduitUtil, getRequiredDouble_wrongType) {
+    conduit::Node parent;
+    parent["fieldName"] = "field value";
     try {
         auto value = getRequiredDouble("fieldName", parent, "parent name");
         FAIL() << "Should not have found double, but got " << value;
@@ -96,30 +109,27 @@ TEST(JsonUtil, getRequiredDouble_wrongType) {
     }
 }
 
-TEST(JsonUtil, getOptionalString_valid) {
-    nlohmann::json parent{
-            {"fieldName", "the value"}
-    };
+TEST(ConduitUtil, getOptionalString_valid) {
+    conduit::Node parent;
+    parent["fieldName"] = "the value";
     EXPECT_EQ("the value",
-            getOptionalString("fieldName", parent, "parent name"));
+              getOptionalString("fieldName", parent, "parent name"));
 }
 
-TEST(JsonUtil, getOptionalString_missing) {
-    nlohmann::json parent;
+TEST(ConduitUtil, getOptionalString_missing) {
+    conduit::Node parent;
     EXPECT_EQ("", getOptionalString("fieldName", parent, "parent name"));
 }
 
-TEST(JsonUtil, getOptionalString_explicitNullValue) {
-    nlohmann::json parent{
-            {"fieldName", nullptr}
-    };
+TEST(ConduitUtil, getOptionalString_explicitNullValue) {
+    conduit::Node parent;
+    parent["fieldName"];
     EXPECT_EQ("", getOptionalString("fieldName", parent, "parent name"));
 }
 
-TEST(JsonUtil, getOptionalString_wrongType) {
-    nlohmann::json parent{
-            {"fieldName", 123}
-    };
+TEST(ConduitUtil, getOptionalString_wrongType) {
+    conduit::Node parent;
+    parent["fieldName"] = 123;
     try {
         auto value = getOptionalString("fieldName", parent, "parent name");
         FAIL() << "Should not have found string, but got " << value;
@@ -128,6 +138,13 @@ TEST(JsonUtil, getOptionalString_wrongType) {
         EXPECT_THAT(expected.what(), HasSubstr("parent name"));
         EXPECT_THAT(expected.what(), HasSubstr("string"));
     }
+}
+
+TEST(ConduitUtil, getOptionalField_slashes) {
+    conduit::Node parent;
+    parent["some/name"] = "undesired value";
+    EXPECT_EQ("",
+              getOptionalString("some/name", parent, "parent name"));
 }
 
 }}}

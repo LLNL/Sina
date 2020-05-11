@@ -3,14 +3,13 @@
 namespace sina { namespace testing {
 
 template<>
-TestRecord<std::string>::TestRecord(nlohmann::json const &asJson) :
-        Record{asJson},
-        value{getRequiredString(TEST_RECORD_VALUE_KEY, asJson, "TestRecord")} {}
+TestRecord<std::string>::TestRecord(conduit::Node const &asNode) :
+        Record{asNode},
+        value{getRequiredString(TEST_RECORD_VALUE_KEY, asNode, "TestRecord")} {}
 
 template<>
-TestRecord<int>::TestRecord(nlohmann::json const &asJson) :
-        Record{asJson},
-        value{getRequiredField(TEST_RECORD_VALUE_KEY, asJson,
-                "TestRecord")} {}
-
+TestRecord<int>::TestRecord(conduit::Node const &asNode) :
+        Record{asNode},
+        value{getRequiredField(TEST_RECORD_VALUE_KEY, asNode,
+              "TestRecord").as_int()} {}
 }}

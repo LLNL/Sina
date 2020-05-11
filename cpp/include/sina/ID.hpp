@@ -12,7 +12,7 @@
 
 #include <string>
 
-#include "nlohmann/json.hpp"
+#include "conduit.hpp"
 
 namespace sina {
 
@@ -81,13 +81,13 @@ public:
     IDField(ID value, std::string localName, std::string globalName);
 
     /**
-     * Construct an IDField by looking for its values in a JSON object.
+     * Construct an IDField by looking for its values in a conduit Node.
      *
-     * @param parentObject the JSON object containing the ID field
+     * @param parentObject the conduit Node containing the ID field
      * @param localName the local name of the field
      * @param globalName the global name of the field
      */
-    IDField(nlohmann::json const &parentObject, std::string localName,
+    IDField(conduit::Node const &parentObject, std::string localName,
             std::string globalName);
 
     /**
@@ -118,11 +118,11 @@ public:
     }
 
     /**
-     * Add this field to the given JSON object.
+     * Add this field to the given Node.
      *
-     * @param object the JSON object to which to add the field
+     * @param object the Node to which to add the field
      */
-    void addTo(nlohmann::json &object) const;
+    void addTo(conduit::Node &object) const;
 
 private:
     ID value;

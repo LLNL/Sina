@@ -1,7 +1,7 @@
 #ifndef SINA_TESTRECORD_HPP
 #define SINA_TESTRECORD_HPP
 
-#include "sina/JsonUtil.hpp"
+#include "sina/ConduitUtil.hpp"
 #include "sina/Record.hpp"
 
 namespace sina { namespace testing {
@@ -28,13 +28,13 @@ public:
     TestRecord(std::string id, std::string type, T value);
 
     /**
-     * Create a new TestRecord from its JSON representation.
+     * Create a new TestRecord from its conduit Node representation.
      *
-     * NOTE: This nees to be implemented explicitly for each type of value
+     * NOTE: This needs to be implemented explicitly for each type of value
      *
-     * @param asValue the record in its JSON representation
+     * @param asValue the record in its Node representation
      */
-    explicit TestRecord(nlohmann::json const &asValue);
+    explicit TestRecord(conduit::Node const &asValue);
 
     /**
      * Get the record's value.
@@ -45,7 +45,7 @@ public:
         return value;
     }
 
-    nlohmann::json toJson() const override;
+    conduit::Node toNode() const override;
 
 private:
     T value;
@@ -57,14 +57,14 @@ TestRecord<T>::TestRecord(std::string id, std::string type, T value_) :
         value{std::move(value_)} {}
 
 template<>
-TestRecord<std::string>::TestRecord(nlohmann::json const &asJson);
+TestRecord<std::string>::TestRecord(conduit::Node const &asNode);
 
 template<>
-TestRecord<int>::TestRecord(nlohmann::json const &asJson);
+TestRecord<int>::TestRecord(conduit::Node const &asJson);
 
 template<typename T>
-nlohmann::json TestRecord<T>::toJson() const {
-    auto asJson = Record::toJson();
+conduit::Node TestRecord<T>::toNode() const {
+    auto asJson = Record::toNode();
     asJson[TEST_RECORD_VALUE_KEY] = value;
     return asJson;
 }

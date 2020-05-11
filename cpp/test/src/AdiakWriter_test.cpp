@@ -7,7 +7,6 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "nlohmann/json.hpp"
 #include "adiak.hpp"
 extern "C" {
 #include "adiak_tool.h"
@@ -35,9 +34,9 @@ class AdiakWriterTest : public ::testing::Test {
     adiak::init(nullptr);
     adiak_register_cb(1, adiak_category_all, AdiakWriterTest::callbackWrapper, 0, &current_test);
   }
- 
+
   void SetUp() {
-     current_test=this; 
+     current_test=this;
   }
 
   static void callbackWrapper(const char *name, adiak_category_t category, const char *subcategory, adiak_value_t *val, adiak_datatype_t *adiak_type, void *adiakwriter){
@@ -57,7 +56,6 @@ class AdiakWriterTest : public ::testing::Test {
 
 AdiakWriterTest *AdiakWriterTest::current_test;
 
-
 TEST_F(AdiakWriterTest, basic_assignment) {
   //adiak::init(nullptr);
   //adiak_register_cb(1, adiak_category_all, sina::adiakSinaCallback, 0, callback_record_ptr);
@@ -70,11 +68,11 @@ TEST_F(AdiakWriterTest, basic_assignment) {
   auto result1 = adiak::value(name1, value1);
   auto result2 = adiak::value(name2, value2);
   EXPECT_TRUE(result1 && result2);
-  auto asJson = record.toJson();
-  EXPECT_EQ(value1, asJson[EXPECTED_DATA_KEY][name1]["value"]);
-  EXPECT_EQ(value2, asJson[EXPECTED_DATA_KEY][name2]["value"]);
-  EXPECT_EQ(tags1, asJson[EXPECTED_DATA_KEY][name1]["tags"]);
-  EXPECT_EQ(tags2, asJson[EXPECTED_DATA_KEY][name2]["tags"]);
+  auto asNode = record.toNode();
+  EXPECT_EQ(value1, asNode[EXPECTED_DATA_KEY][name1]["value"].as_string());
+  EXPECT_EQ(value2, int(asNode[EXPECTED_DATA_KEY][name2]["value"].as_double()));
+  EXPECT_EQ(tags1[0], asNode[EXPECTED_DATA_KEY][name1]["tags"][0].as_string());
+  EXPECT_EQ(tags2[0], asNode[EXPECTED_DATA_KEY][name2]["tags"][0].as_string());
 }
 
 TEST_F(AdiakWriterTest, scalar_types) {
@@ -85,9 +83,9 @@ TEST_F(AdiakWriterTest, scalar_types) {
   auto result1 = adiak::value(name1, value1);
   auto result2 = adiak::value(name2, value2);
   EXPECT_TRUE(result1 && result2);
-  auto asJson = record.toJson();
-  EXPECT_EQ(value1, asJson[EXPECTED_DATA_KEY][name1]["value"]);
-  EXPECT_EQ(value2, asJson[EXPECTED_DATA_KEY][name2]["value"]);
+  auto asNode = record.toNode();
+  EXPECT_EQ(value1, asNode[EXPECTED_DATA_KEY][name1]["value"].as_float64());
+  EXPECT_EQ(value2, asNode[EXPECTED_DATA_KEY][name2]["value"].as_double());
 }
 
 // No extra test for string_types (besides date) as they're handled identically
@@ -95,8 +93,8 @@ TEST_F(AdiakWriterTest, date_type) {
   std::string name1 = "my_date";
   auto result = adiak::value(name1, adiak::date(1568397849));
   EXPECT_TRUE(result);
-  auto asJson = record.toJson();
-  EXPECT_EQ("Fri, 13 Sep 2019 11:04:09 -0700", asJson[EXPECTED_DATA_KEY][name1]["value"]);
+  auto toNode = record.toNode();
+  EXPECT_EQ("Fri, 13 Sep 2019 11:04:09 -0700", toNode[EXPECTED_DATA_KEY][name1]["value"].as_string());
 }
 
 TEST_F(AdiakWriterTest, list_types) {
@@ -107,9 +105,15 @@ TEST_F(AdiakWriterTest, list_types) {
   auto result1 = adiak::value(name1, value1);
   auto result2 = adiak::value(name2, value2);
   EXPECT_TRUE(result1 && result2);
-  auto asJson = record.toJson();
-  EXPECT_EQ(value1, asJson[EXPECTED_DATA_KEY][name1]["value"]);
-  EXPECT_EQ(value2, asJson[EXPECTED_DATA_KEY][name2]["value"]);
+  auto asNode = record.toNode();
+  auto doub_array = asNode[EXPECTED_DATA_KEY][name1]["value"].as_double_ptr();
+  std::vector<double>scal_child_vals(doub_array, doub_array+asNode[EXPECTED_DATA_KEY][name1]["value"].dtype().number_of_elements());
+  EXPECT_EQ(value1, scal_child_vals);
+  std::set<std::string> node_vals;
+  auto val_itr = asNode[EXPECTED_DATA_KEY][name2]["value"].children();
+  while(val_itr.has_next())
+      node_vals.insert(val_itr.next().as_string());
+  EXPECT_EQ(value2, node_vals);
 }
 
 TEST_F(AdiakWriterTest, files) {
@@ -121,9 +125,10 @@ TEST_F(AdiakWriterTest, files) {
   auto result1 = adiak::value(name1, adiak::path(value1));
   auto result2 = adiak::value(name2, adiak::path(value2));
   EXPECT_TRUE(result1 && result2);
-  auto asJson = record.toJson();
-  EXPECT_FALSE(asJson[EXPECTED_FILES_KEY][value1].is_null());
-  EXPECT_EQ(tags2, asJson[EXPECTED_FILES_KEY][value2]["tags"]);
+  auto asNode = record.toNode();
+  EXPECT_FALSE(asNode[EXPECTED_FILES_KEY].child(value1).dtype().is_empty());
+  EXPECT_EQ(1, asNode[EXPECTED_FILES_KEY].child(value2)["tags"].number_of_children());
+  EXPECT_EQ(tags2[0], asNode[EXPECTED_FILES_KEY].child(value2)["tags"][0].as_string());
 }
 
 TEST_F(AdiakWriterTest, files_list){
@@ -133,12 +138,12 @@ TEST_F(AdiakWriterTest, files_list){
   std::vector<adiak::path> fileListAdiak{adiak::path(fileListVal1), adiak::path(fileListVal2)};
   std::vector<std::string> tags = {"string"};
   EXPECT_TRUE(adiak::value(fileListName, fileListAdiak));
-  auto asJson = record.toJson();
-  EXPECT_FALSE(asJson[EXPECTED_FILES_KEY][fileListVal1].is_null());
-  EXPECT_EQ(std::vector<std::string>{fileListName}, asJson[EXPECTED_FILES_KEY][fileListVal2]["tags"]);
+  auto asNode = record.toNode();
+  EXPECT_FALSE(asNode[EXPECTED_FILES_KEY].child(fileListVal1).dtype().is_empty());
+  EXPECT_EQ(1, asNode[EXPECTED_FILES_KEY].child(fileListVal2)["tags"].number_of_children());
+  EXPECT_EQ(fileListName, asNode[EXPECTED_FILES_KEY].child(fileListVal2)["tags"][0].as_string());
 }
 
 }}}
 
 #endif //SINA_BUILD_ADIAK_BINDINGS
-
