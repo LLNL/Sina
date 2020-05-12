@@ -5,9 +5,8 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "nlohmann/json.hpp"
-
 #include "sina/Datum.hpp"
+#include "sina/ConduitUtil.hpp"
 
 namespace sina { namespace testing { namespace {
 
@@ -42,38 +41,52 @@ TEST(Datum, create) {
     EXPECT_EQ(scal_list, datum4.getScalarArray());
 }
 
-TEST(Datum, createFromJson) {
-    nlohmann::json object1;
-    nlohmann::json object2;
-    nlohmann::json object3;
-    nlohmann::json object4;
-    nlohmann::json object5;
+TEST(Datum, createFromNode) {
+    conduit::Node val_with_tags;
+    conduit::Node scalar_with_units;
+    conduit::Node val_list_node;
+    conduit::Node scal_list_node;
+    conduit::Node empty_list_node;
+    conduit::Node int_array_node;
+    conduit::Node char_array_node;
+
     std::vector<std::string> tags = {"hello", "world"};
     std::vector<std::string> val_list = {"val1", "val2"};
     std::vector<double> scal_list = {100, 2.0};
-    object1["value"] = "the value";
-    object1["tags"] = tags;
-    object1["units"] = "some units";
-    object2["value"] = 3.14;
-    object3["value"] = val_list;
-    object4["value"] = scal_list;
-    //Empty arrays are valid
-    object5["value"] = nlohmann::json::array();
+    // Conduit has some special treatment of arrays
+    int int_array [] = {-2, 2, 4, 8};
+    std::vector<double> array_equiv = {-2, 2, 4, 8};
+    char coerced_to_string [] = {'a', 'b', 'c'};
+    //Empty lists are valid
+    conduit::Node empty_list(conduit::DataType::list());
 
-    Datum datum1{object1};
-    Datum datum2{object2};
-    Datum datum3{object3};
-    Datum datum4{object4};
-    Datum datum5{object5};
+    val_with_tags["value"] = "the value";
+    addStringsToNode(val_with_tags, "tags", tags);
+    scalar_with_units["units"] = "some units";
+    scalar_with_units["value"] = 3.14;
+    addStringsToNode(val_list_node, "value", val_list);
+    scal_list_node["value"] = scal_list;
+    empty_list_node["value"] = empty_list;
+    int_array_node["value"].set(int_array, 4);
+    char_array_node["value"] = coerced_to_string;
+
+    Datum datum1{val_with_tags};
+    Datum datum2{scalar_with_units};
+    Datum datum3{val_list_node};
+    Datum datum4{scal_list_node};
+    Datum datum5{empty_list_node};
+    Datum datum6{int_array_node};
+    Datum datum7{char_array_node};
 
     EXPECT_EQ("the value", datum1.getValue());
-    EXPECT_EQ("some units", datum1.getUnits());
     EXPECT_EQ(tags, datum1.getTags());
+    EXPECT_THAT(3.14, DoubleEq(datum2.getScalar()));
+    EXPECT_EQ("some units", datum2.getUnits());
     EXPECT_EQ(val_list, datum3.getStringArray());
     EXPECT_EQ(scal_list, datum4.getScalarArray());
     EXPECT_EQ(ValueType::ScalarArray, datum5.getType());
-
-    EXPECT_THAT(3.14, DoubleEq(datum2.getScalar()));
+    EXPECT_EQ(array_equiv, datum6.getScalarArray());
+    EXPECT_EQ("abc", datum7.getValue());
 }
 
 TEST(Datum, setUnits) {
@@ -91,7 +104,7 @@ TEST(Datum, setTags) {
 }
 
 TEST(Datum, createFromJson_missingKeys) {
-    nlohmann::json object1;
+    conduit::Node object1;
     try {
         Datum datum1{object1};
         FAIL() << "Should have gotten a value error";
@@ -101,8 +114,11 @@ TEST(Datum, createFromJson_missingKeys) {
 }
 
 TEST(Datum, createFromJson_badListValue) {
-    nlohmann::json object1;
-    object1["value"] = {1, "two", 3};
+    conduit::Node object1;
+    auto &mixed_scal = object1["value"].append();
+    mixed_scal.set(1.0);
+    auto &mixed_val = object1["value"].append();
+    mixed_val.set("two");
     try {
         Datum datum1{object1};
         FAIL() << "Should have gotten a value error";
@@ -123,18 +139,30 @@ TEST(Datum, toJson) {
     datum2.setUnits("Datum units");
     Datum datum3{scal_list};
     Datum datum4{val_list};
-    nlohmann::json datumRef1 = datum1.toJson();
-    nlohmann::json datumRef2 = datum2.toJson();
-    nlohmann::json datumRef3 = datum3.toJson();
-    nlohmann::json datumRef4 = datum4.toJson();
-    EXPECT_EQ("Datum value", datumRef1["value"]);
-    EXPECT_EQ(tags, datumRef1["tags"]);
+    conduit::Node datumRef1 = datum1.toNode();
+    conduit::Node datumRef2 = datum2.toNode();
+    conduit::Node datumRef3 = datum3.toNode();
+    conduit::Node datumRef4 = datum4.toNode();
+    EXPECT_EQ("Datum value", datumRef1["value"].as_string());
+    std::vector<std::string> node_tags;
+    auto tags_itr = datumRef1["tags"].children();
+    while(tags_itr.has_next())
+        node_tags.emplace_back(tags_itr.next().as_string());
+    EXPECT_EQ(tags, node_tags);
 
-    EXPECT_EQ("Datum units", datumRef2["units"]);
-    EXPECT_THAT(3.14, DoubleEq(datumRef2["value"]));
+    EXPECT_EQ("Datum units", datumRef2["units"].as_string());
+    EXPECT_THAT(3.14, DoubleEq(datumRef2["value"].value()));
 
-    EXPECT_EQ(scal_list, datumRef3["value"]);
-    EXPECT_EQ(val_list, datumRef4["value"]);
+    // Conduit will pack vectors of numbers into arrays, but
+    // strings can only live as lists of Nodes
+    auto doub_array = datumRef3["value"].as_double_ptr();
+    std::vector<double>scal_child_vals(doub_array, doub_array+datumRef3["value"].dtype().number_of_elements());
+    std::vector<std::string>str_child_vals;
+    auto str_itr = datumRef4["value"].children();
+    while(str_itr.has_next())
+        str_child_vals.emplace_back(str_itr.next().as_string());
+    EXPECT_EQ(scal_list, scal_child_vals);
+    EXPECT_EQ(val_list, str_child_vals);
 }
 
 }}}

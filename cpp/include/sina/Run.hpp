@@ -36,11 +36,11 @@ public:
     Run(ID id, std::string application, std::string version = "", std::string user = "");
 
     /**
-     * Create a Run from its representation as a Json object
+     * Create a Run from its representation as a conduit Node
      *
-     * @param asJson the run as a Json object
+     * @param asNode the run as a Node
      */
-    explicit Run(nlohmann::json const &asJson);
+    explicit Run(conduit::Node const &asNode);
 
     /**
      * Get the application that was run.
@@ -69,7 +69,7 @@ public:
         return user;
     }
 
-    nlohmann::json toJson() const override;
+    conduit::Node toNode() const override;
 
 private:
     std::string application;

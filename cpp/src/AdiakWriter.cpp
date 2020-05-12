@@ -13,7 +13,7 @@ extern "C" {
 }
 
 #include "sina/CppBridge.hpp"
-#include "sina/JsonUtil.hpp"
+#include "sina/ConduitUtil.hpp"
 #include "sina/Record.hpp"
 #include "sina/Datum.hpp"
 #include "sina/Document.hpp"

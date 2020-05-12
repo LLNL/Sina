@@ -68,12 +68,12 @@ def populate_database_with_data(record_dao, run_dao):
     spam_record_3.data["spam_scal_2"] = {"value": 10.5}
     spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
     spam_record_3.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_3.files = {"beeq.png": {}}
+    spam_record_3.files = {"beeq.png": {"mimetype": 'image/png'}}
 
     spam_record_4 = Record(id="spam4", type="bar")
     spam_record_4.data["val_data_list_1"] = {"value": [-11, -9]}
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_4.files = {"beep.png": {}}
+    spam_record_4.files = {"beep.png": {"mimetype": 'image/png'}}
 
     spam_record_5 = Run(id="spam5", application="breakfast_maker")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
@@ -141,7 +141,8 @@ class TestModify(unittest.TestCase):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = self.factory.create_record_dao()
         rec = Record(id="spam", type="eggs",
-                     data={"eggs": {"value": 12, "units": None, "tags": ["runny"]}},
+                     data={"eggs": {"value": 12, "units": None, "tags": ["runny"]},
+                           "recipes": {"value": []}},
                      files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
                      user_defined={})
         record_dao.insert(rec)
@@ -891,6 +892,47 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         get_norec = self.record_dao.get_scalars(id="wheeee",
                                                 scalar_names=["value-1"])
         self.assertFalse(get_norec)
+
+    def test_get_with_mime_type_single_record(self):
+        """Test that the RecordDAO mimetype query retrieves only one Record."""
+        just_5 = list(self.record_dao.get_with_mime_type(mimetype="audio/wav",
+                                                         ids_only=False))
+        self.assertEqual(len(just_5), 1)
+        self.assertEqual(just_5[0].id, "spam5")
+
+    def test_get_with_mime_type_multi_records(self):
+        """Test that the RecordDAO mimetype query retrieves multiple Records."""
+        just_3_and_4 = list(self.record_dao.get_with_mime_type(mimetype="image/png",
+                                                               ids_only=False))
+        self.assertEqual(len(just_3_and_4), 2)
+        six.assertCountEqual(self, [just_3_and_4[0].id, just_3_and_4[1].id],
+                             ["spam3", "spam4"])
+
+    def test_get_with_mime_type_no_match(self):
+        """Test that the RecordDAO mimetype query retrieves no Records when there is no match."""
+        get_none = list(self.record_dao.get_with_mime_type(mimetype="nope/nonexist",
+                                                           ids_only=False))
+        self.assertFalse(get_none)
+
+    def test_get_with_mime_type_single_id(self):
+        """Test that the RecordDAO mimetype query retrieves only one ID."""
+        just_5_id = list(self.record_dao.get_with_mime_type(mimetype="audio/wav",
+                                                            ids_only=True))
+        self.assertEqual(len(just_5_id), 1)
+        self.assertEqual(just_5_id[0], "spam5")
+
+    def test_get_with_mime_type_multi_ids(self):
+        """Test that the RecordDAO mimetype query retrieves multiple IDs."""
+        just_3_and_4_ids = list(self.record_dao.get_with_mime_type(mimetype="image/png",
+                                                                   ids_only=True))
+        self.assertEqual(len(just_3_and_4_ids), 2)
+        six.assertCountEqual(self, just_3_and_4_ids, ["spam3", "spam4"])
+
+    def test_get_with_mime_type_no_match_id_only(self):
+        """Test that the RecordDAO mimetype query retrieves no IDs when there is no match."""
+        get_no_ids = list(self.record_dao.get_with_mime_type(mimetype="nope/nonexist",
+                                                             ids_only=True))
+        self.assertFalse(get_no_ids)
 
 
 class TestImportExport(unittest.TestCase):

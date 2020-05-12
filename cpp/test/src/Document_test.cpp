@@ -22,21 +22,20 @@ char const TEST_RECORD_TYPE[] = "test type";
 char const EXPECTED_RECORDS_KEY[] = "records";
 char const EXPECTED_RELATIONSHIPS_KEY[] = "relationships";
 
-TEST(Document, create_fromJson_empty) {
-    nlohmann::json documentAsJson;
+TEST(Document, create_fromNode_empty) {
+    conduit::Node documentAsNode;
     RecordLoader loader;
-    Document document{documentAsJson, loader};
+    Document document{documentAsNode, loader};
     EXPECT_EQ(0u, document.getRecords().size());
     EXPECT_EQ(0u, document.getRelationships().size());
 }
 
-TEST(Document, create_fromJson_wrongRecordsType) {
-    nlohmann::json recordsAsJson{
-            {EXPECTED_RECORDS_KEY, "123"}
-    };
+TEST(Document, create_fromNode_wrongRecordsType) {
+    conduit::Node recordsAsNodes;
+    recordsAsNodes[EXPECTED_RECORDS_KEY] = 123;
     RecordLoader loader;
     try {
-        Document document{recordsAsJson, loader};
+        Document document{recordsAsNodes, loader};
         FAIL() << "Should not have been able to parse records. Have "
                << document.getRecords().size();
     } catch (std::invalid_argument const &expected) {
@@ -44,25 +43,24 @@ TEST(Document, create_fromJson_wrongRecordsType) {
     }
 }
 
-TEST(Document, create_fromJson_withRecords) {
-    nlohmann::json recordAsJson{
-            {"type", "IntTestRecord"},
-            {"id", "the ID"},
-            {TEST_RECORD_VALUE_KEY, 123}
-    };
+TEST(Document, create_fromNode_withRecords) {
+    conduit::Node recordAsNode;
+    recordAsNode["type"] = "IntTestRecord";
+    recordAsNode["id"] = "the ID";
+    recordAsNode[TEST_RECORD_VALUE_KEY] = 123;
 
-    nlohmann::json recordsAsJson;
-    recordsAsJson.emplace_back(recordAsJson);
+    conduit::Node recordsAsNodes;
+    recordsAsNodes.append().set(recordAsNode);
 
-    nlohmann::json documentAsJson;
-    documentAsJson[EXPECTED_RECORDS_KEY] = recordsAsJson;
+    conduit::Node documentAsNode;
+    documentAsNode[EXPECTED_RECORDS_KEY] = recordsAsNodes;
 
     RecordLoader loader;
-    loader.addTypeLoader("IntTestRecord", [](nlohmann::json const &asJson) {
-        return internal::make_unique<TestRecord<int>>(asJson);
+    loader.addTypeLoader("IntTestRecord", [](conduit::Node const &asNode) {
+        return internal::make_unique<TestRecord<int>>(asNode);
     });
 
-    Document document{documentAsJson, loader};
+    Document document{documentAsNode, loader};
     auto &records = document.getRecords();
     ASSERT_EQ(1u, records.size());
     auto testRecord = dynamic_cast<TestRecord<int> const *>(records[0].get());
@@ -70,21 +68,19 @@ TEST(Document, create_fromJson_withRecords) {
     ASSERT_EQ(123, testRecord->getValue());
 }
 
-TEST(Document, create_fromJson_withRelationships) {
-    nlohmann::json relationshipAsJson{
-            {"subject", "the subject"},
-            {"object", "the object"},
-            {"predicate", "is related to"},
-    };
+TEST(Document, create_fromNode_withRelationships) {
+    conduit::Node relationshipAsNode;
+    relationshipAsNode["subject"] = "the subject";
+    relationshipAsNode["object"] = "the object";
+    relationshipAsNode["predicate"] = "is related to";
 
-    nlohmann::json relationshipsAsJson;
-    relationshipsAsJson.emplace_back(relationshipAsJson);
+    conduit::Node relationshipsAsNodes;
+    relationshipsAsNodes.append().set(relationshipAsNode);
 
-    nlohmann::json documentAsJson{
-            {EXPECTED_RELATIONSHIPS_KEY, relationshipsAsJson}
-    };
+    conduit::Node documentAsNode;
+    documentAsNode[EXPECTED_RELATIONSHIPS_KEY] = relationshipsAsNodes;
 
-    Document document{documentAsJson, RecordLoader{}};
+    Document document{documentAsNode, RecordLoader{}};
     auto &relationships = document.getRelationships();
     ASSERT_EQ(1u, relationships.size());
     EXPECT_EQ("the subject", relationships[0].getSubject().getId());
@@ -94,16 +90,50 @@ TEST(Document, create_fromJson_withRelationships) {
     EXPECT_EQ("is related to", relationships[0].getPredicate());
 }
 
-TEST(Document, toJson_empty) {
+TEST(Document, create_fromJson_roundtrip) {
+  std::string orig_json = "{\"records\": [{\"type\": \"test_rec\",\"id\": \"test\"}],\"relationships\": []}";
+  sina::Document myDocument = Document(orig_json, createRecordLoaderWithAllKnownTypes());
+  EXPECT_EQ(0, myDocument.getRelationships().size());
+  ASSERT_EQ(1, myDocument.getRecords().size());
+  EXPECT_EQ("test_rec", myDocument.getRecords()[0]->getType());
+  std::string returned_json = myDocument.toJson(0,0,"","");
+  EXPECT_EQ(orig_json, returned_json);
+}
+
+TEST(Document, create_fromJson_full) {
+  std::string long_json = "{\"records\": [{\"type\": \"foo\",\"id\": \"test_1\",\"user_defined\":{\"name\":\"bob\"},\"files\":{\"foo/bar.png\":{\"mimetype\":\"image\"}},\"data\":{\"scalar\": {\"value\": 500,\"units\": \"miles\"}}},{\"type\":\"bar\",\"id\": \"test_2\",\"data\": {\"scalar_list\": {\"value\": [1, 2, 3]}, \"string_list\": {\"value\": [\"a\",\"wonderful\",\"world\"], \"tags\":[\"observation\"]}}},{\"type\": \"run\",\"application\":\"sina_test\",\"id\": \"test_3\",\"data\":{\"scalar\": {\"value\": 12.3, \"units\": \"g/s\", \"tags\": [\"hi\"]}, \"scalar_list\": {\"value\": [1,2,3.0,4]}}}, {\"type\": \"bar\",\"id\": \"test_4\",\"data\":{\"string\": {\"value\": \"yarr\"}, \"string_list\": {\"value\": [\"y\",\"a\",\"r\"]}}, \"files\":{\"test/test.png\":{}}, \"user_defined\":{\"hello\":\"there\"}}],\"relationships\": [{\"predicate\": \"completes\",\"subject\": \"test_2\",\"object\": \"test_1\"},{\"subject\": \"test_3\", \"predicate\": \"overrides\", \"object\": \"test_4\"}]}";
+  sina::Document myDocument = Document(long_json, createRecordLoaderWithAllKnownTypes());
+  EXPECT_EQ(2, myDocument.getRelationships().size());
+  auto &records = myDocument.getRecords();
+  EXPECT_EQ(4, records.size());
+}
+
+TEST(Document, create_fromJson_value_check) {
+  std::string data_json = "{\"records\": [{\"type\": \"run\", \"application\":\"test\", \"id\": \"test_1\",\"data\":{\"int\": {\"value\": 500,\"units\": \"miles\"}, \"str/ings\": {\"value\":[\"z\", \"o\", \"o\"]}}, \"files\":{\"test/test.png\":{}}}]}";
+  sina::Document myDocument = Document(data_json, createRecordLoaderWithAllKnownTypes());
+  EXPECT_EQ(0, myDocument.getRelationships().size());
+  auto &records = myDocument.getRecords();
+  EXPECT_EQ(1, records.size());
+  EXPECT_EQ(records[0]->getType(), "run");
+  auto &data = records[0]->getData();
+  EXPECT_EQ(data.at("int").getScalar(), 500.0);
+  std::vector<std::string> expected_string_vals = {"z", "o", "o"};
+  EXPECT_EQ(data.at("str/ings").getStringArray(), expected_string_vals);
+  EXPECT_EQ(records[0]->getFiles().count(File{"test/test.png"}), 1);
+}
+
+TEST(Document, toNode_empty) {
     // A sina document should always have, at minimum, both records and
     // relationships as empty arrays.
     Document const document;
-    nlohmann::json asJson = document.toJson();
-    EXPECT_EQ(nlohmann::json::array({}), asJson[EXPECTED_RECORDS_KEY]);
-    EXPECT_EQ(nlohmann::json::array({}), asJson[EXPECTED_RELATIONSHIPS_KEY]);
+    conduit::Node asNode = document.toNode();
+    EXPECT_TRUE(asNode[EXPECTED_RECORDS_KEY].dtype().is_list());
+    EXPECT_EQ(0, asNode[EXPECTED_RECORDS_KEY].number_of_children());
+    EXPECT_TRUE(asNode[EXPECTED_RELATIONSHIPS_KEY].dtype().is_list());
+    EXPECT_EQ(0, asNode[EXPECTED_RELATIONSHIPS_KEY].number_of_children());
 }
 
-TEST(Document, toJson_records) {
+TEST(Document, toNode_records) {
     Document document;
     std::string expectedIds[] = {"id 1", "id 2", "id 3"};
     std::string expectedValues[] = {"value 1", "value 2", "value 3"};
@@ -114,26 +144,27 @@ TEST(Document, toJson_records) {
                 expectedIds[i], TEST_RECORD_TYPE, expectedValues[i]));
     }
 
-    auto asJson = document.toJson();
+    auto asNode = document.toNode();
 
-    auto records = asJson[EXPECTED_RECORDS_KEY];
-    ASSERT_EQ(numRecords, records.size());
-    for (std::size_t i = 0; i < numRecords; ++i) {
-        auto &actualRecord = records[i];
-        EXPECT_EQ(expectedIds[i], actualRecord["id"]);
-        EXPECT_EQ(TEST_RECORD_TYPE, actualRecord["type"]);
-        EXPECT_EQ(expectedValues[i], actualRecord[TEST_RECORD_VALUE_KEY]);
+    auto record_nodes = asNode[EXPECTED_RECORDS_KEY];
+    ASSERT_EQ(numRecords, record_nodes.number_of_children());
+    for (auto i = 0; i < record_nodes.number_of_children(); ++i) {
+        auto &actualNode = record_nodes[i];
+        EXPECT_EQ(expectedIds[i], actualNode["id"].as_string());
+        EXPECT_EQ(TEST_RECORD_TYPE, actualNode["type"].as_string());
+        EXPECT_EQ(expectedValues[i],
+                  actualNode[TEST_RECORD_VALUE_KEY].as_string());
     }
 }
 
-TEST(Document, toJson_relationships) {
+TEST(Document, toNode_relationships) {
     Document document;
     std::string expectedSubjects[] = {"subject 1", "subject 2"};
     std::string expectedObjects[] = {"object 1", "object 2"};
     std::string expectedPredicates[] = {"predicate 1", "predicate 2"};
 
     auto numRecords = sizeof(expectedSubjects) / sizeof(expectedSubjects[0]);
-    for (std::size_t i = 0; i < numRecords; ++i) {
+    for (unsigned long i = 0; i < numRecords; ++i) {
         document.add(Relationship{
                 ID{expectedSubjects[i], IDType::Global},
                 expectedPredicates[i],
@@ -141,15 +172,15 @@ TEST(Document, toJson_relationships) {
         });
     }
 
-    auto asJson = document.toJson();
+    auto asNode = document.toNode();
 
-    auto relationships = asJson[EXPECTED_RELATIONSHIPS_KEY];
-    ASSERT_EQ(numRecords, relationships.size());
-    for (std::size_t i = 0; i < numRecords; ++i) {
-        auto &actualRelationship = relationships[i];
-        EXPECT_EQ(expectedSubjects[i], actualRelationship["subject"]);
-        EXPECT_EQ(expectedObjects[i], actualRelationship["object"]);
-        EXPECT_EQ(expectedPredicates[i], actualRelationship["predicate"]);
+    auto relationship_nodes = asNode[EXPECTED_RELATIONSHIPS_KEY];
+    ASSERT_EQ(numRecords, relationship_nodes.number_of_children());
+    for (auto i = 0; i < relationship_nodes.number_of_children(); ++i) {
+        auto &actualRelationship = relationship_nodes[i];
+        EXPECT_EQ(expectedSubjects[i], actualRelationship["subject"].as_string());
+        EXPECT_EQ(expectedObjects[i], actualRelationship["object"].as_string());
+        EXPECT_EQ(expectedPredicates[i], actualRelationship["predicate"].as_string());
     }
 }
 
@@ -216,17 +247,19 @@ TEST(Document, saveDocument) {
 
     saveDocument(document, tmpFile.getName());
 
-    nlohmann::json readContents;
+    conduit::Node readContents;
     {
         std::ifstream fin{tmpFile.getName()};
-        fin >> readContents;
+        std::stringstream f_buf;
+        f_buf << fin.rdbuf();
+        readContents.parse(f_buf.str(),"json");
     }
 
-    ASSERT_TRUE(readContents[EXPECTED_RECORDS_KEY].is_array());
-    EXPECT_EQ(1, readContents[EXPECTED_RECORDS_KEY].size());
+    ASSERT_TRUE(readContents[EXPECTED_RECORDS_KEY].dtype().is_list());
+    EXPECT_EQ(1, readContents[EXPECTED_RECORDS_KEY].number_of_children());
     auto &readRecord = readContents[EXPECTED_RECORDS_KEY][0];
-    EXPECT_EQ("the id", readRecord["id"]);
-    EXPECT_EQ("the type", readRecord["type"]);
+    EXPECT_EQ("the id", readRecord["id"].as_string());
+    EXPECT_EQ("the type", readRecord["type"].as_string());
 }
 
 TEST(Document, load_specifiedRecordLoader) {
@@ -239,16 +272,16 @@ TEST(Document, load_specifiedRecordLoader) {
     NamedTempFile file;
     {
         std::ofstream fout{file.getName()};
-        fout << originalDocument.toJson();
+        fout << originalDocument.toNode().to_json();
     }
 
     RecordLoader loader;
-    loader.addTypeLoader("my type", [](nlohmann::json const &asJson) {
+    loader.addTypeLoader("my type", [](conduit::Node const &asNode) {
         return internal::make_unique<RecordType>(
-                getRequiredString("id", asJson, "Test type"),
-                getRequiredString("type", asJson, "Test type"),
-                getRequiredField(TEST_RECORD_VALUE_KEY, asJson,
-                        "Test type"));
+                getRequiredString("id", asNode, "Test type"),
+                getRequiredString("type", asNode, "Test type"),
+                static_cast<int>(getRequiredField(TEST_RECORD_VALUE_KEY, asNode,
+                                 "Test type").as_int64()));
     });
     Document loadedDocument = loadDocument(file.getName(), loader);
     ASSERT_EQ(1u, loadedDocument.getRecords().size());
@@ -267,7 +300,7 @@ TEST(Document, load_defaultRecordLoaders) {
     NamedTempFile file;
     {
         std::ofstream fout{file.getName()};
-        fout << originalDocument.toJson();
+        fout << originalDocument.toNode().to_json();
     }
 
     Document loadedDocument = loadDocument(file.getName());

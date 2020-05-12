@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
 #include "sina/File.hpp"
+#include "sina/ConduitUtil.hpp"
 
 namespace sina { namespace testing { namespace {
 
@@ -29,45 +30,42 @@ TEST(File, setTags) {
     EXPECT_EQ(tags, file.getTags());
 }
 
-TEST(File, create_fromJson_basic) {
+TEST(File, create_fromNode_basic) {
     std::string uri = "the URI";
-    nlohmann::json basic_file;
+    conduit::Node basic_file(conduit::DataType::object());
     File file{uri, basic_file};
     EXPECT_EQ(uri, file.getUri());
     EXPECT_EQ("", file.getMimeType());
     EXPECT_EQ(0, file.getTags().size());
 }
 
-TEST(File, create_fromJson_complete) {
+TEST(File, create_fromNode_complete) {
     std::string uri = "another/uri.txt";
     std::vector<std::string> tags = {"tags", "are", "fun"};
-    nlohmann::json full_file{
-            {EXPECTED_MIMETYPE_KEY, "the mime type"},
-    };
-    full_file[EXPECTED_TAGS_KEY] = tags;
+    conduit::Node full_file(conduit::DataType::object());
+    full_file[EXPECTED_MIMETYPE_KEY] = "the mime type";
+    addStringsToNode(full_file, EXPECTED_TAGS_KEY, tags);
     File file{uri, full_file};
     EXPECT_EQ(uri, file.getUri());
     EXPECT_EQ("the mime type", file.getMimeType());
     EXPECT_EQ(tags, file.getTags());
 }
 
-TEST(File, toJson_basic) {
+TEST(File, toNode_basic) {
     File file{"the URI"};
-    auto asJson = file.toJson();
-    EXPECT_EQ(nlohmann::json::value_t::null,
-            asJson[EXPECTED_MIMETYPE_KEY].type());
-    EXPECT_EQ(nlohmann::json::value_t::null,
-            asJson[EXPECTED_TAGS_KEY].type());
+    auto asNode = file.toNode();
+    EXPECT_FALSE(asNode.has_child(EXPECTED_MIMETYPE_KEY));
+    EXPECT_FALSE(asNode.has_child(EXPECTED_TAGS_KEY));
 }
 
-TEST(File, toJson_complete) {
+TEST(File, toNode_complete) {
     std::vector<std::string> tags = {"these", "are", "tags"};
     File file{"the URI"};
     file.setMimeType("the mime type");
     file.setTags(tags);
-    auto asJson = file.toJson();
-    EXPECT_EQ("the mime type", asJson[EXPECTED_MIMETYPE_KEY]);
-    EXPECT_EQ(tags, asJson[EXPECTED_TAGS_KEY]);
+    auto asNode = file.toNode();
+    EXPECT_EQ("the mime type", asNode[EXPECTED_MIMETYPE_KEY].as_string());
+    EXPECT_EQ(tags, file.getTags());
 }
 
 }}}

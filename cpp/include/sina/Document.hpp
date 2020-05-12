@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-#include "nlohmann/json.hpp"
+#include "conduit.hpp"
 
 #include "sina/Record.hpp"
 #include "sina/Relationship.hpp"
@@ -37,9 +37,9 @@ namespace sina {
  *
  * To generate a Document from a JSON string and vice versa:
  * \code
- * nhlohmann::json jObj = "{\"records\":[{\"type\":\"run\",\"id\":\"test\"}],\"relationships\":[]}"_json;
- * sina::Document myDocument = sina::Document(jObj, sina::createRecordLoaderWithAllKnownTypes());
- * std::cout << myDocument.toJson().dump(4) << std::endl;);
+ * std::string my_json = "{\"records\":[{\"type\":\"run\",\"id\":\"test\"}],\"relationships\":[]}";
+ * sina::Document myDocument = sina::Document(my_json, sina::createRecordLoaderWithAllKnownTypes());
+ * std::cout << myDocument.toJson() << std::endl;);
  * \endcode
  *
  * You can add further entries to the Document using add():
@@ -74,13 +74,22 @@ public:
     Document &operator=(Document &&) = default;
 
     /**
-     * Create a Document from its JSON representation
+     * Create a Document from its Conduit Node representation
      *
-     * @param asJson the Document as a JSON object
+     * @param asNode the Document as a Node
      * @param recordLoader an RecordLoader to use to load the different
      * types of records which may be in the document
      */
-    Document(nlohmann::json const &asJson, RecordLoader const &recordLoader);
+    Document(conduit::Node const &asNode, RecordLoader const &recordLoader);
+
+    /**
+     * Create a Document from a JSON string representation
+     *
+     * @param asJson the Document as a JSON string
+     * @param recordLoader an RecordLoader to use to load the different
+     * types of records which may be in the document
+     */
+    Document(std::string const &asJson, RecordLoader const &recordLoader);
 
     /**
      * Add the given record to this document.
@@ -116,13 +125,26 @@ public:
 
 
     /**
-     * Convert this document to its JSON representation.
+     * Convert this document to a conduit Node.
      *
-     * @return the contents of the document as JSON
+     * @return the contents of the document as a Node
      */
-    nlohmann::json toJson() const;
+    conduit::Node toNode() const;
+
+    /**
+     * Convert this document to a JSON string.
+     *
+     * @return the contents of the document as a JSON string
+     */
+    std::string toJson(conduit::index_t indent=0, conduit::index_t depth=0,
+        const std::string &pad="", const std::string &eoe="") const;
 
 private:
+    /**
+     * Constructor helper method, extracts info from a conduit Node.
+     */
+    void createFromNode(conduit::Node const &asNode,
+          RecordLoader const &recordLoader);
     RecordList records;
     RelationshipList relationships;
 };

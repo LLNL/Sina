@@ -6,7 +6,7 @@
 #include <utility>
 
 #include "sina/CppBridge.hpp"
-#include "sina/JsonUtil.hpp"
+#include "sina/ConduitUtil.hpp"
 #include "sina/Run.hpp"
 #include "sina/Datum.hpp"
 
@@ -27,54 +27,60 @@ Record::Record(ID id_, std::string type_) :
         id{std::move(id_), LOCAL_ID_FIELD, GLOBAL_ID_FIELD},
         type{std::move(type_)} {}
 
-nlohmann::json Record::toJson() const {
-    nlohmann::json asJson;
-    asJson[TYPE_FIELD] = type;
-    id.addTo(asJson);
+conduit::Node Record::toNode() const {
+    conduit::Node asNode;
+    asNode[TYPE_FIELD] = type;
+    id.addTo(asNode);
     // Optional fields
     if(!files.empty()){
-      nlohmann::json fileRef;
+      conduit::Node fileRef;
       for (auto &file : files) {
-          fileRef[file.getUri()] = file.toJson();
-      asJson[FILES_FIELD] = fileRef;
+          auto &n = fileRef.add_child(file.getUri());
+          n.set(file.toNode());
+      asNode[FILES_FIELD] = fileRef;
       }
     }
     if(!data.empty()){
       //Loop through vector of data and append Json
-      nlohmann::json datumRef;
-      for(auto &datum : data)
-          datumRef[datum.first] = datum.second.toJson();
-      asJson[DATA_FIELD] = datumRef;
+      conduit::Node datumRef;
+      for(auto &datum : data){
+          datumRef[datum.first] = datum.second.toNode();
+      }
+      asNode[DATA_FIELD] = datumRef;
     }
-    if(!userDefined.is_null()){
-      asJson[USER_DEFINED_FIELD] = userDefined;
+    if(!userDefined.dtype().is_empty()){
+      asNode[USER_DEFINED_FIELD] = userDefined;
     }
-    return asJson;
+    return asNode;
 }
 
-Record::Record(nlohmann::json const &asJson) :
-        id{asJson, LOCAL_ID_FIELD, GLOBAL_ID_FIELD},
-        type{getRequiredString(TYPE_FIELD, asJson, "record")} {
-    auto dataIter = asJson.find(DATA_FIELD);
-    if(dataIter != asJson.end()){
+Record::Record(conduit::Node const &asNode) :
+        id{asNode, LOCAL_ID_FIELD, GLOBAL_ID_FIELD},
+        type{getRequiredString(TYPE_FIELD, asNode, "record")} {
+    if(asNode.has_child(DATA_FIELD)){
+        auto dataIter = asNode[DATA_FIELD].children();
         //Loop through DATA_FIELD objects and add them to data:
-        for(auto &namedDatum : dataIter->items()){
-            data.emplace(std::make_pair(namedDatum.key(), Datum(namedDatum.value())));
+        while(dataIter.has_next()){
+            auto &namedDatum = dataIter.next();
+            data.emplace(std::make_pair(dataIter.name(), Datum(namedDatum)));
         }
     }
-    auto filesIter = asJson.find(FILES_FIELD);
-    if (filesIter != asJson.end()) {
-        for (auto &namedFile : filesIter->items()){
-            files.insert(File(namedFile.key(), namedFile.value()));
+    if(asNode.has_child(FILES_FIELD)){
+        auto filesIter = asNode[FILES_FIELD].children();
+        while(filesIter.has_next()){
+            auto &namedFile = filesIter.next();
+            files.insert(File(filesIter.name(), namedFile));
         }
     }
-    auto userDefinedIter = asJson.find(USER_DEFINED_FIELD);
-    if (userDefinedIter != asJson.end()) {
-        // Enforce that user_defined must be an object
-        if (!userDefinedIter->is_object()) {
-            throw std::invalid_argument("User_defined must be a JSON object");
+    if(asNode.has_child(USER_DEFINED_FIELD)){
+        auto userDefinedNode = asNode[USER_DEFINED_FIELD];
+        if (!userDefinedNode.dtype().is_empty()) {
+            // Enforce that user_defined must be an object
+            if (!userDefinedNode.dtype().is_object()) {
+                throw std::invalid_argument("User_defined must be an object Node");
+            }
+            userDefined = userDefinedNode;
         }
-        userDefined = *userDefinedIter;
     }
 }
 
@@ -86,7 +92,7 @@ void Record::add(File file) {
     files.insert(std::move(file));
 }
 
-void Record::setUserDefinedContent(nlohmann::json::object_t userDefined_) {
+void Record::setUserDefinedContent(conduit::Node userDefined_) {
     userDefined = std::move(userDefined_);
 }
 
@@ -95,12 +101,12 @@ void RecordLoader::addTypeLoader(std::string const &type, TypeLoader loader) {
 }
 
 std::unique_ptr<Record>
-RecordLoader::load(nlohmann::json const &recordAsJson) const {
-    auto loaderIter = typeLoaders.find(recordAsJson[TYPE_FIELD]);
+RecordLoader::load(conduit::Node const &recordAsNode) const {
+    auto loaderIter = typeLoaders.find(recordAsNode[TYPE_FIELD].as_string());
     if (loaderIter != typeLoaders.end()) {
-        return loaderIter->second(recordAsJson);
+        return loaderIter->second(recordAsNode);
     }
-    return internal::make_unique<Record>(recordAsJson);
+    return internal::make_unique<Record>(recordAsNode);
 }
 
 bool RecordLoader::canLoad(std::string const &type) const {
