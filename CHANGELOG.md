@@ -5,6 +5,14 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.8
+===
+- Improved SQL support for long string data
+- Changed C++ component to write JSON with Conduit instead of nlohmann_json
+- Add querying on mimetype
+- Fixed bug with building C++ component on OSX
+- Fixed bug preventing insertion of empty lists
+
 1.7
 ===
 - Added support for MySQL access
