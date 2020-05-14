@@ -66,7 +66,7 @@ class DocumentFromRecord(Model):
 
     id = columns.Text(primary_key=True)
     uri = columns.Text(primary_key=True)
-    mimetype = columns.Text()
+    mimetype = columns.Text(index=True)  # Relatively low-cardinality value
     tags = columns.Set(columns.Text())
 
 
