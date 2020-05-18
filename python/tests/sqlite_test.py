@@ -11,7 +11,7 @@ import sina.datastores.sql as backend
 
 
 def test_close():
-    """Test that closing the factory closes the connection"""
+    """Test that closing the factory closes the connection."""
     factory = backend.DAOFactory()
     with mock.patch.object(factory.session, 'close', wraps=factory.session.close) as close:
         factory.close()
@@ -41,9 +41,7 @@ class SQLMixin(object):  # pylint: disable=no-init,too-few-public-methods
 
 
 class TestSetup(SQLMixin, unittest.TestCase):
-    """
-    Provides methods needed for setup-type tests on the SQL backend.
-    """
+    """Provides methods needed for setup-type tests on the SQL backend."""
 
     def test_factory_instantiate_file(self):
         """Test to ensure SQL DAOFactory is able to create files."""

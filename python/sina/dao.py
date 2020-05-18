@@ -8,6 +8,7 @@ and Relationships, it will not differ between backends, e.g., Cassandra and sql.
 from abc import ABCMeta, abstractmethod
 import logging
 import numbers
+import warnings
 
 import six
 
@@ -21,43 +22,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 @six.add_metaclass(ABCMeta)
-class DAOFactory(object):
+class DataHandler(object):
     """Builds DAOs used for interacting with Sina data objects."""
+
     supports_parallel_ingestion = False
 
     @abstractmethod
-    def create_record_dao(self):
-        """
-        Create a DAO for interacting with Records.
-
-        :returns: a RecordDAO for the DAOFactory's backend
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def create_relationship_dao(self):
-        """
-        Create a DAO for interacting with Relationships.
-
-        :returns: a RelationshipDAO for the DAOFactory's backend
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def create_run_dao(self):
-        """
-        Create a DAO for interacting with Runs.
-
-        :returns: a RunDAO for the DAOFactory's backend
-        """
-        raise NotImplementedError
-
-    @abstractmethod
     def close(self):
-        """
-        Close any resources held by this DAO factory. This invalidates any DAOs created by the
-        factory.
-        """
+        """Close any resources held by this DataHandler."""
         raise NotImplementedError
 
     def __enter__(self):
@@ -80,13 +52,88 @@ class DAOFactory(object):
         self.close()
         return False
 
-
-class RecordDAO(object):
-    """The DAO responsible for handling Records."""
-
-    __metaclass__ = ABCMeta
-
     def get(self, ids, _record_builder=sina.model.generate_record_from_json):
+        """
+        Given an (iterable of) id(s), return matching Record(s).
+
+        :param ids: The id(s) of the Record(s) to return.
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw. Does not
+                                need to be touched by the user.
+
+        :returns: If provided an iterable, a generator of Record objects, else a
+                  single Record object.
+
+        :raises ValueError: if no Record is found for some id.
+        """
+        def gen_records(ids):
+            """Hack around the limitation of returning generators XOR non-gens."""
+            for id in ids:
+                yield self._get_one(id, _record_builder)
+
+        if isinstance(ids, six.string_types):
+            LOGGER.debug('Getting record with id=%s', ids)
+            return self._get_one(ids, _record_builder)
+        ids = list(ids)
+        LOGGER.debug('Getting records with ids in=%s', ids)
+        return gen_records(ids)
+
+    def get_all(self, ids_only=False):
+        """
+        Return all Records in the database.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A list of all Records
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _get_one(self, id, _record_builder):
+        """
+        Apply some "get" function to a single Record id.
+
+        Because the overload needs to be invisible to the user, we need to
+        be able to return both a generator (from a list) and non-generator
+        (from a single ID). This is the framework for allowing it.
+
+        Currently, this makes sense because Cassandra can't batch reads. May
+        be worth revisiting.
+
+        :param id: A Record id to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A Record if found, else None.
+
+        :raises ValueError: if no Record is found for the id.
+        """
+        raise NotImplementedError
+
+    def insert(self, objects_to_insert):
+        """
+        Given one or more Sina objects, insert them into the DAO's backend.
+
+        :param objects_to_insert: Some Sina object(s) (Records, Relationships)
+                                  to insert
+        """
+        if isinstance(objects_to_insert, sina.model.Record):
+            self.insert_record(objects_to_insert)
+        elif isinstance(objects_to_insert, sina.model.Relationship):
+            self.insert_relationship(objects_to_insert)
+        else:
+            records = []
+            relationships = []
+            for sina_object in objects_to_insert:
+                if isinstance(sina_object, sina.model.Record):
+                    records.append(sina_object)
+                else:
+                    relationships.append(sina_object)
+            self.insert_record(records)
+            self.insert_relationship(relationships)
+
+    def get_record(self, ids,
+                   _record_builder=sina.model.generate_record_from_json):
         """
         Given an (iterable of) id(s), return matching Record(s).
 
@@ -112,37 +159,6 @@ class RecordDAO(object):
         ids = list(ids)
         LOGGER.debug('Getting records with ids in=%s', ids)
         return gen_records(ids)
-
-    @abstractmethod
-    def _get_one(self, id, _record_builder):
-        """
-        Apply some "get" function to a single Record id.
-
-        Because the overload needs to be invisible to the user, we need to
-        be able to return both a generator (from a list) and non-generator
-        (from a single ID). This is the framework for allowing it.
-
-        Currently, this makes sense because Cassandra can't batch reads. May
-        be worth revisiting.
-
-        :param id: A Record id to return
-        :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw.
-
-        :returns: A Record if found, else None.
-
-        :raises ValueError: if no Record is found for the id.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def insert(self, records):
-        """
-        Given one or more Records, insert them into the DAO's backend.
-
-        :param records: A Record or iter of Records to insert
-        """
-        raise NotImplementedError
 
     @abstractmethod
     def delete(self, ids):
@@ -326,7 +342,7 @@ class RecordDAO(object):
     @abstractmethod
     def get_with_mime_type(self, mimetype, ids_only=False):
         """
-        Return all records or IDs associated with documents whose mimetype match some arg
+        Return all records or IDs with documents of a given mimetype.
 
         :param mimetype: The mimetype to use as a search term
         :param ids_only: Whether to only return the ids
@@ -334,12 +350,6 @@ class RecordDAO(object):
         :returns: Record object or IDs fitting the criteria.
         """
         raise NotImplementedError
-
-
-class RelationshipDAO(object):
-    """The DAO responsible for handling Relationships."""
-
-    __metaclass__ = ABCMeta
 
     @staticmethod
     def _build_relationships(query):
@@ -358,8 +368,8 @@ class RelationshipDAO(object):
         return relationships
 
     @abstractmethod
-    def insert(self, relationships=None, subject_id=None,
-               object_id=None, predicate=None):
+    def insert_relationship(self, relationships=None, subject_id=None,
+                            object_id=None, predicate=None):
         """
         Given one or more Relationships, insert into the DAO's backend.
 
@@ -421,7 +431,7 @@ class RelationshipDAO(object):
         return subject_id, object_id, predicate
 
     @abstractmethod
-    def get(self, subject_id=None, object_id=None, predicate=None):
+    def get_relationship(self, subject_id=None, object_id=None, predicate=None):
         """
         Given Relationship info, return matching Relationships (or empty list).
 
@@ -435,130 +445,69 @@ class RelationshipDAO(object):
         raise NotImplementedError
 
 
-class RunDAO(object):
-    """The DAO responsible for handling Runs, a subtype of Record."""
+class DAOFactory(object):
+    """
+    An implementation of the old-style DAOFactory for backwards compat.
 
-    __metaclass__ = ABCMeta
+    Should expose all the same functionality (besides the RunDAO) to prevent
+    anything from breaking, but this is no longer the recommended way of doing
+    things. Consider this style of accessing data to be deprecated.
+    """
 
-    def __init__(self, record_dao):
-        """
-        Initialize RunDAO with contained RecordDAO and backend.
+    supports_parallel_ingestion = False
 
-        :param record_dao: A RecordDAO used to interact with the Record table
-        :param backend: The DAO's backend (ex: filepath, SQLite session)
-        """
-        self.record_dao = record_dao
+    def create_record_dao(self):
+        """Create a DAO for interacting with Records."""
+        warnings.warn("DAOFactories are deprecated; use DataHandler.",
+                      DeprecationWarning)
+        return self.datahandler
 
-    @abstractmethod
-    def _return_only_run_ids(self, ids):
-        """
-        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
+    def create_relationship_dao(self):
+        """Create a DAO for interacting with Relationships."""
+        warnings.warn("DAOFactories are deprecated; use DataHandler.",
+                      DeprecationWarning)
+        return FakeRelationshipDAO(self.datahandler)
 
-        :param ids: An id or iterable of ids to sort through
+    def create_run_dao(self):
+        """Create a DAO for interacting with Runs."""
+        raise NotImplementedError("Runs are no longer treated as distinct "
+                                  "from Records. Please create a recordDAO and "
+                                  "filter on type instead. Note that "
+                                  "DAOFactories as a whole are deprecated; use "
+                                  "DataHandler.")
 
-        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
-                  if "ids" is an iterable, else returns a single value.
-        """
-        raise NotImplementedError
+    def close(self):
+        """Close any resources held by this DataHandler."""
+        self.datahandler.close()
 
-    def get(self, ids):
-        """
-        Given a(n iterable of) id(s), return matching Run(s) from the DAO's backend.
+    def __enter__(self):
+        """Use the datahandler as a context manager."""
+        return self.datahandler
 
-        :param ids: The id or an iterable of ids to find and return Runs for. If a
-                    Record with that id exists but is not a Run, it won't be returned.
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close the datahandler's resources."""
+        return self.datahandler.close()
 
-        :returns: If provided an iterable, a generator containing either
-                  a matching Run or None for each identifier provided. In the
-                  case that an id (not an iterator of ids) is provided, will
-                  return a Run or None.
 
-        :raises ValueError: if no Record is found for some id(s).
-        """
-        if isinstance(ids, six.string_types):
-            LOGGER.debug('Getting Run with id: %s', ids)
-            run_ids = self._return_only_run_ids(ids)
-            if run_ids is None:
-                raise ValueError("No Run found with id {}.".format(id))
-        else:
-            LOGGER.debug('Getting Runs with ids: %s', ids)
-            run_ids = list(self._return_only_run_ids(ids))  # Gen safety
-            if None in run_ids:
-                ids_not_found = set(ids).difference(run_ids)
-                raise ValueError("No Runs found with ids: {}".format(ids_not_found))
-        return self.record_dao.get(run_ids, _record_builder=sina.model.generate_run_from_json)
+class FakeRelationshipDAO():
+    """
+    A mock of an old-style RelationshipDAO.
 
-    @abstractmethod
-    def insert(self, runs):
-        """
-        Given a(n iterable of) Run(s), insert them into the DAO's backend.
+    All this does is swap the various *_relationships in for their short-named
+    counterparts.
+    """
 
-        :param runs: A Run or iterable of Runs to insert
-        """
-        raise NotImplementedError
+    def __init__(self, datahandler):
+        """Assign the datahandler we'll piggyback off of."""
+        self.datahandler = datahandler
 
-    @abstractmethod
-    def delete(self, ids):
-        """
-        Given a(n iterable of) Run id(s), delete all mention from the DAO's backend.
+    def get(self, subject_id=None, object_id=None, predicate=None):
+        """Redirect to get_relathionship."""
+        return self.datahandler.get_relationship(subject_id, object_id,
+                                                 predicate)
 
-        This includes removing all data, raw(s), any relationships
-        involving it/them, etc.
-
-        :param ids: A Run id or iterable of Run ids to delete.
-        """
-        raise NotImplementedError
-
-    def get_all(self, ids_only=False):
-        """
-        Return all Records with type 'run'.
-
-        :param ids_only: whether to return only the ids of matching Runs
-                         (used for further filtering)
-        :returns: A list of all Records which are Runs
-        """
-        # Collapsed TODO down, we can reindex on type
-        # NYI in Cassandra
-        return self.record_dao.get_all_of_type('run', ids_only)
-
-    def data_query(self, **kwargs):
-        """
-        Call Record's implementation then filter on type.
-
-        :param scalar_range: A sina.ScalarRange describing the criteria
-
-        :returns: A generator of run ids fitting the criteria
-        """
-        matched_runs = self._return_only_run_ids(self.record_dao.data_query(**kwargs))
-        for entry in matched_runs:
-            if entry is not None:
-                yield entry
-
-    def get_given_data(self, **kwargs):
-        """Alias data_query()."""
-        return self.data_query(**kwargs)
-
-    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
-        """
-        Return Runs associated with a document uri.
-
-        Mostly identical to Record's implementation, also filters out non-Runs.
-
-        :param uri: The uri to match.
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
-        :param ids_only: whether to return only the ids of matching Runs
-                         (used for further filtering)
-
-        :returns: A generator of Runs fitting the criteria
-        """
-        records = self.record_dao.get_given_document_uri(uri,
-                                                         accepted_ids_list=accepted_ids_list,
-                                                         ids_only=ids_only)
-        if ids_only:
-            for run_id in self._return_only_run_ids(records):
-                yield run_id
-        else:
-            for record in records:
-                if record.type == "run":
-                    yield sina.model.generate_run_from_json(record.raw)
+    def insert(self, relationships=None, subject_id=None,
+               object_id=None, predicate=None):
+        """Redirect to insert_relationship."""
+        return self.datahandler.insert_relationship(relationships, subject_id,
+                                                    object_id, predicate)

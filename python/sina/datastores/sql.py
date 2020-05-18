@@ -3,6 +3,7 @@ import os
 import numbers
 import logging
 import json
+import warnings
 from collections import defaultdict
 
 import six
@@ -29,14 +30,61 @@ DATA_TABLES = [schema.ScalarData, schema.StringData,
                schema.ListScalarData, schema.ListStringDataEntry]
 
 
-class RecordDAO(dao.RecordDAO):
-    """The DAO specifically responsible for handling Records in SQL."""
+class DataHandler(dao.DataHandler):
+    """
+    Sets up connection and mediates interaction with Sina-based objects.
 
-    def __init__(self, session):
-        """Initialize RecordDAO with session for its SQL database."""
-        self.session = session
+    Includes Records, Relationships, etc.
+    """
 
-    def insert(self, records):
+    def __init__(self, db_path=None):
+        """
+        Initialize a Factory with a path to its backend.
+
+        Currently supports only SQLite.
+
+        :param db_path: Path to the database to use as a backend. If None, will
+                        use an in-memory database. If it contains a '://', it is assumed that
+                        this is a URL which can be used to connect to the database. Otherwise,
+                        this is treated as a path for a SQLite database.
+        """
+        self.db_path = db_path
+        use_sqlite = False
+        if db_path:
+            if '://' not in db_path:
+                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
+                create_db = not os.path.exists(db_path)
+                use_sqlite = True
+            else:
+                engine = sqlalchemy.create_engine(db_path)
+                create_db = True
+        else:
+            engine = sqlalchemy.create_engine(SQLITE_PREFIX)
+            use_sqlite = True
+            create_db = True
+
+        if use_sqlite:
+            def configure_on_connect(connection, _):
+                """Activate foreign key support on connection creation."""
+                connection.execute('pragma foreign_keys=ON')
+
+            sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
+
+        if create_db:
+            schema.Base.metadata.create_all(engine)
+
+        session = sqlalchemy.orm.sessionmaker(bind=engine)
+        self.session = session()
+
+    def __repr__(self):
+        """Return a string representation of a SQL DAOFactory."""
+        return 'SQL DAOFactory <db_path={}>'.format(self.db_path)
+
+    def close(self):
+        """Close the session for this factory and all created DAOs."""
+        self.session.close()
+
+    def insert_record(self, records):
         """
         Given a(n iterable of) Record(s), insert into the current SQL database.
 
@@ -64,9 +112,9 @@ class RecordDAO(dao.RecordDAO):
         sql_record = schema.Record(id=sina_record.id, type=sina_record.type,
                                    raw=json.dumps(sina_record.raw))
         if sina_record.data:
-            RecordDAO._attach_data(sql_record, sina_record.data)
+            DataHandler._attach_data(sql_record, sina_record.data)
         if sina_record.files:
-            RecordDAO._attach_files(sql_record, sina_record.files)
+            DataHandler._attach_files(sql_record, sina_record.files)
 
         return sql_record
 
@@ -598,7 +646,7 @@ class RecordDAO(dao.RecordDAO):
 
     def get_with_mime_type(self, mimetype, ids_only=False):
         """
-        Return all records or IDs associated with documents whose mimetype match some arg
+        Return all records or IDs with documents of a given mimetype.
 
         :param mimetype: The mimetype to use as a search term
         :param ids_only: Whether to only return the ids
@@ -610,16 +658,8 @@ class RecordDAO(dao.RecordDAO):
         ids = (x[0] for x in query_set)
         return ids if ids_only else self.get(ids)
 
-
-class RelationshipDAO(dao.RelationshipDAO):
-    """The DAO responsible for handling Relationships in SQL."""
-
-    def __init__(self, session):
-        """Initialize RelationshipDAO with session for its SQL database."""
-        self.session = session
-
-    def insert(self, relationships=None, subject_id=None,
-               object_id=None, predicate=None):
+    def insert_relationship(self, relationships=None, subject_id=None,
+                            object_id=None, predicate=None):
         """
         Given some Relationship(s), import it/them into a SQL database.
 
@@ -651,7 +691,7 @@ class RelationshipDAO(dao.RelationshipDAO):
         self.session.commit()
 
     # Note that get() is implemented by its parent.
-    def get(self, subject_id=None, object_id=None, predicate=None):
+    def get_relationship(self, subject_id=None, object_id=None, predicate=None):
         """Retrieve relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
@@ -667,147 +707,17 @@ class RelationshipDAO(dao.RelationshipDAO):
         return self._build_relationships(query.all())
 
 
-class RunDAO(dao.RunDAO):
-    """DAO responsible for handling Runs (Record subtype) in SQL."""
-
-    def __init__(self, session, record_dao):
-        """Initialize RunDAO and assign a contained RecordDAO."""
-        super(RunDAO, self).__init__(record_dao)
-        self.session = session
-        self.record_dao = record_dao
-
-    def _return_only_run_ids(self, ids):
-        """
-        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
-
-        :param ids: An id or iterable of ids to sort through
-
-        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
-                  if "ids" is an iterable, else returns a single value.
-        """
-        if isinstance(ids, six.string_types):
-            val = self.session.query(schema.Run.id).filter(schema.Run.id == ids).one_or_none()
-            return val[0] if val is not None else None
-        ids = list(ids)
-        query = self.session.query(schema.Run.id).filter(schema.Run.id.in_(ids)).all()
-        run_ids = set(str(x[0]) for x in query)
-        # We do this in order to fulfill the "id or None" requirement
-        results = [x if x in run_ids else None for x in ids]
-        return results
-
-    def insert(self, runs):
-        """
-        Given a(n iterable of) Run(s), import into the SQL database.
-
-        :param runs: A Run or iterator of Runs to import
-        """
-        if isinstance(runs, model.Run):
-            runs = [runs]
-        for run in runs:
-            record = RecordDAO.create_sql_record(run)
-            run = schema.Run(application=run.application, user=run.user,
-                             version=run.version)
-            run.record = record
-            self.session.add(record)
-            self.session.add(run)
-        self.session.commit()
-
-    def delete(self, ids):
-        """
-        Given (a) Run id(s), delete all mention from the SQL database.
-
-        This includes removing all related data, raw(s), any relationships
-        involving it/them, etc.
-
-        :param ids: The id or iterator of ids of the Run to delete.
-        """
-        run_ids = self._return_only_run_ids(ids)
-        if run_ids is None:  # We have nothing to do here
-            return
-        elif isinstance(run_ids, six.string_types):
-            run_ids = [run_ids]
-        else:
-            run_ids = [id for id in run_ids if id is not None]
-        self.record_dao.delete(run_ids)
-
-
 class DAOFactory(dao.DAOFactory):
     """
-    Build SQL-backed DAOs for interacting with Sina-based objects.
+    A fake DAOFactory for backwards compatibility.
 
-    Includes Records, Relationships, etc.
+    Most implementation is provided by sina.dao.
     """
 
     def __init__(self, db_path=None):
-        """
-        Initialize a Factory with a path to its backend.
-
-        Currently supports only SQLite.
-
-        :param db_path: Path to the database to use as a backend. If None, will
-                        use an in-memory database. If it contains a '://', it is assumed that
-                        this is a URL which can be used to connect to the database. Otherwise,
-                        this is treated as a path for a SQLite database.
-        """
+        """Create the actual workhorse, the DataHandler."""
+        warnings.warn("DAOFactories are deprecated; use DataHandler.",
+                      DeprecationWarning)
         self.db_path = db_path
-        use_sqlite = False
-        if db_path:
-            if '://' not in db_path:
-                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
-                create_db = not os.path.exists(db_path)
-                use_sqlite = True
-            else:
-                engine = sqlalchemy.create_engine(db_path)
-                create_db = True
-        else:
-            engine = sqlalchemy.create_engine(SQLITE_PREFIX)
-            use_sqlite = True
-            create_db = True
-
-        if use_sqlite:
-            def configure_on_connect(connection, _):
-                """Activate foreign key support on connection creation."""
-                connection.execute('pragma foreign_keys=ON')
-
-            sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
-
-        if create_db:
-            schema.Base.metadata.create_all(engine)
-
-        session = sqlalchemy.orm.sessionmaker(bind=engine)
-        self.session = session()
-
-    def create_record_dao(self):
-        """
-        Create a DAO for interacting with records.
-
-        :returns: a RecordDAO
-        """
-        return RecordDAO(session=self.session)
-
-    def create_relationship_dao(self):
-        """
-        Create a DAO for interacting with relationships.
-
-        :returns: a RelationshipDAO
-        """
-        return RelationshipDAO(session=self.session)
-
-    def create_run_dao(self):
-        """
-        Create a DAO for interacting with runs.
-
-        :returns: a RunDAO
-        """
-        return RunDAO(session=self.session,
-                      record_dao=self.create_record_dao())
-
-    def __repr__(self):
-        """Return a string representation of a SQL DAOFactory."""
-        return 'SQL DAOFactory <db_path={}>'.format(self.db_path)
-
-    def close(self):
-        """
-        Close the session for this factory and all created DAOs
-        """
-        self.session.close()
+        self.datahandler = DataHandler(db_path)
+        self.session = self.datahandler.session
