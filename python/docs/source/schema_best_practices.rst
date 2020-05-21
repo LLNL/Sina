@@ -14,8 +14,10 @@ Backend/Database
 
 Sina can handle many types of Record within one database. The most important
 consideration on deciding what to store together is how it'll be queried.
-If, for example, you generate both msub info and runs, and you expect to need details
-from the msubs when handling the runs, it makes sense to store them together.
+If, for example, you generate both msub info and data from application executions,
+and you expect to need details from the msubs when handling the application data,
+it makes sense to store them together.
+
 To contrast that, if you're doing two experiments that happen to use the same
 code, but never want to see results from the first experiment mixed in with
 the second, it may be more appropriate to use a database apiece.
@@ -30,7 +32,7 @@ later without breaking syntax highlighting by changing the file extension.
 
 A full copy of each record is kept by Sina in order to preserve any
 non-queryable data. If you're generating a document per record, you can
-generally ingest and then dump the file, useful for saving on inodes.
+generally ingest and then delete the file, useful for saving on inodes.
 
 
 Record
@@ -85,5 +87,5 @@ User Defined
 If you have a string datum that's many thousands of characters long, chances
 are you're not querying on it--a very long string like that can cause
 ingestion to fail if it's in the data section due to row size limitations, but
-can be safely stored in User Defined. In general, though, consider keeping
-bulk data on the filesystem.
+can be safely stored in the top-level :code:`user_defined` field in a record. In
+general, though, consider keeping bulk data on the filesystem.
