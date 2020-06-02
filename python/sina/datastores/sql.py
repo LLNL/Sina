@@ -3,7 +3,6 @@ import os
 import numbers
 import logging
 import json
-import warnings
 from collections import defaultdict
 
 import six
@@ -30,61 +29,14 @@ DATA_TABLES = [schema.ScalarData, schema.StringData,
                schema.ListScalarData, schema.ListStringDataEntry]
 
 
-class DataHandler(dao.DataHandler):
-    """
-    Sets up connection and mediates interaction with Sina-based objects.
+class RecordDAO(dao.RecordDAO):
+    """The DAO specifically responsible for handling Records in SQL."""
 
-    Includes Records, Relationships, etc.
-    """
+    def __init__(self, session):
+        """Initialize RecordDAO with session for its SQL database."""
+        self.session = session
 
-    def __init__(self, db_path=None):
-        """
-        Initialize a Factory with a path to its backend.
-
-        Currently supports only SQLite.
-
-        :param db_path: Path to the database to use as a backend. If None, will
-                        use an in-memory database. If it contains a '://', it is assumed that
-                        this is a URL which can be used to connect to the database. Otherwise,
-                        this is treated as a path for a SQLite database.
-        """
-        self.db_path = db_path
-        use_sqlite = False
-        if db_path:
-            if '://' not in db_path:
-                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
-                create_db = not os.path.exists(db_path)
-                use_sqlite = True
-            else:
-                engine = sqlalchemy.create_engine(db_path)
-                create_db = True
-        else:
-            engine = sqlalchemy.create_engine(SQLITE_PREFIX)
-            use_sqlite = True
-            create_db = True
-
-        if use_sqlite:
-            def configure_on_connect(connection, _):
-                """Activate foreign key support on connection creation."""
-                connection.execute('pragma foreign_keys=ON')
-
-            sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
-
-        if create_db:
-            schema.Base.metadata.create_all(engine)
-
-        session = sqlalchemy.orm.sessionmaker(bind=engine)
-        self.session = session()
-
-    def __repr__(self):
-        """Return a string representation of a SQL DAOFactory."""
-        return 'SQL DAOFactory <db_path={}>'.format(self.db_path)
-
-    def close(self):
-        """Close the session for this factory and all created DAOs."""
-        self.session.close()
-
-    def insert_record(self, records):
+    def insert(self, records):
         """
         Given a(n iterable of) Record(s), insert into the current SQL database.
 
@@ -112,9 +64,9 @@ class DataHandler(dao.DataHandler):
         sql_record = schema.Record(id=sina_record.id, type=sina_record.type,
                                    raw=json.dumps(sina_record.raw))
         if sina_record.data:
-            DataHandler._attach_data(sql_record, sina_record.data)
+            RecordDAO._attach_data(sql_record, sina_record.data)
         if sina_record.files:
-            DataHandler._attach_files(sql_record, sina_record.files)
+            RecordDAO._attach_files(sql_record, sina_record.files)
 
         return sql_record
 
@@ -658,8 +610,16 @@ class DataHandler(dao.DataHandler):
         ids = (x[0] for x in query_set)
         return ids if ids_only else self.get(ids)
 
-    def insert_relationship(self, relationships=None, subject_id=None,
-                            object_id=None, predicate=None):
+
+class RelationshipDAO(dao.RelationshipDAO):
+    """The DAO responsible for handling Relationships in SQL."""
+
+    def __init__(self, session):
+        """Initialize RelationshipDAO with session for its SQL database."""
+        self.session = session
+
+    def insert(self, relationships=None, subject_id=None, object_id=None,
+               predicate=None):
         """
         Given some Relationship(s), import it/them into a SQL database.
 
@@ -691,7 +651,7 @@ class DataHandler(dao.DataHandler):
         self.session.commit()
 
     # Note that get() is implemented by its parent.
-    def get_relationship(self, subject_id=None, object_id=None, predicate=None):
+    def get(self, subject_id=None, object_id=None, predicate=None):
         """Retrieve relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
@@ -709,15 +669,70 @@ class DataHandler(dao.DataHandler):
 
 class DAOFactory(dao.DAOFactory):
     """
-    A fake DAOFactory for backwards compatibility.
+    Build SQL-backed DAOs for interacting with Sina-based objects.
 
-    Most implementation is provided by sina.dao.
+    Includes Records, Relationships, etc.
     """
 
     def __init__(self, db_path=None):
-        """Create the actual workhorse, the DataHandler."""
-        warnings.warn("DAOFactories are deprecated; use DataHandler.",
-                      DeprecationWarning)
+        """
+        Initialize a Factory with a path to its backend.
+
+        Currently supports only SQLite.
+
+        :param db_path: Path to the database to use as a backend. If None, will
+                        use an in-memory database. If it contains a '://', it is assumed that
+                        this is a URL which can be used to connect to the database. Otherwise,
+                        this is treated as a path for a SQLite database.
+        """
         self.db_path = db_path
-        self.datahandler = DataHandler(db_path)
-        self.session = self.datahandler.session
+        use_sqlite = False
+        if db_path:
+            if '://' not in db_path:
+                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
+                create_db = not os.path.exists(db_path)
+                use_sqlite = True
+            else:
+                engine = sqlalchemy.create_engine(db_path)
+                create_db = True
+        else:
+            engine = sqlalchemy.create_engine(SQLITE_PREFIX)
+            use_sqlite = True
+            create_db = True
+
+        if use_sqlite:
+            def configure_on_connect(connection, _):
+                """Activate foreign key support on connection creation."""
+                connection.execute('pragma foreign_keys=ON')
+
+            sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
+
+        if create_db:
+            schema.Base.metadata.create_all(engine)
+
+        session = sqlalchemy.orm.sessionmaker(bind=engine)
+        self.session = session()
+
+    def create_record_dao(self):
+        """
+        Create a DAO for interacting with records.
+
+        :returns: a RecordDAO
+        """
+        return RecordDAO(session=self.session)
+
+    def create_relationship_dao(self):
+        """
+        Create a DAO for interacting with relationships.
+
+        :returns: a RelationshipDAO
+        """
+        return RelationshipDAO(session=self.session)
+
+    def __repr__(self):
+        """Return a string representation of a SQL DAOFactory."""
+        return 'SQL DAOFactory <db_path={}>'.format(self.db_path)
+
+    def close(self):
+        """Close the session for this factory and all created DAOs."""
+        self.session.close()

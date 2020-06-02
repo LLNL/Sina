@@ -7,10 +7,12 @@ import unittest
 
 # Disable pylint checks due to its issue with virtual environments
 from nose.plugins.attrib import attr  # pylint: disable=import-error
-
-import tests.backend_test
-import sina.datastores.sql as backend
 import sqlalchemy  # pylint: disable=import-error
+
+import sina.datastores.sql as backend
+import sina.datastore
+import tests.backend_test
+import tests.datastore_test
 
 
 class DBManager(object):
@@ -158,3 +160,14 @@ class TestImportExport(InstanceSQLMixin, tests.backend_test.TestImportExport):
     Also runs any import/export-type tests that are unique to SQL.
     """
     __test__ = True
+
+
+@attr('mysql')
+class TestDatastore(InstanceSQLMixin, tests.datastore_test.TestDatastore):
+    """Provides methods needed for datastore tests on the MySQL backend."""
+
+    __test__ = True
+
+    def test_identity(self):
+        """Test that the DataStore is of the expected type."""
+        self.assertIsInstance(self.datastore, sina.datastore.SQLDataStore)

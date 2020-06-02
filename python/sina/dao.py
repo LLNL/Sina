@@ -8,7 +8,6 @@ and Relationships, it will not differ between backends, e.g., Cassandra and sql.
 from abc import ABCMeta, abstractmethod
 import logging
 import numbers
-import warnings
 
 import six
 
@@ -21,36 +20,10 @@ LOGGER = logging.getLogger(__name__)
 # pylint: disable=invalid-name,redefined-builtin
 
 
-@six.add_metaclass(ABCMeta)
-class DataHandler(object):
-    """Builds DAOs used for interacting with Sina data objects."""
+class RecordDAO(object):
+    """The DAO responsible for handling Records."""
 
-    supports_parallel_ingestion = False
-
-    @abstractmethod
-    def close(self):
-        """Close any resources held by this DataHandler."""
-        raise NotImplementedError
-
-    def __enter__(self):
-        """
-        Use this factory as a context manager.
-
-        :return: this factory
-        """
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Call this factory's close() method.
-
-        :param exc_type: the type of any raised exception
-        :param exc_val: the value of any raised exception
-        :param exc_tb: the stack trace of any raised exception
-        :return: whether a raised exception should be suppressed
-        """
-        self.close()
-        return False
+    __metaclass__ = ABCMeta
 
     def get(self, ids, _record_builder=sina.model.generate_record_from_json):
         """
@@ -78,16 +51,6 @@ class DataHandler(object):
         LOGGER.debug('Getting records with ids in=%s', ids)
         return gen_records(ids)
 
-    def get_all(self, ids_only=False):
-        """
-        Return all Records in the database.
-
-        :param ids_only: whether to return only the ids of matching Records
-
-        :returns: A list of all Records
-        """
-        raise NotImplementedError
-
     @abstractmethod
     def _get_one(self, id, _record_builder):
         """
@@ -110,56 +73,6 @@ class DataHandler(object):
         """
         raise NotImplementedError
 
-    def insert(self, objects_to_insert):
-        """
-        Given one or more Sina objects, insert them into the DAO's backend.
-
-        :param objects_to_insert: Some Sina object(s) (Records, Relationships)
-                                  to insert
-        """
-        if isinstance(objects_to_insert, sina.model.Record):
-            self.insert_record(objects_to_insert)
-        elif isinstance(objects_to_insert, sina.model.Relationship):
-            self.insert_relationship(objects_to_insert)
-        else:
-            records = []
-            relationships = []
-            for sina_object in objects_to_insert:
-                if isinstance(sina_object, sina.model.Record):
-                    records.append(sina_object)
-                else:
-                    relationships.append(sina_object)
-            self.insert_record(records)
-            self.insert_relationship(relationships)
-
-    def get_record(self, ids,
-                   _record_builder=sina.model.generate_record_from_json):
-        """
-        Given an (iterable of) id(s), return matching Record(s).
-
-        :param ids: The id(s) of the Record(s) to return.
-        :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw. Used
-                                by DAOs calling get() (RecordDAO, RunDAO), does not
-                                need to be touched by the user.
-
-        :returns: If provided an iterable, a generator of Record objects, else a
-                  single Record object.
-
-        :raises ValueError: if no Record is found for some id.
-        """
-        def gen_records(ids):
-            """Hack around the limitation of returning generators XOR non-gens."""
-            for id in ids:
-                yield self._get_one(id, _record_builder)
-
-        if isinstance(ids, six.string_types):
-            LOGGER.debug('Getting record with id=%s', ids)
-            return self._get_one(ids, _record_builder)
-        ids = list(ids)
-        LOGGER.debug('Getting records with ids in=%s', ids)
-        return gen_records(ids)
-
     @abstractmethod
     def delete(self, ids):
         """
@@ -169,6 +82,15 @@ class DataHandler(object):
         involving it/them, etc.
 
         :param ids: A Record id or iterable of Record ids to delete.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def insert(self, records):
+        """
+        Given one or more Records, insert them into the DAO's backend.
+
+        :param records: A Record or iter of Records to insert
         """
         raise NotImplementedError
 
@@ -351,6 +273,12 @@ class DataHandler(object):
         """
         raise NotImplementedError
 
+
+class RelationshipDAO(object):
+    """The DAO responsible for handling Relationships."""
+
+    __metaclass__ = ABCMeta
+
     @staticmethod
     def _build_relationships(query):
         """
@@ -368,8 +296,8 @@ class DataHandler(object):
         return relationships
 
     @abstractmethod
-    def insert_relationship(self, relationships=None, subject_id=None,
-                            object_id=None, predicate=None):
+    def insert(self, relationships=None, subject_id=None, object_id=None,
+               predicate=None):
         """
         Given one or more Relationships, insert into the DAO's backend.
 
@@ -431,7 +359,7 @@ class DataHandler(object):
         return subject_id, object_id, predicate
 
     @abstractmethod
-    def get_relationship(self, subject_id=None, object_id=None, predicate=None):
+    def get(self, subject_id=None, object_id=None, predicate=None):
         """
         Given Relationship info, return matching Relationships (or empty list).
 
@@ -446,68 +374,49 @@ class DataHandler(object):
 
 
 class DAOFactory(object):
-    """
-    An implementation of the old-style DAOFactory for backwards compat.
-
-    Should expose all the same functionality (besides the RunDAO) to prevent
-    anything from breaking, but this is no longer the recommended way of doing
-    things. Consider this style of accessing data to be deprecated.
-    """
+    """Builds DAOs used for interacting with Sina data objects."""
 
     supports_parallel_ingestion = False
 
+    @abstractmethod
     def create_record_dao(self):
         """Create a DAO for interacting with Records."""
-        warnings.warn("DAOFactories are deprecated; use DataHandler.",
-                      DeprecationWarning)
-        return self.datahandler
+        raise NotImplementedError
 
+    @abstractmethod
     def create_relationship_dao(self):
         """Create a DAO for interacting with Relationships."""
-        warnings.warn("DAOFactories are deprecated; use DataHandler.",
-                      DeprecationWarning)
-        return FakeRelationshipDAO(self.datahandler)
+        raise NotImplementedError
 
-    def create_run_dao(self):
+    @classmethod
+    def create_run_dao(cls):
         """Create a DAO for interacting with Runs."""
-        raise NotImplementedError("Runs are no longer treated as distinct "
-                                  "from Records. Please create a recordDAO and "
-                                  "filter on type instead. Note that "
-                                  "DAOFactories as a whole are deprecated; use "
-                                  "DataHandler.")
+        raise AttributeError("This method is no longer available in DAOFactory."
+                             "Runs are no longer treated as a special type. "
+                             "Please create a recordDAO and filter on type "
+                             "instead.")
 
+    @abstractmethod
     def close(self):
         """Close any resources held by this DataHandler."""
-        self.datahandler.close()
+        raise NotImplementedError
 
     def __enter__(self):
-        """Use the datahandler as a context manager."""
-        return self.datahandler
+        """
+        Use this factory as a context manager.
+
+        :return: this factory
+        """
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Close the datahandler's resources."""
-        return self.datahandler.close()
+        """
+        Call this factory's close() method.
 
-
-class FakeRelationshipDAO():
-    """
-    A mock of an old-style RelationshipDAO.
-
-    All this does is swap the various *_relationships in for their short-named
-    counterparts.
-    """
-
-    def __init__(self, datahandler):
-        """Assign the datahandler we'll piggyback off of."""
-        self.datahandler = datahandler
-
-    def get(self, subject_id=None, object_id=None, predicate=None):
-        """Redirect to get_relathionship."""
-        return self.datahandler.get_relationship(subject_id, object_id,
-                                                 predicate)
-
-    def insert(self, relationships=None, subject_id=None,
-               object_id=None, predicate=None):
-        """Redirect to insert_relationship."""
-        return self.datahandler.insert_relationship(relationships, subject_id,
-                                                    object_id, predicate)
+        :param exc_type: the type of any raised exception
+        :param exc_val: the value of any raised exception
+        :param exc_tb: the stack trace of any raised exception
+        :return: whether a raised exception should be suppressed
+        """
+        self.close()
+        return False
