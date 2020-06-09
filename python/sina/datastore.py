@@ -16,6 +16,16 @@ except ImportError:
 import sina.model
 import sina.dao
 
+# Observations:
+# One thing I'm starting to worry about for the ds.records_* naming convention
+# is the implication of plural as part of all the names. If we had
+# records.get instead of get_records, it's much clearer that the get() works
+# for one or more, not just "more".
+
+# A weakness of the ds.records.data / ds.records.files naming is that it
+# feels like it implies *returning*, rather than *querying on*, data/files.
+# I'm going to stop with those names for now.
+
 
 def create_datastore(db_path=None, keyspace=None, backend=None):
     """
@@ -40,45 +50,57 @@ def create_datastore(db_path=None, keyspace=None, backend=None):
         else:
             backend = "sql" if keyspace is None else "cassandra"
     if backend == "sql":
-        return SQLDataStore(db_path)
+        factory = sina_sql.DAOFactory(db_path)
     elif backend == "cassandra":
-        return CassandraDataStore(db_path, keyspace)
+        factory = sina_cass.DAOFactory(db_path, keyspace)
     else:
         raise ValueError("Given unrecognized backend: {}".format(backend))
+    return DataStore(factory)
 
 
-@six.add_metaclass(ABCMeta)
-class DataStore(sina.dao.RecordDAO, sina.dao.RelationshipDAO):
+class DataStore():
     """Defines the basic implementation of DataStore classes."""
 
-    @abstractmethod
-    def __init__(self, db_path=None):
+    def __init__(self, connection):
         """Define attributes needed by a datastore."""
-        self.factory = None
-        raise NotImplementedError
+        self.connection = None
+        self.records = connection.create_record_dao()
+        self.relationships = connection.create_relationship_dao()
 
-    @abstractmethod  # override with proper parent
+    def close(self):
+        """Close any resources held by this datastore."""
+        self.factory.close()
+
+    def __enter__(self):
+        """Use the datastore as a context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close the datastore's resources."""
+        return self.factory.close()
+
     def insert_records(self, records_to_insert):
         """Wrap record insertion for explicit use."""
-        raise NotImplementedError
+        # records.insert
+        self.records.insert(records_to_insert)
 
-    @abstractmethod  # override with proper parent
     def insert_relationships(self, relationships_to_insert):
         """Wrap relationship insertion for explicit use."""
-        raise NotImplementedError
+        # relationships.insert
+        self.relationships.insert(relationships_to_insert)
 
-    @abstractmethod  # override with proper parent
     def get_records(self, records_to_get):
         """Wrap getting records for explicit use."""
-        raise NotImplementedError
+        # records.get
+        return self.records.get(records_to_get)
 
-    @abstractmethod  # override with proper parent
     def get_relationships(self, subject_id=None, predicate=None,
                           object_id=None):
         """Wrap getting relationships for explicit use."""
-        raise NotImplementedError
+        # relationships.get
+        return self.relationships.get(subject_id, predicate, object_id)
 
-    # Unifies functionality of DAOs, Pylint is not aware
+    # "Unifies" functionality of DAOs, Pylint is not aware
     # pylint: disable=arguments-differ
     @classmethod
     def get(cls, _):
@@ -89,6 +111,7 @@ class DataStore(sina.dao.RecordDAO, sina.dao.RelationshipDAO):
 
     # Unifies functionality of DAOs, Pylint is not aware
     # pylint: disable=arguments-differ
+
     def insert(self, objects_to_insert):
         """
         Given one or more Sina objects, insert them into the DAO's backend.
@@ -96,6 +119,11 @@ class DataStore(sina.dao.RecordDAO, sina.dao.RelationshipDAO):
         :param objects_to_insert: Some Sina object(s) (Records, Relationships)
                                   to insert
         """
+        # records.insert
+        # relationships.insert
+        # MAYBE plain old insert() continues to exist? "Datastore-wide"
+        # methods feel like they make sense to me, there just wouldn't be
+        # a huge number.
         if isinstance(objects_to_insert, sina.model.Record):
             self.insert_records(objects_to_insert)
         elif isinstance(objects_to_insert, sina.model.Relationship):
@@ -111,92 +139,73 @@ class DataStore(sina.dao.RecordDAO, sina.dao.RelationshipDAO):
             self.insert_records(records)
             self.insert_relationships(relationships)
 
-    def close(self):
-        """Close any resources held by this datastore."""
-        self.factory.close()
+    # There's only one delete right now, but there could be more.
+    def delete_records(self, objects_to_delete):
+        """
+        Given one or more Sina objects, insert them into the DAO's backend.
 
-    def __enter__(self):
-        """Use the datastore as a context manager."""
-        return self
+        :param objects_to_delete: Some id(s) of Record(s) to delete.
+        """
+        # records.delete
+        return self.records.delete(objects_to_delete)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Close the datastore's resources."""
-        return self.factory.close()
+    def get_records_with_data(self, **kwargs):
+        """
+        """
+        # With or given? I prefer "with" because of how it reads once there
+        # are args. get_records_with_data() looks like it's just getting
+        # all records with data (no), but get_records_with_data(volume=10)
+        # reads better to me than the prior get_given_data(volume=10).
+        # but this is much more obvious for get_with_max vs. get_given_max.
+        # Latter doesn't really make sense.
+        # records.query_data
+        # records.data.get_with_data
+        return self.records.data_query(kwargs)
 
+    def get_records_of_type(self, type, ids_only=False):
+        """
+        """
+        # records.get_by_type
+        return self.records.get_all_of_type(type, ids_only)
 
-if HAS_CASSANDRA:
-    class CassandraDataStore(DataStore, sina_cass.RecordDAO,
-                             sina_cass.RelationshipDAO):
-        """Builds DAOs used for interacting with the Sina Cassandra backend."""
+    def get_record_types(self):
+        """
+        """
+        # records.get_types
+        return self.records.get_available_types()
 
-        def __init__(self, db_path=None, keyspace=None):
-            """Perform initializations for accessing Cassandra data."""
-            # Pylint expects abstract super init to be called.
-            # pylint: disable=super-init-not-called
-            if isinstance(db_path, sina_cass.DAOFactory):
-                self.factory = db_path
-            else:
-                self.factory = sina_cass.DAOFactory(db_path, keyspace)
+    def get_records_with_file_uri(self, uri, accepted_ids_list=None,
+                                  ids_only=False):
+        """
+        """
+        # records.get_with_file_uri
+        # records.files.get_with_uri
+        return self.records.get_given_document_uri(self, uri, accepted_ids_list,
+                                                   ids_only)
 
-        def insert_records(self, records_to_insert):
-            """Wrap record insertion for explicit use."""
-            return sina_cass.RecordDAO.insert(self, records_to_insert)
+    def get_records_with_max(self, scalar_name, count=1, id_only=False):
+        """
+        """
+        # records.get_with_max
+        return self.records.get_with_max(scalar_name, count, id_only)
 
-        def insert_relationships(self, relationships_to_insert):
-            """Wrap relationship insertion for explicit use."""
-            return sina_cass.RelationshipDAO.insert(self,
-                                                    relationships_to_insert)
+    def get_records_with_min(self, scalar_name, count=1, id_only=False):
+        """
+        """
+        # records.get_with_min
+        return self.records.get_with_min(scalar_name, count, id_only)
 
-        def get_records(self, records_to_get):
-            """Wrap getting records for explicit use."""
-            return sina_cass.RecordDAO.get(self, records_to_get)
+    # Get_scalars is legacy, will not be carried forward here.
 
-        def get_relationships(self, subject_id=None, predicate=None,
-                              object_id=None):
-            """Wrap getting relationships for explicit use."""
-            return sina_cass.RelationshipDAO.get(self, subject_id=subject_id,
-                                                 predicate=predicate,
-                                                 object_id=object_id)
-else:
-    class CassandraDataStore(object):
-        """An error-throwing dummy in case Cassandra's unavailable."""
+    def get_data_for_records(self, data_list, id_list=None):
+        """
+        """
+        # records.get_data
+        return self.records.get_data_for_records(data_list, id_list)
 
-        # Dummy class is not expected to have public methods
-        # pylint: disable=too-few-public-methods
-        def __init__(self):
-            """Raise a descriptive error and exit."""
-            raise ImportError("A CassandraDataStore cannot be created until "
-                              "Cassandra dependencies are loaded into the "
-                              "environment. See the README.")
-
-
-class SQLDataStore(DataStore, sina_sql.RecordDAO, sina_sql.RelationshipDAO):
-    """Builds DAOs used for interacting with the Sina SQL backend."""
-
-    def __init__(self, db_path=None):
-        """Perform initializations for accessing SQL data."""
-        # Pylint expects abstract super init to be called.
-        # pylint: disable=super-init-not-called
-        if isinstance(db_path, sina_sql.DAOFactory):
-            self.factory = db_path
-        else:
-            self.factory = sina_sql.DAOFactory(db_path)
-        self.session = self.factory.session
-
-    def insert_records(self, records_to_insert):
-        """Wrap record insertion for explicit use."""
-        return sina_sql.RecordDAO.insert(self, records_to_insert)
-
-    def insert_relationships(self, relationships_to_insert):
-        """Wrap relationship insertion for explicit use."""
-        return sina_sql.RelationshipDAO.insert(self, relationships_to_insert)
-
-    def get_records(self, records_to_get):
-        """Wrap getting records for explicit use."""
-        return sina_sql.RecordDAO.get(self, records_to_get)
-
-    def get_relationships(self, subject_id=None, predicate=None, object_id=None):
-        """Wrap getting relationships for explicit use."""
-        return sina_sql.RelationshipDAO.get(self, subject_id=subject_id,
-                                            predicate=predicate,
-                                            object_id=object_id)
+    def get_records_with_mime_type(self, mimetype, ids_only=False):
+        """
+        """
+        # Note: it's mime_type in the name but mimetype elsewhere.
+        # records.get_with_mime_type
+        return self.records.get_with_mime_type(mimetype, ids_only)
