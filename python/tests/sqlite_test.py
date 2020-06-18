@@ -7,8 +7,6 @@ import unittest
 import mock  # pylint: disable=import-error
 
 import tests.backend_test
-import tests.datastore_test
-import sina.datastore
 import sina.datastores.sql as backend
 
 
@@ -83,13 +81,3 @@ class TestImportExport(SQLMixin, tests.backend_test.TestImportExport):
     """
 
     __test__ = True
-
-
-class TestDatastore(SQLMixin, tests.datastore_test.TestDatastore):
-    """Provides methods needed for datastore tests on the SQL backend."""
-
-    __test__ = True
-
-    def test_identity(self):
-        """Test that the DataStore is of the expected type."""
-        self.assertIsInstance(self.datastore, sina.datastore.SQLDataStore)

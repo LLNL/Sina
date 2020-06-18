@@ -1,9 +1,10 @@
 """
-Contains toplevel, abstract DAOs used for accessing each type of object.
+Describes functionality needed by DAOs and implements backend-independent logic.
 
-This module describes the DAOs available, as well as the functions available to
-each DAO. While function availability may differ between objects, e.g., Records
-and Relationships, it will not differ between backends, e.g., Cassandra and sql.
+Each object here should be implemented in each backend. Note that these DAOs
+exist more as contracts and helpers than as descriptions of functionality--see
+datastore.py for up-to-date user-level descriptions of what everything should
+do.
 """
 from abc import ABCMeta, abstractmethod
 import logging

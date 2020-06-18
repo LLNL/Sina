@@ -21,8 +21,6 @@ except ImportError:
     # Nose doesn't know that initially, and thus tries these imports anyways.
     pass
 
-import sina.datastore
-import tests.datastore_test
 import tests.backend_test
 
 # Cassandra's logger is natively Debug, and it's very verbose,
@@ -166,26 +164,3 @@ class TestImportExport(CassandraMixin, tests.backend_test.TestImportExport):
     def tearDown(self):
         self.teardown_cass_keyspace()
         super(TestImportExport, self).tearDown()
-
-
-@attr('cassandra')
-class TestDatastore(CassandraMixin, tests.datastore_test.TestDatastore):
-    """Provides methods needed for datastore tests on Cassandra."""
-
-    __test__ = True
-
-    @classmethod
-    def setUpClass(cls):
-        """Create the connection and populate it."""
-        cls.create_cass_keyspace()
-        super(TestDatastore, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """Remove connections and keyspaces as needed."""
-        super(TestDatastore, cls).tearDownClass()
-        cls.teardown_cass_keyspace()
-
-    def test_identity(self):
-        """Test that the DataStore is of the expected type."""
-        self.assertIsInstance(self.datastore, sina.datastore.CassandraDataStore)

@@ -1,8 +1,4 @@
 """Defines the DataStore, Sina's toplevel data interaction object."""
-from abc import ABCMeta, abstractmethod
-
-import six
-
 import sina.datastores.sql as sina_sql
 try:
     import sina.datastores.cass as sina_cass
@@ -10,202 +6,289 @@ try:
 
 except ImportError:
     # Not having Cassandra is a possibility. If someone tries to use Cassandra
-    # without the dependencies, we raise a descriptive error in the DataStore.
+    # without the dependencies, we raise a descriptive error.
     HAS_CASSANDRA = False
 
-import sina.model
-import sina.dao
 
-# Observations:
-# One thing I'm starting to worry about for the ds.records_* naming convention
-# is the implication of plural as part of all the names. If we had
-# records.get instead of get_records, it's much clearer that the get() works
-# for one or more, not just "more".
-
-# A weakness of the ds.records.data / ds.records.files naming is that it
-# feels like it implies *returning*, rather than *querying on*, data/files.
-# I'm going to stop with those names for now.
-
-
+# TODO: Initial plan was to allow them to create from a DAOFactory. But maybe
+# we hide the DAOFactory entirely and allow them to create from a Datastore.
+# Same functionality, but no use of the words "DAO" and "Factory". Remember to
+# change the func doc to suite!
 def create_datastore(db_path=None, keyspace=None, backend=None):
     """
     Create a DataStore for handling some type of backend.
 
     Given a uri/path (and, if required, the name of a keyspace),
     figures out which backend is required. You can also provide it with an
-    existing DAOFactory.
+    existing DAOFactory if you'd like to reuse a connection.
 
     :param db_path: The path/IP/URI/DAOFactory pointing to the database.
     :param keyspace: The keyspace at <uri> to connect to (Cassandra only).
     :param backend: Normally, the uri will be used to determine the
                     required backend. To override this behavior, provide
                     the desired backend here (case-insensitive, one of
-                    "sql", or "cassandra")
+                    "sql", or "cassandra"). Ignored if a DAOFactory is provided.
     """
+    # If they've provided a DAOFactory, ignore backend
+    if isinstance(db_path, sina_sql.DAOFactory):
+        return DataStore(db_path)
+    elif isinstance(db_path, sina_cass.DAOFactory):
+        return DataStore(db_path)
+
+    # Else determine a backend
     if backend is None:
-        if isinstance(db_path, sina_sql.DAOFactory):
-            backend = "sql"
-        elif isinstance(db_path, sina_cass.DAOFactory):
-            backend = "cassandra"
+        backend = "sql" if keyspace is None else "cassandra"
+    elif backend == "sql":
+        connection = sina_sql.DAOFactory(db_path)
+    elif backend == "casandra":
+        if HAS_CASSANDRA:
+            connection = sina_cass.DAOFactory(db_path, keyspace)
         else:
-            backend = "sql" if keyspace is None else "cassandra"
-    if backend == "sql":
-        factory = sina_sql.DAOFactory(db_path)
-    elif backend == "cassandra":
-        factory = sina_cass.DAOFactory(db_path, keyspace)
+            raise ImportError("A Cassandra backend cannot be accessed until "
+                              "Cassandra dependencies are loaded into the "
+                              "environment. See the README.")
     else:
         raise ValueError("Given unrecognized backend: {}".format(backend))
-    return DataStore(factory)
+    return DataStore(connection)
 
 
 class DataStore():
-    """Defines the basic implementation of DataStore classes."""
+    """Mediates interactions between users and data."""
 
     def __init__(self, connection):
         """Define attributes needed by a datastore."""
-        self.connection = None
-        self.records = connection.create_record_dao()
-        self.relationships = connection.create_relationship_dao()
+        self.connection = connection
+        self.records = self.RecordOperations(connection)
+        self.relationships = self.RelationshipOperations(connection)
 
     def close(self):
         """Close any resources held by this datastore."""
-        self.factory.close()
+        self.connection.close()
 
     def __enter__(self):
         """Use the datastore as a context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Close the datastore's resources."""
-        return self.factory.close()
+        """
+        Close the datastore's resources.
 
-    def insert_records(self, records_to_insert):
-        """Wrap record insertion for explicit use."""
-        # records.insert
-        self.records.insert(records_to_insert)
+        Be careful! This will close the connection for anyone sharing it.
+        Any Datastores created from the same DAOFactory share the same
+        connection.
+        """
+        return self.close()
 
-    def insert_relationships(self, relationships_to_insert):
-        """Wrap relationship insertion for explicit use."""
-        # relationships.insert
-        self.relationships.insert(relationships_to_insert)
+    class RecordOperations():
+        """
+        Defines the queries users can perform on Records.
 
-    def get_records(self, records_to_get):
-        """Wrap getting records for explicit use."""
-        # records.get
-        return self.records.get(records_to_get)
+        This should be considered the "source of truth" in terms of what Record
+        operations are available to users and what each does.
 
-    def get_relationships(self, subject_id=None, predicate=None,
-                          object_id=None):
-        """Wrap getting relationships for explicit use."""
-        # relationships.get
-        return self.relationships.get(subject_id, predicate, object_id)
+        This doesn't handle implementation, helper methods, etc; it's for
+        defining the user interface.
+        """
 
-    # "Unifies" functionality of DAOs, Pylint is not aware
-    # pylint: disable=arguments-differ
-    @classmethod
-    def get(cls, _):
-        """Wrap getting relationships for explicit use."""
-        raise AttributeError("get() is ambiguous for DataStore and is not "
-                             "implemented. Use either get_record() or "
-                             "get_relationship, or see the DAO objects.")
+        def __init__(self, connection):
+            """Create object(s) we'll need for performing queries."""
+            self.accessor = connection.create_record_dao()
 
-    # Unifies functionality of DAOs, Pylint is not aware
-    # pylint: disable=arguments-differ
+        # -------------------- Basic operations ---------------------
+        def get(self, ids_to_get):
+            """
+            Given one or more Record ids, return matching Record(s).
 
-    def insert(self, objects_to_insert):
-        """
-        Given one or more Sina objects, insert them into the DAO's backend.
+            :param ids_to_get: The id(s) of the Record(s) to return.
 
-        :param objects_to_insert: Some Sina object(s) (Records, Relationships)
-                                  to insert
-        """
-        # records.insert
-        # relationships.insert
-        # MAYBE plain old insert() continues to exist? "Datastore-wide"
-        # methods feel like they make sense to me, there just wouldn't be
-        # a huge number.
-        if isinstance(objects_to_insert, sina.model.Record):
-            self.insert_records(objects_to_insert)
-        elif isinstance(objects_to_insert, sina.model.Relationship):
-            self.insert_relationships(objects_to_insert)
-        else:
-            records = []
-            relationships = []
-            for sina_object in objects_to_insert:
-                if isinstance(sina_object, sina.model.Record):
-                    records.append(sina_object)
-                else:
-                    relationships.append(sina_object)
-            self.insert_records(records)
-            self.insert_relationships(relationships)
+            :returns: If provided an iterable, a generator of Record objects,
+                      else a single Record object.
 
-    # There's only one delete right now, but there could be more.
-    def delete_records(self, objects_to_delete):
-        """
-        Given one or more Sina objects, insert them into the DAO's backend.
+            :raises ValueError: if no Record is found for some id.
+            """
+            return self.accessor.get(ids_to_get)
 
-        :param objects_to_delete: Some id(s) of Record(s) to delete.
-        """
-        # records.delete
-        return self.records.delete(objects_to_delete)
+        def insert(self, records_to_insert):
+            """
+            Given one or more Records, insert them into the DAO's backend.
 
-    def get_records_with_data(self, **kwargs):
-        """
-        """
-        # With or given? I prefer "with" because of how it reads once there
-        # are args. get_records_with_data() looks like it's just getting
-        # all records with data (no), but get_records_with_data(volume=10)
-        # reads better to me than the prior get_given_data(volume=10).
-        # but this is much more obvious for get_with_max vs. get_given_max.
-        # Latter doesn't really make sense.
-        # records.query_data
-        # records.data.get_with_data
-        return self.records.data_query(kwargs)
+            :param records: A Record or iter of Records to insert
+            """
+            self.accessor.insert(records_to_insert)
 
-    def get_records_of_type(self, type, ids_only=False):
-        """
-        """
-        # records.get_by_type
-        return self.records.get_all_of_type(type, ids_only)
+        def delete(self, ids_to_delete):
+            """
+            Given one or more Record ids, delete all mention from the DAO's backend.
 
-    def get_record_types(self):
-        """
-        """
-        # records.get_types
-        return self.records.get_available_types()
+            This includes removing all data, raw(s), any relationships
+            involving it/them, etc.
 
-    def get_records_with_file_uri(self, uri, accepted_ids_list=None,
-                                  ids_only=False):
-        """
-        """
-        # records.get_with_file_uri
-        # records.files.get_with_uri
-        return self.records.get_given_document_uri(self, uri, accepted_ids_list,
-                                                   ids_only)
+            :param ids_to_delete: A Record id or iterable of Record ids to delete.
+            """
+            return self.accessor.delete(ids_to_delete)
 
-    def get_records_with_max(self, scalar_name, count=1, id_only=False):
-        """
-        """
-        # records.get_with_max
-        return self.records.get_with_max(scalar_name, count, id_only)
+        # ------------------ Operations tied to Record type -------------------
+        def get_by_type(self, type, ids_only=False):
+            """
+            Given a type of Record, return all Records of that type.
 
-    def get_records_with_min(self, scalar_name, count=1, id_only=False):
-        """
-        """
-        # records.get_with_min
-        return self.records.get_with_min(scalar_name, count, id_only)
+            :param type: The type of Record to return
+            :param ids_only: whether to return only the ids of matching Records
 
-    # Get_scalars is legacy, will not be carried forward here.
+            :returns: A generator of matching Records.
+            """
+            return self.accessor.get_all_of_type(type, ids_only)
 
-    def get_data_for_records(self, data_list, id_list=None):
-        """
-        """
-        # records.get_data
-        return self.records.get_data_for_records(data_list, id_list)
+        def get_types(self):
+            """
+            Return all types of Records available in the backend.
 
-    def get_records_with_mime_type(self, mimetype, ids_only=False):
+            :returns: A generator of types of Record.
+            """
+            return self.accessor.get_available_types()
+
+        # ------------------ Operations tied to Record data -------------------
+        def get_by_data(self, **kwargs):
+            """
+            Return the ids of Records whose data fulfill some criteria.
+
+            Criteria are expressed as keyword arguments. Each keyword
+            is the name of an entry in a Record's data field, and it's set
+            equal to a single value, a DataRange (see utils.DataRanges), or a
+            special criteria (ex: has_all(), see utils) that expresses the
+            desired value/range of values. All criteria must be satisfied for
+            an ID to be returned:
+
+                # Return ids of all Records with a volume of 12, a quadrant of
+                # "NW", AND a height >=30 and <40.
+                data_query(volume=12, quadrant="NW", height=DataRange(30,40))
+
+            :param kwargs: Pairs of the names of data and the criteria that data
+                             must fulfill.
+            :returns: A generator of Record ids that fulfill all criteria.
+
+            :raises ValueError: if not supplied at least one criterion or given
+                                a criterion it does not support
+            """
+            return self.accessor.data_query(**kwargs)
+
+        def get_data(self, data_list, id_list=None):
+            """
+            Retrieve a subset of data for some or all Records.
+
+            For example, it might get "debugger_version" and "volume" for the
+            Records with ids "foo_1" and "foo_3". Requested data is returned as
+            a dictionary of dictionaries; the outer key is the record_id, the
+            inner key is the name of the datum (ex: "volume"). So::
+
+                {"foo_1": {"volume": {"value": 12, "units": cm^3},
+                           "debugger_version": {"value": "alpha"}}
+                 "foo_3": {"debugger_version": {"value": "alpha"}}
+
+            As seen in foo_3 above, if a piece of data is missing, it won't be
+            included; think of this as a subset of a Record's own data.
+            Similarly, if a Record ends up containing none of the requested
+            data, it will be omitted.
+
+            :param data_list: A list of the names of data fields to find
+            :param id_list: A list of the record ids to find data for, None if
+                            all Records should be considered.
+
+            :returns: a dictionary of dictionaries containing the requested
+                      data, keyed by record_id and then data field name.
+            """
+            return self.accessor.get_data_for_records(data_list, id_list)
+
+        def get_by_max(self, scalar_name, count=1, ids_only=False):
+            """
+            Return the Records/id(s) with the highest value(s) for <scalar_name>.
+
+            The first Record or id returned has the highest value, then
+            second-highest, etc, until <count> records have been listed.
+            This will only return records for plain scalars (not lists of
+            scalars, strings, or list of strings).
+
+            :param scalar_name: The scalar to find the maximum record(s) for.
+            :param count: How many to return.
+            :param ids_only: Whether to only return the id
+
+            :returns: An iterator of the Records or ids corresponding to the
+                      <count> highest <scalar_name> values in descending order.
+            """
+            return self.accessor.get_with_max(scalar_name, count, ids_only)
+
+        def get_by_min(self, scalar_name, count=1, ids_only=False):
+            """
+            Return the Records/id(s) with the lowest value(s) for <scalar_name>.
+
+            The first Record or id returned has the lowest value, then
+            second-lowest, etc, until <count> records have been listed.
+            This will only return records for plain scalars (not lists of
+            scalars, strings, or list of strings).
+
+            :param scalar_name: The scalar to find the minimum record(s) for.
+            :param count: How many to return.
+            :param ids_only: Whether to only return the id
+
+            :returns: An iterator of the Records or ids corresponding to the
+                      <count> lowest <scalar_name> values in ascending order.
+            """
+            return self.accessor.get_with_min(scalar_name, count, ids_only)
+
+        # ------------------ Operations tied to Record files -------------------
+        def get_by_file_uri(self, uri, accepted_ids_list=None, ids_only=False):
+            """
+            Return all records associated with files whose uris match some arg.
+
+            Supports the use of % as a wildcard character. Note that you may or
+            may not get duplicates depending on the backend; call set() to
+            collapse the returned generator if required.
+
+            :param uri: The uri to use as a search term, such as "foo.png"
+            :param accepted_ids_list: A list of ids to restrict the search to.
+                                      If not provided, all ids will be used.
+            :param ids_only: whether to return only the ids of matching Records
+
+            :returns: A generator of matching Records
+            """
+            return self.accessor.get_given_document_uri(uri, accepted_ids_list,
+                                                        ids_only)
+
+        # TODO: "mime type" here, but "mimetype" in the schema. Which to use?
+        def get_by_file_mime_type(self, mime_type, ids_only=False):
+            """
+            Return all records or IDs with documents of a given mimetype.
+
+            :param mimetype: The mimetype to use as a search term
+            :param ids_only: Whether to only return the ids
+
+            :returns: Record object or IDs fitting the criteria.
+            """
+            return self.accessor.get_with_mime_type(mime_type, ids_only)
+
+    class RelationshipOperations():
         """
+        Defines the queries users can perform on Relationships.
+
+        This should be considered the "source of truth" in terms of what
+        Relationship operations are available to users and what each does.
+
+        This doesn't handle implementation, helper methods, etc; it's for
+        defining the user interface.
         """
-        # Note: it's mime_type in the name but mimetype elsewhere.
-        # records.get_with_mime_type
-        return self.records.get_with_mime_type(mimetype, ids_only)
+
+        def __init__(self, connection):
+            """Create object(s) we'll need for performing queries."""
+            self.accessor = connection.create_relationship_dao()
+
+        def get(self, subject_id=None, predicate=None, object_id=None):
+            """Return all relationships that fulfill one or more criteria."""
+            return self.accessor.get(subject_id, predicate, object_id)
+
+        def insert(self, relationships_to_insert):
+            """
+            Given one or more Relationships, insert them into a backend.
+
+            :param relationships_to_insert: Relationships to insert
+            """
+            self.accessor.insert(relationships_to_insert)
