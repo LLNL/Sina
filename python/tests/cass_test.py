@@ -13,6 +13,7 @@ try:
     import cassandra.cqlengine.management as management
 
     import sina.datastores.cass as backend
+    from sina.datastore import create_datastore
 
 except ImportError:
     # Not having Cassandra for tests is a valid case and should be coupled with
@@ -22,6 +23,7 @@ except ImportError:
     pass
 
 import tests.backend_test
+import tests.datastore_test
 
 # Cassandra's logger is natively Debug, and it's very verbose,
 # even at WARNING.
@@ -164,3 +166,51 @@ class TestImportExport(CassandraMixin, tests.backend_test.TestImportExport):
     def tearDown(self):
         self.teardown_cass_keyspace()
         super(TestImportExport, self).tearDown()
+
+
+@attr('cassandra')
+class TestDataStore(CassandraMixin, tests.datastore_test.BackendSpecificTests):
+    """Tests that DataStores are using this backend correctly."""
+
+    __test__ = True
+
+    def setUp(self):
+        self.create_cass_keyspace()
+
+    def tearDown(self):
+        self.teardown_cass_keyspace()
+
+    @staticmethod
+    def create_backend_datastore():
+        return create_datastore(keyspace=TEMP_KEYSPACE_NAME)
+
+    @patch('sina.datastore.DataStore.__init__')
+    @patch('sina.datastores.cass.DAOFactory.__init__')
+    def test_create_datastore(self, mock_dao, mock_ds):
+        """Make sure create_datastore() targets the backend when appropriate."""
+        # Python gets confused if __init__ returns a MagicMock
+        mock_dao.return_value = None
+        mock_ds.return_value = None
+        # Keyspace specified
+        create_datastore(keyspace=TEMP_KEYSPACE_NAME)
+        self.assertTrue(mock_dao.called)
+        mock_args, mock_kwargs = mock_dao.call_args
+        self.assertFalse(mock_args)
+        # create_database has to rename and reorder keyspace and node_ip_list to
+        # work equally well for sql
+        self.assertEqual(mock_kwargs, {'keyspace': 'temp_keyspace_testing_sina',
+                                       'node_ip_list': None})
+
+        # Backend and keyspace specified
+        create_datastore(keyspace=TEMP_KEYSPACE_NAME, database_type="cassandra")
+        self.assertEqual(mock_dao.call_count, 2)
+        mock_args, mock_kwargs = mock_dao.call_args
+        self.assertFalse(mock_args)
+        self.assertEqual(mock_kwargs, {'keyspace': 'temp_keyspace_testing_sina',
+                                       'node_ip_list': None})
+
+        # backend, no keyspace. Should raise an error.
+        with self.assertRaises(ValueError) as context:
+            create_datastore(database_type="cassandra")
+        self.assertIn('keyspace must be provided', str(context.exception))
+        self.assertEqual(mock_dao.call_count, 2)

@@ -20,7 +20,6 @@ from mock import patch  # pylint: disable=import-error
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, all_in, any_in, exists)
 from sina.model import Run, Record, Relationship
-from sina.datastore import create_datastore
 
 LOGGER = logging.getLogger(__name__)
 TARGET = None
@@ -40,7 +39,6 @@ def create_daos(class_):
     class_.factory = class_.create_dao_factory()
     class_.record_dao = class_.factory.create_record_dao()
     class_.relationship_dao = class_.factory.create_relationship_dao()
-    class_.datastore = create_datastore(class_.factory)
 
 
 def populate_database_with_data(record_dao):
@@ -133,20 +131,20 @@ class TestModify(unittest.TestCase):
 
     def setUp(self):
         self.factory = self.create_dao_factory()
-        self.datastore = create_datastore(self.factory)
 
     def tearDown(self):
         self.factory.close()
 
     def test_recorddao_insert_retrieve(self):
         """Test that RecordDAO is inserting and getting correctly."""
+        record_dao = self.factory.create_record_dao()
         rec = Record(id="spam", type="eggs",
                      data={"eggs": {"value": 12, "units": None, "tags": ["runny"]},
                            "recipes": {"value": []}},
                      files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
                      user_defined={})
-        self.datastore.records.insert(rec)
-        returned_record = self.datastore.records.get("spam")
+        record_dao.insert(rec)
+        returned_record = record_dao.get("spam")
         # Test one definition of Record equivalence.
         # Done instead of __dict__ to make it clearer what part fails (if any)
         self.assertEqual(returned_record.id, rec.id)
@@ -171,10 +169,10 @@ class TestModify(unittest.TestCase):
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
-        self.datastore.records
-        self.datastore.records.insert(Record(id="rec_1", type="sample"))
-        self.datastore.records.delete("rec_1")
-        self.assertEqual(list(self.datastore.records.get_by_type("sample")), [])
+        record_dao = self.factory.create_record_dao()
+        record_dao.insert(Record(id="rec_1", type="sample"))
+        record_dao.delete("rec_1")
+        self.assertEqual(list(record_dao.get_all_of_type("sample")), [])
 
     def test_recorddao_delete_data_cascade(self):
         """Test that deletion of a Record correctly cascades to data and files."""
@@ -222,7 +220,7 @@ class TestModify(unittest.TestCase):
         relationship_dao.insert(subject_id="rec_3", object_id="rec_4", predicate="dupes")
         relationship_dao.insert(subject_id="rec_4", object_id="rec_4", predicate="is")
         # Delete several
-        self.datastore.records.delete(["rec_1", "rec_2", "rec_3"])
+        record_dao.delete(["rec_1", "rec_2", "rec_3"])
         remaining_records = list(record_dao.get_all_of_type("sample", ids_only=True))
         self.assertEqual(remaining_records, ["rec_4"])
 
@@ -250,7 +248,7 @@ class TestModify(unittest.TestCase):
         record_dao.insert(Record('eggs', 'test_rec'))
 
         relationship = Relationship(subject_id="spam", object_id="eggs", predicate="loves")
-        self.datastore.relationships.insert(relationship)
+        relationship_dao.insert(relationship)
         subj = relationship_dao.get(subject_id=relationship.subject_id)
         pred = relationship_dao.get(predicate=relationship.predicate)
         for relationship_list in (subj, pred):
@@ -383,7 +381,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # ############################### get #################################
     def test_recorddao_get_one(self):
         """Test our ability to fetch a single record."""
-        just_one = self.datastore.records.get("spam3")
+        just_one = self.record_dao.get("spam3")
         self.assertIsInstance(just_one, Record)
         self.assertEqual(just_one.type, "foo")
 
@@ -404,7 +402,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # ###################### get_given_document_uri ##########################
     def test_recorddao_uri_no_wildcards(self):
         """Test that RecordDAO is retrieving based on full uris correctly."""
-        exact_match = self.datastore.records.get_by_file_uri(uri="beep.png", ids_only=True)
+        exact_match = self.record_dao.get_given_document_uri(uri="beep.png", ids_only=True)
         self.assertEqual(len(list(exact_match)), 1)
 
     def test_recorddao_uri_no_match(self):
@@ -451,11 +449,19 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         all_wildcard = self.record_dao.get_given_document_uri(uri="%")
         self.assertEqual(len(list(all_wildcard)), 5)
 
+    # ############### get_given_document_uri for Runs ################
+    def test_rundao_uri_one_wildcard(self):
+        """Test ability to find only Runs by uri (filter out matching non-Run Records)."""
+        end_wildcard_id = list(self.record_dao.get_given_document_uri(uri="beep.%",
+                                                                      ids_only=True))
+        self.assertEqual(len(end_wildcard_id), 3)
+        end_wildcard_obj = self.record_dao.get_given_document_uri(uri="beep.%", ids_only=False)
+        six.assertCountEqual(self, end_wildcard_id, (x.id for x in end_wildcard_obj))
+
     # ###################### get_with_max ##########################
     def test_get_with_max(self):
         """Test that we return the id of the record with the highest scalar_name value."""
-        max_spam_scal = list(self.datastore.records.get_by_max("spam_scal",
-                                                               ids_only=True))
+        max_spam_scal = list(self.record_dao.get_with_max("spam_scal", id_only=True))
         self.assertEqual(max_spam_scal[0], "spam2")
 
     def test_get_with_max_multi(self):
@@ -468,8 +474,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # ###################### get_with_min ##########################
     def test_get_with_min(self):
         """Test that we return the id of the record with the lowest scalar_name value."""
-        min_spam_scal = list(self.datastore.records.get_by_min("spam_scal",
-                                                               ids_only=True))
+        min_spam_scal = list(self.record_dao.get_with_min("spam_scal", id_only=True))
         self.assertEqual(min_spam_scal[0], "spam")
 
     def test_get_with_min_multi(self):
@@ -482,15 +487,14 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # ####################### test_get_available_types ######################
     def test_get_available_types(self):
         """Make sure that we return a correct list of the types in a datebase."""
-        types_found = self.datastore.records.get_types()
-        six.assertCountEqual(self, types_found, ["run", "spamrec", "bar", "foo",
-                                                 "eggrec"])
+        types_found = self.record_dao.get_available_types()
+        six.assertCountEqual(self, types_found, ["run", "spamrec", "bar", "foo", "eggrec"])
 
     # ########################### basic data_query ##########################
     def test_recorddao_scalar_datum_query(self):
         """Test that the RecordDAO data query is retrieving based on one scalar correctly."""
         just_right_range = DataRange(min=0, max=300, max_inclusive=True)
-        just_right = self.datastore.records.get_by_data(spam_scal=just_right_range)
+        just_right = self.record_dao.data_query(spam_scal=just_right_range)
         self.assertEqual(len(list(just_right)), 3)
 
     def test_recorddao_scalar_datum_min_max(self):
@@ -685,7 +689,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # ######################### get_all_of_type ###########################
     def test_recorddao_type(self):
         """Test the RecordDAO is retrieving based on type correctly."""
-        get_one = list(self.datastore.records.get_by_type("bar"))
+        get_one = list(self.record_dao.get_all_of_type("bar"))
         self.assertEqual(len(get_one), 1)
         self.assertIsInstance(get_one[0], Record)
         self.assertEqual(get_one[0].id, "spam4")
@@ -711,8 +715,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):
         """Test that we're getting a datum for one record correctly."""
-        for_one = self.datastore.records.get_data(id_list=["spam"],
-                                                  data_list=["spam_scal"])
+        for_one = self.record_dao.get_data_for_records(id_list=["spam"],
+                                                       data_list=["spam_scal"])
         self.assertEqual(for_one["spam"]["spam_scal"],
                          {"value": 10, "units": "pigs", "tags": ["hammy"]})
 

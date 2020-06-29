@@ -28,10 +28,10 @@ You start by creating a DataStore, which will connect to your backend of
 choice and expose many functions for interacting with the Records and
 Relationships stored within. For a simple demonstration::
 
-  from sina.datastore import DataStore
+  from sina.datastore import create_datastore
 
   ds = create_datastore(db_path="somefile.sqlite")
-  all_sruns = ds.records.get_by_type("srun")
+  all_sruns = ds.records.find_with_type("srun")
 
 This would set :code:`all_sruns` to a list of all the records contained in
 :code:`somefile.sqlite` with :code:`"type": "srun"`. You can easily pass data
@@ -67,7 +67,7 @@ is queryable, and can be used to find Records fitting criteria. For example, let
 say we're interested in all Records with a :code:`final_volume` of 310 and with
 a :code:`quadrant` of "NW"::
 
-  records = ds.records.get_by_data(final_volume=310, quadrant="NW")
+  records = ds.records.find_with_data(final_volume=310, quadrant="NW")
 
 This will find all the records record_dao knows about (so those in
 :code:`somefile.sqlite`) that fit our specifications.
@@ -85,7 +85,7 @@ convention of min-inclusive, max-exclusive, but this can be altered::
   from sina.utils import DataRange
 
   # data_query is aliased to get_given_data, they're interchangeable
-  records = ds.records.get_by_data(final_volume=DataRange(200, 311),
+  records = ds.records.find_with_data(final_volume=DataRange(200, 311),
                                    final_acceleration=DataRange(min=12,
                                                                 max=20,
                                                                 min_inclusive=False,
@@ -107,7 +107,7 @@ we want a velocity that's never gone above 50::
 
   from sina.utils import all_in
 
-  records = ds.records.get_by_data(velocity=all_in(DataRange(max=50)))
+  records = ds.records.find_with_data(velocity=all_in(DataRange(max=50)))
 
 A slightly different set of queries applies to string list data. Let's say
 we want all Records where "strength_1" or "strength_2" were included in
@@ -115,7 +115,7 @@ we want all Records where "strength_1" or "strength_2" were included in
 
   from sina.utils import has_any
 
-  records = ds.records.get_by_data(active_packages=has_any("strength_1", "strength_2"))
+  records = ds.records.find_with_data(active_packages=has_any("strength_1", "strength_2"))
 
 This is the general syntax for list queries in Sina. Supported queries are:
 
@@ -143,7 +143,7 @@ See examples/basic_usage.ipynb for list queries in use.
 Combining Filters using "IDs Only" Logic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Filtering methods (such as get_by_type and get_by_file_uri) take an
+Filtering methods (such as find_with_type and find_with_file_uri) take an
 optional argument, :code:`ids_only`. If passed as :code:`True`, they'll return
 only the ids of Records that fulfill their criteria, rather than the entire
 Record. This is faster than assembling the entire Record object(s), and is also
@@ -151,8 +151,8 @@ the recommended way of combining queries or implementing more complex logic::
 
   ...
 
-  type_filter = ds.records.get_by_type("msubs", ids_only=True)
-  file_filter = ds.records.get_by_file_uri("mock_msub_out.txt", ids_only=True)
+  type_filter = ds.records.find_with_type("msubs", ids_only=True)
+  file_filter = ds.records.find_with_file_uri("mock_msub_out.txt", ids_only=True)
 
   # This will print ids of all records which are msubs or are associated with
   # a file "mock_msub_out.txt", **but not both** (exclusive OR)
@@ -269,13 +269,13 @@ To delete a Record entirely from one of Sina's backends::
   recs.insert(my_record_to_delete)
 
   # This would print 1
-  print(len(list(recs.get_by_type("fodder_type"))))
+  print(len(list(recs.find_with_type("fodder_type"))))
 
   # Like get() and insert(), delete() takes one or more ids.
   recs.delete("fodder")
 
   # This would print 0
-  print(len(list(recs.get_by_type("fodder_type"))))
+  print(len(list(recs.find_with_type("fodder_type"))))
 
 Be careful, as the deletion will include every Relationship the Record is
 mentioned in, all the scalar data associated with that Record, etc.

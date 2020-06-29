@@ -689,14 +689,14 @@ class DAOFactory(dao.DAOFactory):
         use_sqlite = False
         if db_path:
             if '://' not in db_path:
-                self.engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
+                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
                 create_db = not os.path.exists(db_path)
                 use_sqlite = True
             else:
-                self.engine = sqlalchemy.create_engine(db_path)
+                engine = sqlalchemy.create_engine(db_path)
                 create_db = True
         else:
-            self.engine = sqlalchemy.create_engine(SQLITE_PREFIX)
+            engine = sqlalchemy.create_engine(SQLITE_PREFIX)
             use_sqlite = True
             create_db = True
 
@@ -705,13 +705,13 @@ class DAOFactory(dao.DAOFactory):
                 """Activate foreign key support on connection creation."""
                 connection.execute('pragma foreign_keys=ON')
 
-            sqlalchemy.event.listen(self.engine, 'connect',
+            sqlalchemy.event.listen(engine, 'connect',
                                     configure_on_connect)
 
         if create_db:
-            schema.Base.metadata.create_all(self.engine)
+            schema.Base.metadata.create_all(engine)
 
-        session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        session = sqlalchemy.orm.sessionmaker(bind=engine)
         self.session = session()
 
     def create_record_dao(self):

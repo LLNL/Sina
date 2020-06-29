@@ -10,11 +10,7 @@ except ImportError:
     HAS_CASSANDRA = False
 
 
-# TODO: Initial plan was to allow them to create from a DAOFactory. But maybe
-# we hide the DAOFactory entirely and allow them to create from a Datastore.
-# Same functionality, but no use of the words "DAO" and "Factory". Remember to
-# change the func doc to suite!
-def create_datastore(db_path=None, keyspace=None, backend=None):
+def create_datastore(database=None, keyspace=None, database_type=None):
     """
     Create a DataStore for handling some type of backend.
 
@@ -22,48 +18,65 @@ def create_datastore(db_path=None, keyspace=None, backend=None):
     figures out which backend is required. You can also provide it with an
     existing DAOFactory if you'd like to reuse a connection.
 
-    :param db_path: The path/IP/URI/DAOFactory pointing to the database.
-    :param keyspace: The keyspace at <uri> to connect to (Cassandra only).
-    :param backend: Normally, the uri will be used to determine the
-                    required backend. To override this behavior, provide
-                    the desired backend here (case-insensitive, one of
-                    "sql", or "cassandra"). Ignored if a DAOFactory is provided.
+    :param database: The URI of the database to connect to.
+    :param keyspace: The keyspace to connect to (Cassandra only).
+    :param database_type: Type of backend to connect to. If not provided, Sina
+                          will infer this from <database>. One of "sql" or
+                          "cassandra".
     """
-    # If they've provided a DAOFactory, ignore backend
-    if isinstance(db_path, sina_sql.DAOFactory):
-        return DataStore(db_path)
-    elif isinstance(db_path, sina_cass.DAOFactory):
-        return DataStore(db_path)
-
-    # Else determine a backend
-    if backend is None:
-        backend = "sql" if keyspace is None else "cassandra"
-    elif backend == "sql":
-        connection = sina_sql.DAOFactory(db_path)
-    elif backend == "casandra":
+    # Determine a backend
+    if database_type is None:
+        database_type = "sql" if keyspace is None else "cassandra"
+    if database_type == "sql":
+        connection = sina_sql.DAOFactory(database)
+    elif database_type == "cassandra":
         if HAS_CASSANDRA:
-            connection = sina_cass.DAOFactory(db_path, keyspace)
+            if keyspace:
+                connection = sina_cass.DAOFactory(node_ip_list=database,
+                                                  keyspace=keyspace)
+            else:
+                raise ValueError("A keyspace must be provided to use Cassandra")
         else:
             raise ImportError("A Cassandra backend cannot be accessed until "
                               "Cassandra dependencies are loaded into the "
                               "environment. See the README.")
     else:
-        raise ValueError("Given unrecognized backend: {}".format(backend))
+        raise ValueError("Given unrecognized database type: {}".format(database_type))
     return DataStore(connection)
 
 
-class DataStore():
-    """Mediates interactions between users and data."""
+class DataStore(object):
+    """
+    Mediates interactions between users and data.
 
-    def __init__(self, connection):
-        """Define attributes needed by a datastore."""
-        self.connection = connection
-        self.records = self.RecordOperations(connection)
-        self.relationships = self.RelationshipOperations(connection)
+    DataStores grant access to a selection of operations for both Records and
+    Relationships. They're used like this:
+
+        ds = create_datastore(path_to_my_database)
+        my_runs = ds.records.find_with_type("runs")
+        submission_rels = ds.relationships.get(predicate="submitted")
+
+    Note the use of create_datastore in place of manually creating a DataStore
+    object. For information on all the operations available, see
+    RecordOperations and RelationshipOperations below.
+    """
+
+    def __init__(self, dao_factory):
+        """
+        Define attributes needed by a datastore.
+
+        Generally create_datastore() is preferred.
+
+        :param dao_factory: The DAOFactory that will provide the backend
+                            connection.
+        """
+        self.dao_factory = dao_factory
+        self.records = self.RecordOperations(dao_factory)
+        self.relationships = self.RelationshipOperations(dao_factory)
 
     def close(self):
         """Close any resources held by this datastore."""
-        self.connection.close()
+        self.dao_factory.close()
 
     def __enter__(self):
         """Use the datastore as a context manager."""
@@ -79,7 +92,7 @@ class DataStore():
         """
         return self.close()
 
-    class RecordOperations():
+    class RecordOperations(object):
         """
         Defines the queries users can perform on Records.
 
@@ -92,7 +105,7 @@ class DataStore():
 
         def __init__(self, connection):
             """Create object(s) we'll need for performing queries."""
-            self.accessor = connection.create_record_dao()
+            self.record_dao = connection.create_record_dao()
 
         # -------------------- Basic operations ---------------------
         def get(self, ids_to_get):
@@ -106,7 +119,7 @@ class DataStore():
 
             :raises ValueError: if no Record is found for some id.
             """
-            return self.accessor.get(ids_to_get)
+            return self.record_dao.get(ids_to_get)
 
         def insert(self, records_to_insert):
             """
@@ -114,7 +127,7 @@ class DataStore():
 
             :param records: A Record or iter of Records to insert
             """
-            self.accessor.insert(records_to_insert)
+            self.record_dao.insert(records_to_insert)
 
         def delete(self, ids_to_delete):
             """
@@ -125,10 +138,12 @@ class DataStore():
 
             :param ids_to_delete: A Record id or iterable of Record ids to delete.
             """
-            return self.accessor.delete(ids_to_delete)
+            return self.record_dao.delete(ids_to_delete)
 
         # ------------------ Operations tied to Record type -------------------
-        def get_by_type(self, type, ids_only=False):
+        # It's safe to redefine "type" within the scope of this function.
+        # pylint: disable=redefined-builtin
+        def find_with_type(self, type, ids_only=False):
             """
             Given a type of Record, return all Records of that type.
 
@@ -137,7 +152,7 @@ class DataStore():
 
             :returns: A generator of matching Records.
             """
-            return self.accessor.get_all_of_type(type, ids_only)
+            return self.record_dao.get_all_of_type(type, ids_only)
 
         def get_types(self):
             """
@@ -145,10 +160,10 @@ class DataStore():
 
             :returns: A generator of types of Record.
             """
-            return self.accessor.get_available_types()
+            return self.record_dao.get_available_types()
 
         # ------------------ Operations tied to Record data -------------------
-        def get_by_data(self, **kwargs):
+        def find_with_data(self, **kwargs):
             """
             Return the ids of Records whose data fulfill some criteria.
 
@@ -170,11 +185,11 @@ class DataStore():
             :raises ValueError: if not supplied at least one criterion or given
                                 a criterion it does not support
             """
-            return self.accessor.data_query(**kwargs)
+            return self.record_dao.data_query(**kwargs)
 
         def get_data(self, data_list, id_list=None):
             """
-            Retrieve a subset of data for some or all Records.
+            Retrieve a subset of non-list data for some or all Records.
 
             For example, it might get "debugger_version" and "volume" for the
             Records with ids "foo_1" and "foo_3". Requested data is returned as
@@ -188,7 +203,11 @@ class DataStore():
             As seen in foo_3 above, if a piece of data is missing, it won't be
             included; think of this as a subset of a Record's own data.
             Similarly, if a Record ends up containing none of the requested
-            data, it will be omitted.
+            data, or if the data exists but it's a list of strings or scalars,
+            it will be omitted.
+
+            The absence of list data may be addressed in the future if there's
+            demand for it.
 
             :param data_list: A list of the names of data fields to find
             :param id_list: A list of the record ids to find data for, None if
@@ -197,9 +216,9 @@ class DataStore():
             :returns: a dictionary of dictionaries containing the requested
                       data, keyed by record_id and then data field name.
             """
-            return self.accessor.get_data_for_records(data_list, id_list)
+            return self.record_dao.get_data_for_records(data_list, id_list)
 
-        def get_by_max(self, scalar_name, count=1, ids_only=False):
+        def find_with_max(self, scalar_name, count=1, ids_only=False):
             """
             Return the Records/id(s) with the highest value(s) for <scalar_name>.
 
@@ -215,9 +234,9 @@ class DataStore():
             :returns: An iterator of the Records or ids corresponding to the
                       <count> highest <scalar_name> values in descending order.
             """
-            return self.accessor.get_with_max(scalar_name, count, ids_only)
+            return self.record_dao.get_with_max(scalar_name, count, ids_only)
 
-        def get_by_min(self, scalar_name, count=1, ids_only=False):
+        def find_with_min(self, scalar_name, count=1, ids_only=False):
             """
             Return the Records/id(s) with the lowest value(s) for <scalar_name>.
 
@@ -233,10 +252,11 @@ class DataStore():
             :returns: An iterator of the Records or ids corresponding to the
                       <count> lowest <scalar_name> values in ascending order.
             """
-            return self.accessor.get_with_min(scalar_name, count, ids_only)
+            return self.record_dao.get_with_min(scalar_name, count, ids_only)
 
         # ------------------ Operations tied to Record files -------------------
-        def get_by_file_uri(self, uri, accepted_ids_list=None, ids_only=False):
+        def find_with_file_uri(self, uri, accepted_ids_list=None,
+                               ids_only=False):
             """
             Return all records associated with files whose uris match some arg.
 
@@ -251,11 +271,11 @@ class DataStore():
 
             :returns: A generator of matching Records
             """
-            return self.accessor.get_given_document_uri(uri, accepted_ids_list,
-                                                        ids_only)
+            return self.record_dao.get_given_document_uri(uri,
+                                                          accepted_ids_list,
+                                                          ids_only)
 
-        # TODO: "mime type" here, but "mimetype" in the schema. Which to use?
-        def get_by_file_mime_type(self, mime_type, ids_only=False):
+        def find_with_file_mimetype(self, mimetype, ids_only=False):
             """
             Return all records or IDs with documents of a given mimetype.
 
@@ -264,9 +284,11 @@ class DataStore():
 
             :returns: Record object or IDs fitting the criteria.
             """
-            return self.accessor.get_with_mime_type(mime_type, ids_only)
+            # It's "mimetype" in the schema, but the method is named
+            # mime_type. We follow the schema above for consistency.
+            return self.record_dao.get_with_mime_type(mimetype, ids_only)
 
-    class RelationshipOperations():
+    class RelationshipOperations(object):
         """
         Defines the queries users can perform on Relationships.
 
@@ -279,11 +301,13 @@ class DataStore():
 
         def __init__(self, connection):
             """Create object(s) we'll need for performing queries."""
-            self.accessor = connection.create_relationship_dao()
+            self.relationship_dao = connection.create_relationship_dao()
 
-        def get(self, subject_id=None, predicate=None, object_id=None):
+        def find(self, subject_id=None, predicate=None, object_id=None):
             """Return all relationships that fulfill one or more criteria."""
-            return self.accessor.get(subject_id, predicate, object_id)
+            return self.relationship_dao.get(subject_id=subject_id,
+                                             predicate=predicate,
+                                             object_id=object_id)
 
         def insert(self, relationships_to_insert):
             """
@@ -291,4 +315,4 @@ class DataStore():
 
             :param relationships_to_insert: Relationships to insert
             """
-            self.accessor.insert(relationships_to_insert)
+            self.relationship_dao.insert(relationships_to_insert)

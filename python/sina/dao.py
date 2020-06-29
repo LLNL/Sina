@@ -389,8 +389,8 @@ class DAOFactory(object):
         """Create a DAO for interacting with Relationships."""
         raise NotImplementedError
 
-    @classmethod
-    def create_run_dao(cls):
+    @staticmethod
+    def create_run_dao():
         """Create a DAO for interacting with Runs."""
         raise AttributeError("This method is no longer available in DAOFactory."
                              "Runs are no longer treated as a special type. "

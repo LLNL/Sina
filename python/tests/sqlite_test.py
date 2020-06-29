@@ -6,8 +6,11 @@ import time
 import unittest
 import mock  # pylint: disable=import-error
 
-import tests.backend_test
 import sina.datastores.sql as backend
+from sina.datastore import create_datastore
+
+import tests.backend_test
+import tests.datastore_test
 
 
 def test_close():
@@ -81,3 +84,41 @@ class TestImportExport(SQLMixin, tests.backend_test.TestImportExport):
     """
 
     __test__ = True
+
+
+class TestDataStore(SQLMixin, tests.datastore_test.BackendSpecificTests):
+    """Tests that DataStores are using this backend correctly."""
+
+    __test__ = True
+
+    @staticmethod
+    def create_backend_datastore():
+        """Create an in-memory db for a datastore."""
+        return create_datastore()
+
+    @mock.patch('sina.datastore.DataStore.__init__')
+    @mock.patch('sina.datastores.sql.DAOFactory.__init__')
+    def test_create_datastore(self, mock_dao, mock_ds):
+        """Test that SQL Datastores are created when expected."""
+        # Python gets confused if __init__ returns a MagicMock
+        mock_dao.return_value = None
+        mock_ds.return_value = None
+        # Empty args
+        create_datastore()
+        self.assertTrue(mock_dao.called)
+        mock_args, mock_kwargs = mock_dao.call_args
+        self.assertEqual(mock_args, (None,))
+        self.assertFalse(mock_kwargs)
+        # Backend specified
+        create_datastore(database_type="sql")
+        self.assertEqual(mock_dao.call_count, 2)
+        mock_args, mock_kwargs = mock_dao.call_args
+        self.assertEqual(mock_args, (None,))
+        self.assertFalse(mock_kwargs)
+        # destination specified but no keystore
+        database = "mock_stops_me_from_being_created.sqlite"
+        create_datastore(database)
+        self.assertEqual(mock_dao.call_count, 3)
+        mock_args, mock_kwargs = mock_dao.call_args
+        self.assertEqual(mock_args, (database,))
+        self.assertFalse(mock_kwargs)

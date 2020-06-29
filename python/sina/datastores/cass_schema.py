@@ -156,15 +156,6 @@ class RecordFromStringListData(Model):
     id = columns.Text(primary_key=True)
 
 
-class Run(Model):
-    """Query table for finding runs based on special, supported metadata."""
-
-    id = columns.Text(primary_key=True)
-    application = columns.Text(required=True)
-    user = columns.Text()
-    version = columns.Text()
-
-
 class ObjectFromSubject(Model):
     """
     Query table for finding object given subject (plus optionally predicate).
@@ -343,7 +334,6 @@ def cross_batch_delete_query_tables(name,
 def sync_tables():
     """Prep all tables, ensuring they're in our expected format."""
     sync_table(Record)
-    sync_table(Run)
     sync_table(ObjectFromSubject)
     sync_table(SubjectFromObject)
     sync_table(DocumentFromRecord)
