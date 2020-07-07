@@ -6,18 +6,19 @@ as a file.
 
 No operations are performed--this file makes heavy use of mocking.
 """
+# Disable checks that aren't as applicable for unit tests
+# pylint: disable=too-many-public-methods, too-many-arguments
+
 import unittest
-from abc import ABCMeta, abstractmethod
 
-import six
 # Disable pylint checks due to its issue with virtual environments
-from mock import patch  # pylint: disable=import-error
+from mock import Mock, patch  # pylint: disable=import-error
+from nose.plugins.attrib import attr  # pylint: disable=import-error
 
-from sina.model import Record, Relationship
 from sina.datastore import create_datastore, DataStore
 
 
-class UniversalDatastoreTests(unittest.TestCase):
+class DatastoreTests(unittest.TestCase):
     """
     Tests for datastore functionality.
 
@@ -33,195 +34,226 @@ class UniversalDatastoreTests(unittest.TestCase):
     unless of course the DataStore intentionally rearranges them.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Create the datastore.
+    def setUp(self):
+        """Assemble all our mock objects."""
+        self.dao_factory = Mock()
+        self.record_dao = Mock()
+        self.relationship_dao = Mock()
+        self.dao_factory.create_record_dao = Mock(return_value=self.record_dao)
+        self.dao_factory.create_relationship_dao = Mock(return_value=self.relationship_dao)
+        self.datastore = DataStore(self.dao_factory)
 
-        We need a DB connection to do so, but we won't interact with it, so we
-        set up the "default" of a SQLite in-memory db.
+    def assert_method_is_passthrough(self, method, method_obj,
+                                     delegate, delegate_obj,
+                                     num_args=0, opt_args=tuple(),
+                                     returns=True):
         """
-        cls.datastore = create_datastore()
+        Check args are passed correctly and return is unmodified.
 
-    @classmethod
-    def tearDownClass(cls):
-        """Shut down our datastore resources."""
-        if cls.datastore:
-            cls.datastore.close()
-
-    # This is a testing method; we're not worried about arg count.
-    # Also, we don't modify the kwargs dict, so it's not unsafe.
-    # pylint: disable=too-many-arguments, dangerous-default-value
-    def check_args(self, method, mock, args=tuple(), kwargs={},
-                   expected_args=None):
+        :param method: The method to call.
+        :param method_obj: The owner of the method to call.
+        :param delegate: The name of the method it passes through to.
+        :param delegate_obj: The owner of the method to pass through to
+        :param num_args: How many args are expected. If testing optional args,
+                         use the opt_args param.
+        :param opt_args: A tuple of exact optional arguments the passthrough is
+                         expected to provide.
+        :param returns: Whether or not the test method returns
         """
-        Assert a mocked function was called with the correct args/kwargs.
+        expected_result = "test return" if returns else None
+        setattr(delegate_obj, delegate, Mock(return_value=expected_result))
+        args = range(0, num_args)
+        actual_result = getattr(method_obj, method)(*args)
+        if opt_args:
+            args += opt_args
+        self.assertIs(actual_result, expected_result)
+        getattr(delegate_obj, delegate).called_with(args)
 
-        :param method_to_call: The datastore method being tested.
-        :param mock: The mocked call
-        :param args: The args (if any) to be passed, as an iterable. Will be
-                     unpacked.
-        :param kwargs: The kwargs (if any) to be passed, as a dictionary. Will
-                       be unpacked.
-        :param expected_args: The expected order if it differs from <args>'.
-                              Used for, ex: default args, intentionally altered
-                              order.
-        """
-        method(*args, **kwargs)
-        self.assertTrue(mock.called)
-        mock_args, mock_kwargs = mock.call_args
-        if expected_args is None:
-            expected_args = args
-        self.assertEqual(mock_args, expected_args)
-        self.assertEqual(mock_kwargs, kwargs)
+    def assert_record_method_is_passthrough(self, method, delegate, num_args=0,
+                                            opt_args=tuple(), returns=False):
+        """Provide passthrough tests on record methods."""
+        self.assert_method_is_passthrough(method, self.datastore.records,
+                                          delegate, self.record_dao,
+                                          num_args, opt_args, returns)
+
+    def assert_relationship_method_is_passthrough(self, method, delegate,
+                                                  num_args=0, opt_args=tuple(),
+                                                  returns=False):
+        """Provide passthrough tests on relationship methods."""
+        self.assert_method_is_passthrough(method, self.datastore.relationships,
+                                          delegate, self.relationship_dao,
+                                          num_args, opt_args, returns)
+
+    def assert_datastore_method_is_passthrough(self, method, delegate,
+                                               num_args=0, opt_args=tuple(),
+                                               returns=False):
+        """Provide passthrough tests on datastore methods."""
+        self.assert_method_is_passthrough(method, self.datastore,
+                                          delegate, self.dao_factory,
+                                          num_args, opt_args, returns)
 
     # #############  RecordOperations  ############# #
-    @patch('sina.dao.RecordDAO.get')
-    def test_get_record(self, mock):
+    def test_get_record(self):
         """Test the RecordOperation get()."""
-        self.check_args(self.datastore.records.get, mock, args=("spam_rec_1",))
+        self.assert_record_method_is_passthrough("get", "get", 1)
 
-    @patch('sina.datastores.sql.RecordDAO.insert')
-    def test_insert_record(self, mock):
+    def test_insert_record(self):
         """Test the RecordOperation insert()."""
-        self.check_args(self.datastore.records.insert,
-                        mock, args=(Record(id="hello", type="_"),))
+        self.assert_record_method_is_passthrough("insert", "insert", 1,
+                                                 returns=False)
 
-    @patch('sina.datastores.sql.RecordDAO.delete')
-    def test_delete_record(self, mock):
+    def test_delete_record(self):
         """Test the RecordOperation delete()."""
-        unique_ids = ["something_even_more_unique", "the_most_unique_id"]
-        self.check_args(self.datastore.records.delete, mock, args=(unique_ids,))
+        self.assert_record_method_is_passthrough("delete", "delete", 1,
+                                                 returns=False)
 
-    @patch('sina.datastores.sql.RecordDAO.get_all_of_type')
-    def test_find_with_type(self, mock):
+    def test_find_with_type(self):
         """Test the RecordOperation find_with_type()."""
-        self.check_args(self.datastore.records.find_with_type, mock, args=("foo",),
-                        expected_args=("foo", False))
+        self.assert_record_method_is_passthrough("find_with_type",
+                                                 "get_all_of_type", 2)
+        self.assert_record_method_is_passthrough("find_with_type",
+                                                 "get_all_of_type", 1,
+                                                 opt_args=(False,))
 
-    @patch('sina.datastores.sql.RecordDAO.get_available_types')
-    def test_get_types(self, mock):
+    def test_get_types(self):
         """Test the RecordOperation get_types()."""
-        self.check_args(self.datastore.records.get_types, mock)
+        self.assert_record_method_is_passthrough("get_types",
+                                                 "get_available_types")
 
-    @patch('sina.datastores.sql.RecordDAO.data_query')
-    def test_find_with_data(self, mock):
+    def test_find_with_data(self):
         """Test the RecordOperation find_with_data()."""
-        self.check_args(self.datastore.records.find_with_data, mock,
-                        kwargs={"bleepbloop": 2, "eggs": "fried"})
+        # Here, we need to test kwargs and only kwargs.
+        expected_result = "test return"
+        self.record_dao.data_query = Mock(return_value=expected_result)
+        kwargs = {"some_string": "foo", "some_scalar": 3}
+        actual_result = self.datastore.records.find_with_data(**kwargs)
+        self.assertIs(actual_result, expected_result)
+        self.assertTrue(self.record_dao.data_query.called_with(kwargs))
 
-    @patch('sina.datastores.sql.RecordDAO.get_data_for_records')
-    def test_get_data(self, mock):
+    def test_get_data(self):
         """Test the RecordOperation get_data()."""
-        self.check_args(self.datastore.records.get_data, mock,
-                        args=(("volume", "density"),
-                              ("cool_rec", "less_cool_rec")))
-        self.check_args(self.datastore.records.get_data, mock,
-                        args=(("volume",),), expected_args=(("volume",), None))
+        self.assert_record_method_is_passthrough("get_data",
+                                                 "get_data_for_records", 2)
+        self.assert_record_method_is_passthrough("get_data",
+                                                 "get_data_for_records", 1,
+                                                 opt_args=(None,))
 
-    @patch('sina.datastores.sql.RecordDAO.get_with_max')
-    def test_find_with_max(self, mock):
+    def test_find_with_max(self):
         """Test the RecordOperation find_with_max()."""
-        self.check_args(self.datastore.records.find_with_max, mock,
-                        args=("coolness",),
-                        expected_args=("coolness", 1, False))
+        self.assert_record_method_is_passthrough("find_with_max",
+                                                 "get_with_max", 2)
+        self.assert_record_method_is_passthrough("find_with_max",
+                                                 "get_with_max", 1,
+                                                 opt_args=(False,))
 
-    @patch('sina.datastores.sql.RecordDAO.get_with_min')
-    def test_find_with_min(self, mock):
+    def test_find_with_min(self):
         """Test the RecordOperation find_with_min()."""
-        self.check_args(self.datastore.records.find_with_min, mock,
-                        args=("sadness",),
-                        expected_args=("sadness", 1, False))
+        self.assert_record_method_is_passthrough("find_with_min",
+                                                 "get_with_min", 2)
+        self.assert_record_method_is_passthrough("find_with_min",
+                                                 "get_with_min", 1,
+                                                 opt_args=(False,))
 
-    @patch('sina.datastores.sql.RecordDAO.get_given_document_uri')
-    def test_find_with_file_uri(self, mock):
+    def test_find_with_file_uri(self):
         """Test the RecordOperation find_with_file_uri()."""
-        self.check_args(self.datastore.records.find_with_file_uri, mock,
-                        args=("birdsong.mp3",),
-                        expected_args=("birdsong.mp3", None, False))
+        self.assert_record_method_is_passthrough("find_with_file_uri",
+                                                 "get_given_document_uri", 3)
+        self.assert_record_method_is_passthrough("find_with_file_uri",
+                                                 "get_given_document_uri", 1,
+                                                 opt_args=(None, False))
 
-    @patch('sina.datastores.sql.RecordDAO.get_with_mime_type')
-    def test_find_with_file_mimetype(self, mock):
+    def test_find_with_file_mimetype(self):
         """Test the RecordOperation find_with_file_mimetype()."""
-        self.check_args(self.datastore.records.find_with_file_mimetype, mock,
-                        args=("png",),
-                        expected_args=("png", False))
+        self.assert_record_method_is_passthrough("find_with_file_mimetype",
+                                                 "get_with_mime_type", 2)
+        self.assert_record_method_is_passthrough("find_with_file_mimetype",
+                                                 "get_with_mime_type", 1,
+                                                 opt_args=(False,))
 
     # #############  RelationshipOperations  ############# #
-    @patch('sina.datastores.sql.RelationshipDAO.get')
-    def test_find(self, mock):
+    def test_find(self):
         """Test the RelationshipOperation find()."""
-        # Args were intentionally re-ordered, so we need to check kwargs.
-        self.datastore.relationships.find("subj", "pred", "obj")
-        mock_args, mock_kwargs = mock.call_args
-        self.assertEqual(mock_kwargs, {"subject_id": "subj",
-                                       "predicate": "pred",
-                                       "object_id": "obj"})
-        self.assertFalse(mock_args)
+        self.assert_relationship_method_is_passthrough("find", "get",
+                                                       num_args=1,
+                                                       opt_args=(None, None))
+        # We need to test that args are properly reordered
+        expected_result = "test return"
+        self.relationship_dao.get = Mock(return_value=expected_result)
+        args = ("subject_id", "predicate", "object_id")
+        reordered_args = ("subject_id", "object_id", "predicate")
+        actual_result = self.datastore.relationships.find(*args)
+        self.assertIs(actual_result, expected_result)
+        self.record_dao.data_query.called_with(reordered_args)
 
-        self.datastore.relationships.find(object_id="obj")
-        mock_args, mock_kwargs = mock.call_args
-        self.assertEqual(mock_kwargs, {"subject_id": None,
-                                       "predicate": None,
-                                       "object_id": "obj"})
-        self.assertFalse(mock_args)
-
-    @patch('sina.datastores.sql.RelationshipDAO.insert')
-    def test_insert_relationship(self, mock):
+    def test_insert_relationship(self):
         """Test the RelationshipOperation insert()."""
-        self.check_args(self.datastore.relationships.insert, mock,
-                        args=(Relationship("human", "throws", "ball"),))
+        self.assert_relationship_method_is_passthrough("insert", "insert",
+                                                       num_args=1)
 
     # #############  DataStore Operations  ############# #
-    @patch('sina.datastores.sql.DAOFactory.close')
-    def test_close(self, mock):
+    def test_close(self):
         """Test the DataStore's close() method."""
-        self.check_args(self.datastore.close, mock)
+        self.assert_datastore_method_is_passthrough("close", "close")
 
-    @patch('sina.datastores.sql.DAOFactory.close')
-    @patch('sina.datastores.sql.RecordDAO.get_with_min')
-    def test_context_management(self, mock_query, mock_close):
-        """Test that the DataStore acts as a context manager."""
-        with create_datastore() as self.datastore:
-            # Make sure the datastore itself is passed back
-            self.assertIsInstance(self.datastore, DataStore)
-            # Make sure queries are working
-            self.check_args(self.datastore.records.find_with_min, mock_query,
-                            args=("cool_rocks",),
-                            expected_args=("cool_rocks", 1, False))
-        # Make sure we called the close method.
-        self.check_args(self.datastore.close, mock_close)
-        # We now go out of scope without close() being called, but it's an
-        # in-memory db.
+    def test_exit(self):
+        """Test the DataStore's __exit__() method."""
+        self.assert_datastore_method_is_passthrough("__exit__", "__exit__", 3)
+
+    def test_enter(self):
+        """Test the DataStore's __enter__() method."""
+        self.assertEqual(self.datastore.__enter__(), self.datastore)
+
+    def test_init(self):
+        """Test that DataStore initializes its Operation objects correctly."""
+        rec_dao, rel_dao = ("fake record dao", "fake relationship dao")
+        expected_factory = Mock()
+        expected_factory.create_record_dao = Mock(return_value=rec_dao)
+        expected_factory.create_relationship_dao = Mock(return_value=rel_dao)
+        test_ds = DataStore(expected_factory)
+        self.assertEqual(test_ds.records.record_dao, rec_dao)
+        self.assertEqual(test_ds.relationships.relationship_dao, rel_dao)
 
 
-@six.add_metaclass(ABCMeta)
-class BackendSpecificTests(unittest.TestCase):
+class CreateDatastore(unittest.TestCase):
     """
-    These tests can't be separated from backend.
+    These tests can't be separated from the concept of a backend.
 
-    Each requires the creation of a Datastore and potentially the use of a
-    specific backend. We mock some inits, but specific backends are required.
+    Basically, we test that a specific DAOFactory method is called under the
+    expected conditions.
     """
 
-    __test__ = False
-    backend = None  # Set by child
-
-    @staticmethod
-    @abstractmethod
-    def create_backend_datastore():
-        """Create a datastore appropriate to the backend."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def test_create_datastore(self, mock_dao, mock_ds):
+    @patch('sina.datastore.DataStore.__init__')
+    @patch('sina.datastores.sql.DAOFactory.__init__')
+    def test_create_sql_datastore(self, mock_factory_init, mock_datastore_init):
         """Make sure create_datastore() targets the backend when appropriate."""
-        raise NotImplementedError
+        # Python gets confused if __init__ returns a MagicMock
+        mock_factory_init.return_value = None
+        # Because of that, we have to short-circuit the other init, too.
+        mock_datastore_init.return_value = None
+        create_datastore()
+        self.assertEqual(mock_factory_init.call_count, 1)
+        create_datastore("127.0.0.1")
+        self.assertEqual(mock_factory_init.call_count, 2)
+        create_datastore(database_type="sql")
+        self.assertEqual(mock_factory_init.call_count, 3)
 
-    def test_datastore_init(self):
-        """Make sure DataStore's got all the proper DAOs available."""
-        data = self.create_backend_datastore()
-        self.assertIsInstance(data.dao_factory, self.backend.DAOFactory)
-        self.assertIsInstance(data.records.record_dao, self.backend.RecordDAO)
-        self.assertIsInstance(data.relationships.relationship_dao,
-                              self.backend.RelationshipDAO)
+    @attr('cassandra')
+    @patch('sina.datastore.DataStore.__init__')
+    @patch('sina.datastores.cass.DAOFactory.__init__')
+    def test_create_cass_datastore(self, mock_factory_init,
+                                   mock_datastore_init):
+        """Make sure create_datastore() targets the backend when appropriate."""
+        mock_factory_init.return_value = None
+        mock_datastore_init.return_value = None
+        create_datastore()
+        create_datastore("127.0.0.1")
+        self.assertEqual(mock_factory_init.call_count, 0)
+        create_datastore(keyspace="my cool keyspace")
+        self.assertEqual(mock_factory_init.call_count, 1)
+        create_datastore(database_type="cassandra",
+                         keyspace="my other cool keyspace")
+        self.assertEqual(mock_factory_init.call_count, 2)
+        with self.assertRaises(ValueError) as context:
+            create_datastore(database_type="cassandra")
+        self.assertIn('keyspace must be provided', str(context.exception))
+        self.assertEqual(mock_factory_init.call_count, 2)
