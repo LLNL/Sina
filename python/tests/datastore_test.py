@@ -1,10 +1,7 @@
 """
 Tests for using the Datastore, a more user-friendly access for DAOs.
 
-Like backend_test, these tests are run by each backend rather than here
-as a file.
-
-No operations are performed--this file makes heavy use of mocking.
+Few operations are performed--this file makes heavy use of mocking.
 """
 # Disable checks that aren't as applicable for unit tests
 # pylint: disable=too-many-public-methods, too-many-arguments
@@ -22,16 +19,9 @@ class DatastoreTests(unittest.TestCase):
     """
     Tests for datastore functionality.
 
-    These tests are (spiritually)) independent of backend due to reliance on
-    mock and dao.py. For dao's abstract methods, such as insert(), delete(),
-    and data_query(), the Sqlite implementation will be used, but only to check
-    that something by the expected name was called. The Datastore calls "a"
-    DAO without knowledge of its type. so if anything here would fail on ex:
-    a Cassandra DAO instead of SQLite, that's an error on the DAO's side,
-    and should be caught by backend_test.
-
-    Make sure to order expected args based on the mocked method's signature,
-    unless of course the DataStore intentionally rearranges them.
+    These don't test the functionality of the methods (see instead
+    backend_test), they just make sure that the datastore is wrapping methods
+    correctly.
     """
 
     def setUp(self):
@@ -43,54 +33,63 @@ class DatastoreTests(unittest.TestCase):
         self.dao_factory.create_relationship_dao = Mock(return_value=self.relationship_dao)
         self.datastore = DataStore(self.dao_factory)
 
-    def assert_method_is_passthrough(self, method, method_obj,
-                                     delegate, delegate_obj,
-                                     num_args=0, opt_args=tuple(),
-                                     returns=True):
+    def assert_method_is_passthrough(self, method_name, method_owner,
+                                     delegate_method_name,
+                                     delegate_method_owner, num_args=0,
+                                     opt_args=tuple(), has_result=True):
         """
         Check args are passed correctly and return is unmodified.
 
-        :param method: The method to call.
-        :param method_obj: The owner of the method to call.
-        :param delegate: The name of the method it passes through to.
-        :param delegate_obj: The owner of the method to pass through to
+        :param method_name: The name of the method to call.
+        :param method_owner: The owner of the method to call.
+        :param delegate_method_name: The name of the method it passes through
+                                     to.
+        :param delegate_method_owner: The owner of the method to pass through to
         :param num_args: How many args are expected. If testing optional args,
                          use the opt_args param.
         :param opt_args: A tuple of exact optional arguments the passthrough is
                          expected to provide.
-        :param returns: Whether or not the test method returns
+        :param has_result: Whether or not the test method returns a value
         """
-        expected_result = "test return" if returns else None
-        setattr(delegate_obj, delegate, Mock(return_value=expected_result))
-        args = range(0, num_args)
-        actual_result = getattr(method_obj, method)(*args)
+        expected_result = "test return" if has_result else None
+        setattr(delegate_method_owner,
+                delegate_method_name,
+                Mock(return_value=expected_result))
+        args = list(range(0, num_args))
+        actual_result = getattr(method_owner, method_name)(*args)
         if opt_args:
             args += opt_args
         self.assertIs(actual_result, expected_result)
-        getattr(delegate_obj, delegate).called_with(args)
+        getattr(delegate_method_owner, delegate_method_name).called_with(args)
 
-    def assert_record_method_is_passthrough(self, method, delegate, num_args=0,
-                                            opt_args=tuple(), returns=False):
+    def assert_record_method_is_passthrough(self, method_name,
+                                            delegate_method_name, num_args=0,
+                                            opt_args=tuple(), has_result=False):
         """Provide passthrough tests on record methods."""
-        self.assert_method_is_passthrough(method, self.datastore.records,
-                                          delegate, self.record_dao,
-                                          num_args, opt_args, returns)
+        self.assert_method_is_passthrough(method_name, self.datastore.records,
+                                          delegate_method_name, self.record_dao,
+                                          num_args, opt_args, has_result)
 
-    def assert_relationship_method_is_passthrough(self, method, delegate,
+    def assert_relationship_method_is_passthrough(self, method_name,
+                                                  delegate_method_name,
                                                   num_args=0, opt_args=tuple(),
-                                                  returns=False):
+                                                  has_result=False):
         """Provide passthrough tests on relationship methods."""
-        self.assert_method_is_passthrough(method, self.datastore.relationships,
-                                          delegate, self.relationship_dao,
-                                          num_args, opt_args, returns)
+        self.assert_method_is_passthrough(method_name,
+                                          self.datastore.relationships,
+                                          delegate_method_name,
+                                          self.relationship_dao,
+                                          num_args, opt_args, has_result)
 
-    def assert_datastore_method_is_passthrough(self, method, delegate,
+    def assert_datastore_method_is_passthrough(self, method_name,
+                                               delegate_method_name,
                                                num_args=0, opt_args=tuple(),
-                                               returns=False):
+                                               has_result=False):
         """Provide passthrough tests on datastore methods."""
-        self.assert_method_is_passthrough(method, self.datastore,
-                                          delegate, self.dao_factory,
-                                          num_args, opt_args, returns)
+        self.assert_method_is_passthrough(method_name, self.datastore,
+                                          delegate_method_name,
+                                          self.dao_factory, num_args, opt_args,
+                                          has_result)
 
     # #############  RecordOperations  ############# #
     def test_get_record(self):
@@ -100,12 +99,12 @@ class DatastoreTests(unittest.TestCase):
     def test_insert_record(self):
         """Test the RecordOperation insert()."""
         self.assert_record_method_is_passthrough("insert", "insert", 1,
-                                                 returns=False)
+                                                 has_result=False)
 
     def test_delete_record(self):
         """Test the RecordOperation delete()."""
         self.assert_record_method_is_passthrough("delete", "delete", 1,
-                                                 returns=False)
+                                                 has_result=False)
 
     def test_find_with_type(self):
         """Test the RecordOperation find_with_type()."""
