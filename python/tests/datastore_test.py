@@ -60,7 +60,8 @@ class DatastoreTests(unittest.TestCase):
         if opt_args:
             args += opt_args
         self.assertIs(actual_result, expected_result)
-        getattr(delegate_method_owner, delegate_method_name).called_with(args)
+        getattr(delegate_method_owner,
+                delegate_method_name).assert_called_with(*args)
 
     def assert_record_method_is_passthrough(self, method_name,
                                             delegate_method_name, num_args=0,
@@ -127,7 +128,7 @@ class DatastoreTests(unittest.TestCase):
         kwargs = {"some_string": "foo", "some_scalar": 3}
         actual_result = self.datastore.records.find_with_data(**kwargs)
         self.assertIs(actual_result, expected_result)
-        self.assertTrue(self.record_dao.data_query.called_with(kwargs))
+        self.record_dao.data_query.assert_called_with(**kwargs)
 
     def test_get_data(self):
         """Test the RecordOperation get_data()."""
@@ -140,18 +141,18 @@ class DatastoreTests(unittest.TestCase):
     def test_find_with_max(self):
         """Test the RecordOperation find_with_max()."""
         self.assert_record_method_is_passthrough("find_with_max",
-                                                 "get_with_max", 2)
+                                                 "get_with_max", 3)
         self.assert_record_method_is_passthrough("find_with_max",
                                                  "get_with_max", 1,
-                                                 opt_args=(False,))
+                                                 opt_args=(1, False))
 
     def test_find_with_min(self):
         """Test the RecordOperation find_with_min()."""
         self.assert_record_method_is_passthrough("find_with_min",
-                                                 "get_with_min", 2)
+                                                 "get_with_min", 3)
         self.assert_record_method_is_passthrough("find_with_min",
                                                  "get_with_min", 1,
-                                                 opt_args=(False,))
+                                                 opt_args=(1, False))
 
     def test_find_with_file_uri(self):
         """Test the RecordOperation find_with_file_uri()."""
@@ -172,17 +173,25 @@ class DatastoreTests(unittest.TestCase):
     # #############  RelationshipOperations  ############# #
     def test_find(self):
         """Test the RelationshipOperation find()."""
-        self.assert_relationship_method_is_passthrough("find", "get",
-                                                       num_args=1,
-                                                       opt_args=(None, None))
-        # We need to test that args are properly reordered
+        # We need to test that args are properly kwarg'd to reorder
         expected_result = "test return"
         self.relationship_dao.get = Mock(return_value=expected_result)
         args = ("subject_id", "predicate", "object_id")
-        reordered_args = ("subject_id", "object_id", "predicate")
+        expected_kwargs = {"subject_id": "subject_id",
+                           "object_id": "object_id",
+                           "predicate": "predicate"}
         actual_result = self.datastore.relationships.find(*args)
         self.assertIs(actual_result, expected_result)
-        self.record_dao.data_query.called_with(reordered_args)
+        self.relationship_dao.get.assert_called_with(**expected_kwargs)
+
+        # ...and that default args are properly kwarg'd as well.
+        args = ("subject_id",)
+        expected_kwargs = {"subject_id": "subject_id",
+                           "object_id": None,
+                           "predicate": None}
+        actual_result = self.datastore.relationships.find(*args)
+        self.assertIs(actual_result, expected_result)
+        self.relationship_dao.get.assert_called_with(**expected_kwargs)
 
     def test_insert_relationship(self):
         """Test the RelationshipOperation insert()."""
@@ -196,7 +205,10 @@ class DatastoreTests(unittest.TestCase):
 
     def test_exit(self):
         """Test the DataStore's __exit__() method."""
-        self.assert_datastore_method_is_passthrough("__exit__", "__exit__", 3)
+        # This is mostly a passthrough, but we drop exit's 3 args to call close
+        self.dao_factory.close = Mock()
+        self.datastore.__exit__(1, 2, 3)  # all args dropped
+        self.dao_factory.close.assert_called_with()
 
     def test_enter(self):
         """Test the DataStore's __enter__() method."""
