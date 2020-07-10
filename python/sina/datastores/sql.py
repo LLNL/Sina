@@ -598,7 +598,7 @@ class RecordDAO(dao.RecordDAO):
 
     def get_with_mime_type(self, mimetype, ids_only=False):
         """
-        Return all records or IDs associated with documents whose mimetype match some arg
+        Return all records or IDs with documents of a given mimetype.
 
         :param mimetype: The mimetype to use as a search term
         :param ids_only: Whether to only return the ids
@@ -618,8 +618,8 @@ class RelationshipDAO(dao.RelationshipDAO):
         """Initialize RelationshipDAO with session for its SQL database."""
         self.session = session
 
-    def insert(self, relationships=None, subject_id=None,
-               object_id=None, predicate=None):
+    def insert(self, relationships=None, subject_id=None, object_id=None,
+               predicate=None):
         """
         Given some Relationship(s), import it/them into a SQL database.
 
@@ -667,70 +667,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         return self._build_relationships(query.all())
 
 
-class RunDAO(dao.RunDAO):
-    """DAO responsible for handling Runs (Record subtype) in SQL."""
-
-    def __init__(self, session, record_dao):
-        """Initialize RunDAO and assign a contained RecordDAO."""
-        super(RunDAO, self).__init__(record_dao)
-        self.session = session
-        self.record_dao = record_dao
-
-    def _return_only_run_ids(self, ids):
-        """
-        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
-
-        :param ids: An id or iterable of ids to sort through
-
-        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
-                  if "ids" is an iterable, else returns a single value.
-        """
-        if isinstance(ids, six.string_types):
-            val = self.session.query(schema.Run.id).filter(schema.Run.id == ids).one_or_none()
-            return val[0] if val is not None else None
-        ids = list(ids)
-        query = self.session.query(schema.Run.id).filter(schema.Run.id.in_(ids)).all()
-        run_ids = set(str(x[0]) for x in query)
-        # We do this in order to fulfill the "id or None" requirement
-        results = [x if x in run_ids else None for x in ids]
-        return results
-
-    def insert(self, runs):
-        """
-        Given a(n iterable of) Run(s), import into the SQL database.
-
-        :param runs: A Run or iterator of Runs to import
-        """
-        if isinstance(runs, model.Run):
-            runs = [runs]
-        for run in runs:
-            record = RecordDAO.create_sql_record(run)
-            run = schema.Run(application=run.application, user=run.user,
-                             version=run.version)
-            run.record = record
-            self.session.add(record)
-            self.session.add(run)
-        self.session.commit()
-
-    def delete(self, ids):
-        """
-        Given (a) Run id(s), delete all mention from the SQL database.
-
-        This includes removing all related data, raw(s), any relationships
-        involving it/them, etc.
-
-        :param ids: The id or iterator of ids of the Run to delete.
-        """
-        run_ids = self._return_only_run_ids(ids)
-        if run_ids is None:  # We have nothing to do here
-            return
-        elif isinstance(run_ids, six.string_types):
-            run_ids = [run_ids]
-        else:
-            run_ids = [id for id in run_ids if id is not None]
-        self.record_dao.delete(run_ids)
-
-
 class DAOFactory(dao.DAOFactory):
     """
     Build SQL-backed DAOs for interacting with Sina-based objects.
@@ -769,7 +705,8 @@ class DAOFactory(dao.DAOFactory):
                 """Activate foreign key support on connection creation."""
                 connection.execute('pragma foreign_keys=ON')
 
-            sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
+            sqlalchemy.event.listen(engine, 'connect',
+                                    configure_on_connect)
 
         if create_db:
             schema.Base.metadata.create_all(engine)
@@ -793,21 +730,10 @@ class DAOFactory(dao.DAOFactory):
         """
         return RelationshipDAO(session=self.session)
 
-    def create_run_dao(self):
-        """
-        Create a DAO for interacting with runs.
-
-        :returns: a RunDAO
-        """
-        return RunDAO(session=self.session,
-                      record_dao=self.create_record_dao())
-
     def __repr__(self):
         """Return a string representation of a SQL DAOFactory."""
         return 'SQL DAOFactory <db_path={}>'.format(self.db_path)
 
     def close(self):
-        """
-        Close the session for this factory and all created DAOs
-        """
+        """Close the session for this factory and all created DAOs."""
         self.session.close()

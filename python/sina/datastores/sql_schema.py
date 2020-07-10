@@ -379,34 +379,3 @@ class Document(Base):
         """Return a string representation of a sql schema Document."""
         return ('SQL Schema Document: <id={}, uri={}, mimetype={}, tags={}>'
                 .format(self.id, self.uri, self.mimetype, self.tags))
-
-
-class Run(Base):
-    """
-    Implementation of Run table.
-
-    Stores run metadata. Links to Record table.
-    """
-
-    __tablename__ = 'Run'
-    id = Column(String(255),
-                ForeignKey(Record.id, ondelete='CASCADE'),
-                primary_key=True)
-    application = Column(String(255), nullable=False)
-    user = Column(String(255), nullable=True)
-    version = Column(String(255), nullable=True)
-    record = sqlalchemy.orm.relationship(Record, uselist=False)
-
-    def __init__(self, application, user=None, version=None):
-        """Create Run table entry with id, metadata."""
-        self.application = application
-        self.user = user
-        self.version = version
-
-    def __repr__(self):
-        """Return a string representation of a sql schema Run."""
-        return ('SQL Schema Run: <id={}, application={}, user={},'
-                'version={}>'.format(self.id,
-                                     self.application,
-                                     self.user,
-                                     self.version))

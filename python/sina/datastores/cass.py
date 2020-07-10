@@ -1048,91 +1048,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         return self._build_relationships(query.all())
 
 
-class RunDAO(dao.RunDAO):
-    """DAO responsible for handling Runs, (Record subtype), in Cassandra."""
-
-    def _return_only_run_ids(self, ids):
-        """
-        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
-
-        Note that Cassandra doesn't allow __in queries on partition keys, so we're
-        forced to use a number of queries equal to the number of record ids. If this
-        becomes a performance issue, a dedicated query table should help.
-
-        The driver also tries to be clever about deferring certain fields, even
-        ignoring our own defer([]), which is why we don't use the standard
-        values_list call here. This means we're returning an entire Record but
-        discarding most fields.
-
-        :param ids: An id or iterable of ids to sort through
-
-        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
-                  if "ids" is an iterable, else returns a single value.
-        """
-        def return_if_exists(rec_id):
-            """If a Record exists as a Run, return its id."""
-            try:
-                run_id = schema.Run.objects(id=rec_id).get().id
-                return run_id
-            except DoesNotExist:
-                return None
-        if isinstance(ids, six.string_types):
-            return return_if_exists(ids)
-        return (return_if_exists(rec_id) for rec_id in ids)
-
-    # Args differ because SQL doesn't support force_overwrite yet, SIBO-307
-    # Protected access is to a Record-bound helper method we want to hide from users
-    # pylint: disable=arguments-differ, protected-access
-    def insert(self, runs, force_overwrite=False):
-        """
-        Given a(n iterable of) Run(s), import into the current Cassandra database.
-
-        :param runs: A Run or iterator of Runs to import
-        :param force_overwrite: Whether to forcibly overwrite a preexisting
-                                run that shares this run's id.
-        """
-        LOGGER.debug('Inserting %s into Cassandra with force_overwrite=%s. '
-                     'Run table only.', runs, force_overwrite)
-        if isinstance(runs, model.Run):
-            self.record_dao._insert_one(runs, force_overwrite=force_overwrite)
-            runs = [runs]
-        else:
-            runs = list(runs)  # We'll need to use it twice
-            self.record_dao._insert_many(runs, _type_managed=True,
-                                         force_overwrite=force_overwrite)
-        # This spans partitions, it can't be batched.
-        create = (schema.Run.create if force_overwrite else schema.Run.if_not_exists().create)
-        for run in runs:
-            create(id=run.id,
-                   application=run.application,
-                   user=run.user,
-                   version=run.version)
-
-    def delete(self, ids):
-        """
-        Given a(n iterable of) id(s), delete those belonging to Runs from the Cassandra database.
-
-        Does all the same work as the Record one, but also removes from the Run table.
-
-        :param ids: The id or list of ids of the Run(s) to delete
-        """
-        run_ids = self._return_only_run_ids(ids)
-        if run_ids is None:
-            return
-        if isinstance(run_ids, six.string_types):
-            run_ids = [run_ids]
-        with BatchQuery() as batch:
-            for id in run_ids:
-                if id is not None:
-                    schema.Run.objects(id=id).batch(batch).delete()
-                    # In order to accomplish everything within one batch, we hand it off
-                    # to a record_dao. However, we do not want to expose this part of
-                    # Record deletion to users; it's wrapped by two friendlier functions instead.
-                    # The method's "private" status is to avoid confusion with them.
-                    # pylint: disable=protected-access
-                    self.record_dao._setup_batch_delete(batch, id)
-
-
 class DAOFactory(dao.DAOFactory):
     """
     Build Cassandra-backed DAOs for interacting with Sina-based objects.
@@ -1174,18 +1089,8 @@ class DAOFactory(dao.DAOFactory):
         """
         return RelationshipDAO()
 
-    def create_run_dao(self):
-        """
-        Create a DAO for interacting with runs.
-
-        :returns: a RunDAO
-        """
-        return RunDAO(record_dao=self.create_record_dao())
-
     def close(self):
-        """
-        Close resources being used by this factory.
-        """
+        """Close resources being used by this factory."""
         # For now, we are using a single shared connection. If we change this in the future,
         # we need to close the Cassandra connection here.
         pass

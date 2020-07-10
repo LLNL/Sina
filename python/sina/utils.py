@@ -105,14 +105,7 @@ def import_json(factory, json_paths):
     if not factory.supports_parallel_ingestion or len(json_paths) < 2:
         for json_path in json_paths:
             records, relationships = convert_json_to_records_and_relationships(json_path)
-            generic_records, runs = ([], [])
-            for entry in records:
-                if entry.type == "run":
-                    runs.append(entry)
-                else:
-                    generic_records.append(entry)
-            factory.create_record_dao().insert(generic_records)
-            factory.create_run_dao().insert(runs)
+            factory.create_record_dao().insert(records)
             factory.create_relationship_dao().insert(relationships)
     else:
         LOGGER.debug('Factory supports parallel ingest, building thread pool.')
