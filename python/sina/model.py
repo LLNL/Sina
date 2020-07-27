@@ -85,6 +85,15 @@ class Record(object):
         self['data'] = data
 
     @property
+    def timeplots(self):
+        """Get or set the Record's timeplot dictionary."""
+        return self['timeplots']
+
+    @timeplots.setter
+    def timeplots(self, timeplots):
+        self['timeplots'] = timeplots
+
+    @property
     def files(self):
         """Get or set the Record's file list."""
         return self['files']

@@ -347,6 +347,51 @@ class ListStringDataEntry(Base):
                         self.value))
 
 
+class TimeplotMaster(Base):
+    """
+    Implementation of a table to store timeplot metadata.
+
+    Notably, neither independents nor dependents are mentioned here. That's
+    because queries dependent on their names (rather than their values) would
+    probably need to be resolved at the raw level anyways due to how scalar
+    list data's stored (ex: a method to get the data of all timeplots with
+    a certain name would require converting the raw to an object anyways to
+    get the values). If we ever decided to support fetching scalar lists with
+    database queries, I'd think TimeplotIndependent and TimeplotDependent might
+    be good additions, and have named this one TimeplotMaster just in case.
+    """
+
+    __tablename__ = 'TimeplotMaster'
+    name = Column(String(255), primary_key=True)
+    record_id = Column(String(255),
+                       ForeignKey(Record.id, ondelete='CASCADE'),
+                       nullable=False, primary_key=True)
+    # If ever this is used with TimeplotIndependent and TimeplotDependent,
+    # this is what we'll want for lookup.
+    timeplot_id = Column(Integer(), primary_key=True)
+    tags = Column(Text(), nullable=True)
+    Index('timeplot_record_idx', record_id)
+
+    def __init__(self, name, id, tags=None):
+        """
+        Create a TimeplotMaster entry with the given args.
+
+        :param name: The name of the timeplot
+        :param record_id: The record to which the timeplot belongs.
+        :param tags: Tags, if any.
+        """
+        self.name = name
+        self.record_id = id
+        self.tags = tags
+
+    def __repr__(self):
+        """Return a string repr. of a sql schema TimeplotMaster entry."""
+        return ('SQL Schema TimeplotMaster: <id={}, name={}, tags={}>'
+                .format(self.record_id,
+                        self.name,
+                        self.tags))
+
+
 class Document(Base):
     """
     Implementation of document table.
