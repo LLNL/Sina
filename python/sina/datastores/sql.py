@@ -65,6 +65,8 @@ class RecordDAO(dao.RecordDAO):
                                    raw=json.dumps(sina_record.raw))
         if sina_record.data:
             RecordDAO._attach_data(sql_record, sina_record.data)
+        if sina_record.curves:
+            RecordDAO._attach_curves(sql_record, sina_record.curves)
         if sina_record.files:
             RecordDAO._attach_files(sql_record, sina_record.files)
 
@@ -119,6 +121,68 @@ class RecordDAO(dao.RecordDAO):
                                                 # units might be None, always use get()
                                                 units=datum.get('units'),
                                                 tags=tags))
+
+    @staticmethod
+    def _attach_curves(record, curves):
+        """
+        Attach the curve entries to the given SQL record.
+
+        :param record: The SQL schema record to associate the data to.
+        :param curves: The dictionary of curves to insert.
+        """
+        LOGGER.debug('Inserting %i curve entries to Record ID %s.',
+                     len(curves), record.id)
+        lists_inserted = set(scalar_list.name for scalar_list in record.scalar_lists)
+
+        def resolve_collision(new, old):
+            """
+            Handle name overlap.
+
+            We take the lowest and highest vals for the purpose of querying and
+            unify the tags. If units mismatch, though, that's an error (unless
+            one's just None).
+            """
+            old.min = min(old.min, min(new['value']))
+            old.max = max(old.max, max(new['value']))
+            if old.units != new['units']:
+                # If one's None, that's fine.
+                if not any(units is None for units in (old.units, new['units'])):
+                    msg = ("Tried to set units of {} to {}, but wer already "
+                           "set as {}".format(old.name, new['units'], old.units))
+                    raise ValueError(msg)
+                else:
+                    if old.units is None:
+                        old.units = new['units']
+            new_tags = (json.dumps(new['tags']) if 'tags' in new else None)
+            if old.tags != tags:
+                joined_tags = (set(json.loads(new_tags.tags))
+                               .union(curve_obj['tags']))
+                old.tags = json.dumps(joined_tags)
+
+        def insert_data_from_entry(entry_name, entry_obj):
+            if entry_name in lists_inserted:
+                for scalar_list in record.scalar_list:
+                    if scalar_list.name == curve_name:
+                        resolve_collision(entry_obj, scalar_list)
+                        break
+            else:
+                # This instead of .get because SQL dislikes lists.
+                tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
+                record.scalar_lists.append(schema.ListScalarData(
+                    name=entry_name,
+                    min=min(entry_obj['value']),
+                    max=max(entry_obj['value']),
+                    units=entry_obj.get('units'),  # units might be None, always use get()
+                    tags=tags))
+
+        for curve_name, curve_obj in curves.items():
+            tags = (json.dumps(curve_obj['tags']) if 'tags' in curve_obj else None)
+            record.curve_masters.append(schema.CurveMaster(name=curve_name,
+                                                           tags=tags))
+            for entry_name, entry_obj in curve_obj["independent"]:
+                insert_data_from_entry(curve_name, curve_obj)
+            for entry_name, entry_obj in curve_obj["dependent"]:
+                insert_data_from_entry(curve_name, curve_obj)
 
     @staticmethod
     def _attach_files(record, files):
@@ -381,6 +445,28 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Getting all records of type %s.', type)
         query = (self.session.query(schema.Record.id)
                  .filter(schema.Record.type == type))
+        if ids_only:
+            for record_id in query.all():
+                yield str(record_id[0])
+        else:
+            filtered_ids = (str(x[0]) for x in query.all())
+            for record in self.get(filtered_ids):
+                yield record
+
+    def get_with_curve(self, curve_name, ids_only=False):
+        """
+        Given the name of a curve, return Records containing it.
+
+        :param curve_name: The name of the group of curves
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
+
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
+        """
+        LOGGER.debug('Getting all records with curves named %s.', curve_name)
+        query = (self.session.query(schema.Record.id)
+                 .filter(schema.CurveMaster.name == curve_name))
         if ids_only:
             for record_id in query.all():
                 yield str(record_id[0])

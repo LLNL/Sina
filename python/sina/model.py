@@ -32,7 +32,7 @@ class Record(object):
 
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, id, type, data=None,  # pylint: disable=too-many-arguments
-                 files=None, user_defined=None):
+                 curves=None, files=None, user_defined=None):
         """
         Create Record with its id, type, and optional args.
 
@@ -45,6 +45,7 @@ class Record(object):
         :param type: The type of record. Some types are reserved for
                             children, see sina.model.RESERVED_TYPES
         :param data: A dict of dicts representing the Record's data.
+        :param curves: A dict of dicts representing the Record's curves.
         :param files: A list of dicts representing the Record's files
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
@@ -54,6 +55,7 @@ class Record(object):
         self.id = id
         self.type = type
         self.data = data if data else {}
+        self.curves = curves if curves else {}
         self.files = files if files else {}
         self.user_defined = user_defined if user_defined else {}
 
@@ -85,13 +87,13 @@ class Record(object):
         self['data'] = data
 
     @property
-    def timeplots(self):
-        """Get or set the Record's timeplot dictionary."""
-        return self['timeplots']
+    def curves(self):
+        """Get or set the Record's curve dictionary."""
+        return self['curves']
 
-    @timeplots.setter
-    def timeplots(self, timeplots):
-        self['timeplots'] = timeplots
+    @curves.setter
+    def curves(self, curves):
+        self['curves'] = curves
 
     @property
     def files(self):
@@ -149,6 +151,9 @@ class Record(object):
         return ('Model Record <id={}, type={}>'
                 .format(self.id, self.type))
 
+    # TODO: 1, come up with the QoL method(s) for curves.
+    # TODO: 2, should add_data's error-raising be revisited in light of
+    # curves allowing name collisions?
     def add_data(self, name, value, units=None, tags=None):
         """
         Add a data entry to a Record.
@@ -483,6 +488,7 @@ def generate_record_from_json(json_input):
                         type=json_input['type'],
                         user_defined=json_input.get('user_defined'),
                         data=json_input.get('data'),
+                        curves=json_input.get('curves'),
                         files=json_input.get('files'))
     except KeyError as context:
         msg = 'Missing required key <{}>.'.format(context)

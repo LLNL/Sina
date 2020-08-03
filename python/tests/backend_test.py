@@ -56,10 +56,25 @@ def populate_database_with_data(record_dao):
     spam_record.data["val_data_2"] = {"value": "double yolks"}
     spam_record.files = {"beep.wav": {},
                          "beep.pong": {}}
+    spam_record.curves["spam_curve"] = {
+        "independents": {"time": {"value": [1, 2, 3]}, "tags": ["misc"]},
+        "dependents": {"internal_temp": {"value": [80, 95, 120], "units": "F"},
+                       "rubberiness": {"value": [0, 0.1, 0.3],
+                                       "tags": ["gross"]}},
+        "tags": {"food"}}
+    spam_record.curves["egg_curve"] = {
+        "independents": {"time": {"value": [1, 2, 3, 4]}, "tags": ["timer"]},
+        "dependents": {"yolk_yellowness": {"value": [10, 9, 8, 6]},
+                       "rubberiness": {"value": [0, 0.1, 0.3, 0.8],
+                                       "tags": ["gross"]}},
+        "tags": {"food"}}
 
     spam_record_2 = Run(id="spam2", application="scal_generator")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
     spam_record_2.files = {"beep/png": {}}
+    spam_record.curves["spam_curve"] = {
+        "independents": {"time": {"value": [1, 2, 3]}},
+        "dependents": {"internal_temp": {"value": [80, 95, 120]}}}
 
     spam_record_3 = Record(id="spam3", type="foo")
     spam_record_3.data["spam_scal"] = {"value": 10.5}
@@ -711,6 +726,32 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Test the RecordDAO type query correctly returns multiple Records."""
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
+
+    # ######## get_with_curve
+    def test_recorddao_get_with_curve(self):
+        """Test that the RecordDAO is retrieving based on curve name."""
+        get_one = list(self.record_dao.get_with_curve("egg_curve"))
+        self.assertEqual(len(get_one), 1)
+        self.assertIsInstance(get_one[0], Record)
+        self.assertEqual(get_one[0].id, "spam")
+        self.assertEqual(get_one[0].type, "run")
+        self.assertEqual(get_one[0].user_defined, {})
+
+    def test_recorddao_curve_none(self):
+        """Test that the RecordDAO curve query returns no Records when none match."""
+        get_none = list(self.record_dao.get_with_curve("butterscotch"))
+        self.assertFalse(get_none)
+
+    def test_recorddao_curve_returns_generator(self):
+        """Test that the RecordDAO curve query returns a generator."""
+        ids_only = self.record_dao.get_with_curve("spam_curve")
+        self.assertIsInstance(ids_only, types.GeneratorType,
+                              "Method must return a generator.")
+
+    def test_recorddao_curve_matches_many(self):
+        """Test the RecordDAO curve query correctly returns multiple Records."""
+        ids_only = self.record_dao.get_with_curve("spam_curve", ids_only=True)
+        six.assertCountEqual(self, list(ids_only), ["spam", "spam2"])
 
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):

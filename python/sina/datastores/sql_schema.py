@@ -51,6 +51,10 @@ class Record(Base):
                                                      cascade='all,delete-orphan',
                                                      backref='record',
                                                      passive_deletes=True)
+    curve_masters = sqlalchemy.orm.relationship('CurveMaster',
+                                                cascade='all,delete-orphan',
+                                                backref='record',
+                                                passive_deletes=True)
     documents = sqlalchemy.orm.relationship('Document', cascade='all,delete-orphan',
                                             backref='record', passive_deletes=True)
     Index('type_idx', type)
@@ -347,9 +351,9 @@ class ListStringDataEntry(Base):
                         self.value))
 
 
-class TimeplotMaster(Base):
+class CurveMaster(Base):
     """
-    Implementation of a table to store timeplot metadata.
+    Implementation of a table to store curve metadata.
 
     Notably, neither independents nor dependents are mentioned here. That's
     because queries dependent on their names (rather than their values) would
@@ -357,20 +361,19 @@ class TimeplotMaster(Base):
     list data's stored (ex: a method to get the data of all timeplots with
     a certain name would require converting the raw to an object anyways to
     get the values). If we ever decided to support fetching scalar lists with
-    database queries, I'd think TimeplotIndependent and TimeplotDependent might
-    be good additions, and have named this one TimeplotMaster just in case.
+    database queries, I'd think CurveIndependent and CurveDependent might
+    be good additions, and have named this one CurveMaster just in case.
     """
 
-    __tablename__ = 'TimeplotMaster'
+    __tablename__ = 'CurveMaster'
     name = Column(String(255), primary_key=True)
     record_id = Column(String(255),
                        ForeignKey(Record.id, ondelete='CASCADE'),
                        nullable=False, primary_key=True)
-    # If ever this is used with TimeplotIndependent and TimeplotDependent,
-    # this is what we'll want for lookup.
-    timeplot_id = Column(Integer(), primary_key=True)
+    # Use this for lookups
+    curve_id = Column(Integer(), primary_key=True)
     tags = Column(Text(), nullable=True)
-    Index('timeplot_record_idx', record_id)
+    Index('curve_record_idx', record_id)
 
     def __init__(self, name, id, tags=None):
         """
