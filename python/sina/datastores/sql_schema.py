@@ -129,7 +129,7 @@ class ScalarData(Base):
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, name, value,   # pylint: disable=too-many-arguments
                  tags=None, units=None):
-        """Create entry from id, name, and value, and optionally tags/units."""
+        """Create entry from name and value, and optionally tags/units."""
         self.name = name
         self.value = value
         self.units = units
@@ -367,15 +367,13 @@ class CurveMaster(Base):
 
     __tablename__ = 'CurveMaster'
     name = Column(String(255), primary_key=True)
-    record_id = Column(String(255),
-                       ForeignKey(Record.id, ondelete='CASCADE'),
-                       nullable=False, primary_key=True)
-    # Use this for lookups
-    curve_id = Column(Integer(), primary_key=True)
+    id = Column(String(255),
+                ForeignKey(Record.id, ondelete='CASCADE'),
+                nullable=False, primary_key=True)
     tags = Column(Text(), nullable=True)
-    Index('curve_record_idx', record_id)
+    Index('curve_record_idx', id)
 
-    def __init__(self, name, id, tags=None):
+    def __init__(self, name, tags=None):
         """
         Create a TimeplotMaster entry with the given args.
 
@@ -384,7 +382,6 @@ class CurveMaster(Base):
         :param tags: Tags, if any.
         """
         self.name = name
-        self.record_id = id
         self.tags = tags
 
     def __repr__(self):

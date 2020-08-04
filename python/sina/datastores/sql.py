@@ -144,25 +144,25 @@ class RecordDAO(dao.RecordDAO):
             """
             old.min = min(old.min, min(new['value']))
             old.max = max(old.max, max(new['value']))
-            if old.units != new['units']:
-                # If one's None, that's fine.
-                if not any(units is None for units in (old.units, new['units'])):
-                    msg = ("Tried to set units of {} to {}, but wer already "
+            if new.get("units") is not None and old.units != new['units']:
+                if old.units is not None:
+                    msg = ("Tried to set units of {} to {}, but were already "
                            "set as {}".format(old.name, new['units'], old.units))
                     raise ValueError(msg)
                 else:
-                    if old.units is None:
-                        old.units = new['units']
+                    old.units = new['units']
             new_tags = (json.dumps(new['tags']) if 'tags' in new else None)
-            if old.tags != tags:
-                joined_tags = (set(json.loads(new_tags.tags))
-                               .union(curve_obj['tags']))
-                old.tags = json.dumps(joined_tags)
+            if old.tags != new_tags:
+                joined_tags = (set(json.loads(old.tags))
+                               .union(new['tags']))
+                # TODO: should/do we guarantee tag order?
+                old.tags = json.dumps(list(joined_tags))
 
         def insert_data_from_entry(entry_name, entry_obj):
+            """Convert a curve timeseries to entries in the record."""
             if entry_name in lists_inserted:
-                for scalar_list in record.scalar_list:
-                    if scalar_list.name == curve_name:
+                for scalar_list in record.scalar_lists:
+                    if scalar_list.name == entry_name:
                         resolve_collision(entry_obj, scalar_list)
                         break
             else:
@@ -174,15 +174,16 @@ class RecordDAO(dao.RecordDAO):
                     max=max(entry_obj['value']),
                     units=entry_obj.get('units'),  # units might be None, always use get()
                     tags=tags))
+                lists_inserted.add(entry_name)
 
         for curve_name, curve_obj in curves.items():
             tags = (json.dumps(curve_obj['tags']) if 'tags' in curve_obj else None)
             record.curve_masters.append(schema.CurveMaster(name=curve_name,
                                                            tags=tags))
-            for entry_name, entry_obj in curve_obj["independent"]:
-                insert_data_from_entry(curve_name, curve_obj)
-            for entry_name, entry_obj in curve_obj["dependent"]:
-                insert_data_from_entry(curve_name, curve_obj)
+            for entry_name, entry_obj in curve_obj["independent"].items():
+                insert_data_from_entry(entry_name, entry_obj)
+            for entry_name, entry_obj in curve_obj["dependent"].items():
+                insert_data_from_entry(entry_name, entry_obj)
 
     @staticmethod
     def _attach_files(record, files):
@@ -465,7 +466,7 @@ class RecordDAO(dao.RecordDAO):
                   generator of their ids
         """
         LOGGER.debug('Getting all records with curves named %s.', curve_name)
-        query = (self.session.query(schema.Record.id)
+        query = (self.session.query(schema.CurveMaster.id)
                  .filter(schema.CurveMaster.name == curve_name))
         if ids_only:
             for record_id in query.all():

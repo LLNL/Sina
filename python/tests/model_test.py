@@ -184,6 +184,9 @@ class TestModel(unittest.TestCase):
         target_json = ('{"id":"hello", "type":"greeting", '
                        '"data":{"language": {"value": "english"},'
                        '"mood": {"value": "friendly"}},'
+                       '"curves":{"learning": {'
+                       '"independent":{"time": {"value": [1, 2, 3]}},'
+                       '"dependent": {"words": {"value": [0, 6, 12]}}}},'
                        '"files":{"pronounce.wav": {}},'
                        '"user_defined":{"good": "morning"}}')
         test_record = model.Record("hello", "greeting")
@@ -202,6 +205,9 @@ class TestModel(unittest.TestCase):
                        '"application":"foo", "user":"JohnD", "version":0,'
                        '"data": {"language": {"value":"english"},'
                        '"mood": {"value":"friendly"}},'
+                       '"curves":{"learning": {'
+                       '"independent":{"time": {"value": [1, 2, 3]}},'
+                       '"dependent": {"words": {"value": [0, 6, 12]}}}},'
                        '"files":{"pronounce.wav": {}},'
                        '"user_defined":{"good": "morning"}}')
         test_run = model.Run("hello", "foo", user="JohnD", version=0)
@@ -297,7 +303,8 @@ class TestModel(unittest.TestCase):
                       "type": "run",
                       "application": "foo",
                       "user": "John Doe",
-                      "data": {}, "user_defined": {},
+                      "data": {}, "curves": {},
+                      "user_defined": {},
                       "files": {}, "version": None}
         rec = model.generate_record_from_json(json_input=raw_record)
         converted_run = model.convert_record_to_run(record=rec)

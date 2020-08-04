@@ -57,24 +57,24 @@ def populate_database_with_data(record_dao):
     spam_record.files = {"beep.wav": {},
                          "beep.pong": {}}
     spam_record.curves["spam_curve"] = {
-        "independents": {"time": {"value": [1, 2, 3]}, "tags": ["misc"]},
-        "dependents": {"internal_temp": {"value": [80, 95, 120], "units": "F"},
-                       "rubberiness": {"value": [0, 0.1, 0.3],
-                                       "tags": ["gross"]}},
-        "tags": {"food"}}
+        "independent": {"time": {"value": [1, 2, 3], "tags": ["misc"]}},
+        "dependent": {"internal_temp": {"value": [80, 95, 120], "units": "F"},
+                      "rubberiness": {"value": [0, 0.1, 0.3],
+                                      "tags": ["gross"]}},
+        "tags": ["food"]}
     spam_record.curves["egg_curve"] = {
-        "independents": {"time": {"value": [1, 2, 3, 4]}, "tags": ["timer"]},
-        "dependents": {"yolk_yellowness": {"value": [10, 9, 8, 6]},
-                       "rubberiness": {"value": [0, 0.1, 0.3, 0.8],
-                                       "tags": ["gross"]}},
-        "tags": {"food"}}
+        "independent": {"time": {"value": [1, 2, 3, 4], "tags": ["timer"]}},
+        "dependent": {"yolk_yellowness": {"value": [10, 9, 8, 6]},
+                      "rubberiness": {"value": [0, 0.1, 0.3, 0.8],
+                                      "tags": ["gross"]}},
+        "tags": ["food"]}
 
     spam_record_2 = Run(id="spam2", application="scal_generator")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
     spam_record_2.files = {"beep/png": {}}
-    spam_record.curves["spam_curve"] = {
-        "independents": {"time": {"value": [1, 2, 3]}},
-        "dependents": {"internal_temp": {"value": [80, 95, 120]}}}
+    spam_record_2.curves["spam_curve"] = {
+        "independent": {"time": {"value": [1, 2, 3]}},
+        "dependent": {"internal_temp": {"value": [80, 95, 120]}}}
 
     spam_record_3 = Record(id="spam3", type="foo")
     spam_record_3.data["spam_scal"] = {"value": 10.5}
@@ -181,6 +181,54 @@ class TestModify(unittest.TestCase):
                          rec_1["data"]["eggs"]["value"])
         self.assertEqual(returned_records[1].data["eggs"]["value"],
                          rec_2["data"]["eggs"]["value"])
+
+    def test_recorddao_insert_overlapped_curves(self):
+        """Test that curves with overlapping values are handled properly."""
+        record_dao = self.factory.create_record_dao()
+        rec = Record(id="spam", type="eggs")
+        # Note that empty dependent. We only check that dependent is *there*
+        # TODO: Should this be part of on-insert validation?
+        rec.curves["spam_curve"] = {
+            "dependent": {},
+            "independent": {"time": {"value": [0, 1, 2, 3],
+                                     "tags": ["misc"],
+                                     "units": "seconds"}}}
+        rec.curves["egg_curve"] = {
+            "dependent": {},
+            "independent": {"time": {"value": [1, 2, 3, 4],
+                                     "tags": ["timer"]}}}
+        record_dao.insert(rec)
+        ret_record = record_dao.get("spam")
+        # We sort-of check how it's stored *in the db*
+        # There's not a great way of doing that in a backend-independent way
+        # since get_data doesn't handle timeseries data, though.
+        # The best we can do is check that the values unified.
+        should_be_empty = record_dao.data_query(time=all_in(DataRange(0, 4)))
+        also_be_empty = record_dao.data_query(time=all_in(DataRange(1, 5)))
+        self.assertFalse(list(should_be_empty))
+        self.assertFalse(list(also_be_empty))
+        # Make sure we didn't overwrite anything while merging the times
+        self.assertEqual(
+            ret_record.curves["spam_curve"]["independent"]["time"]["value"],
+            rec["curves"]["spam_curve"]["independent"]["time"]["value"])
+        self.assertListEqual(
+            ret_record.curves["spam_curve"]["independent"]["time"]["tags"],
+            rec["curves"]["spam_curve"]["independent"]["time"]["tags"])
+        self.assertEqual(
+            ret_record.curves["egg_curve"]["independent"]["time"]["value"],
+            rec["curves"]["egg_curve"]["independent"]["time"]["value"])
+        self.assertListEqual(
+            ret_record.curves["egg_curve"]["independent"]["time"]["tags"],
+            rec["curves"]["egg_curve"]["independent"]["time"]["tags"])
+        record_dao.delete(rec.id)
+        rec.curves["bad_time"] = {
+            "dependent": {},
+            "independent": {"time": {"value": [1, 2, 3, 4],
+                                     "tags": ["timer"],
+                                     "units": "NOT SECONDS"}}}
+        with self.assertRaises(ValueError) as context:
+            record_dao.insert(rec)
+        self.assertIn('Tried to set units', str(context.exception))
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
@@ -727,7 +775,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
 
-    # ######## get_with_curve
+    # ######################### get_with_curve #########################
     def test_recorddao_get_with_curve(self):
         """Test that the RecordDAO is retrieving based on curve name."""
         get_one = list(self.record_dao.get_with_curve("egg_curve"))
