@@ -65,8 +65,8 @@ class RecordDAO(dao.RecordDAO):
                                    raw=json.dumps(sina_record.raw))
         if sina_record.data:
             RecordDAO._attach_data(sql_record, sina_record.data)
-        if sina_record.curves:
-            RecordDAO._attach_curves(sql_record, sina_record.curves)
+        if sina_record.curve_sets:
+            RecordDAO._attach_curves(sql_record, sina_record.curve_sets)
         if sina_record.files:
             RecordDAO._attach_files(sql_record, sina_record.files)
 
@@ -132,7 +132,9 @@ class RecordDAO(dao.RecordDAO):
         """
         LOGGER.debug('Inserting %i curve entries to Record ID %s.',
                      len(curves), record.id)
-        lists_inserted = set(scalar_list.name for scalar_list in record.scalar_lists)
+        scalars_inserted = set(scalar_list.name for scalar_list in record.scalar_lists)
+        scalars_inserted = scalars_inserted.union(set(scalar.name for scalar in record.scalars))
+        curve_entries_inserted = set()
 
         def resolve_collision(new, old):
             """
@@ -155,12 +157,15 @@ class RecordDAO(dao.RecordDAO):
             if old.tags != new_tags:
                 joined_tags = (set(json.loads(old.tags))
                                .union(new['tags']))
-                # TODO: should/do we guarantee tag order?
                 old.tags = json.dumps(list(joined_tags))
 
         def insert_data_from_entry(entry_name, entry_obj):
             """Convert a curve timeseries to entries in the record."""
-            if entry_name in lists_inserted:
+            if entry_name in scalars_inserted:
+                raise ValueError(
+                    "Tried to insert curve data {} when there was already a "
+                    "scalar by that name.")
+            if entry_name in curve_entries_inserted:
                 for scalar_list in record.scalar_lists:
                     if scalar_list.name == entry_name:
                         resolve_collision(entry_obj, scalar_list)
@@ -174,12 +179,12 @@ class RecordDAO(dao.RecordDAO):
                     max=max(entry_obj['value']),
                     units=entry_obj.get('units'),  # units might be None, always use get()
                     tags=tags))
-                lists_inserted.add(entry_name)
+                curve_entries_inserted.add(entry_name)
 
         for curve_name, curve_obj in curves.items():
             tags = (json.dumps(curve_obj['tags']) if 'tags' in curve_obj else None)
-            record.curve_masters.append(schema.CurveMaster(name=curve_name,
-                                                           tags=tags))
+            record.curve_set_meta.append(schema.CurveSetMeta(name=curve_name,
+                                                             tags=tags))
             for entry_name, entry_obj in curve_obj["independent"].items():
                 insert_data_from_entry(entry_name, entry_obj)
             for entry_name, entry_obj in curve_obj["dependent"].items():
@@ -466,8 +471,8 @@ class RecordDAO(dao.RecordDAO):
                   generator of their ids
         """
         LOGGER.debug('Getting all records with curves named %s.', curve_name)
-        query = (self.session.query(schema.CurveMaster.id)
-                 .filter(schema.CurveMaster.name == curve_name))
+        query = (self.session.query(schema.CurveSetMeta.id)
+                 .filter(schema.CurveSetMeta.name == curve_name))
         if ids_only:
             for record_id in query.all():
                 yield str(record_id[0])

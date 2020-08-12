@@ -15,7 +15,9 @@ RESERVED_TYPES = ["run"]  # Types reserved by Record's children
 # Disable redefined-builtin, invalid-name due to ubiquitous use of id and type
 # pylint: disable=invalid-name,redefined-builtin
 
-class Record(object):
+# We don't mind the high instance attribute count since this is essentially
+# a reflection of our schema.
+class Record(object):  # pylint: disable=too-many-instance-attributes
     """
     A record is any arbitrary object we've chosen to store.
 
@@ -32,7 +34,7 @@ class Record(object):
 
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, id, type, data=None,  # pylint: disable=too-many-arguments
-                 curves=None, files=None, user_defined=None):
+                 curve_sets=None, files=None, user_defined=None):
         """
         Create Record with its id, type, and optional args.
 
@@ -45,17 +47,21 @@ class Record(object):
         :param type: The type of record. Some types are reserved for
                             children, see sina.model.RESERVED_TYPES
         :param data: A dict of dicts representing the Record's data.
-        :param curves: A dict of dicts representing the Record's curves.
+        :param curve_sets: A dict of dicts representing the Record's curve sets.
         :param files: A list of dicts representing the Record's files
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
         """
+        # We store curve names specially so we don't need to loop through the
+        # curve sets every time a piece of data is added.
+        self.curve_names = set()
+
         self.raw = {}
-        # Note these are all going to raw behind the scenes (see __setattr__)
+        # Items in this block are going to raw behind the scenes (see __setattr__)
         self.id = id
         self.type = type
         self.data = data if data else {}
-        self.curves = curves if curves else {}
+        self.curve_sets = curve_sets if curve_sets else {}
         self.files = files if files else {}
         self.user_defined = user_defined if user_defined else {}
 
@@ -87,13 +93,15 @@ class Record(object):
         self['data'] = data
 
     @property
-    def curves(self):
+    def curve_sets(self):
         """Get or set the Record's curve dictionary."""
-        return self['curves']
+        return self['curve_sets']
 
-    @curves.setter
-    def curves(self, curves):
-        self['curves'] = curves
+    @curve_sets.setter
+    def curve_sets(self, curve_sets):
+        names = self._find_curve_names_and_collisions(curve_sets)
+        self['curve_sets'] = curve_sets
+        self.curve_names = self.curve_names.union(names)
 
     @property
     def files(self):
@@ -151,9 +159,6 @@ class Record(object):
         return ('Model Record <id={}, type={}>'
                 .format(self.id, self.type))
 
-    # TODO: 1, come up with the QoL method(s) for curves.
-    # TODO: 2, should add_data's error-raising be revisited in light of
-    # curves allowing name collisions?
     def add_data(self, name, value, units=None, tags=None):
         """
         Add a data entry to a Record.
@@ -170,6 +175,9 @@ class Record(object):
         if name in self.data:
             raise ValueError('Duplicate datum: "{}" is already an entry in Record "{}".'
                              .format(name, self.id))
+        if name in self.curve_names:
+            raise ValueError('Name collision: "{}" is already the name of a '
+                             'curve entry in Record "{}"'.format(name, self.id))
         else:
             self.set_data(name, value, units, tags)
 
@@ -324,6 +332,26 @@ class Record(object):
             LOGGER.warning(warnstring)
             return False, warnings
         return True, warnings
+
+    def _find_curve_names_and_collisions(self, new_curves):
+        """
+        Add names the curve name set if they're not collisions.
+
+        This is used to check datum name collisions.
+
+        :returns: A set of curve names
+        :raises: ValueError if any of the curve names are already datum names.
+        """
+        new_names = set()
+        for entry in new_curves.values():
+            for subcategory in ["independent", "dependent"]:
+                for name in entry[subcategory].keys():
+                    if name in self.data:
+                        msg = ('Name collision: "{}" is already the name of a '
+                               'datum entry in Record "{}"')
+                        raise ValueError(msg.format(name, self.id))
+                    new_names.add(name)
+        return new_names
 
 
 # Disable pylint check to if and until the team decides to address the issue
@@ -488,7 +516,7 @@ def generate_record_from_json(json_input):
                         type=json_input['type'],
                         user_defined=json_input.get('user_defined'),
                         data=json_input.get('data'),
-                        curves=json_input.get('curves'),
+                        curve_sets=json_input.get('curve_sets'),
                         files=json_input.get('files'))
     except KeyError as context:
         msg = 'Missing required key <{}>.'.format(context)

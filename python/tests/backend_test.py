@@ -56,13 +56,13 @@ def populate_database_with_data(record_dao):
     spam_record.data["val_data_2"] = {"value": "double yolks"}
     spam_record.files = {"beep.wav": {},
                          "beep.pong": {}}
-    spam_record.curves["spam_curve"] = {
+    spam_record.curve_sets["spam_curve"] = {
         "independent": {"time": {"value": [1, 2, 3], "tags": ["misc"]}},
         "dependent": {"internal_temp": {"value": [80, 95, 120], "units": "F"},
                       "rubberiness": {"value": [0, 0.1, 0.3],
                                       "tags": ["gross"]}},
         "tags": ["food"]}
-    spam_record.curves["egg_curve"] = {
+    spam_record.curve_sets["egg_curve"] = {
         "independent": {"time": {"value": [1, 2, 3, 4], "tags": ["timer"]}},
         "dependent": {"yolk_yellowness": {"value": [10, 9, 8, 6]},
                       "rubberiness": {"value": [0, 0.1, 0.3, 0.8],
@@ -72,7 +72,7 @@ def populate_database_with_data(record_dao):
     spam_record_2 = Run(id="spam2", application="scal_generator")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
     spam_record_2.files = {"beep/png": {}}
-    spam_record_2.curves["spam_curve"] = {
+    spam_record_2.curve_sets["spam_curve"] = {
         "independent": {"time": {"value": [1, 2, 3]}},
         "dependent": {"internal_temp": {"value": [80, 95, 120]}}}
 
@@ -186,15 +186,13 @@ class TestModify(unittest.TestCase):
         """Test that curves with overlapping values are handled properly."""
         record_dao = self.factory.create_record_dao()
         rec = Record(id="spam", type="eggs")
-        # Note that empty dependent. We only check that dependent is *there*
-        # TODO: Should this be part of on-insert validation?
-        rec.curves["spam_curve"] = {
-            "dependent": {},
+        rec.curve_sets["spam_curve"] = {
+            "dependent": {"firmness": {"value": [1, 1, 1, 1.2]}},
             "independent": {"time": {"value": [0, 1, 2, 3],
                                      "tags": ["misc"],
                                      "units": "seconds"}}}
-        rec.curves["egg_curve"] = {
-            "dependent": {},
+        rec.curve_sets["egg_curve"] = {
+            "dependent": {"firmness": {"value": [0, 0, 0.1, 0.3]}},
             "independent": {"time": {"value": [1, 2, 3, 4],
                                      "tags": ["timer"]}}}
         record_dao.insert(rec)
@@ -207,21 +205,25 @@ class TestModify(unittest.TestCase):
         also_be_empty = record_dao.data_query(time=all_in(DataRange(1, 5)))
         self.assertFalse(list(should_be_empty))
         self.assertFalse(list(also_be_empty))
+        # Repeat for dependent
+        self.assertFalse(list(record_dao.data_query(firmness=all_in(DataRange(1, 1.2)))))
+        self.assertFalse(list(record_dao.data_query(firmness=all_in(DataRange(0, 0.3)))))
         # Make sure we didn't overwrite anything while merging the times
         self.assertEqual(
-            ret_record.curves["spam_curve"]["independent"]["time"]["value"],
-            rec["curves"]["spam_curve"]["independent"]["time"]["value"])
+            ret_record.curve_sets["spam_curve"]["independent"]["time"]["value"],
+            rec["curve_sets"]["spam_curve"]["independent"]["time"]["value"])
         self.assertListEqual(
-            ret_record.curves["spam_curve"]["independent"]["time"]["tags"],
-            rec["curves"]["spam_curve"]["independent"]["time"]["tags"])
+            ret_record.curve_sets["spam_curve"]["independent"]["time"]["tags"],
+            rec["curve_sets"]["spam_curve"]["independent"]["time"]["tags"])
         self.assertEqual(
-            ret_record.curves["egg_curve"]["independent"]["time"]["value"],
-            rec["curves"]["egg_curve"]["independent"]["time"]["value"])
+            ret_record.curve_sets["egg_curve"]["independent"]["time"]["value"],
+            rec["curve_sets"]["egg_curve"]["independent"]["time"]["value"])
         self.assertListEqual(
-            ret_record.curves["egg_curve"]["independent"]["time"]["tags"],
-            rec["curves"]["egg_curve"]["independent"]["time"]["tags"])
+            ret_record.curve_sets["egg_curve"]["independent"]["time"]["tags"],
+            rec["curve_sets"]["egg_curve"]["independent"]["time"]["tags"])
         record_dao.delete(rec.id)
-        rec.curves["bad_time"] = {
+        # Make sure we're erroring on unit overwriting
+        rec.curve_sets["bad_time"] = {
             "dependent": {},
             "independent": {"time": {"value": [1, 2, 3, 4],
                                      "tags": ["timer"],
@@ -229,6 +231,20 @@ class TestModify(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             record_dao.insert(rec)
         self.assertIn('Tried to set units', str(context.exception))
+
+    def test_recorddao_insert_overlapped_curve_and_data(self):
+        """Test that we raise an error if a curve and data item overlap."""
+        rec = Record(id="spam", type="eggs")
+        rec.curve_sets["spam_curve"] = {
+            "dependent": {"firmness": {"value": [1, 1, 1, 1.2]}},
+            "independent": {"time": {"value": [0, 1, 2, 3],
+                                     "tags": ["misc"],
+                                     "units": "seconds"}}}
+        rec.data["time"] = {"value": 1}
+        with self.assertRaises(ValueError) as context:
+            self.factory.create_record_dao().insert(rec)
+        self.assertIn("when there was already a scalar by that name",
+                      str(context.exception))
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
