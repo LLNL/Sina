@@ -51,6 +51,10 @@ class Record(Base):
                                                      cascade='all,delete-orphan',
                                                      backref='record',
                                                      passive_deletes=True)
+    curve_set_meta = sqlalchemy.orm.relationship('CurveSetMeta',
+                                                 cascade='all,delete-orphan',
+                                                 backref='record',
+                                                 passive_deletes=True)
     documents = sqlalchemy.orm.relationship('Document', cascade='all,delete-orphan',
                                             backref='record', passive_deletes=True)
     Index('type_idx', type)
@@ -125,7 +129,7 @@ class ScalarData(Base):
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, name, value,   # pylint: disable=too-many-arguments
                  tags=None, units=None):
-        """Create entry from id, name, and value, and optionally tags/units."""
+        """Create entry from name and value, and optionally tags/units."""
         self.name = name
         self.value = value
         self.units = units
@@ -345,6 +349,46 @@ class ListStringDataEntry(Base):
                         self.name,
                         self.index,
                         self.value))
+
+
+class CurveSetMeta(Base):
+    """
+    Implementation of a table to store curve metadata.
+
+    Notably, neither independents nor dependents are mentioned here. That's
+    because queries dependent on their names (rather than their values) would
+    probably need to be resolved at the raw level anyways due to how scalar
+    list data's stored (ex: a method to get the data of all curve sets with
+    a certain name would require converting the raw to an object anyways to
+    get the values). If we ever decided to support fetching scalar lists with
+    database queries, I'd think CurveIndependent and CurveDependent might
+    be good additions.
+    """
+
+    __tablename__ = 'CurveSetMeta'
+    name = Column(String(255), primary_key=True)
+    id = Column(String(255),
+                ForeignKey(Record.id, ondelete='CASCADE'),
+                nullable=False, primary_key=True)
+    tags = Column(Text(), nullable=True)
+    Index('curve_record_idx', id)
+
+    def __init__(self, name, tags=None):
+        """
+        Create a CurveSetMeta entry with the given args.
+
+        :param name: The name of the curve set
+        :param tags: Tags, if any.
+        """
+        self.name = name
+        self.tags = tags
+
+    def __repr__(self):
+        """Return a string repr. of a sql schema CurveSetMeta entry."""
+        return ('SQL Schema CurveSetMeta: <id={}, name={}, tags={}>'
+                .format(self.record_id,
+                        self.name,
+                        self.tags))
 
 
 class Document(Base):
