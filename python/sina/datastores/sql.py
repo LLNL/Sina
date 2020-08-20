@@ -367,6 +367,33 @@ class RecordDAO(dao.RecordDAO):
             raise ValueError("No Record found with id {}".format(id))
         return _record_builder(json_input=json.loads(result.raw))
 
+    def _get_many(self, ids, chunk_size, _record_builder):
+        """
+        Apply some "get" function to an iterable of Record ids.
+        Used by the parent get(), this is the SQL-specific implementation of
+        getting multiple Records.
+        ...
+
+        :param ids: An iterable of Record ids to return
+        :param chunk_size: Size of chunks to pull records in.
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+        :returns: A generator of Record objects
+        """
+
+        chunks = [ids[x:x+chunk_size] for x in range(0, len(ids), chunk_size)]
+        for chunk in chunks:
+            results = (self.session.query(schema.Record)
+                      .filter(schema.Record.id.in_(chunk)))
+
+            if results is None:
+                raise ValueError("No Record found with ids {}".format(ids))
+
+            else:
+                for result in results:
+                    yield _record_builder(json_input=json.loads(result.raw))
+
+
     def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of record, return all Records of that type.

@@ -26,11 +26,13 @@ class RecordDAO(object):
 
     __metaclass__ = ABCMeta
 
-    def get(self, ids, _record_builder=sina.model.generate_record_from_json):
+
+    def get(self, ids, chunk_size=999, _record_builder=sina.model.generate_record_from_json):
         """
         Given an (iterable of) id(s), return matching Record(s).
 
         :param ids: The id(s) of the Record(s) to return.
+        :param chunk_size: Size of chunks to pull records in.
         :param _record_builder: The function used to create a Record object
                                 (or one of its children) from the raw. Does not
                                 need to be touched by the user.
@@ -40,17 +42,15 @@ class RecordDAO(object):
 
         :raises ValueError: if no Record is found for some id.
         """
-        def gen_records(ids):
-            """Hack around the limitation of returning generators XOR non-gens."""
-            for id in ids:
-                yield self._get_one(id, _record_builder)
 
         if isinstance(ids, six.string_types):
             LOGGER.debug('Getting record with id=%s', ids)
             return self._get_one(ids, _record_builder)
+
         ids = list(ids)
-        LOGGER.debug('Getting records with ids in=%s', ids)
-        return gen_records(ids)
+        LOGGER.debug('Getting records with ids in={}'.format(ids))
+        return self._get_many(ids, chunk_size, _record_builder)
+
 
     @abstractmethod
     def _get_one(self, id, _record_builder):
@@ -71,6 +71,28 @@ class RecordDAO(object):
         :returns: A Record if found, else None.
 
         :raises ValueError: if no Record is found for the id.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _get_many(self, ids, _record_builder):
+        """
+        Apply some "get" function to an iterable of Record ids.
+
+        Because the overload needs to be invisible to the user, we need to
+        be able to return both a generator (from a list) and non-generator
+        (from a single ID). This is the framework for allowing it.
+
+        Currently, this makes sense because Cassandra can't batch reads. May
+        be worth revisiting.
+
+        :param id: An Iterable of Record ids to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A generator of Records if found, else None.
+
+        :raises ValueError: if no Record is found for the ids.
         """
         raise NotImplementedError
 

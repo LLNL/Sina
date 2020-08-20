@@ -108,20 +108,21 @@ class DataStore(object):
             self.record_dao = connection.create_record_dao()
 
         # -------------------- Basic operations ---------------------
-        def get(self, ids_to_get):
+        def get(self, ids_to_get, chunk_size=999):
             """
             Given one or more Record ids, return matching Record(s).
 
             :param ids_to_get: The id(s) of the Record(s) to return.
-
+            :param chunk_size: Size of chunks to pull records in.
+            
             :returns: If provided an iterable, a generator of Record objects,
                       else a single Record object.
 
             :raises ValueError: if no Record is found for some id.
             """
-            return self.record_dao.get(ids_to_get)
+            return self.record_dao.get(ids_to_get, chunk_size)
 
-        def insert(self, records_to_insert):
+        def insert(self, records_to_insert, chunk_size):
             """
             Given one or more Records, insert them into the DAO's backend.
 

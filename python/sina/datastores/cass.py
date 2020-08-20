@@ -643,6 +643,32 @@ class RecordDAO(dao.RecordDAO):
         except DoesNotExist:  # Raise a more familiar, descriptive error.
             raise ValueError("No Record found with id {}".format(id))
 
+    def _get_many(self, ids, chunk_size, _record_builder):
+        """
+        Apply some "get" function to an iterable of Record ids.
+
+        Used by the parent get(), this is the Cassandra-specific implementation of
+        getting a multiple Records.
+
+        :param ids: An iterable of Record ids to return
+        :param chunk_size: Currently unused for Cassandra
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A generator of Records if found, else None.
+
+        :raises ValueError: if a Record with the id can't be found.
+        """
+
+        try:
+            results = schema.Record.objects.filter(schema.Record.id.in_(ids))
+            for result in results:
+                yield _record_builder(json_input=json.loads(result.raw))
+
+        except DoesNotExist:
+            raise ValueError("No Record found with ids {}".format(ids))
+
+
     def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of Record, return all Records of that type.
