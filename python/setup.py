@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 VERSION = __import__('sina').get_version()
 
-setup(name='sina',
+setup(name='llnl-sina',
       version=VERSION,
       author='Siboka Team',
       author_email='siboka@llnl.gov',
