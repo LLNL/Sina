@@ -189,12 +189,12 @@ class TestModify(unittest.TestCase):
         rec.curve_sets["spam_curve"] = {
             "dependent": {"firmness": {"value": [1, 1, 1, 1.2]}},
             "independent": {"time": {"value": [0, 1, 2, 3],
-                                     "tags": ["misc"],
+                                     "tags": ["misc", "protein"],
                                      "units": "seconds"}}}
         rec.curve_sets["egg_curve"] = {
             "dependent": {"firmness": {"value": [0, 0, 0.1, 0.3]}},
             "independent": {"time": {"value": [1, 2, 3, 4],
-                                     "tags": ["timer"]}}}
+                                     "tags": ["timer", "protein"]}}}
         record_dao.insert(rec)
         ret_record = record_dao.get("spam")
         # We sort-of check how it's stored *in the db*
@@ -235,16 +235,16 @@ class TestModify(unittest.TestCase):
     def test_recorddao_insert_overlapped_curve_and_data(self):
         """Test that we raise an error if a curve and data item overlap."""
         rec = Record(id="spam", type="eggs")
-        rec.curve_sets["spam_curve"] = {
-            "dependent": {"firmness": {"value": [1, 1, 1, 1.2]}},
-            "independent": {"time": {"value": [0, 1, 2, 3],
-                                     "tags": ["misc"],
-                                     "units": "seconds"}}}
+        rec.curve_sets = {
+            "spam_curve": {
+                "dependent": {"firmness": {"value": [1, 1, 1, 1.2]}},
+                "independent": {"time": {"value": [0, 1, 2, 3],
+                                         "tags": ["misc"],
+                                         "units": "seconds"}}}}
         rec.data["time"] = {"value": 1}
         with self.assertRaises(ValueError) as context:
             self.factory.create_record_dao().insert(rec)
-        self.assertIn("when there was already a scalar by that name",
-                      str(context.exception))
+        self.assertIn("Data and curve name overlap", str(context.exception))
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
@@ -791,10 +791,10 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
 
-    # ######################### get_with_curve #########################
-    def test_recorddao_get_with_curve(self):
+    # ######################### get_with_curve_set #########################
+    def test_recorddao_get_with_curve_set(self):
         """Test that the RecordDAO is retrieving based on curve name."""
-        get_one = list(self.record_dao.get_with_curve("egg_curve"))
+        get_one = list(self.record_dao.get_with_curve_set("egg_curve"))
         self.assertEqual(len(get_one), 1)
         self.assertIsInstance(get_one[0], Record)
         self.assertEqual(get_one[0].id, "spam")
@@ -803,18 +803,18 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_recorddao_curve_none(self):
         """Test that the RecordDAO curve query returns no Records when none match."""
-        get_none = list(self.record_dao.get_with_curve("butterscotch"))
+        get_none = list(self.record_dao.get_with_curve_set("butterscotch"))
         self.assertFalse(get_none)
 
     def test_recorddao_curve_returns_generator(self):
         """Test that the RecordDAO curve query returns a generator."""
-        ids_only = self.record_dao.get_with_curve("spam_curve")
+        ids_only = self.record_dao.get_with_curve_set("spam_curve")
         self.assertIsInstance(ids_only, types.GeneratorType,
                               "Method must return a generator.")
 
     def test_recorddao_curve_matches_many(self):
         """Test the RecordDAO curve query correctly returns multiple Records."""
-        ids_only = self.record_dao.get_with_curve("spam_curve", ids_only=True)
+        ids_only = self.record_dao.get_with_curve_set("spam_curve", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2"])
 
     # ###################### get_data_for_records ########################

@@ -90,7 +90,16 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
 
     @data.setter
     def data(self, data):
-        self['data'] = data
+        try:
+            if self.curve_names.intersection(data.keys()):
+                msg = ("Record {} has overlapping curve and data entries. Make sure "
+                       "you haven't duplicated your curve values into record.data. "
+                       "Overlapping entries: {}"
+                       .format(self.id, self.curve_names.intersection(self.data.keys())))
+                raise ValueError(msg)
+            self['data'] = data
+        except AttributeError:
+            raise TypeError("Record {}'s data field must be a dictionary!".format(self.id))
 
     @property
     def curve_sets(self):
@@ -99,9 +108,15 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
 
     @curve_sets.setter
     def curve_sets(self, curve_sets):
+        """
+        Set the Record's curve sets to a new dict of curve sets.
+
+        This only works for rec.curve_sets = {"curveset_1" ...}. Indexing in
+        won't trigger it.
+        """
         names = self._find_curve_names_and_collisions(curve_sets)
         self['curve_sets'] = curve_sets
-        self.curve_names = self.curve_names.union(names)
+        self.curve_names = names
 
     @property
     def files(self):
@@ -283,6 +298,12 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
             (warnings.append("Record {}'s data field must be a dictionary!"
                              .format(self.id)))
         else:
+            # We have to do an extra check for collisions in case of
+            # record["data"] usage.
+            data_names = set(self.data.keys())
+            if data_names.intersection(self.curve_names):
+                (warnings.append("Data and curve name overlap: {}"
+                                 .format(data_names.intersection(self.curve_names))))
             for entry in self.data:
                 # Check data entry is a dictionary
                 if not isinstance(self.data[entry], dict):
@@ -343,14 +364,18 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         :raises: ValueError if any of the curve names are already datum names.
         """
         new_names = set()
+        collision_names = set()
         for entry in new_curves.values():
             for subcategory in ["independent", "dependent"]:
                 for name in entry[subcategory].keys():
                     if name in self.data:
-                        msg = ('Name collision: "{}" is already the name of a '
-                               'datum entry in Record "{}"')
-                        raise ValueError(msg.format(name, self.id))
+                        collision_names.add(name)
                     new_names.add(name)
+        if collision_names:
+            msg = ("Record {} has overlapping curve and data entries. Make sure "
+                   "you haven't duplicated your curve values into record.data. "
+                   "Overlapping entries: {}")
+            raise ValueError(msg.format(self.id, collision_names))
         return new_names
 
 

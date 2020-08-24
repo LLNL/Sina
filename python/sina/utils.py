@@ -10,10 +10,11 @@ import csv
 import io
 import time
 import datetime
+import copy
 from numbers import Real
 from enum import Enum
 from multiprocessing.pool import ThreadPool
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 import six
 
@@ -307,6 +308,77 @@ def intersect_ordered(iterables):
                         most_recents[index] = six.next(gen)
                     except StopIteration:
                         return
+
+
+# Disabled as the logic-splitting was even more convoluted. *Maybe* rework later.
+# pylint: disable=too-many-locals, too-many-branches
+def resolve_curve_sets(curve_sets, stringify_tags=True):
+    """
+    Given a record's curve sets, return an ingestion-ready version.
+
+    It's legal for multiple curves to have the same name. In that case, the
+    min and max of all the curves with that name are used for queries, and
+    any tags are combined into a single list. The min/max thing means that
+    the resolved set returned by this function will have all curves of length
+    2, meaning this is really only useful in the context of the backends.
+
+    If there's any collision on the units, that's an error.
+
+    :param curve_sets: The curve_sets section of a record to resolve.
+    :param stringify_tags: Whether to return tags as a string instead of a list;
+                           what's required depends on the backend.
+    :returns: <curve_sets> if there are no collisions, else a version with
+              collisions resolved.
+    :raises ValueError: if given curves with unit collisions.
+    """
+    # Will be of the form {name: [(curve_set, curve_type)]}
+    curve_mappings = defaultdict(list)
+    # Loop through to see if we have a collision.
+    for curve_set_name, curve_set_obj in curve_sets.items():
+        for curve_type in ["independent", "dependent"]:
+            for curve_name in curve_set_obj[curve_type].keys():
+                curve_mappings[curve_name].append((curve_set_name, curve_type))
+
+    # We've only collided if a name has more than one mapping.
+    if all(len(x) == 1 for x in curve_mappings.items()):
+        # We expect this to be the case the majority of the time.
+        return curve_sets
+
+    # We have a collision. Loop through again and build a dictionary of
+    # "resolved" curves.
+    resolved_curves = {}
+    for curve_name, curve_coordlist in curve_mappings.items():
+        if len(curve_coordlist) > 1:
+            mins = []
+            maxes = []
+            tags = set()
+            units = None
+            for curve_set_name, curve_type in curve_coordlist:
+                instance = curve_sets[curve_set_name][curve_type][curve_name]
+                if units is not None and instance.get("units") != units:
+                    msg = ("Tried to set units of {} to {}, but were already "
+                           "set as {}".format(curve_name, instance.get("units"), units))
+                    raise ValueError(msg)
+                else:
+                    units = instance.get("units")
+                if instance.get("tags") is not None:
+                    tags.update(instance.get("tags"))
+                mins.append(min(instance["value"]))
+                maxes.append(max(instance["value"]))
+            resolved_curves[curve_name] = {"value": [min(mins), max(maxes)]}
+            if tags:
+                new_tags = json.dumps(list(tags)) if stringify_tags else list(tags)
+                resolved_curves[curve_name]["tags"] = new_tags
+            if units:
+                resolved_curves[curve_name]["units"] = units
+
+    # Now all that's left is to overwrite each "collided" curve with a resolved one.
+    resolved_sets = copy.deepcopy(curve_sets)
+    for curve_name, curve_coordlist in curve_mappings.items():
+        if len(curve_coordlist) > 1:
+            for curve_set_name, curve_type in curve_coordlist:
+                resolved_sets[curve_set_name][curve_type][curve_name] = resolved_curves[curve_name]
+    return resolved_sets
 
 
 def export(factory, id_list, scalar_names, output_type, output_file=None):

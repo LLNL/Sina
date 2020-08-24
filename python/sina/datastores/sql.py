@@ -123,55 +123,25 @@ class RecordDAO(dao.RecordDAO):
                                                 tags=tags))
 
     @staticmethod
-    def _attach_curves(record, curves):
+    def _attach_curves(record, curve_sets):
         """
         Attach the curve entries to the given SQL record.
 
         :param record: The SQL schema record to associate the data to.
-        :param curves: The dictionary of curves to insert.
+        :param curve_sets: The dictionary of curve sets to insert.
         """
-        LOGGER.debug('Inserting %i curve entries to Record ID %s.',
-                     len(curves), record.id)
-        scalars_inserted = set(scalar_list.name for scalar_list in record.scalar_lists)
-        scalars_inserted = scalars_inserted.union(set(scalar.name for scalar in record.scalars))
-        curve_entries_inserted = set()
+        LOGGER.debug('Inserting %i curve set entries to Record ID %s.',
+                     len(curve_sets), record.id)
 
-        def resolve_collision(new, old):
-            """
-            Handle name overlap.
-
-            We take the lowest and highest vals for the purpose of querying and
-            unify the tags. If units mismatch, though, that's an error (unless
-            one's just None).
-            """
-            old.min = min(old.min, min(new['value']))
-            old.max = max(old.max, max(new['value']))
-            if new.get("units") is not None and old.units != new['units']:
-                if old.units is not None:
-                    msg = ("Tried to set units of {} to {}, but were already "
-                           "set as {}".format(old.name, new['units'], old.units))
-                    raise ValueError(msg)
-                else:
-                    old.units = new['units']
-            new_tags = (json.dumps(new['tags']) if 'tags' in new else None)
-            if old.tags != new_tags:
-                joined_tags = (set(json.loads(old.tags))
-                               .union(new['tags']))
-                old.tags = json.dumps(list(joined_tags))
+        # Collisions between data names and curve names are checked within
+        # the Record.
+        # Collisions between curve names and other curve names are checked here:
+        curve_sets = utils.resolve_curve_sets(curve_sets)
+        inserted_curves = set()
 
         def insert_data_from_entry(entry_name, entry_obj):
-            """Convert a curve timeseries to entries in the record."""
-            if entry_name in scalars_inserted:
-                raise ValueError(
-                    "Tried to insert curve data {} when there was already a "
-                    "scalar by that name.")
-            if entry_name in curve_entries_inserted:
-                for scalar_list in record.scalar_lists:
-                    if scalar_list.name == entry_name:
-                        resolve_collision(entry_obj, scalar_list)
-                        break
-            else:
-                # This instead of .get because SQL dislikes lists.
+            """Convert a curve timeseries to entries in the record if not already in."""
+            if entry_name not in inserted_curves:
                 tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
                 record.scalar_lists.append(schema.ListScalarData(
                     name=entry_name,
@@ -179,15 +149,15 @@ class RecordDAO(dao.RecordDAO):
                     max=max(entry_obj['value']),
                     units=entry_obj.get('units'),  # units might be None, always use get()
                     tags=tags))
-                curve_entries_inserted.add(entry_name)
+                inserted_curves.add(entry_name)
 
-        for curve_name, curve_obj in curves.items():
-            tags = (json.dumps(curve_obj['tags']) if 'tags' in curve_obj else None)
-            record.curve_set_meta.append(schema.CurveSetMeta(name=curve_name,
+        for curveset_name, curveset_obj in curve_sets.items():
+            tags = (json.dumps(curveset_obj['tags']) if 'tags' in curveset_obj else None)
+            record.curve_set_meta.append(schema.CurveSetMeta(name=curveset_name,
                                                              tags=tags))
-            for entry_name, entry_obj in curve_obj["independent"].items():
+            for entry_name, entry_obj in curveset_obj["independent"].items():
                 insert_data_from_entry(entry_name, entry_obj)
-            for entry_name, entry_obj in curve_obj["dependent"].items():
+            for entry_name, entry_obj in curveset_obj["dependent"].items():
                 insert_data_from_entry(entry_name, entry_obj)
 
     @staticmethod
@@ -459,20 +429,20 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get(filtered_ids):
                 yield record
 
-    def get_with_curve(self, curve_name, ids_only=False):
+    def get_with_curve_set(self, curve_set_name, ids_only=False):
         """
-        Given the name of a curve, return Records containing it.
+        Given the name of a curve set, return Records containing it.
 
-        :param curve_name: The name of the group of curves
+        :param curve_set_name: The name of the group of curves
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
         :returns: A generator of Records of that type or (if ids_only) a
                   generator of their ids
         """
-        LOGGER.debug('Getting all records with curves named %s.', curve_name)
+        LOGGER.debug('Getting all records with curve sets named %s.', curve_set_name)
         query = (self.session.query(schema.CurveSetMeta.id)
-                 .filter(schema.CurveSetMeta.name == curve_name))
+                 .filter(schema.CurveSetMeta.name == curve_set_name))
         if ids_only:
             for record_id in query.all():
                 yield str(record_id[0])
