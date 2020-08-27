@@ -162,9 +162,11 @@ def _execute_notebook(path):  # pylint: disable=too-many-branches
 def _find_notebooks():
     """
     Find all of the notebooks in the repository examples directory.
+    Ignores notebooks in the advanced_tutorials directory.
 
     :returns: pathname list
     """
+
     child = subprocess.Popen("find {} -name '*.ipynb' -print".
                              format(EXAMPLES_PATH), shell=True,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -172,8 +174,14 @@ def _find_notebooks():
     (_stdoutdata, _) = child.communicate()
 
     # Skip checkpoint notebooks in generated subdirectories
-    return sorted([filename for filename in _stdoutdata.split("\n")[:-1]
-                   if filename.find(".ipynb_checkpoints") < 0])
+    filenames = sorted([filename for filename in _stdoutdata.split("\n")[:-1]
+                        if filename.find(".ipynb_checkpoints") < 0])
+
+    # ignore notebooks from the advanced_tutorials subdirectory
+    ignore_string = 'advanced_tutorials'
+    filenames = [filename for filename in filenames if ignore_string not in filename]
+
+    return filenames
 
 
 def _check_notebook_style(path):
