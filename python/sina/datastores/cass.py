@@ -643,7 +643,7 @@ class RecordDAO(dao.RecordDAO):
         except DoesNotExist:  # Raise a more familiar, descriptive error.
             raise ValueError("No Record found with id {}".format(id))
 
-    def _get_many(self, ids, chunk_size, _record_builder):
+    def _get_many(self, ids, _record_builder, chunk_size):
         """
         Apply some "get" function to an iterable of Record ids.
 
@@ -666,8 +666,7 @@ class RecordDAO(dao.RecordDAO):
                 yield _record_builder(json_input=json.loads(result.raw))
 
         except DoesNotExist:
-            raise ValueError("No Record found with ids {}".format(ids))
-
+            raise ValueError("No Record found with id in %s" % ids)
 
     def get_all_of_type(self, type, ids_only=False):
         """

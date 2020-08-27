@@ -363,11 +363,12 @@ class RecordDAO(dao.RecordDAO):
         """
         result = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one_or_none())
+
         if result is None:
-            raise ValueError("No Record found with id {}".format(id))
+            raise ValueError("No Record found with id %s" % id)
         return _record_builder(json_input=json.loads(result.raw))
 
-    def _get_many(self, ids, chunk_size, _record_builder):
+    def _get_many(self, ids, _record_builder, chunk_size):
         """
         Apply some "get" function to an iterable of Record ids.
         Used by the parent get(), this is the SQL-specific implementation of
@@ -380,19 +381,16 @@ class RecordDAO(dao.RecordDAO):
                                 (or one of its children) from the raw.
         :returns: A generator of Record objects
         """
-
         chunks = [ids[x:x+chunk_size] for x in range(0, len(ids), chunk_size)]
         for chunk in chunks:
             results = (self.session.query(schema.Record)
-                      .filter(schema.Record.id.in_(chunk)))
+                       .filter(schema.Record.id.in_(chunk)))
 
-            if results is None:
-                raise ValueError("No Record found with ids {}".format(ids))
+            if len(results.all()) < len(chunk):
+                raise ValueError("No Record found with id in chunk %s" % chunk)
 
-            else:
-                for result in results:
-                    yield _record_builder(json_input=json.loads(result.raw))
-
+            for result in results:
+                yield _record_builder(json_input=json.loads(result.raw))
 
     def get_all_of_type(self, type, ids_only=False):
         """

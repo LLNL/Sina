@@ -26,8 +26,7 @@ class RecordDAO(object):
 
     __metaclass__ = ABCMeta
 
-
-    def get(self, ids, chunk_size=999, _record_builder=sina.model.generate_record_from_json):
+    def get(self, ids, _record_builder=sina.model.generate_record_from_json, chunk_size=999):
         """
         Given an (iterable of) id(s), return matching Record(s).
 
@@ -48,9 +47,8 @@ class RecordDAO(object):
             return self._get_one(ids, _record_builder)
 
         ids = list(ids)
-        LOGGER.debug('Getting records with ids in={}'.format(ids))
-        return self._get_many(ids, chunk_size, _record_builder)
-
+        LOGGER.debug('Getting records with ids in %s', ids)
+        return self._get_many(ids, _record_builder, chunk_size)
 
     @abstractmethod
     def _get_one(self, id, _record_builder):
@@ -75,7 +73,7 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def _get_many(self, ids, _record_builder):
+    def _get_many(self, ids, _record_builder, chunk_size):
         """
         Apply some "get" function to an iterable of Record ids.
 

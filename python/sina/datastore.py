@@ -114,15 +114,15 @@ class DataStore(object):
 
             :param ids_to_get: The id(s) of the Record(s) to return.
             :param chunk_size: Size of chunks to pull records in.
-            
+
             :returns: If provided an iterable, a generator of Record objects,
                       else a single Record object.
 
             :raises ValueError: if no Record is found for some id.
             """
-            return self.record_dao.get(ids_to_get, chunk_size)
+            return self.record_dao.get(ids_to_get, chunk_size=chunk_size)
 
-        def insert(self, records_to_insert, chunk_size):
+        def insert(self, records_to_insert):
             """
             Given one or more Records, insert them into the DAO's backend.
 
