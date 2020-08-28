@@ -389,6 +389,40 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get(filtered_ids):
                 yield record
 
+    def _one_record_exists(self, id):
+        """
+        Given an id, return boolean
+
+        This is SQL specific implementation.
+
+        :param ids: The id(s) of the Record(s) to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        query = (self.session.query(schema.Record.id)
+                 .filter(schema.Record.id == id).one_or_none())
+        return bool(query)
+
+    def _many_records_exist(self, ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+
+        This SQL specific implementation
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        chunk_size = 999
+        chunks = [ids[x:x+chunk_size] for x in range(0, len(ids), chunk_size)]
+        for chunk in chunks:
+            query = (self.session.query(schema.Record.id)
+                     .filter(schema.Record.id.in_(chunk)))
+            filtered_ids = (str(x[0]) for x in query.all())
+            for id in chunk:
+                yield id in filtered_ids
+
     def _universal_query(self, universal_criteria):
         """
         Pull back all record ids fulfilling universal criteria.

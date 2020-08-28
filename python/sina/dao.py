@@ -167,6 +167,52 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def records_exist(self, ids):
+        """
+        Given an (iterable of) id(s), return boolean list of whether those
+        records exist or not.
+
+        :param ids: The id(s) of the Record(s) to test.
+
+        :returns: If provided an iterable, a generator of bools pertaining to
+                  the ids existence, else a single boolean value.
+        """
+
+        if isinstance(ids, six.string_types):
+            LOGGER.debug('Getting record with id=%s', ids)
+            return self._one_record_exists(ids)
+
+        ids = list(ids)
+        LOGGER.debug('Getting records with ids in %s', ids)
+        return self._many_records_exist(ids)
+
+    @abstractmethod
+    def _one_record_exists(self, id):
+        """
+        Given an id, return boolean
+
+        This is SQL specific implementation.
+
+        :param ids: The id(s) of the Record(s) to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _many_records_exist(self, ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+
+        This SQL specific implementation
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
