@@ -383,14 +383,16 @@ class RecordDAO(dao.RecordDAO):
         """
         chunks = [ids[x:x+chunk_size] for x in range(0, len(ids), chunk_size)]
         for chunk in chunks:
+            ids_found = 0
             results = (self.session.query(schema.Record)
                        .filter(schema.Record.id.in_(chunk)))
 
-            if len(results.all()) < len(chunk):
-                raise ValueError("No Record found with id in chunk %s" % chunk)
-
             for result in results:
+                ids_found += 1
                 yield _record_builder(json_input=json.loads(result.raw))
+
+            if ids_found != len(chunk):
+                raise ValueError("No Record found with id in chunk %s" % chunk)
 
     def get_all_of_type(self, type, ids_only=False):
         """

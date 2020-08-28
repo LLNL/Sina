@@ -648,24 +648,25 @@ class RecordDAO(dao.RecordDAO):
         Apply some "get" function to an iterable of Record ids.
 
         Used by the parent get(), this is the Cassandra-specific implementation of
-        getting a multiple Records.
+        getting multiple Records.
 
         :param ids: An iterable of Record ids to return
         :param chunk_size: Currently unused for Cassandra
         :param _record_builder: The function used to create a Record object
                                 (or one of its children) from the raw.
 
-        :returns: A generator of Records if found, else None.
+        :returns: A generator of Records if found.
 
         :raises ValueError: if a Record with the id can't be found.
         """
 
-        try:
-            results = schema.Record.objects.filter(schema.Record.id.in_(ids))
-            for result in results:
-                yield _record_builder(json_input=json.loads(result.raw))
+        results = schema.Record.objects.filter(schema.Record.id.in_(ids))
+        ids_found = 0
+        for result in results:
+            yield _record_builder(json_input=json.loads(result.raw))
+            ids_found += 1
 
-        except DoesNotExist:
+        if ids_found != len(ids):
             raise ValueError("No Record found with id in %s" % ids)
 
     def get_all_of_type(self, type, ids_only=False):
