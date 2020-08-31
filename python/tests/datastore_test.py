@@ -95,7 +95,23 @@ class DatastoreTests(unittest.TestCase):
     # #############  RecordOperations  ############# #
     def test_get_record(self):
         """Test the RecordOperation get()."""
-        self.assert_record_method_is_passthrough("get", "get", 1)
+        # We need to test that args are properly kwarg'd to reorder
+        expected_result = "test return"
+        self.record_dao.get = Mock(return_value=expected_result)
+        args = ("ids", "chunk_size")
+        expected_args = ['ids']
+        expected_kwargs = {"chunk_size": "chunk_size"}
+        actual_result = self.datastore.records.get(*args)
+        self.assertIs(actual_result, expected_result)
+        self.record_dao.get.assert_called_with(*expected_args, **expected_kwargs)
+
+        # ...and that default args are properly kwarg'd as well.
+        args = ("ids",)
+        expected_args = ['ids']
+        expected_kwargs = {"chunk_size": 999}
+        actual_result = self.datastore.records.get(*args)
+        self.assertIs(actual_result, expected_result)
+        self.record_dao.get.assert_called_with(*expected_args, **expected_kwargs)
 
     def test_insert_record(self):
         """Test the RecordOperation insert()."""
