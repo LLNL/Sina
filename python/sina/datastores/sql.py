@@ -363,9 +363,36 @@ class RecordDAO(dao.RecordDAO):
         """
         result = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one_or_none())
+
         if result is None:
-            raise ValueError("No Record found with id {}".format(id))
+            raise ValueError("No Record found with id %s" % id)
         return _record_builder(json_input=json.loads(result.raw))
+
+    def _get_many(self, ids, _record_builder, chunk_size):
+        """
+        Apply some "get" function to an iterable of Record ids.
+        Used by the parent get(), this is the SQL-specific implementation of
+        getting multiple Records.
+        ...
+
+        :param ids: An iterable of Record ids to return
+        :param chunk_size: Size of chunks to pull records in.
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+        :returns: A generator of Record objects
+        """
+        chunks = [ids[x:x+chunk_size] for x in range(0, len(ids), chunk_size)]
+        for chunk in chunks:
+            ids_found = 0
+            results = (self.session.query(schema.Record)
+                       .filter(schema.Record.id.in_(chunk)))
+
+            for result in results:
+                ids_found += 1
+                yield _record_builder(json_input=json.loads(result.raw))
+
+            if ids_found != len(chunk):
+                raise ValueError("No Record found with id in chunk %s" % chunk)
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -392,7 +419,6 @@ class RecordDAO(dao.RecordDAO):
     def _one_record_exists(self, id):
         """
         Given an id, return boolean
-
         This is SQL specific implementation.
 
         :param ids: The id(s) of the Record(s) to test.
@@ -407,8 +433,7 @@ class RecordDAO(dao.RecordDAO):
         """
         Given an iterable of ids, return boolean list of whether those
         records exist or not.
-
-        This SQL specific implementation
+        This is SQL specific implementation
 
         :param ids: The ids of the Records to test.
 
