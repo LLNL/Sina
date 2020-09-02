@@ -22,8 +22,9 @@ setup(name='llnl-sina',
             'cassandra-driver',
         ],
         'jupyter:python_version<"3"': [
+            'wcwidth<0.1.8',
             'ipython>=5,<6',  # ipython 6 drops support for Python 2
-            'ipykernel<5',
+            'ipykernel<5'
         ],
         'jupyter:python_version>="3"': [
             'ipython',
