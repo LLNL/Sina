@@ -24,18 +24,16 @@ setup(name='llnl-sina',
         'jupyter:python_version<"3"': [
             'ipython>=5,<6',  # ipython 6 drops support for Python 2
             'ipykernel<5',
-            'wcwidth<0.1.8',
-            'tornado<5.1'
         ],
         'jupyter:python_version>="3"': [
             'ipython',
-            'ipykernel>=5',
-            'tornado<5.1'
+            'ipykernel>=5'
         ],
         'jupyter': [
             'pyzmq<18',   # pyzmq 18.0 has bug on Python 3, use anything below
             'ipywidgets',
             'tabulate',
+            'tornado<5.1',  # Tornado 5.1 gets stuck in a loop
             'matplotlib'
         ],
         'cli_tools': [
