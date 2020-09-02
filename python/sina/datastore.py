@@ -141,7 +141,7 @@ class DataStore(object):
             """
             return self.record_dao.delete(ids_to_delete)
 
-        def records_exist(self, ids_to_check):
+        def exist(self, ids_to_check):
             """
             Given an (iterable of) id(s), return boolean list of whether those
             records exist or not.
@@ -151,7 +151,7 @@ class DataStore(object):
             :returns: If provided an iterable, a generator of bools pertaining to
                       the ids existence, else a single boolean value.
             """
-            return self.record_dao.records_exist(ids_to_check)
+            return self.record_dao.exist(ids_to_check)
 
         # ------------------ Operations tied to Record type -------------------
         # It's safe to redefine "type" within the scope of this function.

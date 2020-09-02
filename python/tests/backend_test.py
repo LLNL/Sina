@@ -484,6 +484,19 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                            id_only=True))
         self.assertEqual(min_spam_scals, ["spam", "spam3"])
 
+    # ####################### test_exist ####################################
+    def test_one_exists(self):
+        """Make sure that we return a correct bool for each ID."""
+        hit = self.record_dao.exist('spam')
+        self.assertEqual(hit, True)
+        miss = self.record_dao.exist('IDonNotExist')
+        self.assertEqual(miss, False)
+
+    def test_many_exist(self):
+        """Make sure that we return a correct list of Bools"""
+        result = list(self.record_dao.exist(['spam', 'IDonNotExist', 'spam2', 'IAlsoDoNotExist']))
+        self.assertEqual(result, [True, False, True, False])
+
     # ####################### test_get_available_types ######################
     def test_get_available_types(self):
         """Make sure that we return a correct list of the types in a datebase."""

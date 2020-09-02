@@ -28,6 +28,9 @@ SQLITE_PREFIX = "sqlite:///"
 DATA_TABLES = [schema.ScalarData, schema.StringData,
                schema.ListScalarData, schema.ListStringDataEntry]
 
+# Set maximum chunk size for id queries
+CHUNK_SIZE = 999
+
 
 class RecordDAO(dao.RecordDAO):
     """The DAO specifically responsible for handling Records in SQL."""
@@ -416,12 +419,12 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get(filtered_ids):
                 yield record
 
-    def _one_record_exists(self, id):
+    def _one_exists(self, id):
         """
         Given an id, return boolean
-        This is SQL specific implementation.
+        This is the SQL specific implementation.
 
-        :param ids: The id(s) of the Record(s) to test.
+        :param id: The id of the Record to test.
 
         :returns: A single boolean value pertaining to the id's existence.
         """
@@ -429,24 +432,24 @@ class RecordDAO(dao.RecordDAO):
                  .filter(schema.Record.id == id).one_or_none())
         return bool(query)
 
-    def _many_records_exist(self, ids):
+    def _many_exist(self, test_ids):
         """
         Given an iterable of ids, return boolean list of whether those
         records exist or not.
-        This is SQL specific implementation
+        This is the SQL specific implementation
 
         :param ids: The ids of the Records to test.
 
         :returns: A generator of bools pertaining to the ids' existence.
         """
-        chunk_size = 999
-        chunks = [ids[x:x+chunk_size] for x in range(0, len(ids), chunk_size)]
+        test_ids = list(test_ids)
+        chunks = [test_ids[x:x+CHUNK_SIZE] for x in range(0, len(test_ids), CHUNK_SIZE)]
         for chunk in chunks:
             query = (self.session.query(schema.Record.id)
                      .filter(schema.Record.id.in_(chunk)))
-            filtered_ids = (str(x[0]) for x in query.all())
-            for id in chunk:
-                yield id in filtered_ids
+            actual_ids = list((str(x[0]) for x in query.all()))
+            for test_id in chunk:
+                yield test_id in actual_ids
 
     def _universal_query(self, universal_criteria):
         """
