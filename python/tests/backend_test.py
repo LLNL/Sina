@@ -494,7 +494,9 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_many_exist(self):
         """Make sure that we return a correct list of Bools"""
-        result = list(self.record_dao.exist(['spam', 'IDonNotExist', 'spam2', 'IAlsoDoNotExist']))
+        result = list(self.record_dao.exist(id_ for id_ in
+                                            ['spam', 'IDoNotExist',
+                                             'spam2', 'IAlsoDoNotExist']))
         self.assertEqual(result, [True, False, True, False])
 
     # ####################### test_get_available_types ######################

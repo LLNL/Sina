@@ -187,7 +187,7 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
-    def exist(self, ids):
+    def exist(self, test_ids):
         """
         Given an (iterable of) id(s), return boolean (list) of whether those
         record(s) exist or not.
@@ -198,16 +198,15 @@ class RecordDAO(object):
                   the ids' existence, else a single boolean value.
         """
 
-        if isinstance(ids, six.string_types):
-            LOGGER.debug('Getting record with id=%s', ids)
-            return self._one_exists(ids)
+        if isinstance(test_ids, six.string_types):
+            LOGGER.debug('Getting record with id=%s', test_ids)
+            return self._one_exists(test_ids)
 
-        ids = list(ids)
-        LOGGER.debug('Getting records with ids in %s', ids)
-        return self._many_exist(ids)
+        LOGGER.debug('Getting records with ids in %s', test_ids)
+        return self._many_exist(test_ids)
 
     @abstractmethod
-    def _one_exists(self, id):
+    def _one_exists(self, test_id):
         """
         Given an id, return boolean
 
