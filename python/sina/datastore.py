@@ -141,6 +141,18 @@ class DataStore(object):
             """
             return self.record_dao.delete(ids_to_delete)
 
+        def exist(self, ids_to_check):
+            """
+            Given an (iterable of) id(s), return boolean list of whether those
+            records exist or not.
+
+            :param ids: The id(s) of the Record(s) to test.
+
+            :returns: If provided an iterable, a generator of bools pertaining to
+                      the ids existence, else a single boolean value.
+            """
+            return self.record_dao.exist(ids_to_check)
+
         # ------------------ Operations tied to Record type -------------------
         # It's safe to redefine "type" within the scope of this function.
         # pylint: disable=redefined-builtin

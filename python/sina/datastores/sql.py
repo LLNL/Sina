@@ -28,6 +28,9 @@ SQLITE_PREFIX = "sqlite:///"
 DATA_TABLES = [schema.ScalarData, schema.StringData,
                schema.ListScalarData, schema.ListStringDataEntry]
 
+# Set maximum chunk size for id queries
+CHUNK_SIZE = 999
+
 
 class RecordDAO(dao.RecordDAO):
     """The DAO specifically responsible for handling Records in SQL."""
@@ -416,7 +419,7 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get(filtered_ids):
                 yield record
 
-    def _one_exists(self, id):
+    def _one_exists(self, test_id):
         """
         Given an id, return boolean
         This is the SQL specific implementation.
@@ -426,7 +429,7 @@ class RecordDAO(dao.RecordDAO):
         :returns: A single boolean value pertaining to the id's existence.
         """
         query = (self.session.query(schema.Record.id)
-                 .filter(schema.Record.id == id).one_or_none())
+                 .filter(schema.Record.id == test_id).one_or_none())
         return bool(query)
 
     def _many_exist(self, test_ids):
