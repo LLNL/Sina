@@ -163,6 +163,19 @@ class DataStore(object):
             """
             return self.record_dao.get_available_types()
 
+        def data_names(self, record_type, data_types=None):
+            """
+            Return a list of all the data labels for data of a given type.
+            Defaults to getting all data names for all records.
+            ...
+            :param record_type: Type of records to get data names for.
+            :param data_types: A list of data types to get the data names for.
+                               Current options are limited to:
+                               'scalar', 'string', 'scalar_list', 'string_list'.
+            :returns: A generator of data names.
+            """
+            return self.record_dao.data_names(record_type, data_types)
+
         # ------------------ Operations tied to Record data -------------------
         def find_with_data(self, **kwargs):
             """

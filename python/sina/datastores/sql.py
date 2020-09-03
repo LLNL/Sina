@@ -483,6 +483,39 @@ class RecordDAO(dao.RecordDAO):
         results = self.session.query(schema.Record.type).distinct().all()
         return [entry[0] for entry in results]
 
+    def data_names(self, record_type, data_types=None):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for all records.
+        ...
+        :param record_type: Type of records to get data names for.
+        :param data_types: A list of data types to get the data names for.
+                           Current options are limited to:
+                           'scalar', 'string', 'scalar_list', 'string_list'.
+        :returns: A generator of data names.
+        """
+        possible_data_types = ['scalar', 'string', 'scalar_list', 'string_list']
+        data_types_map = {'scalar': schema.ScalarData,
+                          'string': schema.StringData,
+                          'scalar_list': schema.ListScalarData,
+                          'string_list': schema.ListStringDataMaster}
+
+        if data_types is None:
+            data_types = possible_data_types
+        if not isinstance(data_types, list):
+            data_types = [data_types]
+        if not set(data_types).issubset(set(possible_data_types)):
+            raise ValueError('Only select data types from: %s' % possible_data_types)
+
+        query_tables = [data_types_map[type] for type in data_types]
+
+        for query_table in query_tables:
+            results = (self.session.query(query_table.name).join(schema.Record)
+                       .filter(schema.Record.type == record_type)
+                       .distinct().all())
+            for result in results:
+                yield result[0]
+
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
