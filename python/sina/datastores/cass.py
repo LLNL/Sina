@@ -669,6 +669,38 @@ class RecordDAO(dao.RecordDAO):
         if ids_found != len(ids):
             raise ValueError("No Record found with id in %s" % ids)
 
+    def _one_exists(self, test_id):
+        """
+        Given an id, return boolean of if it exists or not.
+        This is the Cassandra specific implementation.
+
+        :param id: The id of the Record to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        try:
+            _ = schema.Record.objects.filter(id=test_id).get()
+            return True
+        except DoesNotExist:
+            return False
+
+    def _many_exist(self, test_ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+        This is the Cassandra specific implementation
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        test_ids = list(test_ids)
+        actual_ids = set(schema.Record.objects
+                         .filter(schema.Record.id.in_(test_ids))
+                         .values_list('id', flat=True))
+        for test_id in test_ids:
+            yield test_id in actual_ids
+
     def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of Record, return all Records of that type.

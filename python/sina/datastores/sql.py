@@ -28,6 +28,9 @@ SQLITE_PREFIX = "sqlite:///"
 DATA_TABLES = [schema.ScalarData, schema.StringData,
                schema.ListScalarData, schema.ListStringDataEntry]
 
+# Set maximum chunk size for id queries
+CHUNK_SIZE = 999
+
 
 class RecordDAO(dao.RecordDAO):
     """The DAO specifically responsible for handling Records in SQL."""
@@ -415,6 +418,38 @@ class RecordDAO(dao.RecordDAO):
             filtered_ids = (str(x[0]) for x in query.all())
             for record in self.get(filtered_ids):
                 yield record
+
+    def _one_exists(self, test_id):
+        """
+        Given an id, return boolean
+        This is the SQL specific implementation.
+
+        :param id: The id of the Record to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        query = (self.session.query(schema.Record.id)
+                 .filter(schema.Record.id == test_id).one_or_none())
+        return bool(query)
+
+    def _many_exist(self, test_ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+        This is the SQL specific implementation
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        test_ids = list(test_ids)
+        chunks = [test_ids[x:x+CHUNK_SIZE] for x in range(0, len(test_ids), CHUNK_SIZE)]
+        for chunk in chunks:
+            query = (self.session.query(schema.Record.id)
+                     .filter(schema.Record.id.in_(chunk)))
+            actual_ids = set((str(x[0]) for x in query.all()))
+            for test_id in chunk:
+                yield test_id in actual_ids
 
     def _universal_query(self, universal_criteria):
         """
