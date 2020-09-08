@@ -140,6 +140,12 @@ class DatastoreTests(unittest.TestCase):
         """Test the RecordOperation exist()."""
         self.assert_record_method_is_passthrough("exist", "exist", 1)
 
+    def test_data_names(self):
+        """Test the RecordOperation data_names()."""
+        self.assert_record_method_is_passthrough("data_names", "data_names", 2)
+        self.assert_record_method_is_passthrough("data_names", "data_names", 1,
+                                                 opt_args=(None,))
+
     def test_find_with_data(self):
         """Test the RecordOperation find_with_data()."""
         # Here, we need to test kwargs and only kwargs.

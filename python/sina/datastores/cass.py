@@ -743,24 +743,24 @@ class RecordDAO(dao.RecordDAO):
                            'scalar', 'string', 'scalar_list', 'string_list'.
         :returns: A generator of data names.
         """
-        possible_data_types = ['scalar', 'string']
+        possible_types = ['scalar', 'string']
         data_types_map = {'scalar': schema.ScalarDataFromRecord,
                           'string': schema.StringDataFromRecord}
         if data_types is None:
-            data_types = possible_data_types
+            data_types = possible_types
         if not isinstance(data_types, list):
             data_types = [data_types]
-        if not set(data_types).issubset(set(possible_data_types)):
-            raise ValueError('Only select data types from: %s' % possible_data_types)
+        if not set(data_types).issubset(set(possible_types)):
+            raise ValueError('Only select data types from: %s' % possible_types)
 
         query_tables = [data_types_map[type] for type in data_types]
 
-        ids = get_all_of_type(record_type, ids_only=True)
+        ids = self.get_all_of_type(record_type, ids_only=True)
 
         for query_table in query_tables:
-            result = set(query_table.objects
-                         .filter(query_table.id.in_(ids))
-                         .values_list('name', flat=True))
+            results = set(query_table.objects
+                          .filter(query_table.id.in_(ids))
+                          .values_list('name', flat=True))
             for result in results:
                 yield result
 

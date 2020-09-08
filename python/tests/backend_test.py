@@ -499,6 +499,22 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                              'spam2', 'IAlsoDoNotExist']))
         self.assertEqual(result, [True, False, True, False])
 
+    # ####################### test_data_names ####################################
+    def test_data_names_with_string(self):
+        """Make sure that we get names of scalar data when given a string."""
+        names = list(self.record_dao.data_names(record_type='foo', data_types='scalar'))
+        self.assertEqual(names, ["spam_scal", "spam_scal_2"])
+
+    def test_data_names_with_list(self):
+        """Make sure that we get names of scalar data when given a list."""
+        names = list(self.record_dao.data_names(record_type='foo', data_types=['scalar']))
+        self.assertEqual(names, ["spam_scal", "spam_scal_2"])
+
+    def test_data_names_with_default(self):
+        """Make sure that we get names of all data by default."""
+        names = list(self.record_dao.data_names(record_type='foo'))
+        self.assertEqual(names, ["spam_scal", "spam_scal_2", "val_data", "val_data_2"])
+
     # ####################### test_get_available_types ######################
     def test_get_available_types(self):
         """Make sure that we return a correct list of the types in a datebase."""
