@@ -501,7 +501,7 @@ class RecordDAO(dao.RecordDAO):
         data_types_map = {'scalar': schema.ScalarData,
                           'string': schema.StringData,
                           'scalar_list': schema.ListScalarData,
-                          'string_list': schema.ListStringDataMaster}
+                          'string_list': schema.ListStringDataEntry}
 
         if data_types is None:
             data_types = possible_data_types

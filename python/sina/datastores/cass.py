@@ -732,6 +732,38 @@ class RecordDAO(dao.RecordDAO):
         # CQL's "distinct" is limited to partition columns (ID) and "static" columns only.
         return list(set(schema.Record.objects.values_list('type', flat=True)))
 
+    def data_names(self, record_type, data_types=None):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for all records.
+        ...
+        :param record_type: Type of records to get data names for.
+        :param data_types: A list of data types to get the data names for.
+                           Current options are limited to:
+                           'scalar', 'string', 'scalar_list', 'string_list'.
+        :returns: A generator of data names.
+        """
+        possible_data_types = ['scalar', 'string']
+        data_types_map = {'scalar': schema.ScalarDataFromRecord,
+                          'string': schema.StringDataFromRecord}
+        if data_types is None:
+            data_types = possible_data_types
+        if not isinstance(data_types, list):
+            data_types = [data_types]
+        if not set(data_types).issubset(set(possible_data_types)):
+            raise ValueError('Only select data types from: %s' % possible_data_types)
+
+        query_tables = [data_types_map[type] for type in data_types]
+
+        ids = get_all_of_type(record_type, ids_only=True)
+
+        for query_table in query_tables:
+            result = set(query_table.objects
+                         .filter(query_table.id.in_(ids))
+                         .values_list('name', flat=True))
+            for result in results:
+                yield result
+
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
