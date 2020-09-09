@@ -178,6 +178,16 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def get_all(self, ids_only):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def get_available_types(self):
         """

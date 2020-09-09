@@ -701,6 +701,24 @@ class RecordDAO(dao.RecordDAO):
         for test_id in test_ids:
             yield test_id in actual_ids
 
+    def get_all(self, ids_only=False):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        LOGGER.debug('Getting all records')
+        if ids_only:
+            query = (schema.Record.objects.values_list('id', flat=True))
+            for id in query:
+                yield str(id)
+        else:
+            results = schema.Record.objects
+            for result in results:
+                yield model.generate_record_from_json(json_input=json.loads(result.raw))
+
     def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of Record, return all Records of that type.
