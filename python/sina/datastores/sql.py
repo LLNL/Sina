@@ -489,19 +489,19 @@ class RecordDAO(dao.RecordDAO):
     def data_names(self, record_type, data_types=None):
         """
         Return a list of all the data labels for data of a given type.
-        Defaults to getting all data names for all records.
+        Defaults to getting all data names for a given record type.
 
         :param record_type: Type of records to get data names for.
-        :param data_types: A list of data types to get the data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
 
         :returns: A generator of data names.
         """
-        possible_data_types = ['scalar', 'string', 'scalar_list', 'string_list']
-        data_types_map = {'scalar': schema.ScalarData,
-                          'string': schema.StringData,
-                          'scalar_list': schema.ListScalarData,
-                          'string_list': schema.ListStringDataEntry}
-
+        type_name_to_tables = {'scalar': schema.ScalarData,
+                               'string': schema.StringData,
+                               'scalar_list': schema.ListScalarData,
+                               'string_list': schema.ListStringDataEntry}
+        possible_data_types = list(type_name_to_tables.keys())
         if data_types is None:
             data_types = possible_data_types
         if not isinstance(data_types, list):
@@ -509,12 +509,12 @@ class RecordDAO(dao.RecordDAO):
         if not set(data_types).issubset(set(possible_data_types)):
             raise ValueError('Only select data types from: %s' % possible_data_types)
 
-        query_tables = [data_types_map[type] for type in data_types]
+        query_tables = [type_name_to_tables[type] for type in data_types]
 
         for query_table in query_tables:
             results = (self.session.query(query_table.name).join(schema.Record)
                        .filter(schema.Record.type == record_type)
-                       .distinct().all())
+                       .distinct())
             for result in results:
                 yield result[0]
 

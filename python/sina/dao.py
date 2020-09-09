@@ -232,10 +232,11 @@ class RecordDAO(object):
     def data_names(self, record_type, data_types):
         """
         Return a list of all the data labels for data of a given type.
-        Defaults to getting all data names for all records.
+        Defaults to getting all data names for a given record type.
 
         :param record_type: Type of records to get data names for.
-        :param data_types: A list of data types to get the data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
 
         :returns: A generator of data names.
         """

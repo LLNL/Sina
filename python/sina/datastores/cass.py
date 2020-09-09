@@ -735,16 +735,17 @@ class RecordDAO(dao.RecordDAO):
     def data_names(self, record_type, data_types=None):
         """
         Return a list of all the data labels for data of a given type.
-        Defaults to getting all data names for all records.
+        Defaults to getting all data names for a given record type.
 
         :param record_type: Type of records to get data names for.
-        :param data_types: A list of data types to get the data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
 
         :returns: A generator of data names.
         """
-        possible_types = ['scalar', 'string']
-        data_types_map = {'scalar': schema.ScalarDataFromRecord,
-                          'string': schema.StringDataFromRecord}
+        type_name_to_tables = {'scalar': schema.ScalarDataFromRecord,
+                               'string': schema.StringDataFromRecord}
+        possible_types = list(type_name_to_tables.keys())
         if data_types is None:
             data_types = possible_types
         if not isinstance(data_types, list):
@@ -752,9 +753,9 @@ class RecordDAO(dao.RecordDAO):
         if not set(data_types).issubset(set(possible_types)):
             raise ValueError('Only select data types from: %s' % possible_types)
 
-        query_tables = [data_types_map[type] for type in data_types]
+        query_tables = [type_name_to_tables[type] for type in data_types]
 
-        ids = self.get_all_of_type(record_type, ids_only=True)
+        ids = list(self.get_all_of_type(record_type, ids_only=True))
 
         for query_table in query_tables:
             results = set(query_table.objects
