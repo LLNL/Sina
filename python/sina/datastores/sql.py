@@ -397,6 +397,24 @@ class RecordDAO(dao.RecordDAO):
             if ids_found != len(chunk):
                 raise ValueError("No Record found with id in chunk %s" % chunk)
 
+    def get_all(self, ids_only=False):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        LOGGER.debug('Getting all records')
+        if ids_only:
+            query = self.session.query(schema.Record.id)
+            for record_id in query:
+                yield str(record_id[0])
+        else:
+            results = self.session.query(schema.Record)
+            for result in results:
+                yield model.generate_record_from_json(json_input=json.loads(result.raw))
+
     def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of record, return all Records of that type.

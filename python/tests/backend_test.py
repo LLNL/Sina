@@ -727,6 +727,26 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
 
+    # ######################### get_all ##################################
+    def test_recorddao_get_all(self):
+        """Test the RecordDAO is retrieving all Records."""
+        all_records = list(self.record_dao.get_all())
+        self.assertEqual(len(all_records), 7)
+        self.assertIsInstance(all_records[0], Record)
+
+    def test_recorddao_get_all_returns_generator(self):
+        """Test that the RecordDAO type query returns a generator."""
+        all_records = self.record_dao.get_all()
+        self.assertIsInstance(all_records, types.GeneratorType,
+                              "Method must return a generator.")
+
+    def test_recorddao_get_all_matches_many(self):
+        """Test the RecordDAO type query correctly returns multiple Records."""
+        all_ids = self.record_dao.get_all(ids_only=True)
+        six.assertCountEqual(self, list(all_ids), ["spam", "spam2", "spam3",
+                                                   "spam4", "spam5", "spam6",
+                                                   "eggs"])
+
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):
         """Test that we're getting a datum for one record correctly."""

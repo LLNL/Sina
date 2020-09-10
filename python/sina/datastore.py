@@ -153,6 +153,16 @@ class DataStore(object):
             """
             return self.record_dao.exist(ids_to_check)
 
+        def get_all(self, ids_only=False):
+            """
+            Return all Records.
+
+            :param ids_only: whether to return only the ids of matching Records
+
+            :returns: A generator of all Records.
+            """
+            return self.record_dao.get_all(ids_only)
+
         # ------------------ Operations tied to Record type -------------------
         # It's safe to redefine "type" within the scope of this function.
         # pylint: disable=redefined-builtin

@@ -131,6 +131,14 @@ class DatastoreTests(unittest.TestCase):
                                                  "get_all_of_type", 1,
                                                  opt_args=(False,))
 
+    def test_get_all(self):
+        """Test the RecordOperation get_all()."""
+        self.assert_record_method_is_passthrough("get_all",
+                                                 "get_all", 1)
+        self.assert_record_method_is_passthrough("get_all",
+                                                 "get_all", 0,
+                                                 opt_args=(False,))
+
     def test_get_types(self):
         """Test the RecordOperation get_types()."""
         self.assert_record_method_is_passthrough("get_types",
