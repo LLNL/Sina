@@ -239,6 +239,20 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
+    def data_names(self, record_type, data_types):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for a given record type.
+
+        :param record_type: Type of records to get data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
+
+        :returns: A generator of data names.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
