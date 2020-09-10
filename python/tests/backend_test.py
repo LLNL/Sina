@@ -711,6 +711,22 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(get_one[0].type, "bar")
         self.assertEqual(get_one[0].user_defined, {})
 
+    def test_recorddao_type_none(self):
+        """Test that the RecordDAO type query returns no Records when none match."""
+        get_none = list(self.record_dao.get_all_of_type("butterscotch"))
+        self.assertFalse(get_none)
+
+    def test_recorddao_type_returns_generator(self):
+        """Test that the RecordDAO type query returns a generator."""
+        ids_only = self.record_dao.get_all_of_type("run")
+        self.assertIsInstance(ids_only, types.GeneratorType,
+                              "Method must return a generator.")
+
+    def test_recorddao_type_matches_many(self):
+        """Test the RecordDAO type query correctly returns multiple Records."""
+        ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
+        six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
+
     # ######################### get_all ##################################
     def test_recorddao_get_all(self):
         """Test the RecordDAO is retrieving all Records."""
