@@ -173,24 +173,23 @@ class RecordDAO(dao.RecordDAO):
                    raw=json.dumps(record.raw))
 
             if record.curve_sets:
-                curve_sets = utils.resolve_curve_sets(record.curve_sets)
                 # Curve set names are meta, everything else is per-record.
+                for curveset_name, curveset_obj in record.curve_sets.items():
+                    from_curve_set_meta_batch[curveset_name].append([record.id,
+                                                                     curveset_obj.get("tags")])
+                resolved_curves = utils.resolve_curve_sets(record.curve_sets)
                 # Curve data is stored as a scalar list
                 scalar_list_from_rec_batch = []
                 tags, units, value, datum_name, id = [None]*5
-
-                for curveset_name, curveset_obj in curve_sets.items():
-                    from_curve_set_meta_batch[curveset_name].append([record.id,
-                                                                     curveset_obj.get("tags")])
-                    for curve_type in ("independent", "dependent"):
-                        for entry_name, entry in six.iteritems(curveset_obj[curve_type]):
-                            datum_name = entry_name
-                            tags = [str(x) for x in entry['tags']] if 'tags' in entry else None
-                            units = entry.get('units')
-                            value = entry['value']
-                            id = record.id
-                            _cross_populate_batch(from_scalar_list_batch,
-                                                  scalar_list_from_rec_batch)
+                for entry_name, entry in six.iteritems(resolved_curves):
+                    # The values set here are used by _cross_populate_batch
+                    datum_name = entry_name
+                    tags = [str(x) for x in entry['tags']] if 'tags' in entry else None
+                    units = entry.get('units')
+                    value = entry['value']
+                    id = record.id
+                    _cross_populate_batch(from_scalar_list_batch,
+                                          scalar_list_from_rec_batch)
 
             if record.data:
                 # Unlike the rec_from_x dictionaries, these have the scope of a
@@ -322,44 +321,32 @@ class RecordDAO(dao.RecordDAO):
     @staticmethod
     def _insert_curve_sets(curve_sets, id, force_overwrite=False):
         """
-        Insert data into two of the Cassandra query tables depending on value.
+        Insert curves into two of the Cassandra query tables depending on value.
 
-        Data entries that are numbers (12.0) go in the ScalarData tables. Any that
-        aren't ("Tuesday","12.0") go in the StringData tables. Helper method to
-        simplify insertion.
+        Data is loaded into the scalar list data and curve meta tables. Helper
+        method to simplify insertion.
 
-        :param data: The dictionary of data to insert.
-        :param id: The Record ID to associate the data to.
-        :param force_overwrite: Whether to forcibly overwrite preexisting data.
+        :param curve_sets: The dictionary of curve sets to insert.
+        :param id: The Record ID to associate the curve sets to.
+        :param force_overwrite: Whether to forcibly overwrite preexisting curves.
                                 Currently only used by Cassandra DAOs.
         """
         LOGGER.debug('Inserting %i curve sets into Record ID %s with force_overwrite=%s.',
                      len(curve_sets), id, force_overwrite)
         create_meta = (schema.RecordFromCurveSetMeta.create if force_overwrite
                        else schema.RecordFromCurveSetMeta.if_not_exists().create)
-        curve_sets = utils.resolve_curve_sets(curve_sets)
-        # Curves are always allowed to overwrite one another, but the
-        # cross-populate won't know that.
-        inserted_curves = set()
-
-        def create_curve_entry(entry_name, entry_obj):
-            """Convert a curve timeseries to entries in the record if not already in."""
-            if force_overwrite or entry_name not in inserted_curves:
-                schema.cross_populate_query_tables(id=id,
-                                                   name=entry_name,
-                                                   value=entry_obj['value'],
-                                                   units=entry_obj.get('units'),
-                                                   tags=entry_obj.get('tags'),
-                                                   force_overwrite=force_overwrite)
-                if not force_overwrite:
-                    inserted_curves.add(entry_name)
+        resolved_curves = utils.resolve_curve_sets(curve_sets)
 
         for curveset_name, curveset_obj in curve_sets.items():
             create_meta(name=curveset_name, id=id, tags=curveset_obj.get("tags"))
-            for entry_name, entry_obj in curveset_obj["independent"].items():
-                create_curve_entry(entry_name, entry_obj)
-            for entry_name, entry_obj in curveset_obj["dependent"].items():
-                create_curve_entry(entry_name, entry_obj)
+        for entry_name, entry_obj in six.iteritems(resolved_curves):
+            print(entry_name, entry_obj)
+            schema.cross_populate_query_tables(id=id,
+                                               name=entry_name,
+                                               value=entry_obj['value'],
+                                               units=entry_obj.get('units'),
+                                               tags=entry_obj.get('tags'),
+                                               force_overwrite=force_overwrite)
 
     @staticmethod
     def _insert_files(id, files, force_overwrite=False):

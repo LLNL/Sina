@@ -133,32 +133,19 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting %i curve set entries to Record ID %s.',
                      len(curve_sets), record.id)
 
-        # Collisions between data names and curve names are checked within
-        # the Record.
-        # Collisions between curve names and other curve names are checked here:
-        curve_sets = utils.resolve_curve_sets(curve_sets)
-        inserted_curves = set()
-
-        def insert_data_from_entry(entry_name, entry_obj):
-            """Convert a curve timeseries to entries in the record if not already in."""
-            if entry_name not in inserted_curves:
-                tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
-                record.scalar_lists.append(schema.ListScalarData(
-                    name=entry_name,
-                    min=min(entry_obj['value']),
-                    max=max(entry_obj['value']),
-                    units=entry_obj.get('units'),  # units might be None, always use get()
-                    tags=tags))
-                inserted_curves.add(entry_name)
-
         for curveset_name, curveset_obj in curve_sets.items():
             tags = (json.dumps(curveset_obj['tags']) if 'tags' in curveset_obj else None)
             record.curve_set_meta.append(schema.CurveSetMeta(name=curveset_name,
                                                              tags=tags))
-            for entry_name, entry_obj in curveset_obj["independent"].items():
-                insert_data_from_entry(entry_name, entry_obj)
-            for entry_name, entry_obj in curveset_obj["dependent"].items():
-                insert_data_from_entry(entry_name, entry_obj)
+        resolved_sets = utils.resolve_curve_sets(curve_sets)
+        for entry_name, entry_obj in resolved_sets.items():
+            tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
+            record.scalar_lists.append(schema.ListScalarData(
+                name=entry_name,
+                min=min(entry_obj['value']),
+                max=max(entry_obj['value']),
+                units=entry_obj.get('units'),  # units might be None, always use get()
+                tags=tags))
 
     @staticmethod
     def _attach_files(record, files):

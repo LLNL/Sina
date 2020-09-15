@@ -278,31 +278,24 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
             "dependent": {"time": {"value": [1, 2, 3, 4],
                                    "tags": ["timer", "protein"]}},
             "independent": {"firmness": {"value": [0, 0, 0.1, 0.3]}}}
-        resolved_curves = sina.utils.resolve_curve_sets(curve_sets, stringify_tags=False)
-        # First, make sure they're not equal. If they are, curve_sets was overwritten.
+        resolved_curves = sina.utils.resolve_curve_sets(curve_sets)
+        # Make sure they're not equal. If they are, curve_sets was overwritten.
         self.assertNotEqual(curve_sets, resolved_curves)
 
-        # Check non-colliding curves are untouched.
-        self.assertEqual(curve_sets["spam_curve"]["dependent"]["saltiness"],
-                         resolved_curves["spam_curve"]["dependent"]["saltiness"])
-
-        spam_time = resolved_curves["spam_curve"]["independent"]["time"]
-        egg_time = resolved_curves["egg_curve"]["dependent"]["time"]
-
-        # Variants of "time" must be equal
-        self.assertEqual(spam_time, egg_time)
+        # There is only one time in the return set, spam's time and egg's time combined
+        time = resolved_curves["time"]
 
         # Proper min, max, tags, and units
-        self.assertEqual(spam_time["value"][0], 0)
-        self.assertEqual(spam_time["value"][1], 4)
-        self.assertEqual(spam_time["units"], "seconds")
-        six.assertCountEqual(self, spam_time["tags"], ["timer", "protein", "misc"])
+        self.assertEqual(time["value"][0], 0)
+        self.assertEqual(time["value"][1], 4)
+        self.assertEqual(time["units"], "seconds")
+        six.assertCountEqual(self, time["tags"], ["timer", "protein", "misc"])
 
         # Error out on unit overwriting
         curve_sets["bad_time"] = {
             "dependent": {},
             "independent": {"time": {"value": [1, 2, 3, 4],
-                                     "tags": ["timer"],
+                                     "tags": ["timer", "output"],
                                      "units": "NOT SECONDS"}}}
         with self.assertRaises(ValueError) as context:
             sina.utils.resolve_curve_sets(curve_sets)

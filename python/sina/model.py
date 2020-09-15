@@ -90,16 +90,13 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
 
     @data.setter
     def data(self, data):
-        try:
-            if self.curve_names.intersection(data.keys()):
-                msg = ("Record {} has overlapping curve and data entries. Make sure "
-                       "you haven't duplicated your curve values into record.data. "
-                       "Overlapping entries: {}"
-                       .format(self.id, self.curve_names.intersection(self.data.keys())))
-                raise ValueError(msg)
-            self['data'] = data
-        except AttributeError:
-            raise TypeError("Record {}'s data field must be a dictionary!".format(self.id))
+        if self.curve_names.intersection(data.keys()):
+            msg = ("Record {} has overlapping curve and data entries. Make sure "
+                   "you haven't duplicated your curve values into record.data. "
+                   "Overlapping entries: {}"
+                   .format(self.id, self.curve_names.intersection(self.data.keys())))
+            raise ValueError(msg)
+        self['data'] = data
 
     @property
     def curve_sets(self):

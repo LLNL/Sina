@@ -10,7 +10,6 @@ import csv
 import io
 import time
 import datetime
-import copy
 from numbers import Real
 from enum import Enum
 from multiprocessing.pool import ThreadPool
@@ -310,9 +309,7 @@ def intersect_ordered(iterables):
                         return
 
 
-# Disabled as the logic-splitting was even more convoluted. *Maybe* rework later.
-# pylint: disable=too-many-locals, too-many-branches
-def resolve_curve_sets(curve_sets, stringify_tags=True):
+def resolve_curve_sets(curve_sets):
     """
     Given a record's curve sets, return an ingestion-ready version.
 
@@ -324,61 +321,55 @@ def resolve_curve_sets(curve_sets, stringify_tags=True):
 
     If there's any collision on the units, that's an error.
 
+    This does not preserve independent/dependent/parent curve set. It's
+    purely used for ingestion.
+
     :param curve_sets: The curve_sets section of a record to resolve.
-    :param stringify_tags: Whether to return tags as a string instead of a list;
-                           what's required depends on the backend.
     :returns: <curve_sets> if there are no collisions, else a version with
               collisions resolved.
     :raises ValueError: if given curves with unit collisions.
     """
-    # Will be of the form {name: [(curve_set, curve_type)]}
-    curve_mappings = defaultdict(list)
+    curves = defaultdict(dict)
+
+    def resolve_collision(curve_name, old_curve, new_curve):
+        """Take two colliding curves and resolve the collision."""
+        old_units, new_units = (old_curve.get("units"), new_curve.get("units"))
+        if new_units is None:
+            resolved_units = old_units
+        elif old_units is not None and new_units != old_units:
+            msg = ("Tried to set units of {} to {}, but were already "
+                   "set as {}".format(curve_name, new_units, old_units))
+            raise ValueError(msg)
+        else:
+            resolved_units = new_units
+        if new_curve.get("tags") is None:
+            resolved_tags = old_curve.get("tags")
+        else:
+            resolved_tags = list(set(old_curve.get("tags")).union(new_curve.get("tags")))
+        available_values = old_curve["value"] + new_curve["value"]
+        resolved_curve = {"value": [min(available_values), max(available_values)]}
+        if resolved_tags:
+            resolved_curve["tags"] = resolved_tags
+        if resolved_units:
+            resolved_curve["units"] = resolved_units
+        return resolved_curve
+
     # Loop through to see if we have a collision.
-    for curve_set_name, curve_set_obj in curve_sets.items():
+    for curve_set_obj in curve_sets.values():
         for curve_type in ["independent", "dependent"]:
-            for curve_name in curve_set_obj[curve_type].keys():
-                curve_mappings[curve_name].append((curve_set_name, curve_type))
-
-    # We've only collided if a name has more than one mapping.
-    if all(len(x) == 1 for x in curve_mappings.items()):
-        # We expect this to be the case the majority of the time.
-        return curve_sets
-
-    # We have a collision. Loop through again and build a dictionary of
-    # "resolved" curves.
-    resolved_curves = {}
-    for curve_name, curve_coordlist in curve_mappings.items():
-        if len(curve_coordlist) > 1:
-            mins = []
-            maxes = []
-            tags = set()
-            units = None
-            for curve_set_name, curve_type in curve_coordlist:
-                instance = curve_sets[curve_set_name][curve_type][curve_name]
-                if units is not None and instance.get("units") != units:
-                    msg = ("Tried to set units of {} to {}, but were already "
-                           "set as {}".format(curve_name, instance.get("units"), units))
-                    raise ValueError(msg)
-                else:
-                    units = instance.get("units")
-                if instance.get("tags") is not None:
-                    tags.update(instance.get("tags"))
-                mins.append(min(instance["value"]))
-                maxes.append(max(instance["value"]))
-            resolved_curves[curve_name] = {"value": [min(mins), max(maxes)]}
-            if tags:
-                new_tags = json.dumps(list(tags)) if stringify_tags else list(tags)
-                resolved_curves[curve_name]["tags"] = new_tags
-            if units:
-                resolved_curves[curve_name]["units"] = units
-
-    # Now all that's left is to overwrite each "collided" curve with a resolved one.
-    resolved_sets = copy.deepcopy(curve_sets)
-    for curve_name, curve_coordlist in curve_mappings.items():
-        if len(curve_coordlist) > 1:
-            for curve_set_name, curve_type in curve_coordlist:
-                resolved_sets[curve_set_name][curve_type][curve_name] = resolved_curves[curve_name]
-    return resolved_sets
+            for curve_name, curve_obj in curve_set_obj[curve_type].items():
+                if curve_name not in curves:
+                    if curve_obj.get("tags"):
+                        curves[curve_name]["tags"] = curve_obj["tags"]
+                    if curve_obj.get("units"):
+                        curves[curve_name]["units"] = curve_obj["units"]
+                    curves[curve_name]["value"] = [min(curve_obj["value"]),
+                                                   max(curve_obj["value"])]
+                else:  # collision
+                    curves[curve_name] = resolve_collision(curve_name,
+                                                           curves[curve_name],
+                                                           curve_obj)
+    return curves
 
 
 def export(factory, id_list, scalar_names, output_type, output_file=None):
