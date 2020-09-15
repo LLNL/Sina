@@ -13,7 +13,9 @@ class SinaCpp(CMakePackage):
     variant('docs', default=False,
             description='Allow generating documentation')
     variant('adiak', default=False,
-            description='Creates interface for calling Sina through Adiak')
+            description='Create interface for calling Sina through Adiak')
+    variant('test', default=True,
+            description='Build tests')
 
     # Higher versions of cmake require C++14 or newer
     depends_on('cmake@3.8.0:', type='build')
@@ -25,4 +27,5 @@ class SinaCpp(CMakePackage):
         spec = self.spec if self.spec is not None else ""
         return [
             '-DSINA_BUILD_ADIAK_BINDINGS={0}'.format('YES' if '+adiak' in spec else 'NO'),
+            '-DSINA_BUILD_TESTS={0}'.format('NO' if '-test' in spec else 'YES'),
         ]

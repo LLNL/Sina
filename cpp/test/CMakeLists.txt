@@ -1,3 +1,4 @@
+if (${SINA_BUILD_TESTS})
 cmake_minimum_required (VERSION 3.7)
 
 add_definitions(${SINA_CXX_TEST_FLAGS})
@@ -44,3 +45,4 @@ blt_add_executable(NAME unittests
 
 blt_add_test(NAME unittests
              COMMAND unittests)
+endif (${SINA_BUILD_TESTS})
