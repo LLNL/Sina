@@ -108,18 +108,19 @@ class DataStore(object):
             self.record_dao = connection.create_record_dao()
 
         # -------------------- Basic operations ---------------------
-        def get(self, ids_to_get):
+        def get(self, ids_to_get, chunk_size=999):
             """
             Given one or more Record ids, return matching Record(s).
 
             :param ids_to_get: The id(s) of the Record(s) to return.
+            :param chunk_size: Size of chunks to pull records in.
 
             :returns: If provided an iterable, a generator of Record objects,
                       else a single Record object.
 
             :raises ValueError: if no Record is found for some id.
             """
-            return self.record_dao.get(ids_to_get)
+            return self.record_dao.get(ids_to_get, chunk_size=chunk_size)
 
         def insert(self, records_to_insert):
             """
@@ -139,6 +140,28 @@ class DataStore(object):
             :param ids_to_delete: A Record id or iterable of Record ids to delete.
             """
             return self.record_dao.delete(ids_to_delete)
+
+        def exist(self, ids_to_check):
+            """
+            Given an (iterable of) id(s), return boolean list of whether those
+            records exist or not.
+
+            :param ids: The id(s) of the Record(s) to test.
+
+            :returns: If provided an iterable, a generator of bools pertaining to
+                      the ids existence, else a single boolean value.
+            """
+            return self.record_dao.exist(ids_to_check)
+
+        def get_all(self, ids_only=False):
+            """
+            Return all Records.
+
+            :param ids_only: whether to return only the ids of matching Records
+
+            :returns: A generator of all Records.
+            """
+            return self.record_dao.get_all(ids_only)
 
         # ------------------ Operations tied to Record type -------------------
         # It's safe to redefine "type" within the scope of this function.
@@ -161,6 +184,19 @@ class DataStore(object):
             :returns: A generator of types of Record.
             """
             return self.record_dao.get_available_types()
+
+        def data_names(self, record_type, data_types=None):
+            """
+            Return a list of all the data labels for data of a given type.
+            Defaults to getting all data names for a given record type.
+
+            :param record_type: Type of records to get data names for.
+            :param data_types: A single data type or a list of data types
+                               to get the data names for.
+
+            :returns: A generator of data names.
+            """
+            return self.record_dao.data_names(record_type, data_types)
 
         # ------------------ Operations tied to Record data -------------------
         def find_with_data(self, **kwargs):

@@ -563,6 +563,37 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                            id_only=True))
         self.assertEqual(min_spam_scals, ["spam", "spam3"])
 
+    # ####################### test_exist ####################################
+    def test_one_exists(self):
+        """Make sure that we return a correct bool for each ID."""
+        hit = self.record_dao.exist('spam')
+        self.assertEqual(hit, True)
+        miss = self.record_dao.exist('IDonNotExist')
+        self.assertEqual(miss, False)
+
+    def test_many_exist(self):
+        """Make sure that we return a correct list of Bools"""
+        result = list(self.record_dao.exist(id_ for id_ in
+                                            ['spam', 'IDoNotExist',
+                                             'spam2', 'IAlsoDoNotExist']))
+        self.assertEqual(result, [True, False, True, False])
+
+    # ####################### test_data_names ####################################
+    def test_data_names_with_string(self):
+        """Make sure that we get names of scalar data when given a string."""
+        names = set(self.record_dao.data_names(record_type='foo', data_types='scalar'))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2"]))
+
+    def test_data_names_with_list(self):
+        """Make sure that we get names of scalar data when given a list."""
+        names = set(self.record_dao.data_names(record_type='foo', data_types=['scalar']))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2"]))
+
+    def test_data_names_with_default(self):
+        """Make sure that we get names of all data by default."""
+        names = set(self.record_dao.data_names(record_type='foo'))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2", "val_data", "val_data_2"]))
+
     # ####################### test_get_available_types ######################
     def test_get_available_types(self):
         """Make sure that we return a correct list of the types in a datebase."""
@@ -816,6 +847,26 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Test the RecordDAO curve query correctly returns multiple Records."""
         ids_only = self.record_dao.get_with_curve_set("spam_curve", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2"])
+
+    # ######################### get_all ##################################
+    def test_recorddao_get_all(self):
+        """Test the RecordDAO is retrieving all Records."""
+        all_records = list(self.record_dao.get_all())
+        self.assertEqual(len(all_records), 7)
+        self.assertIsInstance(all_records[0], Record)
+
+    def test_recorddao_get_all_returns_generator(self):
+        """Test that the RecordDAO type query returns a generator."""
+        all_records = self.record_dao.get_all()
+        self.assertIsInstance(all_records, types.GeneratorType,
+                              "Method must return a generator.")
+
+    def test_recorddao_get_all_matches_many(self):
+        """Test the RecordDAO type query correctly returns multiple Records."""
+        all_ids = self.record_dao.get_all(ids_only=True)
+        six.assertCountEqual(self, list(all_ids), ["spam", "spam2", "spam3",
+                                                   "spam4", "spam5", "spam6",
+                                                   "eggs"])
 
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):

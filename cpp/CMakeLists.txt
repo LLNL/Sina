@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.7)
 
-project(sina CXX)
+project(sina)
 
 set (ENABLE_GMOCK ON CACHE PATH "")
 

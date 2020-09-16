@@ -708,6 +708,82 @@ class RecordDAO(dao.RecordDAO):
         except DoesNotExist:  # Raise a more familiar, descriptive error.
             raise ValueError("No Record found with id {}".format(id))
 
+    def _get_many(self, ids, _record_builder, chunk_size):
+        """
+        Apply some "get" function to an iterable of Record ids.
+
+        Used by the parent get(), this is the Cassandra-specific implementation of
+        getting multiple Records.
+
+        :param ids: An iterable of Record ids to return
+        :param chunk_size: Currently unused for Cassandra
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A generator of Records if found.
+
+        :raises ValueError: if a Record with the id can't be found.
+        """
+
+        results = schema.Record.objects.filter(schema.Record.id.in_(ids))
+        ids_found = 0
+        for result in results:
+            yield _record_builder(json_input=json.loads(result.raw))
+            ids_found += 1
+
+        if ids_found != len(ids):
+            raise ValueError("No Record found with id in %s" % ids)
+
+    def _one_exists(self, test_id):
+        """
+        Given an id, return boolean of if it exists or not.
+        This is the Cassandra specific implementation.
+
+        :param id: The id of the Record to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        try:
+            _ = schema.Record.objects.filter(id=test_id).get()
+            return True
+        except DoesNotExist:
+            return False
+
+    def _many_exist(self, test_ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+        This is the Cassandra specific implementation
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        test_ids = list(test_ids)
+        actual_ids = set(schema.Record.objects
+                         .filter(schema.Record.id.in_(test_ids))
+                         .values_list('id', flat=True))
+        for test_id in test_ids:
+            yield test_id in actual_ids
+
+    def get_all(self, ids_only=False):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        LOGGER.debug('Getting all records')
+        if ids_only:
+            query = (schema.Record.objects.values_list('id', flat=True))
+            for id in query:
+                yield str(id)
+        else:
+            results = schema.Record.objects
+            for result in results:
+                yield model.generate_record_from_json(json_input=json.loads(result.raw))
+
     def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of Record, return all Records of that type.
@@ -759,6 +835,38 @@ class RecordDAO(dao.RecordDAO):
         """
         # CQL's "distinct" is limited to partition columns (ID) and "static" columns only.
         return list(set(schema.Record.objects.values_list('type', flat=True)))
+
+    def data_names(self, record_type, data_types=None):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for a given record type.
+
+        :param record_type: Type of records to get data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
+
+        :returns: A generator of data names.
+        """
+        type_name_to_tables = {'scalar': schema.ScalarDataFromRecord,
+                               'string': schema.StringDataFromRecord}
+        possible_types = list(type_name_to_tables.keys())
+        if data_types is None:
+            data_types = possible_types
+        if not isinstance(data_types, list):
+            data_types = [data_types]
+        if not set(data_types).issubset(set(possible_types)):
+            raise ValueError('Only select data types from: %s' % possible_types)
+
+        query_tables = [type_name_to_tables[type] for type in data_types]
+
+        ids = list(self.get_all_of_type(record_type, ids_only=True))
+
+        for query_table in query_tables:
+            results = set(query_table.objects
+                          .filter(query_table.id.in_(ids))
+                          .values_list('name', flat=True))
+            for result in results:
+                yield result
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
