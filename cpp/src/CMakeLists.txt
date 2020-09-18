@@ -25,7 +25,7 @@ if(${SINA_BUILD_ADIAK_BINDINGS})
     blt_register_library(NAME adiak
         TREAT_INCLUDES_AS_SYSTEM ON
         INCLUDES "${adiak_DIR}/../../../include"
-        LIBRARIES "${adiak_DIR}/../../libadiak.a"
+        LIBRARIES "${ADIAK_LIBRARIES}"
     )
     string(CONCAT OPTIONAL_SINA_DEPENDENCIES "adiak")
 endif(${SINA_BUILD_ADIAK_BINDINGS})
