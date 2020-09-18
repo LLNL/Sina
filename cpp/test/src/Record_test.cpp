@@ -7,11 +7,14 @@
 #include "sina/Record.hpp"
 #include "sina/CppBridge.hpp"
 
+#include "sina/testing/ConduitTestUtils.hpp"
 #include "sina/testing/TestRecord.hpp"
 
 namespace sina { namespace testing { namespace {
 
+using ::testing::Contains;
 using ::testing::ElementsAre;
+using ::testing::Key;
 using ::testing::HasSubstr;
 using ::testing::DoubleEq;
 
@@ -99,6 +102,27 @@ TEST(Record, create_globalId_files) {
     EXPECT_EQ(1, files.count(File{uri1}));
     EXPECT_EQ(1, files.count(File{uri2}));
     EXPECT_EQ(1, files.count(File{uri3}));
+}
+
+
+TEST(Record, create_fromNode_curveSets) {
+    conduit::Node recordAsNode = parseJsonValue(R"({
+        "id": "myId",
+        "type": "myType",
+        "curve_sets": {
+            "cs1": {
+                "independent": {
+                    "i1": { "value": [1, 2, 3]}
+                },
+                "dependent": {
+                    "d1": { "value": [4, 5, 6]}
+                }
+            }
+        }
+    })");
+    Record record{recordAsNode};
+    auto &curveSets = record.getCurveSets();
+    ASSERT_THAT(curveSets, Contains(Key("cs1")));
 }
 
 TEST(Record, create_fromNode_userDefined) {
@@ -225,6 +249,28 @@ TEST(Record, toNode_files) {
     auto &child_with_slashes = asNode[EXPECTED_FILES_KEY].child(uri1);
     EXPECT_EQ("mt1", child_with_slashes["mimetype"].as_string());
     EXPECT_TRUE(asNode[EXPECTED_FILES_KEY][uri2]["mimetype"].dtype().is_empty());
+}
+
+TEST(Record, toNode_curveSets) {
+    ID id{"the id", IDType::Local};
+    Record record{id, "my type"};
+    CurveSet cs{"myCurveSet"};
+    cs.addIndependentCurve(Curve{"myCurve", {1, 2, 3}});
+    record.add(cs);
+    EXPECT_THAT(record.toNode(), MatchesJson(R"({
+        "local_id": "the id",
+        "type": "my type",
+        "curve_sets": {
+            "myCurveSet": {
+                "independent": {
+                     "myCurve": {
+                         "value": [1.0, 2.0, 3.0]
+                     }
+                 },
+                 "dependent": {}
+            }
+        }
+    })"));
 }
 
 TEST(RecordLoader, load_missingLoader) {
