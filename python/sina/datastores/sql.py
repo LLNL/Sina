@@ -28,6 +28,9 @@ SQLITE_PREFIX = "sqlite:///"
 DATA_TABLES = [schema.ScalarData, schema.StringData,
                schema.ListScalarData, schema.ListStringDataEntry]
 
+# Set maximum chunk size for id queries
+CHUNK_SIZE = 999
+
 
 class RecordDAO(dao.RecordDAO):
     """The DAO specifically responsible for handling Records in SQL."""
@@ -123,72 +126,29 @@ class RecordDAO(dao.RecordDAO):
                                                 tags=tags))
 
     @staticmethod
-    def _attach_curves(record, curves):
+    def _attach_curves(record, curve_sets):
         """
         Attach the curve entries to the given SQL record.
 
         :param record: The SQL schema record to associate the data to.
-        :param curves: The dictionary of curves to insert.
+        :param curve_sets: The dictionary of curve sets to insert.
         """
-        LOGGER.debug('Inserting %i curve entries to Record ID %s.',
-                     len(curves), record.id)
-        scalars_inserted = set(scalar_list.name for scalar_list in record.scalar_lists)
-        scalars_inserted = scalars_inserted.union(set(scalar.name for scalar in record.scalars))
-        curve_entries_inserted = set()
+        LOGGER.debug('Inserting %i curve set entries to Record ID %s.',
+                     len(curve_sets), record.id)
 
-        def resolve_collision(new, old):
-            """
-            Handle name overlap.
-
-            We take the lowest and highest vals for the purpose of querying and
-            unify the tags. If units mismatch, though, that's an error (unless
-            one's just None).
-            """
-            old.min = min(old.min, min(new['value']))
-            old.max = max(old.max, max(new['value']))
-            if new.get("units") is not None and old.units != new['units']:
-                if old.units is not None:
-                    msg = ("Tried to set units of {} to {}, but were already "
-                           "set as {}".format(old.name, new['units'], old.units))
-                    raise ValueError(msg)
-                else:
-                    old.units = new['units']
-            new_tags = (json.dumps(new['tags']) if 'tags' in new else None)
-            if old.tags != new_tags:
-                joined_tags = (set(json.loads(old.tags))
-                               .union(new['tags']))
-                old.tags = json.dumps(list(joined_tags))
-
-        def insert_data_from_entry(entry_name, entry_obj):
-            """Convert a curve timeseries to entries in the record."""
-            if entry_name in scalars_inserted:
-                raise ValueError(
-                    "Tried to insert curve data {} when there was already a "
-                    "scalar by that name.")
-            if entry_name in curve_entries_inserted:
-                for scalar_list in record.scalar_lists:
-                    if scalar_list.name == entry_name:
-                        resolve_collision(entry_obj, scalar_list)
-                        break
-            else:
-                # This instead of .get because SQL dislikes lists.
-                tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
-                record.scalar_lists.append(schema.ListScalarData(
-                    name=entry_name,
-                    min=min(entry_obj['value']),
-                    max=max(entry_obj['value']),
-                    units=entry_obj.get('units'),  # units might be None, always use get()
-                    tags=tags))
-                curve_entries_inserted.add(entry_name)
-
-        for curve_name, curve_obj in curves.items():
-            tags = (json.dumps(curve_obj['tags']) if 'tags' in curve_obj else None)
-            record.curve_set_meta.append(schema.CurveSetMeta(name=curve_name,
+        for curveset_name, curveset_obj in curve_sets.items():
+            tags = (json.dumps(curveset_obj['tags']) if 'tags' in curveset_obj else None)
+            record.curve_set_meta.append(schema.CurveSetMeta(name=curveset_name,
                                                              tags=tags))
-            for entry_name, entry_obj in curve_obj["independent"].items():
-                insert_data_from_entry(entry_name, entry_obj)
-            for entry_name, entry_obj in curve_obj["dependent"].items():
-                insert_data_from_entry(entry_name, entry_obj)
+        resolved_sets = utils.resolve_curve_sets(curve_sets)
+        for entry_name, entry_obj in resolved_sets.items():
+            tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
+            record.scalar_lists.append(schema.ListScalarData(
+                name=entry_name,
+                min=min(entry_obj['value']),
+                max=max(entry_obj['value']),
+                units=entry_obj.get('units'),  # units might be None, always use get()
+                tags=tags))
 
     @staticmethod
     def _attach_files(record, files):
@@ -433,9 +393,54 @@ class RecordDAO(dao.RecordDAO):
         """
         result = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one_or_none())
+
         if result is None:
-            raise ValueError("No Record found with id {}".format(id))
+            raise ValueError("No Record found with id %s" % id)
         return _record_builder(json_input=json.loads(result.raw))
+
+    def _get_many(self, ids, _record_builder, chunk_size):
+        """
+        Apply some "get" function to an iterable of Record ids.
+        Used by the parent get(), this is the SQL-specific implementation of
+        getting multiple Records.
+        ...
+
+        :param ids: An iterable of Record ids to return
+        :param chunk_size: Size of chunks to pull records in.
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+        :returns: A generator of Record objects
+        """
+        chunks = [ids[x:x+chunk_size] for x in range(0, len(ids), chunk_size)]
+        for chunk in chunks:
+            ids_found = 0
+            results = (self.session.query(schema.Record)
+                       .filter(schema.Record.id.in_(chunk)))
+
+            for result in results:
+                ids_found += 1
+                yield _record_builder(json_input=json.loads(result.raw))
+
+            if ids_found != len(chunk):
+                raise ValueError("No Record found with id in chunk %s" % chunk)
+
+    def get_all(self, ids_only=False):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        LOGGER.debug('Getting all records')
+        if ids_only:
+            query = self.session.query(schema.Record.id)
+            for record_id in query:
+                yield str(record_id[0])
+        else:
+            results = self.session.query(schema.Record)
+            for result in results:
+                yield model.generate_record_from_json(json_input=json.loads(result.raw))
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -459,20 +464,20 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get(filtered_ids):
                 yield record
 
-    def get_with_curve(self, curve_name, ids_only=False):
+    def get_with_curve_set(self, curve_set_name, ids_only=False):
         """
-        Given the name of a curve, return Records containing it.
+        Given the name of a curve set, return Records containing it.
 
-        :param curve_name: The name of the group of curves
+        :param curve_set_name: The name of the group of curves
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
         :returns: A generator of Records of that type or (if ids_only) a
                   generator of their ids
         """
-        LOGGER.debug('Getting all records with curves named %s.', curve_name)
+        LOGGER.debug('Getting all records with curve sets named %s.', curve_set_name)
         query = (self.session.query(schema.CurveSetMeta.id)
-                 .filter(schema.CurveSetMeta.name == curve_name))
+                 .filter(schema.CurveSetMeta.name == curve_set_name))
         if ids_only:
             for record_id in query.all():
                 yield str(record_id[0])
@@ -480,6 +485,38 @@ class RecordDAO(dao.RecordDAO):
             filtered_ids = (str(x[0]) for x in query.all())
             for record in self.get(filtered_ids):
                 yield record
+
+    def _one_exists(self, test_id):
+        """
+        Given an id, return boolean
+        This is the SQL specific implementation.
+
+        :param id: The id of the Record to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        query = (self.session.query(schema.Record.id)
+                 .filter(schema.Record.id == test_id).one_or_none())
+        return bool(query)
+
+    def _many_exist(self, test_ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+        This is the SQL specific implementation
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        test_ids = list(test_ids)
+        chunks = [test_ids[x:x+CHUNK_SIZE] for x in range(0, len(test_ids), CHUNK_SIZE)]
+        for chunk in chunks:
+            query = (self.session.query(schema.Record.id)
+                     .filter(schema.Record.id.in_(chunk)))
+            actual_ids = set((str(x[0]) for x in query.all()))
+            for test_id in chunk:
+                yield test_id in actual_ids
 
     def _universal_query(self, universal_criteria):
         """
@@ -515,6 +552,38 @@ class RecordDAO(dao.RecordDAO):
         """
         results = self.session.query(schema.Record.type).distinct().all()
         return [entry[0] for entry in results]
+
+    def data_names(self, record_type, data_types=None):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for a given record type.
+
+        :param record_type: Type of records to get data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
+
+        :returns: A generator of data names.
+        """
+        type_name_to_tables = {'scalar': schema.ScalarData,
+                               'string': schema.StringData,
+                               'scalar_list': schema.ListScalarData,
+                               'string_list': schema.ListStringDataEntry}
+        possible_data_types = list(type_name_to_tables.keys())
+        if data_types is None:
+            data_types = possible_data_types
+        if not isinstance(data_types, list):
+            data_types = [data_types]
+        if not set(data_types).issubset(set(possible_data_types)):
+            raise ValueError('Only select data types from: %s' % possible_data_types)
+
+        query_tables = [type_name_to_tables[type] for type in data_types]
+
+        for query_table in query_tables:
+            results = (self.session.query(query_table.name).join(schema.Record)
+                       .filter(schema.Record.type == record_type)
+                       .distinct())
+            for result in results:
+                yield result[0]
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """

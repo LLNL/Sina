@@ -189,12 +189,12 @@ class TestModify(unittest.TestCase):
         rec.curve_sets["spam_curve"] = {
             "dependent": {"firmness": {"value": [1, 1, 1, 1.2]}},
             "independent": {"time": {"value": [0, 1, 2, 3],
-                                     "tags": ["misc"],
+                                     "tags": ["misc", "protein"],
                                      "units": "seconds"}}}
         rec.curve_sets["egg_curve"] = {
             "dependent": {"firmness": {"value": [0, 0, 0.1, 0.3]}},
             "independent": {"time": {"value": [1, 2, 3, 4],
-                                     "tags": ["timer"]}}}
+                                     "tags": ["timer", "protein"]}}}
         record_dao.insert(rec)
         ret_record = record_dao.get("spam")
         # We sort-of check how it's stored *in the db*
@@ -235,16 +235,16 @@ class TestModify(unittest.TestCase):
     def test_recorddao_insert_overlapped_curve_and_data(self):
         """Test that we raise an error if a curve and data item overlap."""
         rec = Record(id="spam", type="eggs")
-        rec.curve_sets["spam_curve"] = {
-            "dependent": {"firmness": {"value": [1, 1, 1, 1.2]}},
-            "independent": {"time": {"value": [0, 1, 2, 3],
-                                     "tags": ["misc"],
-                                     "units": "seconds"}}}
+        rec.curve_sets = {
+            "spam_curve": {
+                "dependent": {"firmness": {"value": [1, 1, 1, 1.2]}},
+                "independent": {"time": {"value": [0, 1, 2, 3],
+                                         "tags": ["misc"],
+                                         "units": "seconds"}}}}
         rec.data["time"] = {"value": 1}
         with self.assertRaises(ValueError) as context:
             self.factory.create_record_dao().insert(rec)
-        self.assertIn("when there was already a scalar by that name",
-                      str(context.exception))
+        self.assertIn("Data and curve name overlap", str(context.exception))
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
@@ -563,6 +563,37 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                            id_only=True))
         self.assertEqual(min_spam_scals, ["spam", "spam3"])
 
+    # ####################### test_exist ####################################
+    def test_one_exists(self):
+        """Make sure that we return a correct bool for each ID."""
+        hit = self.record_dao.exist('spam')
+        self.assertEqual(hit, True)
+        miss = self.record_dao.exist('IDonNotExist')
+        self.assertEqual(miss, False)
+
+    def test_many_exist(self):
+        """Make sure that we return a correct list of Bools"""
+        result = list(self.record_dao.exist(id_ for id_ in
+                                            ['spam', 'IDoNotExist',
+                                             'spam2', 'IAlsoDoNotExist']))
+        self.assertEqual(result, [True, False, True, False])
+
+    # ####################### test_data_names ####################################
+    def test_data_names_with_string(self):
+        """Make sure that we get names of scalar data when given a string."""
+        names = set(self.record_dao.data_names(record_type='foo', data_types='scalar'))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2"]))
+
+    def test_data_names_with_list(self):
+        """Make sure that we get names of scalar data when given a list."""
+        names = set(self.record_dao.data_names(record_type='foo', data_types=['scalar']))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2"]))
+
+    def test_data_names_with_default(self):
+        """Make sure that we get names of all data by default."""
+        names = set(self.record_dao.data_names(record_type='foo'))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2", "val_data", "val_data_2"]))
+
     # ####################### test_get_available_types ######################
     def test_get_available_types(self):
         """Make sure that we return a correct list of the types in a datebase."""
@@ -791,10 +822,10 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
 
-    # ######################### get_with_curve #########################
-    def test_recorddao_get_with_curve(self):
+    # ######################### get_with_curve_set #########################
+    def test_recorddao_get_with_curve_set(self):
         """Test that the RecordDAO is retrieving based on curve name."""
-        get_one = list(self.record_dao.get_with_curve("egg_curve"))
+        get_one = list(self.record_dao.get_with_curve_set("egg_curve"))
         self.assertEqual(len(get_one), 1)
         self.assertIsInstance(get_one[0], Record)
         self.assertEqual(get_one[0].id, "spam")
@@ -803,19 +834,39 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_recorddao_curve_none(self):
         """Test that the RecordDAO curve query returns no Records when none match."""
-        get_none = list(self.record_dao.get_with_curve("butterscotch"))
+        get_none = list(self.record_dao.get_with_curve_set("butterscotch"))
         self.assertFalse(get_none)
 
     def test_recorddao_curve_returns_generator(self):
         """Test that the RecordDAO curve query returns a generator."""
-        ids_only = self.record_dao.get_with_curve("spam_curve")
+        ids_only = self.record_dao.get_with_curve_set("spam_curve")
         self.assertIsInstance(ids_only, types.GeneratorType,
                               "Method must return a generator.")
 
     def test_recorddao_curve_matches_many(self):
         """Test the RecordDAO curve query correctly returns multiple Records."""
-        ids_only = self.record_dao.get_with_curve("spam_curve", ids_only=True)
+        ids_only = self.record_dao.get_with_curve_set("spam_curve", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2"])
+
+    # ######################### get_all ##################################
+    def test_recorddao_get_all(self):
+        """Test the RecordDAO is retrieving all Records."""
+        all_records = list(self.record_dao.get_all())
+        self.assertEqual(len(all_records), 7)
+        self.assertIsInstance(all_records[0], Record)
+
+    def test_recorddao_get_all_returns_generator(self):
+        """Test that the RecordDAO type query returns a generator."""
+        all_records = self.record_dao.get_all()
+        self.assertIsInstance(all_records, types.GeneratorType,
+                              "Method must return a generator.")
+
+    def test_recorddao_get_all_matches_many(self):
+        """Test the RecordDAO type query correctly returns multiple Records."""
+        all_ids = self.record_dao.get_all(ids_only=True)
+        six.assertCountEqual(self, list(all_ids), ["spam", "spam2", "spam3",
+                                                   "spam4", "spam5", "spam6",
+                                                   "eggs"])
 
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):

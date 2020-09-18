@@ -108,13 +108,17 @@ class RecordDAO(dao.RecordDAO):
             self._insert_data(id=record.id,
                               data=record.data,
                               force_overwrite=force_overwrite)
+        if record.curve_sets:
+            self._insert_curve_sets(id=record.id,
+                                    curve_sets=record.curve_sets,
+                                    force_overwrite=force_overwrite)
         if record.files:
             self._insert_files(id=record.id,
                                files=record.files,
                                force_overwrite=force_overwrite)
 
     # Disabled until rework, possibly splitting into the first and second batch types
-    # pylint: disable=too-many-locals, too-many-branches
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements
     @staticmethod
     def _insert_many(list_to_insert, _type_managed, force_overwrite=False):
         """
@@ -143,6 +147,9 @@ class RecordDAO(dao.RecordDAO):
         from_scalar_list_batch = defaultdict(list)
         from_string_list_batch = defaultdict(list)
 
+        # Different setup from the others, no units or value.
+        from_curve_set_meta_batch = defaultdict(list)
+
         def _cross_populate_batch(batch_dict, batch_list=None):
             """
             Insert data into a batch dict (rec_from_x) and list (x_from_rec).
@@ -164,6 +171,26 @@ class RecordDAO(dao.RecordDAO):
             create(id=record.id,
                    type=record.type,
                    raw=json.dumps(record.raw))
+
+            if record.curve_sets:
+                # Curve set names are meta, everything else is per-record.
+                for curveset_name, curveset_obj in record.curve_sets.items():
+                    from_curve_set_meta_batch[curveset_name].append([record.id,
+                                                                     curveset_obj.get("tags")])
+                resolved_curves = utils.resolve_curve_sets(record.curve_sets)
+                # Curve data is stored as a scalar list
+                scalar_list_from_rec_batch = []
+                tags, units, value, datum_name, id = [None]*5
+                for entry_name, entry in six.iteritems(resolved_curves):
+                    # The values set here are used by _cross_populate_batch
+                    datum_name = entry_name
+                    tags = [str(x) for x in entry['tags']] if 'tags' in entry else None
+                    units = entry.get('units')
+                    value = entry['value']
+                    id = record.id
+                    _cross_populate_batch(from_scalar_list_batch,
+                                          scalar_list_from_rec_batch)
+
             if record.data:
                 # Unlike the rec_from_x dictionaries, these have the scope of a
                 # single Record, since the record id acts as their partition key.
@@ -258,6 +285,14 @@ class RecordDAO(dao.RecordDAO):
                         table.batch(batch_query).create(name=partition,
                                                         value=value,
                                                         id=entry[1])
+        # The RecordFromCurveSetMeta table is pretty simple.
+        table = schema.RecordFromCurveSetMeta
+        for partition, data_list in six.iteritems(from_curve_set_meta_batch):
+            with BatchQuery() as batch_query:
+                for entry in data_list:
+                    table.batch(batch_query).create(name=partition,
+                                                    id=entry[0],
+                                                    tags=entry[1])
 
     @staticmethod
     def _insert_data(data, id, force_overwrite=False):
@@ -281,6 +316,36 @@ class RecordDAO(dao.RecordDAO):
                                                value=datum['value'],
                                                units=datum.get('units'),
                                                tags=datum.get('tags'),
+                                               force_overwrite=force_overwrite)
+
+    @staticmethod
+    def _insert_curve_sets(curve_sets, id, force_overwrite=False):
+        """
+        Insert curves into two of the Cassandra query tables depending on value.
+
+        Data is loaded into the scalar list data and curve meta tables. Helper
+        method to simplify insertion.
+
+        :param curve_sets: The dictionary of curve sets to insert.
+        :param id: The Record ID to associate the curve sets to.
+        :param force_overwrite: Whether to forcibly overwrite preexisting curves.
+                                Currently only used by Cassandra DAOs.
+        """
+        LOGGER.debug('Inserting %i curve sets into Record ID %s with force_overwrite=%s.',
+                     len(curve_sets), id, force_overwrite)
+        create_meta = (schema.RecordFromCurveSetMeta.create if force_overwrite
+                       else schema.RecordFromCurveSetMeta.if_not_exists().create)
+        resolved_curves = utils.resolve_curve_sets(curve_sets)
+
+        for curveset_name, curveset_obj in curve_sets.items():
+            create_meta(name=curveset_name, id=id, tags=curveset_obj.get("tags"))
+        for entry_name, entry_obj in six.iteritems(resolved_curves):
+            print(entry_name, entry_obj)
+            schema.cross_populate_query_tables(id=id,
+                                               name=entry_name,
+                                               value=entry_obj['value'],
+                                               units=entry_obj.get('units'),
+                                               tags=entry_obj.get('tags'),
                                                force_overwrite=force_overwrite)
 
     @staticmethod
@@ -643,6 +708,82 @@ class RecordDAO(dao.RecordDAO):
         except DoesNotExist:  # Raise a more familiar, descriptive error.
             raise ValueError("No Record found with id {}".format(id))
 
+    def _get_many(self, ids, _record_builder, chunk_size):
+        """
+        Apply some "get" function to an iterable of Record ids.
+
+        Used by the parent get(), this is the Cassandra-specific implementation of
+        getting multiple Records.
+
+        :param ids: An iterable of Record ids to return
+        :param chunk_size: Currently unused for Cassandra
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A generator of Records if found.
+
+        :raises ValueError: if a Record with the id can't be found.
+        """
+
+        results = schema.Record.objects.filter(schema.Record.id.in_(ids))
+        ids_found = 0
+        for result in results:
+            yield _record_builder(json_input=json.loads(result.raw))
+            ids_found += 1
+
+        if ids_found != len(ids):
+            raise ValueError("No Record found with id in %s" % ids)
+
+    def _one_exists(self, test_id):
+        """
+        Given an id, return boolean of if it exists or not.
+        This is the Cassandra specific implementation.
+
+        :param id: The id of the Record to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        try:
+            _ = schema.Record.objects.filter(id=test_id).get()
+            return True
+        except DoesNotExist:
+            return False
+
+    def _many_exist(self, test_ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+        This is the Cassandra specific implementation
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        test_ids = list(test_ids)
+        actual_ids = set(schema.Record.objects
+                         .filter(schema.Record.id.in_(test_ids))
+                         .values_list('id', flat=True))
+        for test_id in test_ids:
+            yield test_id in actual_ids
+
+    def get_all(self, ids_only=False):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        LOGGER.debug('Getting all records')
+        if ids_only:
+            query = (schema.Record.objects.values_list('id', flat=True))
+            for id in query:
+                yield str(id)
+        else:
+            results = schema.Record.objects
+            for result in results:
+                yield model.generate_record_from_json(json_input=json.loads(result.raw))
+
     def get_all_of_type(self, type, ids_only=False):
         """
         Given a type of Record, return all Records of that type.
@@ -665,6 +806,27 @@ class RecordDAO(dao.RecordDAO):
             for record in self.get(query):
                 yield record
 
+    def get_with_curve_set(self, curve_set_name, ids_only=False):
+        """
+        Given the name of a curve set, return Records containing it.
+
+        :param curve_set_name: The name of the group of curves
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
+
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
+        """
+        LOGGER.debug('Getting all records with curve sets named %s.', curve_set_name)
+        query = (schema.RecordFromCurveSetMeta.filter(name=curve_set_name)
+                 .values_list('id', flat=True))
+        if ids_only:
+            for record_id in query.all():
+                yield record_id
+        else:
+            for record in self.get(query.all()):
+                yield record
+
     def get_available_types(self):
         """
         Return a list of all the Record types in the database.
@@ -673,6 +835,38 @@ class RecordDAO(dao.RecordDAO):
         """
         # CQL's "distinct" is limited to partition columns (ID) and "static" columns only.
         return list(set(schema.Record.objects.values_list('type', flat=True)))
+
+    def data_names(self, record_type, data_types=None):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for a given record type.
+
+        :param record_type: Type of records to get data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
+
+        :returns: A generator of data names.
+        """
+        type_name_to_tables = {'scalar': schema.ScalarDataFromRecord,
+                               'string': schema.StringDataFromRecord}
+        possible_types = list(type_name_to_tables.keys())
+        if data_types is None:
+            data_types = possible_types
+        if not isinstance(data_types, list):
+            data_types = [data_types]
+        if not set(data_types).issubset(set(possible_types)):
+            raise ValueError('Only select data types from: %s' % possible_types)
+
+        query_tables = [type_name_to_tables[type] for type in data_types]
+
+        ids = list(self.get_all_of_type(record_type, ids_only=True))
+
+        for query_table in query_tables:
+            results = set(query_table.objects
+                          .filter(query_table.id.in_(ids))
+                          .values_list('name', flat=True))
+            for result in results:
+                yield result
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """

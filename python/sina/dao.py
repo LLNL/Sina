@@ -26,11 +26,12 @@ class RecordDAO(object):
 
     __metaclass__ = ABCMeta
 
-    def get(self, ids, _record_builder=sina.model.generate_record_from_json):
+    def get(self, ids, _record_builder=sina.model.generate_record_from_json, chunk_size=999):
         """
         Given an (iterable of) id(s), return matching Record(s).
 
         :param ids: The id(s) of the Record(s) to return.
+        :param chunk_size: Size of chunks to pull records in.
         :param _record_builder: The function used to create a Record object
                                 (or one of its children) from the raw. Does not
                                 need to be touched by the user.
@@ -40,17 +41,14 @@ class RecordDAO(object):
 
         :raises ValueError: if no Record is found for some id.
         """
-        def gen_records(ids):
-            """Hack around the limitation of returning generators XOR non-gens."""
-            for id in ids:
-                yield self._get_one(id, _record_builder)
 
         if isinstance(ids, six.string_types):
             LOGGER.debug('Getting record with id=%s', ids)
             return self._get_one(ids, _record_builder)
+
         ids = list(ids)
-        LOGGER.debug('Getting records with ids in=%s', ids)
-        return gen_records(ids)
+        LOGGER.debug('Getting records with ids in %s', ids)
+        return self._get_many(ids, _record_builder, chunk_size)
 
     @abstractmethod
     def _get_one(self, id, _record_builder):
@@ -71,6 +69,28 @@ class RecordDAO(object):
         :returns: A Record if found, else None.
 
         :raises ValueError: if no Record is found for the id.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _get_many(self, ids, _record_builder, chunk_size):
+        """
+        Apply some "get" function to an iterable of Record ids.
+
+        Because the overload needs to be invisible to the user, we need to
+        be able to return both a generator (from a list) and non-generator
+        (from a single ID). This is the framework for allowing it.
+
+        Currently, this makes sense because Cassandra can't batch reads. May
+        be worth revisiting.
+
+        :param id: An Iterable of Record ids to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A generator of Records if found, else None.
+
+        :raises ValueError: if no Record is found for the ids.
         """
         raise NotImplementedError
 
@@ -158,12 +178,77 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def get_all(self, ids_only):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def get_available_types(self):
         """
         Return a list of all the Record types in the database.
 
         :returns: A list of types present (ex: ["run", "experiment"])
+        """
+        raise NotImplementedError
+
+    def exist(self, test_ids):
+        """
+        Given an (iterable of) id(s), return boolean (list) of whether those
+        record(s) exist or not.
+
+        :param ids: The id(s) of the Record(s) to test.
+
+        :returns: If provided an iterable, a generator of bools pertaining to
+                  the ids' existence, else a single boolean value.
+        """
+
+        if isinstance(test_ids, six.string_types):
+            LOGGER.debug('Getting record with id=%s', test_ids)
+            return self._one_exists(test_ids)
+
+        LOGGER.debug('Getting records with ids in %s', test_ids)
+        return self._many_exist(test_ids)
+
+    @abstractmethod
+    def _one_exists(self, test_id):
+        """
+        Given an id, return boolean
+
+        :param ids: The id(s) of the Record(s) to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _many_exist(self, test_ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def data_names(self, record_type, data_types):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for a given record type.
+
+        :param record_type: Type of records to get data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
+
+        :returns: A generator of data names.
         """
         raise NotImplementedError
 

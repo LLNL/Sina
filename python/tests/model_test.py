@@ -60,7 +60,9 @@ class TestModel(unittest.TestCase):
                      'spam': 'spam'}
         self.assertFalse(spam.is_valid()[0])
         # Data needs to be a dict, not a list!
-        spam.data = [{"value": "runny", "tags": ["tEGGxture"]}]
+        # We have to use ["data"] notation as .data will trigger the setter,
+        # which TypeErrors on non-dicts.
+        spam["data"] = [{"value": "runny", "tags": ["tEGGxture"]}]
         self.assertFalse(spam.is_valid()[0])
 
         spam.data = {"eggstate": {"value": "runny", "tags": ["tEGGxture"]}}
@@ -178,6 +180,11 @@ class TestModel(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             rec.add_data("density", 40)
         self.assertIn('is already the name of a curve', str(context.exception))
+        # Subtle difference between add_data() and just assigning the entire data chunk
+        # Errors are different, as the latter can have more than one collision.
+        with self.assertRaises(ValueError) as context:
+            rec.data = {"density": {"value": 40}}
+        self.assertIn('overlapping curve and data entries', str(context.exception))
 
     def test_add_curve_with_data_overlap(self):
         """Test for error raising when same-name datum and curve are added."""
@@ -187,7 +194,7 @@ class TestModel(unittest.TestCase):
         rec = model.Record(id="data_test", type="test", data=complete_data)
         with self.assertRaises(ValueError) as context:
             rec.curve_sets = complete_curvesets
-        self.assertIn('is already the name of a datum', str(context.exception))
+        self.assertIn('overlapping curve and data entries', str(context.exception))
 
     def test_record_access(self):
         """Ensure accessing record attribs using rec["spam"]."""
