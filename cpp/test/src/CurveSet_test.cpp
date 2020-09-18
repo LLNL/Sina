@@ -129,10 +129,11 @@ TEST(CurveSet, createFromNode_curveSetsDefined) {
 
 TEST(CurveSet, toNode_empty) {
     CurveSet curveSet{"theName"};
-    EXPECT_THAT(curveSet.toNode(), MatchesJson(R"({
+    auto expected = R"({
         "independent": {},
         "dependent": {}
-    })"));
+    })";
+    EXPECT_THAT(curveSet.toNode(), MatchesJson(expected));
 }
 
 TEST(CurveSet, toNode_withCurves) {
@@ -141,7 +142,7 @@ TEST(CurveSet, toNode_withCurves) {
     curveSet.addIndependentCurve(Curve{"i2", {4, 5, 6}});
     curveSet.addDependentCurve(Curve{"d1", {10, 20, 30}});
     curveSet.addDependentCurve(Curve{"d2", {40, 50, 60}});
-    EXPECT_THAT(curveSet.toNode(), MatchesJson(R"({
+    auto expected = R"({
         "independent": {
             "i1": {
                 "value": [1.0, 2.0, 3.0]
@@ -158,7 +159,8 @@ TEST(CurveSet, toNode_withCurves) {
                 "value": [40.0, 50.0, 60.0]
             }
         }
-    })"));
+    })";
+    EXPECT_THAT(curveSet.toNode(), MatchesJson(expected));
 }
 
 }}}

@@ -80,20 +80,22 @@ TEST(Curve, createFromNode_optionalFields) {
 
 TEST(Curve, toNode_requiredOnly) {
     Curve const curve{"theName", {1, 2, 3, 4}};
-    EXPECT_THAT(curve.toNode(), MatchesJson(R"({
+    auto expected = (R"({
         "value": [1.0, 2.0, 3.0, 4.0]
-    })"));
+    })");
+    EXPECT_THAT(curve.toNode(), MatchesJson(expected));
 }
 
 TEST(Curve, toNode_optionalFields) {
     Curve curve{"theName", {1, 2, 3, 4}};
     curve.setUnits("cm");
     curve.setTags({"t1", "t2", "t3"});
-    EXPECT_THAT(curve.toNode(), MatchesJson(R"({
+    auto expected = R"({
         "value": [1.0, 2.0, 3.0, 4.0],
         "units": "cm",
         "tags": ["t1", "t2", "t3"]
-    })"));
+    })";
+    EXPECT_THAT(curve.toNode(), MatchesJson(expected));
 }
 
 }}}

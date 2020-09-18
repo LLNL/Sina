@@ -257,7 +257,7 @@ TEST(Record, toNode_curveSets) {
     CurveSet cs{"myCurveSet"};
     cs.addIndependentCurve(Curve{"myCurve", {1, 2, 3}});
     record.add(cs);
-    EXPECT_THAT(record.toNode(), MatchesJson(R"({
+    auto expected = R"({
         "local_id": "the id",
         "type": "my type",
         "curve_sets": {
@@ -270,7 +270,8 @@ TEST(Record, toNode_curveSets) {
                  "dependent": {}
             }
         }
-    })"));
+    })";
+    EXPECT_THAT(record.toNode(), MatchesJson(expected));
 }
 
 TEST(RecordLoader, load_missingLoader) {
