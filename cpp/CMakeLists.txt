@@ -23,4 +23,4 @@ endif (${SINA_BUILD_TESTS})
 
 if (${SINA_BUILD_DOCS})
     add_subdirectory(docs)
-if (${SINA_BUILD_DOCS})
+endif (${SINA_BUILD_DOCS})
