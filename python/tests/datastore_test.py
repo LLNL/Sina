@@ -95,7 +95,23 @@ class DatastoreTests(unittest.TestCase):
     # #############  RecordOperations  ############# #
     def test_get_record(self):
         """Test the RecordOperation get()."""
-        self.assert_record_method_is_passthrough("get", "get", 1)
+        # We need to test that args are properly kwarg'd to reorder
+        expected_result = "test return"
+        self.record_dao.get = Mock(return_value=expected_result)
+        args = ("ids", "chunk_size")
+        expected_args = ['ids']
+        expected_kwargs = {"chunk_size": "chunk_size"}
+        actual_result = self.datastore.records.get(*args)
+        self.assertIs(actual_result, expected_result)
+        self.record_dao.get.assert_called_with(*expected_args, **expected_kwargs)
+
+        # ...and that default args are properly kwarg'd as well.
+        args = ("ids",)
+        expected_args = ['ids']
+        expected_kwargs = {"chunk_size": 999}
+        actual_result = self.datastore.records.get(*args)
+        self.assertIs(actual_result, expected_result)
+        self.record_dao.get.assert_called_with(*expected_args, **expected_kwargs)
 
     def test_insert_record(self):
         """Test the RecordOperation insert()."""
@@ -115,10 +131,28 @@ class DatastoreTests(unittest.TestCase):
                                                  "get_all_of_type", 1,
                                                  opt_args=(False,))
 
+    def test_get_all(self):
+        """Test the RecordOperation get_all()."""
+        self.assert_record_method_is_passthrough("get_all",
+                                                 "get_all", 1)
+        self.assert_record_method_is_passthrough("get_all",
+                                                 "get_all", 0,
+                                                 opt_args=(False,))
+
     def test_get_types(self):
         """Test the RecordOperation get_types()."""
         self.assert_record_method_is_passthrough("get_types",
                                                  "get_available_types")
+
+    def test_exist(self):
+        """Test the RecordOperation exist()."""
+        self.assert_record_method_is_passthrough("exist", "exist", 1)
+
+    def test_data_names(self):
+        """Test the RecordOperation data_names()."""
+        self.assert_record_method_is_passthrough("data_names", "data_names", 2)
+        self.assert_record_method_is_passthrough("data_names", "data_names", 1,
+                                                 opt_args=(None,))
 
     def test_find_with_data(self):
         """Test the RecordOperation find_with_data()."""
