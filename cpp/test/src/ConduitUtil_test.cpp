@@ -4,11 +4,14 @@
 #include "gmock/gmock.h"
 
 #include "sina/ConduitUtil.hpp"
+#include "sina/testing/ConduitTestUtils.hpp"
 
 namespace sina { namespace testing { namespace {
 
-using ::testing::HasSubstr;
+using ::testing::ContainerEq;
+using ::testing::ElementsAre;
 using ::testing::DoubleEq;
+using ::testing::HasSubstr;
 
 TEST(ConduitUtil, getRequiredField_present) {
     conduit::Node parent;
@@ -145,6 +148,59 @@ TEST(ConduitUtil, getOptionalField_slashes) {
     parent["some/name"] = "undesired value";
     EXPECT_EQ("",
               getOptionalString("some/name", parent, "parent name"));
+}
+
+TEST(ConduitUtil, toDoubleVector_empty) {
+    conduit::Node emptyList = parseJsonValue("[]");
+    EXPECT_EQ(std::vector<double>{}, toDoubleVector(emptyList, "testNode"));
+}
+
+TEST(ConduitUtil, toDoubleVector_validValues) {
+    conduit::Node nonEmptyList = parseJsonValue("[1, 2.0, 3, 4]");
+    EXPECT_THAT(toDoubleVector(nonEmptyList, "testNode"),
+            ElementsAre(1.0, 2.0, 3.0, 4.0));
+}
+
+TEST(ConduitUtil, toDoubleVector_NotList) {
+    conduit::Node notList = parseJsonValue("\"this is not a list of doubles\"");
+    try {
+        toDoubleVector(notList, "someName");
+        FAIL() << "Should have thrown an exception";
+    } catch (std::invalid_argument const &ex) {
+        EXPECT_THAT(ex.what(), HasSubstr("someName"));
+    }
+}
+
+TEST(ConduitUtil, toStringVector_empty) {
+    conduit::Node emptyList = parseJsonValue("[]");
+    EXPECT_THAT(toStringVector(emptyList, "testNode"),
+            ContainerEq(std::vector<std::string>{}));
+}
+
+TEST(ConduitUtil, toStringVector_validValues) {
+    conduit::Node nonEmptyList = parseJsonValue(R"(["s1", "s2", "s3"])");
+    EXPECT_THAT(toStringVector(nonEmptyList, "testNode"),
+            ElementsAre("s1", "s2", "s3"));
+}
+
+TEST(ConduitUtil, toStringVector_NotList) {
+    conduit::Node notList = parseJsonValue("\"this is not a list of doubles\"");
+    try {
+        toStringVector(notList, "someName");
+        FAIL() << "Should have thrown an exception.";
+    } catch (std::invalid_argument const &ex) {
+        EXPECT_THAT(ex.what(), HasSubstr("someName"));
+    }
+}
+
+TEST(ConduitUtil, toStringVector_NotListOfStrings) {
+    conduit::Node notList = parseJsonValue(R"([1, 2, "a string"])");
+    try {
+        toStringVector(notList, "someName");
+        FAIL() << "Should have thrown an exception.";
+    } catch (std::invalid_argument const &ex) {
+        EXPECT_THAT(ex.what(), HasSubstr("someName"));
+    }
 }
 
 }}}

@@ -13,6 +13,7 @@
 #include "conduit.hpp"
 
 #include "sina/ID.hpp"
+#include "sina/CurveSet.hpp"
 #include "sina/Datum.hpp"
 #include "sina/File.hpp"
 
@@ -64,6 +65,7 @@ class Record {
 public:
     using DatumMap = std::unordered_map<std::string, Datum>;
     using FileSet = std::unordered_set<File, FileHashByURI, FileEqualByURI>;
+    using CurveSetMap = std::unordered_map<std::string, CurveSet>;
 
     /**
      * Construct a new Record.
@@ -136,6 +138,22 @@ public:
     }
 
     /**
+     * Add a CurveSet to this record.
+     *
+     * @param curveSet the CurveSet to add
+     */
+    void add(CurveSet curveSet);
+
+    /**
+     * Get the curve sets associated with this record.
+     *
+     * @return the record's curve sets
+     */
+    CurveSetMap const &getCurveSets() const noexcept {
+        return curveSets;
+    }
+
+    /**
      * Get the user-defined content of the object.
      *
      * @return the user-defined content
@@ -174,6 +192,7 @@ private:
     std::string type;
     DatumMap data;
     FileSet files;
+    CurveSetMap curveSets;
     conduit::Node userDefined;
 };
 
