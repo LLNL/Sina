@@ -25,7 +25,7 @@ if(${SINA_BUILD_ADIAK_BINDINGS})
     blt_register_library(NAME adiak
         TREAT_INCLUDES_AS_SYSTEM ON
         INCLUDES "${adiak_DIR}/../../../include"
-        LIBRARIES "${adiak_DIR}/../../libadiak.a"
+        LIBRARIES adiak
     )
     string(CONCAT OPTIONAL_SINA_DEPENDENCIES "adiak")
 endif(${SINA_BUILD_ADIAK_BINDINGS})
@@ -33,6 +33,8 @@ endif(${SINA_BUILD_ADIAK_BINDINGS})
 blt_add_library(NAME sina
     HEADERS
         ../include/sina/CppBridge.hpp
+        ../include/sina/Curve.hpp
+        ../include/sina/CurveSet.hpp
         ../include/sina/Document.hpp
         ../include/sina/File.hpp
         ../include/sina/ID.hpp
@@ -44,6 +46,8 @@ blt_add_library(NAME sina
         ../include/sina/Datum.hpp
         ../include/sina/AdiakWriter.hpp
     SOURCES
+        Curve.cpp
+        CurveSet.cpp
         Document.cpp
         File.cpp
         ID.cpp
