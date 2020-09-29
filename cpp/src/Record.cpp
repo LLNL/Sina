@@ -15,6 +15,7 @@ namespace {
 char const LOCAL_ID_FIELD[] = "local_id";
 char const GLOBAL_ID_FIELD[] = "id";
 char const DATA_FIELD[] = "data";
+char const CURVE_SETS_FIELD[] = "curve_sets";
 char const TYPE_FIELD[] = "type";
 char const FILES_FIELD[] = "files";
 char const USER_DEFINED_FIELD[] = "user_defined";
@@ -48,6 +49,13 @@ conduit::Node Record::toNode() const {
       }
       asNode[DATA_FIELD] = datumRef;
     }
+    if(!curveSets.empty()){
+      conduit::Node curveSetsNode;
+      for(auto &entry : curveSets){
+          curveSetsNode[entry.first] = entry.second.toNode();
+      }
+      asNode[CURVE_SETS_FIELD] = curveSetsNode;
+    }
     if(!userDefined.dtype().is_empty()){
       asNode[USER_DEFINED_FIELD] = userDefined;
     }
@@ -72,6 +80,15 @@ Record::Record(conduit::Node const &asNode) :
             files.insert(File(filesIter.name(), namedFile));
         }
     }
+    if (asNode.has_child(CURVE_SETS_FIELD)) {
+        auto curveSetsIter = asNode[CURVE_SETS_FIELD].children();
+        while(curveSetsIter.has_next()){
+            auto &curveSetNode = curveSetsIter.next();
+            std::string name = curveSetsIter.name();
+            CurveSet cs{name, curveSetNode};
+            curveSets.emplace(std::make_pair(std::move(name), std::move(cs)));
+        }
+    }
     if(asNode.has_child(USER_DEFINED_FIELD)){
         auto userDefinedNode = asNode[USER_DEFINED_FIELD];
         if (!userDefinedNode.dtype().is_empty()) {
@@ -90,6 +107,10 @@ void Record::add(std::string name, Datum datum) {
 
 void Record::add(File file) {
     files.insert(std::move(file));
+}
+void Record::add(CurveSet curveSet) {
+    std::string name = curveSet.getName();
+    curveSets.emplace(std::move(name), std::move(curveSet));
 }
 
 void Record::setUserDefinedContent(conduit::Node userDefined_) {
