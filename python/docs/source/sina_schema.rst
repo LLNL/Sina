@@ -27,7 +27,7 @@ Records
 -------
 
 Every Record has, at minimum, an :code:`id` and a :code:`type` (run, msub,
-etc). Records can also have :code:`data`, :code:`files`,
+etc). Records can also have :code:`data`, :code:`curve_sets`, :code:`files`,
 application metadata, arbitrary user-defined information, and more.
 A minimal example of a Record:
 
@@ -60,12 +60,25 @@ A more fleshed-out example, with field descriptions:
       // A dictionary of data associated with the Record
       "data": {
           // Entries must have a value. Optionally, they can have tags and/or units.
-          "initial_angle":: {"value": 30},
+          "initial_angle": {"value": 30},
           "max_density": { "value": 3, "units": "kg/m^3" },
           "total_energy": { "value": 12.2, "units": "MJ", "tags": ["output"]},
           // Data can be strings, scalars, lists of strings, or lists of scalars
           "revision": { "value": "12-4-11", "tags": ["pedigree"]},
           "presets": { "value": ["quickstart", "glass"]}
+      },
+      // Sets of curves associated with the Record (essentially a special case of data)
+      "curve_sets": {
+          // Each set of curves needs a name
+          "timeplot_1": {
+              // Each set has independent(s) and dependent(s)
+              "independents": {
+                  // Individual curves take the same format as lists of scalars in "data"
+                  "time": {"value": [0, 1, 2]}},
+              "dependents": {
+                  "mass": {"value": [12, 11, 8], "tags": ["physics"]},
+                  "volume": {"value": [10, 14, 22.2], "units": "m^3"}}
+          }
       },
       // A dictionary of information that does not make sense as a data or file entry
       "user_defined": {

@@ -156,6 +156,20 @@ class RecordFromStringListData(Model):
     id = columns.Text(primary_key=True)
 
 
+class RecordFromCurveSetMeta(Model):
+    """
+    Query table for finding records given curveset criteria.
+
+    The only "criteria" supported is name. Neither independents nor
+    dependents are mentioned here. See a full explanation on the sql_schema
+    implementation.
+    """
+
+    name = columns.Text(primary_key=True)
+    id = columns.Text(primary_key=True)
+    tags = columns.Set(columns.Text())
+
+
 class ObjectFromSubject(Model):
     """
     Query table for finding object given subject (plus optionally predicate).
@@ -344,6 +358,7 @@ def sync_tables():
     sync_table(RecordFromScalarListDataMin)
     sync_table(RecordFromScalarListDataMax)
     sync_table(RecordFromStringListData)
+    sync_table(RecordFromCurveSetMeta)
 
 
 def form_connection(keyspace, node_ip_list=None, sonar_cqlshrc_path=None):

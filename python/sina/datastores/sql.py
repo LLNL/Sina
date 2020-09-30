@@ -68,6 +68,8 @@ class RecordDAO(dao.RecordDAO):
                                    raw=json.dumps(sina_record.raw))
         if sina_record.data:
             RecordDAO._attach_data(sql_record, sina_record.data)
+        if sina_record.curve_sets:
+            RecordDAO._attach_curves(sql_record, sina_record.curve_sets)
         if sina_record.files:
             RecordDAO._attach_files(sql_record, sina_record.files)
 
@@ -122,6 +124,31 @@ class RecordDAO(dao.RecordDAO):
                                                 # units might be None, always use get()
                                                 units=datum.get('units'),
                                                 tags=tags))
+
+    @staticmethod
+    def _attach_curves(record, curve_sets):
+        """
+        Attach the curve entries to the given SQL record.
+
+        :param record: The SQL schema record to associate the data to.
+        :param curve_sets: The dictionary of curve sets to insert.
+        """
+        LOGGER.debug('Inserting %i curve set entries to Record ID %s.',
+                     len(curve_sets), record.id)
+
+        for curveset_name, curveset_obj in curve_sets.items():
+            tags = (json.dumps(curveset_obj['tags']) if 'tags' in curveset_obj else None)
+            record.curve_set_meta.append(schema.CurveSetMeta(name=curveset_name,
+                                                             tags=tags))
+        resolved_sets = utils.resolve_curve_sets(curve_sets)
+        for entry_name, entry_obj in resolved_sets.items():
+            tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
+            record.scalar_lists.append(schema.ListScalarData(
+                name=entry_name,
+                min=min(entry_obj['value']),
+                max=max(entry_obj['value']),
+                units=entry_obj.get('units'),  # units might be None, always use get()
+                tags=tags))
 
     @staticmethod
     def _attach_files(record, files):
@@ -429,6 +456,28 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Getting all records of type %s.', type)
         query = (self.session.query(schema.Record.id)
                  .filter(schema.Record.type == type))
+        if ids_only:
+            for record_id in query.all():
+                yield str(record_id[0])
+        else:
+            filtered_ids = (str(x[0]) for x in query.all())
+            for record in self.get(filtered_ids):
+                yield record
+
+    def get_with_curve_set(self, curve_set_name, ids_only=False):
+        """
+        Given the name of a curve set, return Records containing it.
+
+        :param curve_set_name: The name of the group of curves
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
+
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
+        """
+        LOGGER.debug('Getting all records with curve sets named %s.', curve_set_name)
+        query = (self.session.query(schema.CurveSetMeta.id)
+                 .filter(schema.CurveSetMeta.name == curve_set_name))
         if ids_only:
             for record_id in query.all():
                 yield str(record_id[0])

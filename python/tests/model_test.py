@@ -60,7 +60,9 @@ class TestModel(unittest.TestCase):
                      'spam': 'spam'}
         self.assertFalse(spam.is_valid()[0])
         # Data needs to be a dict, not a list!
-        spam.data = [{"value": "runny", "tags": ["tEGGxture"]}]
+        # We have to use ["data"] notation as .data will trigger the setter,
+        # which TypeErrors on non-dicts.
+        spam["data"] = [{"value": "runny", "tags": ["tEGGxture"]}]
         self.assertFalse(spam.is_valid()[0])
 
         spam.data = {"eggstate": {"value": "runny", "tags": ["tEGGxture"]}}
@@ -170,6 +172,30 @@ class TestModel(unittest.TestCase):
             rec.add_data("density", 40)
         self.assertIn('Duplicate datum', str(context.exception))
 
+    def test_add_data_with_curve_overlap(self):
+        """Test for error raising when same-name curve and datum are added."""
+        complete_curvesets = {"set_1": {"independent": {"density": {"value": [1, 2]}},
+                                        "dependent": {"density": {"value": [1, 2]}}}}
+        rec = model.Record(id="data_test", type="test", curve_sets=complete_curvesets)
+        with self.assertRaises(ValueError) as context:
+            rec.add_data("density", 40)
+        self.assertIn('is already the name of a curve', str(context.exception))
+        # Subtle difference between add_data() and just assigning the entire data chunk
+        # Errors are different, as the latter can have more than one collision.
+        with self.assertRaises(ValueError) as context:
+            rec.data = {"density": {"value": 40}}
+        self.assertIn('overlapping curve and data entries', str(context.exception))
+
+    def test_add_curve_with_data_overlap(self):
+        """Test for error raising when same-name datum and curve are added."""
+        complete_curvesets = {"set_1": {"independent": {"density": {"value": [1, 2]}},
+                                        "dependent": {"density": {"value": [1, 2]}}}}
+        complete_data = {"density": {"value": 40}}
+        rec = model.Record(id="data_test", type="test", data=complete_data)
+        with self.assertRaises(ValueError) as context:
+            rec.curve_sets = complete_curvesets
+        self.assertIn('overlapping curve and data entries', str(context.exception))
+
     def test_record_access(self):
         """Ensure accessing record attribs using rec["spam"]."""
         rec = model.Record(id="spam_test", type="test")
@@ -184,6 +210,9 @@ class TestModel(unittest.TestCase):
         target_json = ('{"id":"hello", "type":"greeting", '
                        '"data":{"language": {"value": "english"},'
                        '"mood": {"value": "friendly"}},'
+                       '"curve_sets":{"learning": {'
+                       '"independent":{"time": {"value": [1, 2, 3]}},'
+                       '"dependent": {"words": {"value": [0, 6, 12]}}}},'
                        '"files":{"pronounce.wav": {}},'
                        '"user_defined":{"good": "morning"}}')
         test_record = model.Record("hello", "greeting")
@@ -202,6 +231,9 @@ class TestModel(unittest.TestCase):
                        '"application":"foo", "user":"JohnD", "version":0,'
                        '"data": {"language": {"value":"english"},'
                        '"mood": {"value":"friendly"}},'
+                       '"curve_sets":{"learning": {'
+                       '"independent":{"time": {"value": [1, 2, 3]}},'
+                       '"dependent": {"words": {"value": [0, 6, 12]}}}},'
                        '"files":{"pronounce.wav": {}},'
                        '"user_defined":{"good": "morning"}}')
         test_run = model.Run("hello", "foo", user="JohnD", version=0)
@@ -297,7 +329,8 @@ class TestModel(unittest.TestCase):
                       "type": "run",
                       "application": "foo",
                       "user": "John Doe",
-                      "data": {}, "user_defined": {},
+                      "data": {}, "curve_sets": {},
+                      "user_defined": {},
                       "files": {}, "version": None}
         rec = model.generate_record_from_json(json_input=raw_record)
         converted_run = model.convert_record_to_run(record=rec)
