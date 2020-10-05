@@ -18,7 +18,7 @@
 umask 027
 
 # Valid make targets for optional build features
-VALID_MAKE_TARGETS="cassandra,cli_tools,jupyter"
+VALID_MAKE_TARGETS="cassandra,cli_tools,jupyter,mysql"
 
 # Valid deployment processing steps
 VALID_STEPS="clean,git,tests,venv,docs,examples"
@@ -134,6 +134,9 @@ deployExamples() {
     bash $db_build_script $DATASET_SOURCE_DIR
     cd $SOURCE_DIR
   done
+  # We'll also need to create a special folder for the advanced (untested) notebooks
+  # It has no associated db, so it won't be created above
+  mkdir $EXAMPLES_DEST_ROOT/advanced_tutorials
   deactivate
 
   # Copy the example notebooks
@@ -252,7 +255,7 @@ printUsage() {
   echo; echo "USAGE: `basename $0` $OPTIONS"
   echo; echo "where"
   echo "  <build-options>  Comma-separated list of optional build targets from: "
-  echo "                     cassandra,cli_tools,jupyter [default='']"
+  echo "                     cassandra,cli_tools,jupyter,mysql [default='']"
   echo "  <deploy-dir>     Path to the release deployment directory, where the "
   echo "                     venv goes in that directory and the wheel in a "
   echo "                     'wheel' subdirectory [default=$LC_DEPLOY_DIR]"

@@ -34,7 +34,7 @@ fi
 cd python
 # Build the Sina python deployment with all the known options
 # NOTE: Cython currently fails on Python 3.7. This is addressed in the Bamboo job (sets python to use 3.6.4).
-./deploy.sh --build-with=cassandra,cli_tools,jupyter --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK --skip=git
+./deploy.sh --build-with=cli_tools,jupyter,mysql --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK --skip=git
 echo "Python deployment complete! Continuing to C++ portion..."
 
 cd ../cpp
