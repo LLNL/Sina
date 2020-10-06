@@ -5,6 +5,15 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.9
+===
+- Overhauled API; users can now use DataStore object instead of DAOs
+- Added curve sets
+- Improved MySQL pooling behavior for many-node setups
+- Added new queries (get all records, check if record exists)
+- Improved efficiency of get() for large lists
+- Made C++ tests optional and off by default, other minor build improvements
+
 1.8
 ===
 - Improved SQL support for long string data
