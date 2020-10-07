@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.7)
 
-project(sina CXX)
+project(sina)
 
 set (ENABLE_GMOCK ON CACHE PATH "")
 
@@ -17,5 +17,10 @@ install(DIRECTORY "include/sina"
     DESTINATION "include")
 
 add_subdirectory(src)
-add_subdirectory(test)
-add_subdirectory(docs)
+if (${SINA_BUILD_TESTS})
+    add_subdirectory(test)
+endif (${SINA_BUILD_TESTS})
+
+if (${SINA_BUILD_DOCS})
+    add_subdirectory(docs)
+endif (${SINA_BUILD_DOCS})

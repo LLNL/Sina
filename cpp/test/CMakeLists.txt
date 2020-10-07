@@ -27,8 +27,12 @@ endif(${SINA_BUILD_ADIAK_BINDINGS})
 
 blt_add_executable(NAME unittests
     SOURCES
+        include/sina/testing/ConduitTestUtils.hpp
         include/sina/testing/TestRecord.hpp
         src/CppBridge_test.cpp
+        src/ConduitTestUtils.cpp
+        src/Curve_test.cpp
+        src/CurveSet_test.cpp
         src/Document_test.cpp
         src/File_test.cpp
         src/ID_test.cpp

@@ -11,6 +11,8 @@ import shutil
 import unittest
 from types import GeneratorType
 
+import six
+
 import sina.utils
 from sina.utils import (DataRange, StringListCriteria, ScalarListCriteria,
                         sort_and_standardize_criteria)
@@ -263,6 +265,41 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
         with self.assertRaises(ValueError) as context:
             sina.utils.invert_ranges(ranges)
         self.assertIn('must contain at least one DataRange', str(context.exception))
+
+    def test_resolve_curves(self):
+        """Test that curves with overlapping values are handled properly."""
+        curve_sets = {}
+        curve_sets["spam_curve"] = {
+            "dependent": {"saltiness": {"value": [1, 1, 1, 0.8]}},
+            "independent": {"time": {"value": [0, 1, 2, 3],
+                                     "tags": ["misc", "protein"],
+                                     "units": "seconds"}}}
+        curve_sets["egg_curve"] = {
+            "dependent": {"time": {"value": [1, 2, 3, 4],
+                                   "tags": ["timer", "protein"]}},
+            "independent": {"firmness": {"value": [0, 0, 0.1, 0.3]}}}
+        resolved_curves = sina.utils.resolve_curve_sets(curve_sets)
+        # Make sure they're not equal. If they are, curve_sets was overwritten.
+        self.assertNotEqual(curve_sets, resolved_curves)
+
+        # There is only one time in the return set, spam's time and egg's time combined
+        time = resolved_curves["time"]
+
+        # Proper min, max, tags, and units
+        self.assertEqual(time["value"][0], 0)
+        self.assertEqual(time["value"][1], 4)
+        self.assertEqual(time["units"], "seconds")
+        six.assertCountEqual(self, time["tags"], ["timer", "protein", "misc"])
+
+        # Error out on unit overwriting
+        curve_sets["bad_time"] = {
+            "dependent": {},
+            "independent": {"time": {"value": [1, 2, 3, 4],
+                                     "tags": ["timer", "output"],
+                                     "units": "NOT SECONDS"}}}
+        with self.assertRaises(ValueError) as context:
+            sina.utils.resolve_curve_sets(curve_sets)
+        self.assertIn('Tried to set units', str(context.exception))
 
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""

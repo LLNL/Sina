@@ -24,29 +24,23 @@ to allow for these queries. To see what types are available, please see the
 
 Basic Access
 ############
-The API makes use of "DAOs" (Data Access Objects) to streamline accessing data
-independently of the backend. There's one "factory" object per supported backend,
-and this factory can be used to create the DAOs used to interact with Records,
-special Record types, and Relationships. For a simple demonstration::
+You start by creating a DataStore, which will connect to your backend of
+choice and expose many functions for interacting with the Records and
+Relationships stored within. For a simple demonstration::
 
-  import sina.datastores.sql as sina_sql
+  from sina.datastore import create_datastore
 
-  factory = sina_sql.DAOFactory(db_path="somefile.sqlite")
-  record_dao = factory.create_record_dao()
-  all_sruns = record_dao.get_all_of_type("srun")
+  ds = create_datastore(db_path="somefile.sqlite")
+  all_sruns = ds.records.find_with_type("srun")
 
 This would set :code:`all_sruns` to a list of all the records contained in
-:code:`somefile.sqlite` with :code:`"type": "srun"`. The DAOs and factories
-provide a layer of abstraction that allows you to easily pass information
+:code:`somefile.sqlite` with :code:`"type": "srun"`. You can easily pass data
 between supported backends::
 
   ...
 
-  import sina.datastores.cass as sina_cass
-
-  factory=sina_cass.DAOFactory(keyspace="sruns_only")
-  record_dao = factory.create_record_dao()
-  record_dao.insert_many(all_sruns)
+  cass_ds=create_datastore(keyspace="sruns_only")
+  cass_ds.records.insert(all_sruns)
 
 This would result in a keyspace (essentially a Cassandra database)
 :code:`sruns_only` that contains all the :code:`"type": "srun"` records found
@@ -56,10 +50,10 @@ the same type, such as creating a new sqlite file containing a subset of a
 larger one, ex: all the records with :code:`"type": "run"` with a scalar "volume" greater
 than 400.
 
-The remainder of this page will detail the basics of using these DAOs to
+The remainder of this page will detail the basics of using DataStores to
 interact with Records and Relationships. It only covers a subset; for
-documentation of all the methods available to each DAO, please see the
-`DAO documentation <generated_docs/sina.dao.html>`__.
+documentation of all the methods available, please see the
+`DataStore documentation <generated_docs/sina.datastore.html>`__.
 
 
 Filtering Records Based on Their Data
@@ -73,7 +67,7 @@ is queryable, and can be used to find Records fitting criteria. For example, let
 say we're interested in all Records with a :code:`final_volume` of 310 and with
 a :code:`quadrant` of "NW"::
 
-  records = record_dao.get_given_data(final_volume=310, quadrant="NW")
+  records = ds.records.find_with_data(final_volume=310, quadrant="NW")
 
 This will find all the records record_dao knows about (so those in
 :code:`somefile.sqlite`) that fit our specifications.
@@ -91,13 +85,13 @@ convention of min-inclusive, max-exclusive, but this can be altered::
   from sina.utils import DataRange
 
   # data_query is aliased to get_given_data, they're interchangeable
-  records = record_dao.data_query(final_volume=DataRange(200, 311),
-                                  final_acceleration=DataRange(min=12,
-                                                               max=20,
-                                                               min_inclusive=False,
-                                                               max_inclusive=True),
-                                  schema=DataRange(max="bb_12"),
-                                  quadrant="NW")
+  records = ds.records.find_with_data(final_volume=DataRange(200, 311),
+                                   final_acceleration=DataRange(min=12,
+                                                                max=20,
+                                                                min_inclusive=False,
+                                                                max_inclusive=True),
+                                   schema=DataRange(max="bb_12"),
+                                   quadrant="NW")
 
 Now we've found the ids of all Records that have a :code:`final_volume` >= 200
 and < 310, a :code:`final_acceleration` > 12 and <= 20, a :code:`schema`
@@ -113,7 +107,7 @@ we want a velocity that's never gone above 50::
 
   from sina.utils import all_in
 
-  records = record_dao.data_query(velocity=all_in(DataRange(max=50)))
+  records = ds.records.find_with_data(velocity=all_in(DataRange(max=50)))
 
 A slightly different set of queries applies to string list data. Let's say
 we want all Records where "strength_1" or "strength_2" were included in
@@ -121,7 +115,7 @@ we want all Records where "strength_1" or "strength_2" were included in
 
   from sina.utils import has_any
 
-  records = record_dao.data_query(active_packages=has_any("strength_1", "strength_2"))
+  records = ds.records.find_with_data(active_packages=has_any("strength_1", "strength_2"))
 
 This is the general syntax for list queries in Sina. Supported queries are:
 
@@ -149,7 +143,7 @@ See examples/basic_usage.ipynb for list queries in use.
 Combining Filters using "IDs Only" Logic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Filtering methods (such as get_all_of_type and get_given_document_uri) take an
+Filtering methods (such as find_with_type and find_with_file_uri) take an
 optional argument, :code:`ids_only`. If passed as :code:`True`, they'll return
 only the ids of Records that fulfill their criteria, rather than the entire
 Record. This is faster than assembling the entire Record object(s), and is also
@@ -157,8 +151,8 @@ the recommended way of combining queries or implementing more complex logic::
 
   ...
 
-  type_filter = record_dao.get_all_of_type("msubs", ids_only=True)
-  file_filter = record_dao.get_given_document_uri("mock_msub_out.txt", ids_only=True)
+  type_filter = ds.records.find_with_type("msubs", ids_only=True)
+  file_filter = ds.records.find_with_file_uri("mock_msub_out.txt", ids_only=True)
 
   # This will print ids of all records which are msubs or are associated with
   # a file "mock_msub_out.txt", **but not both** (exclusive OR)
@@ -178,8 +172,7 @@ get_data_for_records() to find specific data entries across a list of Records::
 
  desired_data = ["final_speed", "shape"]
 
- data = record_dao.get_data_for_records(id_list = xor_recs,
-                                        data_list = desired_data)
+ data = ds.records.get_data(id_list = xor_recs, data_list = desired_data)
 
  for id in data:
      msg = "For record {}: final speed {}, shape {}"
@@ -198,18 +191,18 @@ Working with Records, Runs, Etc. as Objects
 
 Given the id of a Record, you can get the entire Record as a Python object using::
 
-   record = record_dao.get("my_record_id")
-   records_list = record_dao.get_many(["my_first_record", "my_second_record"])
+   # get() takes one or more ids
+   record = ds.records.get("my_record_id")
+   records_list = ds.records.get(["my_first_record", "my_second_record"])
 
 Full descriptions are available in
 `model documentation <generated_docs/sina.model.html>`__, but
-as a quick overview, Records and their subtypes (Runs, etc.) all
-have, at minimum, an :code:`id` and :code:`type`. These and
-additional optional fields (such as the Record's data and files) can be
+as a quick overview, Records have, at minimum, an :code:`id` and :code:`type`.
+These and additional optional fields (such as the Record's data and files) can be
 accessed as object attributes::
 
  ...
- run_spam = record_dao.get(id="spam")
+ run_spam = ds.records.get(id="spam")
 
  print(run.type)
  print(run.data["egg_count"]["value"])
@@ -246,9 +239,10 @@ Inserting objects is otherwise straightforward::
 
   ...
   from sina.model import Record, Run
-  from sina.datastores.sql import sql
+  from sina.datastore import create_datastore
 
-  factory = sql.DAOFactory(db_path='path_to_sqlite_file')
+  datastore = create_datastore(db_path='path_to_sqlite_file')
+  recs = datastore.records
 
   start_val = 12
   my_record = Record(id="some_id",
@@ -260,21 +254,9 @@ Inserting objects is otherwise straightforward::
                                    "units": "ms"}
 
   my_other_record = Record("another_id", "some_type")
-  record_dao = factory.create_record_dao()
-  record_dao.insert_many([my_record, my_other_record])
 
-  my_run = Run(id="some_run_id",
-               application="some_application",
-               user="John Doe",
-               data={"oof": {"value": 21}},
-               files=[{"uri":"bar/baz.qux"}])
-
-  run_dao = factory.create_run_dao()
-  run_dao.insert(my_run)
-
-Note that the (sub)type of Record is important--use the right constructor and
-DAO or, if you won't know the type in advance, consider using the CLI
-importer.
+  # Like get(), insert() takes one or more ids.
+  recs.insert([my_record, my_other_record])
 
 
 Deleting Records
@@ -284,17 +266,16 @@ To delete a Record entirely from one of Sina's backends::
 
   ...
   my_record_to_delete = Record("fodder", "fodder_type")
-  record_dao.insert(my_record_to_delete)
+  recs.insert(my_record_to_delete)
 
   # This would print 1
-  print(len(list(record_dao.get_all_of_type("fodder_type"))))
+  print(len(list(recs.find_with_type("fodder_type"))))
 
-  record_dao.delete("fodder")
+  # Like get() and insert(), delete() takes one or more ids.
+  recs.delete("fodder")
 
   # This would print 0
-  print(len(list(record_dao.get_all_of_type("fodder_type"))))
+  print(len(list(recs.find_with_type("fodder_type"))))
 
 Be careful, as the deletion will include every Relationship the Record is
-mentioned in, all the scalar data associated with that Record, etc. There is
-also a mass deletion method that takes a list of ids to delete,
-:code:`delete_many()`.
+mentioned in, all the scalar data associated with that Record, etc.

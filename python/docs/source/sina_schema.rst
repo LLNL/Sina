@@ -9,8 +9,11 @@ Overview
 The Sina schema is a generalized JSON format for representing experimental data.
 It consists of two types of JSON objects: Records, which represent the components in
 an experiment (such as runs, msubs, and jobs) and Relationships, which represent
-the relationships between Records. Each Sina document consists of a single JSON
-object with arrays for Records and Relationships:
+the relationships between Records. This page outlines the basics of the schema.
+Further helpful info can be found at :ref:`schema_best_practices`.
+
+Each Sina document consists of a single JSON object with arrays for Records and
+Relationships:
 
 .. code-block:: javascript
 
@@ -24,7 +27,7 @@ Records
 -------
 
 Every Record has, at minimum, an :code:`id` and a :code:`type` (run, msub,
-etc). Records can also have :code:`data`, :code:`files`,
+etc). Records can also have :code:`data`, :code:`curve_sets`, :code:`files`,
 application metadata, arbitrary user-defined information, and more.
 A minimal example of a Record:
 
@@ -57,14 +60,25 @@ A more fleshed-out example, with field descriptions:
       // A dictionary of data associated with the Record
       "data": {
           // Entries must have a value. Optionally, they can have tags and/or units.
-          "initial_angle":: {"value": 30},
-          // For units, we recommend SI with / for division and ^ for exponentiation.
-          // This format may have future support in Sina.
+          "initial_angle": {"value": 30},
           "max_density": { "value": 3, "units": "kg/m^3" },
           "total_energy": { "value": 12.2, "units": "MJ", "tags": ["output"]},
           // Data can be strings, scalars, lists of strings, or lists of scalars
           "revision": { "value": "12-4-11", "tags": ["pedigree"]},
           "presets": { "value": ["quickstart", "glass"]}
+      },
+      // Sets of curves associated with the Record (essentially a special case of data)
+      "curve_sets": {
+          // Each set of curves needs a name
+          "timeplot_1": {
+              // Each set has independent(s) and dependent(s)
+              "independents": {
+                  // Individual curves take the same format as lists of scalars in "data"
+                  "time": {"value": [0, 1, 2]}},
+              "dependents": {
+                  "mass": {"value": [12, 11, 8], "tags": ["physics"]},
+                  "volume": {"value": [10, 14, 22.2], "units": "m^3"}}
+          }
       },
       // A dictionary of information that does not make sense as a data or file entry
       "user_defined": {
@@ -88,10 +102,7 @@ the :code:`subject`, "knows" is the :code:`predicate`, and "Bob" is the :code:`o
   * overlay_12 corrects sample_14
   * msub_3 launches job_3
 
-To avoid confusion, try to use the grammatical active voice when assigning predicates.
-A "passive voice" :code:`predicate` like "contained by", "corrected by", or
-"launched by" reverses the normal direction of relations. In the Sina schema,
-a Relationship always consists of exactly a :code:`subject`,
+In the Sina schema, a Relationship always consists of exactly a :code:`subject`,
 :code:`predicate`, and :code:`object`, where the :code:`subject` and :code:`object`
 are each the :code:`id` of a Record:
 
