@@ -7,7 +7,7 @@ https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
 1.9
 ===
-- Overhauled API; users can now use DataStore object instead of DAOs
+- Enhanced API by adding new higher-level DataStore class to hide DAOs
 - Added curve sets
 - Improved MySQL pooling behavior for many-node setups
 - Added new queries (get all records, check if record exists)
