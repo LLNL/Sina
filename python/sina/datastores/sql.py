@@ -9,6 +9,7 @@ import six
 
 # Disable pylint check due to its issue with virtual environments
 import sqlalchemy  # pylint: disable=import-error
+from sqlalchemy.pool import NullPool  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
@@ -835,27 +836,35 @@ class DAOFactory(dao.DAOFactory):
     Includes Records, Relationships, etc.
     """
 
-    def __init__(self, db_path=None):
+    def __init__(self, db_path=None, allow_connection_pooling=False):
         """
         Initialize a Factory with a path to its backend.
-
-        Currently supports only SQLite.
 
         :param db_path: Path to the database to use as a backend. If None, will
                         use an in-memory database. If it contains a '://', it is assumed that
                         this is a URL which can be used to connect to the database. Otherwise,
                         this is treated as a path for a SQLite database.
+        :param allow_connection_pooling: Allow pooling behavior for connections. Not
+                                         recommended when using large numbers of DAOs (as from
+                                         many nodes accessing one database) to prevent
+                                         "zombie" connections that don't close when .close()d.
+                                         Ignored for in-memory dbs (db_path=None).
         """
         self.db_path = db_path
-        use_sqlite = False
         if db_path:
             if '://' not in db_path:
-                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
+                connection_string = SQLITE_PREFIX + db_path
                 create_db = not os.path.exists(db_path)
                 use_sqlite = True
             else:
-                engine = sqlalchemy.create_engine(db_path)
+                connection_string = db_path
                 create_db = True
+                use_sqlite = False
+            if allow_connection_pooling:
+                engine = sqlalchemy.create_engine(connection_string)
+            else:
+                engine = sqlalchemy.create_engine(connection_string,
+                                                  poolclass=NullPool)
         else:
             engine = sqlalchemy.create_engine(SQLITE_PREFIX)
             use_sqlite = True

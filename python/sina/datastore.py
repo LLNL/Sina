@@ -10,7 +10,8 @@ except ImportError:
     HAS_CASSANDRA = False
 
 
-def create_datastore(database=None, keyspace=None, database_type=None):
+def create_datastore(database=None, keyspace=None, database_type=None,
+                     allow_connection_pooling=False):
     """
     Create a DataStore for handling some type of backend.
 
@@ -23,12 +24,15 @@ def create_datastore(database=None, keyspace=None, database_type=None):
     :param database_type: Type of backend to connect to. If not provided, Sina
                           will infer this from <database>. One of "sql" or
                           "cassandra".
+    :param allow_connection_pooling: Allow "pooling" behavior that recycles connections,
+                                     which may prevent them from closing fully on .close().
+                                     Only used for the sql backend.
     """
     # Determine a backend
     if database_type is None:
         database_type = "sql" if keyspace is None else "cassandra"
     if database_type == "sql":
-        connection = sina_sql.DAOFactory(database)
+        connection = sina_sql.DAOFactory(database, allow_connection_pooling)
     elif database_type == "cassandra":
         if HAS_CASSANDRA:
             if keyspace:
