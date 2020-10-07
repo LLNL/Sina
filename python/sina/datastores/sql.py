@@ -9,7 +9,7 @@ import six
 
 # Disable pylint check due to its issue with virtual environments
 import sqlalchemy  # pylint: disable=import-error
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
@@ -836,9 +836,7 @@ class DAOFactory(dao.DAOFactory):
     Includes Records, Relationships, etc.
     """
 
-    # disable_pooling instead of enable_pooling because we don't actually
-    # enable pooling based on the setting (ex: sqlite in-memory connections)
-    def __init__(self, db_path=None, disable_pooling=True):
+    def __init__(self, db_path=None, allow_connection_pooling=False):
         """
         Initialize a Factory with a path to its backend.
 
@@ -846,11 +844,11 @@ class DAOFactory(dao.DAOFactory):
                         use an in-memory database. If it contains a '://', it is assumed that
                         this is a URL which can be used to connect to the database. Otherwise,
                         this is treated as a path for a SQLite database.
-        :param disable_pooling: Explicitly disable pooling behavior on connections. This is
-                                recommended when using large numbers of connections (as from
-                                a large numbers of nodes accessing one database) to prevent
-                                "zombie" pools that don't close when .close()d. Ignored
-                                for in-memory dbs (db_path=None).
+        :param allow_connection_pooling: Allow pooling behavior for connections. Not
+                                         recommended when using large numbers of DAOs (as from
+                                         many nodes accessing one database) to prevent
+                                         "zombie" connections that don't close when .close()d.
+                                         Ignored for in-memory dbs (db_path=None).
         """
         self.db_path = db_path
         if db_path:
@@ -862,11 +860,11 @@ class DAOFactory(dao.DAOFactory):
                 connection_string = db_path
                 create_db = True
                 use_sqlite = False
-            if disable_pooling:
+            if allow_connection_pooling:
+                engine = sqlalchemy.create_engine(connection_string)
+            else:
                 engine = sqlalchemy.create_engine(connection_string,
                                                   poolclass=NullPool)
-            else:
-                engine = sqlalchemy.create_engine(connection_string)
         else:
             engine = sqlalchemy.create_engine(SQLITE_PREFIX)
             use_sqlite = True
