@@ -10,6 +10,7 @@
  */
 
 #include <string>
+#include <vector>
 
 #include "conduit.hpp"
 
@@ -70,6 +71,28 @@ double getRequiredDouble(std::string const &fieldName,
  */
 std::string getOptionalString(std::string const &fieldName,
         conduit::Node const &parent, std::string const &parentType);
+
+/**
+ * Convert the given node to a vector of doubles.
+ *
+ * @param node the node to convert
+ * @param name the name of the node, used in error reporting
+ * @return the node as a list of doubles
+ * @throws std::invalid_argument if the node is not a list of doubles
+ */
+std::vector<double> toDoubleVector(conduit::Node const &node,
+        std::string const &name);
+
+/**
+ * Convert the given node to a vector of strings.
+ *
+ * @param node the node to convert
+ * @param name the name of the node, used in error reporting
+ * @return the node as a list of strings
+ * @throws std::invalid_argument if the node is not a list of strings
+ */
+std::vector<std::string> toStringVector(conduit::Node const &node,
+        std::string const &name);
 
 /**
  * Add a vector of strings to a Node. This operation's not natively

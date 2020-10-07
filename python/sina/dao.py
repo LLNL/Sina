@@ -1,9 +1,10 @@
 """
-Contains toplevel, abstract DAOs used for accessing each type of object.
+Describes functionality needed by DAOs and implements backend-independent logic.
 
-This module describes the DAOs available, as well as the functions available to
-each DAO. While function availability may differ between objects, e.g., Records
-and Relationships, it will not differ between backends, e.g., Cassandra and sql.
+Each object here should be implemented in each backend. Note that these DAOs
+exist more as contracts and helpers than as descriptions of functionality--see
+datastore.py for up-to-date user-level descriptions of what everything should
+do.
 """
 from abc import ABCMeta, abstractmethod
 import logging
@@ -20,80 +21,19 @@ LOGGER = logging.getLogger(__name__)
 # pylint: disable=invalid-name,redefined-builtin
 
 
-@six.add_metaclass(ABCMeta)
-class DAOFactory(object):
-    """Builds DAOs used for interacting with Sina data objects."""
-    supports_parallel_ingestion = False
-
-    @abstractmethod
-    def create_record_dao(self):
-        """
-        Create a DAO for interacting with Records.
-
-        :returns: a RecordDAO for the DAOFactory's backend
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def create_relationship_dao(self):
-        """
-        Create a DAO for interacting with Relationships.
-
-        :returns: a RelationshipDAO for the DAOFactory's backend
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def create_run_dao(self):
-        """
-        Create a DAO for interacting with Runs.
-
-        :returns: a RunDAO for the DAOFactory's backend
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def close(self):
-        """
-        Close any resources held by this DAO factory. This invalidates any DAOs created by the
-        factory.
-        """
-        raise NotImplementedError
-
-    def __enter__(self):
-        """
-        Use this factory as a context manager.
-
-        :return: this factory
-        """
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Call this factory's close() method.
-
-        :param exc_type: the type of any raised exception
-        :param exc_val: the value of any raised exception
-        :param exc_tb: the stack trace of any raised exception
-        :return: whether a raised exception should be suppressed
-        """
-        self.close()
-        return False
-
-
 class RecordDAO(object):
     """The DAO responsible for handling Records."""
 
     __metaclass__ = ABCMeta
 
-    def get(self, ids, _record_builder=sina.model.generate_record_from_json):
+    def get(self, ids, _record_builder=sina.model.generate_record_from_json, chunk_size=999):
         """
         Given an (iterable of) id(s), return matching Record(s).
 
         :param ids: The id(s) of the Record(s) to return.
+        :param chunk_size: Size of chunks to pull records in.
         :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw. Used
-                                by DAOs calling get() (RecordDAO, RunDAO), does not
+                                (or one of its children) from the raw. Does not
                                 need to be touched by the user.
 
         :returns: If provided an iterable, a generator of Record objects, else a
@@ -101,17 +41,14 @@ class RecordDAO(object):
 
         :raises ValueError: if no Record is found for some id.
         """
-        def gen_records(ids):
-            """Hack around the limitation of returning generators XOR non-gens."""
-            for id in ids:
-                yield self._get_one(id, _record_builder)
 
         if isinstance(ids, six.string_types):
             LOGGER.debug('Getting record with id=%s', ids)
             return self._get_one(ids, _record_builder)
+
         ids = list(ids)
-        LOGGER.debug('Getting records with ids in=%s', ids)
-        return gen_records(ids)
+        LOGGER.debug('Getting records with ids in %s', ids)
+        return self._get_many(ids, _record_builder, chunk_size)
 
     @abstractmethod
     def _get_one(self, id, _record_builder):
@@ -136,11 +73,24 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def insert(self, records):
+    def _get_many(self, ids, _record_builder, chunk_size):
         """
-        Given one or more Records, insert them into the DAO's backend.
+        Apply some "get" function to an iterable of Record ids.
 
-        :param records: A Record or iter of Records to insert
+        Because the overload needs to be invisible to the user, we need to
+        be able to return both a generator (from a list) and non-generator
+        (from a single ID). This is the framework for allowing it.
+
+        Currently, this makes sense because Cassandra can't batch reads. May
+        be worth revisiting.
+
+        :param id: An Iterable of Record ids to return
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+
+        :returns: A generator of Records if found, else None.
+
+        :raises ValueError: if no Record is found for the ids.
         """
         raise NotImplementedError
 
@@ -153,6 +103,15 @@ class RecordDAO(object):
         involving it/them, etc.
 
         :param ids: A Record id or iterable of Record ids to delete.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def insert(self, records):
+        """
+        Given one or more Records, insert them into the DAO's backend.
+
+        :param records: A Record or iter of Records to insert
         """
         raise NotImplementedError
 
@@ -219,12 +178,77 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def get_all(self, ids_only):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def get_available_types(self):
         """
         Return a list of all the Record types in the database.
 
         :returns: A list of types present (ex: ["run", "experiment"])
+        """
+        raise NotImplementedError
+
+    def exist(self, test_ids):
+        """
+        Given an (iterable of) id(s), return boolean (list) of whether those
+        record(s) exist or not.
+
+        :param ids: The id(s) of the Record(s) to test.
+
+        :returns: If provided an iterable, a generator of bools pertaining to
+                  the ids' existence, else a single boolean value.
+        """
+
+        if isinstance(test_ids, six.string_types):
+            LOGGER.debug('Getting record with id=%s', test_ids)
+            return self._one_exists(test_ids)
+
+        LOGGER.debug('Getting records with ids in %s', test_ids)
+        return self._many_exist(test_ids)
+
+    @abstractmethod
+    def _one_exists(self, test_id):
+        """
+        Given an id, return boolean
+
+        :param ids: The id(s) of the Record(s) to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _many_exist(self, test_ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def data_names(self, record_type, data_types):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for a given record type.
+
+        :param record_type: Type of records to get data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
+
+        :returns: A generator of data names.
         """
         raise NotImplementedError
 
@@ -326,7 +350,7 @@ class RecordDAO(object):
     @abstractmethod
     def get_with_mime_type(self, mimetype, ids_only=False):
         """
-        Return all records or IDs associated with documents whose mimetype match some arg
+        Return all records or IDs with documents of a given mimetype.
 
         :param mimetype: The mimetype to use as a search term
         :param ids_only: Whether to only return the ids
@@ -358,8 +382,8 @@ class RelationshipDAO(object):
         return relationships
 
     @abstractmethod
-    def insert(self, relationships=None, subject_id=None,
-               object_id=None, predicate=None):
+    def insert(self, relationships=None, subject_id=None, object_id=None,
+               predicate=None):
         """
         Given one or more Relationships, insert into the DAO's backend.
 
@@ -435,130 +459,50 @@ class RelationshipDAO(object):
         raise NotImplementedError
 
 
-class RunDAO(object):
-    """The DAO responsible for handling Runs, a subtype of Record."""
+class DAOFactory(object):
+    """Builds DAOs used for interacting with Sina data objects."""
 
-    __metaclass__ = ABCMeta
-
-    def __init__(self, record_dao):
-        """
-        Initialize RunDAO with contained RecordDAO and backend.
-
-        :param record_dao: A RecordDAO used to interact with the Record table
-        :param backend: The DAO's backend (ex: filepath, SQLite session)
-        """
-        self.record_dao = record_dao
+    supports_parallel_ingestion = False
 
     @abstractmethod
-    def _return_only_run_ids(self, ids):
-        """
-        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
-
-        :param ids: An id or iterable of ids to sort through
-
-        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
-                  if "ids" is an iterable, else returns a single value.
-        """
-        raise NotImplementedError
-
-    def get(self, ids):
-        """
-        Given a(n iterable of) id(s), return matching Run(s) from the DAO's backend.
-
-        :param ids: The id or an iterable of ids to find and return Runs for. If a
-                    Record with that id exists but is not a Run, it won't be returned.
-
-        :returns: If provided an iterable, a generator containing either
-                  a matching Run or None for each identifier provided. In the
-                  case that an id (not an iterator of ids) is provided, will
-                  return a Run or None.
-
-        :raises ValueError: if no Record is found for some id(s).
-        """
-        if isinstance(ids, six.string_types):
-            LOGGER.debug('Getting Run with id: %s', ids)
-            run_ids = self._return_only_run_ids(ids)
-            if run_ids is None:
-                raise ValueError("No Run found with id {}.".format(id))
-        else:
-            LOGGER.debug('Getting Runs with ids: %s', ids)
-            run_ids = list(self._return_only_run_ids(ids))  # Gen safety
-            if None in run_ids:
-                ids_not_found = set(ids).difference(run_ids)
-                raise ValueError("No Runs found with ids: {}".format(ids_not_found))
-        return self.record_dao.get(run_ids, _record_builder=sina.model.generate_run_from_json)
-
-    @abstractmethod
-    def insert(self, runs):
-        """
-        Given a(n iterable of) Run(s), insert them into the DAO's backend.
-
-        :param runs: A Run or iterable of Runs to insert
-        """
+    def create_record_dao(self):
+        """Create a DAO for interacting with Records."""
         raise NotImplementedError
 
     @abstractmethod
-    def delete(self, ids):
-        """
-        Given a(n iterable of) Run id(s), delete all mention from the DAO's backend.
-
-        This includes removing all data, raw(s), any relationships
-        involving it/them, etc.
-
-        :param ids: A Run id or iterable of Run ids to delete.
-        """
+    def create_relationship_dao(self):
+        """Create a DAO for interacting with Relationships."""
         raise NotImplementedError
 
-    def get_all(self, ids_only=False):
+    @staticmethod
+    def create_run_dao():
+        """Create a DAO for interacting with Runs."""
+        raise AttributeError("This method is no longer available in DAOFactory."
+                             "Runs are no longer treated as a special type. "
+                             "Please create a recordDAO and filter on type "
+                             "instead.")
+
+    @abstractmethod
+    def close(self):
+        """Close any resources held by this DataHandler."""
+        raise NotImplementedError
+
+    def __enter__(self):
         """
-        Return all Records with type 'run'.
+        Use this factory as a context manager.
 
-        :param ids_only: whether to return only the ids of matching Runs
-                         (used for further filtering)
-        :returns: A list of all Records which are Runs
+        :return: this factory
         """
-        # Collapsed TODO down, we can reindex on type
-        # NYI in Cassandra
-        return self.record_dao.get_all_of_type('run', ids_only)
+        return self
 
-    def data_query(self, **kwargs):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        Call Record's implementation then filter on type.
+        Call this factory's close() method.
 
-        :param scalar_range: A sina.ScalarRange describing the criteria
-
-        :returns: A generator of run ids fitting the criteria
+        :param exc_type: the type of any raised exception
+        :param exc_val: the value of any raised exception
+        :param exc_tb: the stack trace of any raised exception
+        :return: whether a raised exception should be suppressed
         """
-        matched_runs = self._return_only_run_ids(self.record_dao.data_query(**kwargs))
-        for entry in matched_runs:
-            if entry is not None:
-                yield entry
-
-    def get_given_data(self, **kwargs):
-        """Alias data_query()."""
-        return self.data_query(**kwargs)
-
-    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
-        """
-        Return Runs associated with a document uri.
-
-        Mostly identical to Record's implementation, also filters out non-Runs.
-
-        :param uri: The uri to match.
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
-        :param ids_only: whether to return only the ids of matching Runs
-                         (used for further filtering)
-
-        :returns: A generator of Runs fitting the criteria
-        """
-        records = self.record_dao.get_given_document_uri(uri,
-                                                         accepted_ids_list=accepted_ids_list,
-                                                         ids_only=ids_only)
-        if ids_only:
-            for run_id in self._return_only_run_ids(records):
-                yield run_id
-        else:
-            for record in records:
-                if record.type == "run":
-                    yield sina.model.generate_run_from_json(record.raw)
+        self.close()
+        return False

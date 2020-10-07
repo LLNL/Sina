@@ -13,6 +13,7 @@ try:
     import cassandra.cqlengine.management as management
 
     import sina.datastores.cass as backend
+
 except ImportError:
     # Not having Cassandra for tests is a valid case and should be coupled with
     # an "-a '!cassandra'" flag for Nose. If not, another error will be raised.
@@ -21,6 +22,7 @@ except ImportError:
     pass
 
 import tests.backend_test
+import tests.datastore_test
 
 # Cassandra's logger is natively Debug, and it's very verbose,
 # even at WARNING.
@@ -84,6 +86,7 @@ class TestSetup(CassandraMixin, unittest.TestCase):
     """
     Provides methods needed for setup-type tests on the Cassandra backend.
     """
+
     def setUp(self):
         self.create_cass_keyspace()
 

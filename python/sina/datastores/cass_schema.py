@@ -156,13 +156,18 @@ class RecordFromStringListData(Model):
     id = columns.Text(primary_key=True)
 
 
-class Run(Model):
-    """Query table for finding runs based on special, supported metadata."""
+class RecordFromCurveSetMeta(Model):
+    """
+    Query table for finding records given curveset criteria.
 
+    The only "criteria" supported is name. Neither independents nor
+    dependents are mentioned here. See a full explanation on the sql_schema
+    implementation.
+    """
+
+    name = columns.Text(primary_key=True)
     id = columns.Text(primary_key=True)
-    application = columns.Text(required=True)
-    user = columns.Text()
-    version = columns.Text()
+    tags = columns.Set(columns.Text())
 
 
 class ObjectFromSubject(Model):
@@ -343,7 +348,6 @@ def cross_batch_delete_query_tables(name,
 def sync_tables():
     """Prep all tables, ensuring they're in our expected format."""
     sync_table(Record)
-    sync_table(Run)
     sync_table(ObjectFromSubject)
     sync_table(SubjectFromObject)
     sync_table(DocumentFromRecord)
@@ -354,6 +358,7 @@ def sync_tables():
     sync_table(RecordFromScalarListDataMin)
     sync_table(RecordFromScalarListDataMax)
     sync_table(RecordFromStringListData)
+    sync_table(RecordFromCurveSetMeta)
 
 
 def form_connection(keyspace, node_ip_list=None, sonar_cqlshrc_path=None):

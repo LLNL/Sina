@@ -11,6 +11,7 @@ Sina documentation index
 
    readme
    sina_schema
+   schema_best_practices
    cli_basics
    api_basics
    cpp

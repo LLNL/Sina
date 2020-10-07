@@ -7,10 +7,10 @@ import unittest
 
 # Disable pylint checks due to its issue with virtual environments
 from nose.plugins.attrib import attr  # pylint: disable=import-error
-
-import tests.backend_test
-import sina.datastores.sql as backend
 import sqlalchemy  # pylint: disable=import-error
+
+import sina.datastores.sql as backend
+import tests.backend_test
 
 
 class DBManager(object):

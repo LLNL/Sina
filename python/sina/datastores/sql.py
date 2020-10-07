@@ -9,6 +9,7 @@ import six
 
 # Disable pylint check due to its issue with virtual environments
 import sqlalchemy  # pylint: disable=import-error
+from sqlalchemy.pool import NullPool  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.model as model
@@ -27,6 +28,9 @@ SQLITE_PREFIX = "sqlite:///"
 # Identify the tables that store Record.data entries.
 DATA_TABLES = [schema.ScalarData, schema.StringData,
                schema.ListScalarData, schema.ListStringDataEntry]
+
+# Set maximum chunk size for id queries
+CHUNK_SIZE = 999
 
 
 class RecordDAO(dao.RecordDAO):
@@ -65,6 +69,8 @@ class RecordDAO(dao.RecordDAO):
                                    raw=json.dumps(sina_record.raw))
         if sina_record.data:
             RecordDAO._attach_data(sql_record, sina_record.data)
+        if sina_record.curve_sets:
+            RecordDAO._attach_curves(sql_record, sina_record.curve_sets)
         if sina_record.files:
             RecordDAO._attach_files(sql_record, sina_record.files)
 
@@ -119,6 +125,31 @@ class RecordDAO(dao.RecordDAO):
                                                 # units might be None, always use get()
                                                 units=datum.get('units'),
                                                 tags=tags))
+
+    @staticmethod
+    def _attach_curves(record, curve_sets):
+        """
+        Attach the curve entries to the given SQL record.
+
+        :param record: The SQL schema record to associate the data to.
+        :param curve_sets: The dictionary of curve sets to insert.
+        """
+        LOGGER.debug('Inserting %i curve set entries to Record ID %s.',
+                     len(curve_sets), record.id)
+
+        for curveset_name, curveset_obj in curve_sets.items():
+            tags = (json.dumps(curveset_obj['tags']) if 'tags' in curveset_obj else None)
+            record.curve_set_meta.append(schema.CurveSetMeta(name=curveset_name,
+                                                             tags=tags))
+        resolved_sets = utils.resolve_curve_sets(curve_sets)
+        for entry_name, entry_obj in resolved_sets.items():
+            tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
+            record.scalar_lists.append(schema.ListScalarData(
+                name=entry_name,
+                min=min(entry_obj['value']),
+                max=max(entry_obj['value']),
+                units=entry_obj.get('units'),  # units might be None, always use get()
+                tags=tags))
 
     @staticmethod
     def _attach_files(record, files):
@@ -363,9 +394,54 @@ class RecordDAO(dao.RecordDAO):
         """
         result = (self.session.query(schema.Record)
                   .filter(schema.Record.id == id).one_or_none())
+
         if result is None:
-            raise ValueError("No Record found with id {}".format(id))
+            raise ValueError("No Record found with id %s" % id)
         return _record_builder(json_input=json.loads(result.raw))
+
+    def _get_many(self, ids, _record_builder, chunk_size):
+        """
+        Apply some "get" function to an iterable of Record ids.
+        Used by the parent get(), this is the SQL-specific implementation of
+        getting multiple Records.
+        ...
+
+        :param ids: An iterable of Record ids to return
+        :param chunk_size: Size of chunks to pull records in.
+        :param _record_builder: The function used to create a Record object
+                                (or one of its children) from the raw.
+        :returns: A generator of Record objects
+        """
+        chunks = [ids[x:x+chunk_size] for x in range(0, len(ids), chunk_size)]
+        for chunk in chunks:
+            ids_found = 0
+            results = (self.session.query(schema.Record)
+                       .filter(schema.Record.id.in_(chunk)))
+
+            for result in results:
+                ids_found += 1
+                yield _record_builder(json_input=json.loads(result.raw))
+
+            if ids_found != len(chunk):
+                raise ValueError("No Record found with id in chunk %s" % chunk)
+
+    def get_all(self, ids_only=False):
+        """
+        Return all Records.
+
+        :param ids_only: whether to return only the ids of matching Records
+
+        :returns: A generator of all Records.
+        """
+        LOGGER.debug('Getting all records')
+        if ids_only:
+            query = self.session.query(schema.Record.id)
+            for record_id in query:
+                yield str(record_id[0])
+        else:
+            results = self.session.query(schema.Record)
+            for result in results:
+                yield model.generate_record_from_json(json_input=json.loads(result.raw))
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -388,6 +464,60 @@ class RecordDAO(dao.RecordDAO):
             filtered_ids = (str(x[0]) for x in query.all())
             for record in self.get(filtered_ids):
                 yield record
+
+    def get_with_curve_set(self, curve_set_name, ids_only=False):
+        """
+        Given the name of a curve set, return Records containing it.
+
+        :param curve_set_name: The name of the group of curves
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
+
+        :returns: A generator of Records of that type or (if ids_only) a
+                  generator of their ids
+        """
+        LOGGER.debug('Getting all records with curve sets named %s.', curve_set_name)
+        query = (self.session.query(schema.CurveSetMeta.id)
+                 .filter(schema.CurveSetMeta.name == curve_set_name))
+        if ids_only:
+            for record_id in query.all():
+                yield str(record_id[0])
+        else:
+            filtered_ids = (str(x[0]) for x in query.all())
+            for record in self.get(filtered_ids):
+                yield record
+
+    def _one_exists(self, test_id):
+        """
+        Given an id, return boolean
+        This is the SQL specific implementation.
+
+        :param id: The id of the Record to test.
+
+        :returns: A single boolean value pertaining to the id's existence.
+        """
+        query = (self.session.query(schema.Record.id)
+                 .filter(schema.Record.id == test_id).one_or_none())
+        return bool(query)
+
+    def _many_exist(self, test_ids):
+        """
+        Given an iterable of ids, return boolean list of whether those
+        records exist or not.
+        This is the SQL specific implementation
+
+        :param ids: The ids of the Records to test.
+
+        :returns: A generator of bools pertaining to the ids' existence.
+        """
+        test_ids = list(test_ids)
+        chunks = [test_ids[x:x+CHUNK_SIZE] for x in range(0, len(test_ids), CHUNK_SIZE)]
+        for chunk in chunks:
+            query = (self.session.query(schema.Record.id)
+                     .filter(schema.Record.id.in_(chunk)))
+            actual_ids = set((str(x[0]) for x in query.all()))
+            for test_id in chunk:
+                yield test_id in actual_ids
 
     def _universal_query(self, universal_criteria):
         """
@@ -423,6 +553,38 @@ class RecordDAO(dao.RecordDAO):
         """
         results = self.session.query(schema.Record.type).distinct().all()
         return [entry[0] for entry in results]
+
+    def data_names(self, record_type, data_types=None):
+        """
+        Return a list of all the data labels for data of a given type.
+        Defaults to getting all data names for a given record type.
+
+        :param record_type: Type of records to get data names for.
+        :param data_types: A single data type or a list of data types
+                           to get the data names for.
+
+        :returns: A generator of data names.
+        """
+        type_name_to_tables = {'scalar': schema.ScalarData,
+                               'string': schema.StringData,
+                               'scalar_list': schema.ListScalarData,
+                               'string_list': schema.ListStringDataEntry}
+        possible_data_types = list(type_name_to_tables.keys())
+        if data_types is None:
+            data_types = possible_data_types
+        if not isinstance(data_types, list):
+            data_types = [data_types]
+        if not set(data_types).issubset(set(possible_data_types)):
+            raise ValueError('Only select data types from: %s' % possible_data_types)
+
+        query_tables = [type_name_to_tables[type] for type in data_types]
+
+        for query_table in query_tables:
+            results = (self.session.query(query_table.name).join(schema.Record)
+                       .filter(schema.Record.type == record_type)
+                       .distinct())
+            for result in results:
+                yield result[0]
 
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
@@ -598,7 +760,7 @@ class RecordDAO(dao.RecordDAO):
 
     def get_with_mime_type(self, mimetype, ids_only=False):
         """
-        Return all records or IDs associated with documents whose mimetype match some arg
+        Return all records or IDs with documents of a given mimetype.
 
         :param mimetype: The mimetype to use as a search term
         :param ids_only: Whether to only return the ids
@@ -618,8 +780,8 @@ class RelationshipDAO(dao.RelationshipDAO):
         """Initialize RelationshipDAO with session for its SQL database."""
         self.session = session
 
-    def insert(self, relationships=None, subject_id=None,
-               object_id=None, predicate=None):
+    def insert(self, relationships=None, subject_id=None, object_id=None,
+               predicate=None):
         """
         Given some Relationship(s), import it/them into a SQL database.
 
@@ -667,70 +829,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         return self._build_relationships(query.all())
 
 
-class RunDAO(dao.RunDAO):
-    """DAO responsible for handling Runs (Record subtype) in SQL."""
-
-    def __init__(self, session, record_dao):
-        """Initialize RunDAO and assign a contained RecordDAO."""
-        super(RunDAO, self).__init__(record_dao)
-        self.session = session
-        self.record_dao = record_dao
-
-    def _return_only_run_ids(self, ids):
-        """
-        Given a(n iterable) of id(s) which might be any type of Record, clear out non-Runs.
-
-        :param ids: An id or iterable of ids to sort through
-
-        :returns: For each id, the id if it belongs to a Run, else None. Returns an iterable
-                  if "ids" is an iterable, else returns a single value.
-        """
-        if isinstance(ids, six.string_types):
-            val = self.session.query(schema.Run.id).filter(schema.Run.id == ids).one_or_none()
-            return val[0] if val is not None else None
-        ids = list(ids)
-        query = self.session.query(schema.Run.id).filter(schema.Run.id.in_(ids)).all()
-        run_ids = set(str(x[0]) for x in query)
-        # We do this in order to fulfill the "id or None" requirement
-        results = [x if x in run_ids else None for x in ids]
-        return results
-
-    def insert(self, runs):
-        """
-        Given a(n iterable of) Run(s), import into the SQL database.
-
-        :param runs: A Run or iterator of Runs to import
-        """
-        if isinstance(runs, model.Run):
-            runs = [runs]
-        for run in runs:
-            record = RecordDAO.create_sql_record(run)
-            run = schema.Run(application=run.application, user=run.user,
-                             version=run.version)
-            run.record = record
-            self.session.add(record)
-            self.session.add(run)
-        self.session.commit()
-
-    def delete(self, ids):
-        """
-        Given (a) Run id(s), delete all mention from the SQL database.
-
-        This includes removing all related data, raw(s), any relationships
-        involving it/them, etc.
-
-        :param ids: The id or iterator of ids of the Run to delete.
-        """
-        run_ids = self._return_only_run_ids(ids)
-        if run_ids is None:  # We have nothing to do here
-            return
-        elif isinstance(run_ids, six.string_types):
-            run_ids = [run_ids]
-        else:
-            run_ids = [id for id in run_ids if id is not None]
-        self.record_dao.delete(run_ids)
-
-
 class DAOFactory(dao.DAOFactory):
     """
     Build SQL-backed DAOs for interacting with Sina-based objects.
@@ -738,27 +836,35 @@ class DAOFactory(dao.DAOFactory):
     Includes Records, Relationships, etc.
     """
 
-    def __init__(self, db_path=None):
+    def __init__(self, db_path=None, allow_connection_pooling=False):
         """
         Initialize a Factory with a path to its backend.
-
-        Currently supports only SQLite.
 
         :param db_path: Path to the database to use as a backend. If None, will
                         use an in-memory database. If it contains a '://', it is assumed that
                         this is a URL which can be used to connect to the database. Otherwise,
                         this is treated as a path for a SQLite database.
+        :param allow_connection_pooling: Allow pooling behavior for connections. Not
+                                         recommended when using large numbers of DAOs (as from
+                                         many nodes accessing one database) to prevent
+                                         "zombie" connections that don't close when .close()d.
+                                         Ignored for in-memory dbs (db_path=None).
         """
         self.db_path = db_path
-        use_sqlite = False
         if db_path:
             if '://' not in db_path:
-                engine = sqlalchemy.create_engine(SQLITE_PREFIX + db_path)
+                connection_string = SQLITE_PREFIX + db_path
                 create_db = not os.path.exists(db_path)
                 use_sqlite = True
             else:
-                engine = sqlalchemy.create_engine(db_path)
+                connection_string = db_path
                 create_db = True
+                use_sqlite = False
+            if allow_connection_pooling:
+                engine = sqlalchemy.create_engine(connection_string)
+            else:
+                engine = sqlalchemy.create_engine(connection_string,
+                                                  poolclass=NullPool)
         else:
             engine = sqlalchemy.create_engine(SQLITE_PREFIX)
             use_sqlite = True
@@ -769,7 +875,8 @@ class DAOFactory(dao.DAOFactory):
                 """Activate foreign key support on connection creation."""
                 connection.execute('pragma foreign_keys=ON')
 
-            sqlalchemy.event.listen(engine, 'connect', configure_on_connect)
+            sqlalchemy.event.listen(engine, 'connect',
+                                    configure_on_connect)
 
         if create_db:
             schema.Base.metadata.create_all(engine)
@@ -793,21 +900,10 @@ class DAOFactory(dao.DAOFactory):
         """
         return RelationshipDAO(session=self.session)
 
-    def create_run_dao(self):
-        """
-        Create a DAO for interacting with runs.
-
-        :returns: a RunDAO
-        """
-        return RunDAO(session=self.session,
-                      record_dao=self.create_record_dao())
-
     def __repr__(self):
         """Return a string representation of a SQL DAOFactory."""
         return 'SQL DAOFactory <db_path={}>'.format(self.db_path)
 
     def close(self):
-        """
-        Close the session for this factory and all created DAOs
-        """
+        """Close the session for this factory and all created DAOs."""
         self.session.close()

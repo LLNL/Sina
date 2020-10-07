@@ -13,7 +13,7 @@ import datetime
 from numbers import Real
 from enum import Enum
 from multiprocessing.pool import ThreadPool
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 import six
 
@@ -105,14 +105,7 @@ def import_json(factory, json_paths):
     if not factory.supports_parallel_ingestion or len(json_paths) < 2:
         for json_path in json_paths:
             records, relationships = convert_json_to_records_and_relationships(json_path)
-            generic_records, runs = ([], [])
-            for entry in records:
-                if entry.type == "run":
-                    runs.append(entry)
-                else:
-                    generic_records.append(entry)
-            factory.create_record_dao().insert(generic_records)
-            factory.create_run_dao().insert(runs)
+            factory.create_record_dao().insert(records)
             factory.create_relationship_dao().insert(relationships)
     else:
         LOGGER.debug('Factory supports parallel ingest, building thread pool.')
@@ -314,6 +307,69 @@ def intersect_ordered(iterables):
                         most_recents[index] = six.next(gen)
                     except StopIteration:
                         return
+
+
+def resolve_curve_sets(curve_sets):
+    """
+    Given a record's curve sets, return an ingestion-ready version.
+
+    It's legal for multiple curves to have the same name. In that case, the
+    min and max of all the curves with that name are used for queries, and
+    any tags are combined into a single list. The min/max thing means that
+    the resolved set returned by this function will have all curves of length
+    2, meaning this is really only useful in the context of the backends.
+
+    If there's any collision on the units, that's an error.
+
+    This does not preserve independent/dependent/parent curve set. It's
+    purely used for ingestion.
+
+    :param curve_sets: The curve_sets section of a record to resolve.
+    :returns: <curve_sets> if there are no collisions, else a version with
+              collisions resolved.
+    :raises ValueError: if given curves with unit collisions.
+    """
+    curves = defaultdict(dict)
+
+    def resolve_collision(curve_name, old_curve, new_curve):
+        """Take two colliding curves and resolve the collision."""
+        old_units, new_units = (old_curve.get("units"), new_curve.get("units"))
+        if new_units is None:
+            resolved_units = old_units
+        elif old_units is not None and new_units != old_units:
+            msg = ("Tried to set units of {} to {}, but were already "
+                   "set as {}".format(curve_name, new_units, old_units))
+            raise ValueError(msg)
+        else:
+            resolved_units = new_units
+        if new_curve.get("tags") is None:
+            resolved_tags = old_curve.get("tags")
+        else:
+            resolved_tags = list(set(old_curve.get("tags")).union(new_curve.get("tags")))
+        available_values = old_curve["value"] + new_curve["value"]
+        resolved_curve = {"value": [min(available_values), max(available_values)]}
+        if resolved_tags:
+            resolved_curve["tags"] = resolved_tags
+        if resolved_units:
+            resolved_curve["units"] = resolved_units
+        return resolved_curve
+
+    # Loop through to see if we have a collision.
+    for curve_set_obj in curve_sets.values():
+        for curve_type in ["independent", "dependent"]:
+            for curve_name, curve_obj in curve_set_obj[curve_type].items():
+                if curve_name not in curves:
+                    if curve_obj.get("tags"):
+                        curves[curve_name]["tags"] = curve_obj["tags"]
+                    if curve_obj.get("units"):
+                        curves[curve_name]["units"] = curve_obj["units"]
+                    curves[curve_name]["value"] = [min(curve_obj["value"]),
+                                                   max(curve_obj["value"])]
+                else:  # collision
+                    curves[curve_name] = resolve_collision(curve_name,
+                                                           curves[curve_name],
+                                                           curve_obj)
+    return curves
 
 
 def export(factory, id_list, scalar_names, output_type, output_file=None):

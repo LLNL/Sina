@@ -1,10 +1,11 @@
+#include "sina/ConduitUtil.hpp"
+
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include "sina/ConduitUtil.hpp"
 #include "conduit.hpp"
 
 namespace sina {
@@ -82,6 +83,58 @@ void addStringsToNode(conduit::Node &parent, std::string const &child_name,
       auto &list_entry = child_node.append();
       list_entry.set(value);
   }
+
+  // If there were no children, this will be a null node rather than a list.
+  // We prefer empty lists to null values in our serialized JSON, so force
+  // this to be a list
+  if (child_node.number_of_children() == 0) {
+      child_node.set_dtype(conduit::DataType::list());
+  }
+}
+
+std::vector<double> toDoubleVector(conduit::Node const &node,
+        std::string const &name) {
+    if (node.dtype().is_list() && node.dtype().number_of_elements() == 0) {
+        return std::vector<double>{};
+    }
+    conduit::Node asDoubles;
+    try {
+        node.to_double_array(asDoubles);
+    } catch (conduit::Error const &err) {
+        std::ostringstream errStream;
+        errStream << "Error trying to convert node \"" << name
+                  << "\" into a list of doubles" << err.what();
+        throw std::invalid_argument(errStream.str());
+    }
+    double const *start = asDoubles.as_double_ptr();
+    auto count = static_cast<std::vector<double>::size_type>(
+            asDoubles.dtype().number_of_elements());
+    return std::vector<double>{start, start + count};
+}
+
+std::vector<std::string> toStringVector(conduit::Node const &node,
+        std::string const &name) {
+    std::vector<std::string> converted;
+    if (!node.dtype().is_list()) {
+        std::ostringstream errStream;
+        errStream << "Error trying to convert node \"" << name
+                  << "\" into a list of strings. It is not a list. "
+                  << node.to_json_default();
+        throw std::invalid_argument(errStream.str());
+    }
+    for (auto iter = node.children(); iter.has_next(); ) {
+        auto &child = iter.next();
+        if (child.dtype().is_string()) {
+            converted.emplace_back(child.as_string());
+        } else {
+            std::ostringstream errStream;
+            errStream << "Error trying to convert node \"" << name
+                      << "\" into a list of strings. A value is not a string. "
+                      << node.to_json_default();
+            throw std::invalid_argument(errStream.str());
+        }
+    }
+    return converted;
 }
 
 }
