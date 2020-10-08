@@ -45,6 +45,8 @@ class SQLMixin(object):  # pylint: disable=no-init,too-few-public-methods
 class TestSetup(SQLMixin, unittest.TestCase):
     """Provides methods needed for setup-type tests on the SQL backend."""
 
+    __test__ = True
+
     def test_factory_instantiate_file(self):
         """Test to ensure SQL DAOFactory is able to create files."""
         test_db = './test_{}_file.temp'.format(time.time())
@@ -53,6 +55,17 @@ class TestSetup(SQLMixin, unittest.TestCase):
             self.assertTrue(os.path.isfile(test_db))
         finally:
             tests.backend_test.remove_file(test_db)
+
+    def test_memory_db(self):
+        """
+        Test that SQLite ":memory:" is recognized/initialized properly.
+
+        db_path=":memory:" should create an in-memory db just like db_path=None.
+        We check to ensure it was created correctly; an incorrectly made
+        in-memory db will have no tables (and so will error on the .exists())
+        """
+        factory = self.create_dao_factory(":memory:")
+        factory.create_record_dao().exist("id_doesnt_matter")
 
 
 class TestModify(SQLMixin, tests.backend_test.TestModify):
