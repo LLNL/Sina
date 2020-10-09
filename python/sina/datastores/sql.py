@@ -851,7 +851,7 @@ class DAOFactory(dao.DAOFactory):
                                          Ignored for in-memory dbs (db_path=None).
         """
         self.db_path = db_path
-        if db_path:
+        if db_path and db_path != ":memory:":
             if '://' not in db_path:
                 connection_string = SQLITE_PREFIX + db_path
                 create_db = not os.path.exists(db_path)
