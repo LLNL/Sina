@@ -304,12 +304,23 @@ test-jupyter: $(LINKS_FILE)
 # Create the Sina wheel
 wheel:
 	@echo "Creating the sina wheel"; \
-	rm -rf ./wheel; \
+	rm -rf ./wheel dist; \
 	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) ./wheel; \
 	wheel/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip wheel; \
 	wheel/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL); \
 	wheel/bin/python setup.py bdist_wheel --universal; \
+	wheel/bin/python setup.py sdist --formats=gztar; \
 	rm -rf ./wheel
+
+# Publish Sina to pypi. For this to work, you have to have an account on
+# pypi.org. For the latest instructions, please see
+# https://packaging.python.org/tutorials/packaging-projects/#uploading-the-distribution-archives
+publish:
+	@echo "Publishing Sina to Pypi"
+	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) distvenv
+	distvenv/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip
+	distvenv/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL) twine
+	distvenv/bin/twine upload dist/*
 
 # Set up a clean branch, recursively calling make to clean up notebooks and
 # files as needed.
