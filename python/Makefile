@@ -312,7 +312,9 @@ wheel:
 	wheel/bin/python setup.py sdist --formats=gztar; \
 	rm -rf ./wheel
 
-# Publish Sina to pypi
+# Publish Sina to pypi. For this to work, you have to have an account on
+# pypi.org. For the latest instructions, please see
+# https://packaging.python.org/tutorials/packaging-projects/#uploading-the-distribution-archives
 publish:
 	@echo "Publishing Sina to Pypi"
 	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) distvenv
