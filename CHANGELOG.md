@@ -5,6 +5,11 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.9.1
+=====
+- Added infrastructure for PyPI release
+- Added hotfix to properly recognize sqlite :memory: dbs.
+
 1.9
 ===
 - Enhanced API by adding new higher-level DataStore class to hide DAOs
