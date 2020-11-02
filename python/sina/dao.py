@@ -7,6 +7,7 @@ datastore.py for up-to-date user-level descriptions of what everything should
 do.
 """
 from abc import ABCMeta, abstractmethod
+import json
 import logging
 import numbers
 
@@ -50,7 +51,6 @@ class RecordDAO(object):
         LOGGER.debug('Getting records with ids in %s', ids)
         return self._get_many(ids, _record_builder, chunk_size)
 
-    @abstractmethod
     def _get_one(self, id, _record_builder):
         """
         Apply some "get" function to a single Record id.
@@ -70,7 +70,8 @@ class RecordDAO(object):
 
         :raises ValueError: if no Record is found for the id.
         """
-        raise NotImplementedError
+        raw = self.get_raw(id)
+        return _record_builder(json_input=json.loads(raw))
 
     @abstractmethod
     def _get_many(self, ids, _record_builder, chunk_size):
@@ -112,6 +113,17 @@ class RecordDAO(object):
         Given one or more Records, insert them into the DAO's backend.
 
         :param records: A Record or iter of Records to insert
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_raw(self, id_):
+        """
+        Get the raw content of the record identified by the given ID.
+
+        :param id_: the ID of the record
+        :return: the raw JSON for the specified record
+        :raises: ValueError if the record does not exist
         """
         raise NotImplementedError
 
