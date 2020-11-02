@@ -437,12 +437,13 @@ class Run(Record):
 
     def __init__(self, id, application,  # pylint: disable=too-many-arguments
                  user=None, version=None, user_defined=None,
-                 data=None, files=None):
+                 data=None, curve_sets=None, files=None):
         """Create Run from Record info plus metadata."""
         super(Run, self).__init__(id=id,
                                   type="run",
                                   user_defined=user_defined,
                                   data=data,
+                                  curve_sets=curve_sets,
                                   files=files)
         self.application = application
         self.user = user
@@ -547,7 +548,7 @@ def generate_record_from_json(json_input):
     # Then set raw to json_input to grab any additional information.
     record.raw.update({key: val for key, val in json_input.items()
                        if key not in ['id', 'type', 'user_defined', 'data',
-                                      'files']})
+                                      'curve_sets', 'files']})
     return record
 
 
@@ -567,6 +568,7 @@ def generate_run_from_json(json_input):
                   version=json_input.get('version'),
                   application=json_input['application'],
                   data=json_input.get('data'),
+                  curve_sets=json_input.get('curve_sets'),
                   files=json_input.get('files'))
     except KeyError as context:
         msg = 'Missing required key <{}>.'.format(context)
@@ -575,7 +577,8 @@ def generate_run_from_json(json_input):
     # Then set raw to json_input to grab any additional information.
     run.raw.update({key: val for key, val in json_input.items()
                     if key not in ['id', 'user', 'user_defined', 'version',
-                                   'type', 'application', 'data', 'files']})
+                                   'type', 'application', 'data', 'curve_sets',
+                                   'files']})
     return run
 
 

@@ -288,6 +288,16 @@ class TestModel(unittest.TestCase):
                       "application": "skillet",
                       "version": "1.2",
                       "user_defined": {"water": "bread"},
+                      "curve_sets": {
+                          "set_1": {
+                              "independent": {
+                                  "time": {"value": [1, 2]}
+                              },
+                              "dependent": {
+                                  "density": {"value": [1, 2]}
+                              }
+                          }
+                      },
                       "data": {"eggs": {"value": 12,
                                         "units": "cm",
                                         "tags": ["runny"]}},
@@ -301,6 +311,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(json_input['version'], run.version)
         self.assertEqual(json_input['user_defined'], run.user_defined)
         self.assertEqual(json_input['data'], run.data)
+        self.assertEqual(json_input['curve_sets'], run.curve_sets)
         self.assertEqual(json_input['files'], run.files)
 
     def test_gen_run_from_json_bad(self):
@@ -322,6 +333,29 @@ class TestModel(unittest.TestCase):
             model.generate_run_from_json(json_input=json_input)
         self.assertIn("Missing required key <'application'>.",
                       str(context.exception))
+
+    def test_test_gen_run_from_json_good_bad_data_overlap(self):
+        """Test for error raising when same-name curve and datum are added."""
+        json_input = {
+            "id": "rec1",
+            "type": "run",
+            "application": "test_app",
+            "data": {"density": {"value": 2}},
+            "curve_sets": {
+                "set_1": {
+                    "independent": {
+                        "time": {"value": [1, 2]}
+                    },
+                    "dependent": {
+                        "density": {"value": [1, 2]}
+                    }
+                }
+            }
+        }
+        with self.assertRaises(ValueError) as context:
+            model.generate_run_from_json(json_input=json_input)
+        self.assertIn("overlapping curve and data entries", str(context.exception))
+
 
     def test_convert_record_to_run_good(self):
         """Test we return a Run when given a Record with valid input."""
