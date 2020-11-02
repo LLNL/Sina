@@ -356,7 +356,6 @@ class TestModel(unittest.TestCase):
             model.generate_run_from_json(json_input=json_input)
         self.assertIn("overlapping curve and data entries", str(context.exception))
 
-
     def test_convert_record_to_run_good(self):
         """Test we return a Run when given a Record with valid input."""
         raw_record = {"id": "run1",
