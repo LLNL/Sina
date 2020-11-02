@@ -436,6 +436,13 @@ class RecordDAO(dao.RecordDAO):
              .batch(batch).delete())
         schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
+    def get_raw(self, id_):
+        try:
+            query = schema.Record.objects.filter(id=id_).get()
+            return query.raw
+        except DoesNotExist:  # Raise a more familiar, descriptive error.
+            raise ValueError("No Record found with id {}".format(id_))
+
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
@@ -686,27 +693,6 @@ class RecordDAO(dao.RecordDAO):
         for entry, val in six.iteritems(result_counts):
             if val == expected_result_count:
                 yield entry
-
-    def _get_one(self, id, _record_builder):
-        """
-        Apply some "get" function to a single Record id.
-
-        Used by the parent get(), this is the Cassandra-specific implementation of
-        getting a single Record.
-
-        :param id: A Record id to return
-        :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw.
-
-        :returns: A Record if found, else None.
-
-        :raises ValueError: if a Record with the id can't be found.
-        """
-        try:
-            query = schema.Record.objects.filter(id=id).get()
-            return _record_builder(json_input=json.loads(query.raw))
-        except DoesNotExist:  # Raise a more familiar, descriptive error.
-            raise ValueError("No Record found with id {}".format(id))
 
     def _get_many(self, ids, _record_builder, chunk_size):
         """

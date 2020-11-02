@@ -315,6 +315,40 @@ class TestModify(unittest.TestCase):
         self.assertFalse(relationship_dao.get(subject_id="rec_3"))
         self.assertEqual(len(relationship_dao.get(object_id="rec_4")), 1)
 
+    def test_recorddao_get_raw(self):
+        """Verify we can get the raw JSON. This is useful for bad data"""
+        record_dao = self.factory.create_record_dao()
+        rec = Record(id="rec1", type="eggs",
+                     data={"eggs": {"value": 12, "units": None, "tags": ["runny"]},
+                           "recipes": {"value": []}},
+                     files={"eggs.break": {"mimetype": "egg", "tags": ["fried"]}},
+                     user_defined={})
+        record_dao.insert(rec)
+        returned_json = record_dao.get_raw("rec1")
+        raw = json.loads(returned_json)
+        self.assertDictEqual(raw, {
+            'id': 'rec1',
+            'type': 'eggs',
+            'data': {
+                'eggs': {
+                    'value': 12,
+                    'tags': ['runny'],
+                    'units': None
+                },
+                'recipes': {
+                    'value': []
+                }
+            },
+            'files': {
+                'eggs.break': {
+                    'mimetype': 'egg',
+                    'tags': ['fried']
+                }
+            },
+            'curve_sets': {},
+            'user_defined': {}
+        })
+
     # RelationshipDAO
     # pylint: disable=fixme
     # TODO: There's no delete method for Relationships. SIBO-781

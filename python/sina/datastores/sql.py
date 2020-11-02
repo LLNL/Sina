@@ -185,6 +185,15 @@ class RecordDAO(dao.RecordDAO):
          .delete(synchronize_session='fetch'))
         self.session.commit()
 
+    def get_raw(self, id_):
+        result = (self.session.query(schema.Record)
+                  .filter(schema.Record.id == id_).one_or_none())
+
+        if result is None:
+            raise ValueError("No Record found with id %s" % id_)
+
+        return result.raw
+
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
@@ -378,26 +387,6 @@ class RecordDAO(dao.RecordDAO):
             query = (query.group_by(table.id)
                      .having(sqlalchemy.func.count(table.id) == len(criteria_pairs)))
         return query
-
-    def _get_one(self, id, _record_builder):
-        """
-        Apply some "get" function to a single Record id.
-
-        Used by the parent get(), this is the SQL-specific implementation of
-        getting a single Record.
-
-        :param id: A Record id to return
-        :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw.
-
-        :returns: A Record object
-        """
-        result = (self.session.query(schema.Record)
-                  .filter(schema.Record.id == id).one_or_none())
-
-        if result is None:
-            raise ValueError("No Record found with id %s" % id)
-        return _record_builder(json_input=json.loads(result.raw))
 
     def _get_many(self, ids, _record_builder, chunk_size):
         """
