@@ -702,15 +702,15 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
         matching_records = self.record_dao.data_query(
             shared_scalar=any_in(DataRange(min=list_min - 10, max=list_min + 10)))
-        self.assertCountEqual(list(matching_records), [inserted_record.id])
+        six.assertCountEqual(self, list(matching_records), [inserted_record.id])
 
         matching_records = self.record_dao.data_query(
             shared_scalar=any_in(DataRange(min=list_max - 10, max=list_max + 10)))
-        self.assertCountEqual(list(matching_records), [inserted_record.id])
+        six.assertCountEqual(self, list(matching_records), [inserted_record.id])
 
         matching_records = self.record_dao.data_query(
             shared_scalar=any_in(DataRange(min=scalar_value - 10, max=scalar_value + 10)))
-        self.assertCountEqual(list(matching_records), [inserted_record.id])
+        six.assertCountEqual(self, list(matching_records), [inserted_record.id])
 
     def test_recorddao_string_datum_query(self):
         """Test that the RecordDAO data query is retrieving based on one string correctly."""
