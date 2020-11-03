@@ -648,7 +648,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_get_available_types(self):
         """Make sure that we return a correct list of the types in a datebase."""
         types_found = self.record_dao.get_available_types()
-        six.assertCountEqual(self, types_found, ["run", "spamrec", "bar", "foo", "eggrec", "overlap"])
+        six.assertCountEqual(self, types_found,
+                             ["run", "spamrec", "bar", "foo", "eggrec", "overlap"])
 
     # ########################### basic data_query ##########################
     def test_recorddao_scalar_datum_query(self):
@@ -694,7 +695,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         inserted_record = self.inserted_records['shared_curve_set_and_matching_scalar_data']
         scalar_value = inserted_record.data['shared_scalar']['value']
         self.assertEqual(1000, scalar_value)
-        inserted_cs_values = inserted_record.curve_sets['cs1']['dependent']['shared_scalar']['value']
+        inserted_cs_values =\
+            inserted_record.curve_sets['cs1']['dependent']['shared_scalar']['value']
         list_min = min(inserted_cs_values)
         list_max = max(inserted_cs_values)
         self.assertEqual(400, list_min)

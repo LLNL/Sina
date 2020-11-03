@@ -381,7 +381,6 @@ def resolve_curve_sets(curve_sets, data):
                 datum['value'] = [datum['value']]
             curves[name] = resolve_collision(name, curve, datum)
 
-
     return curves
 
 
