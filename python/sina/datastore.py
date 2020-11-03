@@ -126,6 +126,20 @@ class DataStore(object):
             """
             return self.record_dao.get(ids_to_get, chunk_size=chunk_size)
 
+        def get_raw(self, id_):
+            """
+            Get the raw content of the record identified by the given ID.
+
+            This can be used in cases where the json is somehow corrupted
+            and cannot be used to create a via the get() call. This is not
+            intended to be used for other purposes.
+
+            :param id_: the ID of the record
+            :return: the raw JSON for the specified record
+            :raises: ValueError if the record does not exist
+            """
+            return self.record_dao.get_raw(id_)
+
         def insert(self, records_to_insert):
             """
             Given one or more Records, insert them into the DAO's backend.

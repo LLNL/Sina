@@ -111,6 +111,7 @@ class RecordDAO(dao.RecordDAO):
         if record.curve_sets:
             self._insert_curve_sets(id=record.id,
                                     curve_sets=record.curve_sets,
+                                    data=record.data,
                                     force_overwrite=force_overwrite)
         if record.files:
             self._insert_files(id=record.id,
@@ -177,7 +178,7 @@ class RecordDAO(dao.RecordDAO):
                 for curveset_name, curveset_obj in record.curve_sets.items():
                     from_curve_set_meta_batch[curveset_name].append([record.id,
                                                                      curveset_obj.get("tags")])
-                resolved_curves = utils.resolve_curve_sets(record.curve_sets)
+                resolved_curves = utils.resolve_curve_sets(record.curve_sets, record.data)
                 # Curve data is stored as a scalar list
                 scalar_list_from_rec_batch = []
                 tags, units, value, datum_name, id = [None]*5
@@ -319,7 +320,7 @@ class RecordDAO(dao.RecordDAO):
                                                force_overwrite=force_overwrite)
 
     @staticmethod
-    def _insert_curve_sets(curve_sets, id, force_overwrite=False):
+    def _insert_curve_sets(curve_sets, id, data, force_overwrite=False):
         """
         Insert curves into two of the Cassandra query tables depending on value.
 
@@ -327,6 +328,7 @@ class RecordDAO(dao.RecordDAO):
         method to simplify insertion.
 
         :param curve_sets: The dictionary of curve sets to insert.
+        :param data: The data associated with the record
         :param id: The Record ID to associate the curve sets to.
         :param force_overwrite: Whether to forcibly overwrite preexisting curves.
                                 Currently only used by Cassandra DAOs.
@@ -335,7 +337,7 @@ class RecordDAO(dao.RecordDAO):
                      len(curve_sets), id, force_overwrite)
         create_meta = (schema.RecordFromCurveSetMeta.create if force_overwrite
                        else schema.RecordFromCurveSetMeta.if_not_exists().create)
-        resolved_curves = utils.resolve_curve_sets(curve_sets)
+        resolved_curves = utils.resolve_curve_sets(curve_sets, data)
 
         for curveset_name, curveset_obj in curve_sets.items():
             create_meta(name=curveset_name, id=id, tags=curveset_obj.get("tags"))
@@ -435,6 +437,13 @@ class RecordDAO(dao.RecordDAO):
                                               object_id=record_id)
              .batch(batch).delete())
         schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
+
+    def get_raw(self, id_):
+        try:
+            query = schema.Record.objects.filter(id=id_).get()
+            return query.raw
+        except DoesNotExist:  # Raise a more familiar, descriptive error.
+            raise ValueError("No Record found with id {}".format(id_))
 
     def data_query(self, **kwargs):
         """
@@ -686,27 +695,6 @@ class RecordDAO(dao.RecordDAO):
         for entry, val in six.iteritems(result_counts):
             if val == expected_result_count:
                 yield entry
-
-    def _get_one(self, id, _record_builder):
-        """
-        Apply some "get" function to a single Record id.
-
-        Used by the parent get(), this is the Cassandra-specific implementation of
-        getting a single Record.
-
-        :param id: A Record id to return
-        :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw.
-
-        :returns: A Record if found, else None.
-
-        :raises ValueError: if a Record with the id can't be found.
-        """
-        try:
-            query = schema.Record.objects.filter(id=id).get()
-            return _record_builder(json_input=json.loads(query.raw))
-        except DoesNotExist:  # Raise a more familiar, descriptive error.
-            raise ValueError("No Record found with id {}".format(id))
 
     def _get_many(self, ids, _record_builder, chunk_size):
         """

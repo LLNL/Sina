@@ -144,6 +144,48 @@ class TestModel(unittest.TestCase):
         rec.set_data("init_energy", 100, tags=["input"], units="J")
         self.assertEqual(complete_data, rec.data)
 
+    def test_set_data_item_conflicts_with_curve_set(self):
+        """Test to make sure we can add data when a curve set already has the same name"""
+        rec = model.Record(id="data_test", type="test")
+        curve_sets = {
+            'cs1': {
+                'independent': {'time': {'value': [1, 2, 3]}},
+                'dependent': {'density': {'value': [4, 5, 6]}}
+            }
+        }
+        rec.curve_sets = curve_sets
+        rec.set_data("density", 40)
+        self.assertIn('density', rec.data)
+        self.assertIn('density', rec.curve_sets['cs1']['dependent'])
+
+    def test_set_data_conflicts_with_curve_set(self):
+        """Test to make sure we can set the data when a curve set already has the same name"""
+        rec = model.Record(id='data_test', type='test')
+        curve_sets = {
+            'cs1': {
+                'independent': {'time': {'value': [1, 2, 3]}},
+                'dependent': {'density': {'value': [4, 5, 6]}}
+            }
+        }
+        rec.curve_sets = curve_sets
+        rec.data = {'density': {'value': 40}}
+        self.assertIn('density', rec.data)
+        self.assertIn('density', rec.curve_sets['cs1']['dependent'])
+
+    def test_add_data_conflicts_with_curve_set(self):
+        """Test to make sure we can add data when a curve set already has the same name"""
+        rec = model.Record(id="data_test", type="test")
+        curve_sets = {
+            'cs1': {
+                'independent': {'time': {'value': [1, 2, 3]}},
+                'dependent': {'density': {'value': [4, 5, 6]}}
+            }
+        }
+        rec.curve_sets = curve_sets
+        rec.add_data("density", 40)
+        self.assertIn('density', rec.data)
+        self.assertIn('density', rec.curve_sets['cs1']['dependent'])
+
     def test_set_file_update(self):
         """Test to make sure we can update files for a Record."""
         complete_files = {"/foo/spam.txt": {"mimetype": "text", "tags": ["doc"]}}
@@ -172,29 +214,16 @@ class TestModel(unittest.TestCase):
             rec.add_data("density", 40)
         self.assertIn('Duplicate datum', str(context.exception))
 
-    def test_add_data_with_curve_overlap(self):
-        """Test for error raising when same-name curve and datum are added."""
-        complete_curvesets = {"set_1": {"independent": {"density": {"value": [1, 2]}},
-                                        "dependent": {"density": {"value": [1, 2]}}}}
-        rec = model.Record(id="data_test", type="test", curve_sets=complete_curvesets)
-        with self.assertRaises(ValueError) as context:
-            rec.add_data("density", 40)
-        self.assertIn('is already the name of a curve', str(context.exception))
-        # Subtle difference between add_data() and just assigning the entire data chunk
-        # Errors are different, as the latter can have more than one collision.
-        with self.assertRaises(ValueError) as context:
-            rec.data = {"density": {"value": 40}}
-        self.assertIn('overlapping curve and data entries', str(context.exception))
-
     def test_add_curve_with_data_overlap(self):
-        """Test for error raising when same-name datum and curve are added."""
-        complete_curvesets = {"set_1": {"independent": {"density": {"value": [1, 2]}},
-                                        "dependent": {"density": {"value": [1, 2]}}}}
+        """Allow data and curve sets to have the same name"""
+        complete_curvesets = {"set_1": {"independent": {"time": {"value": [1, 2]}},
+                                        "dependent": {"density": {"value": [3, 4]}}}}
         complete_data = {"density": {"value": 40}}
-        rec = model.Record(id="data_test", type="test", data=complete_data)
-        with self.assertRaises(ValueError) as context:
-            rec.curve_sets = complete_curvesets
-        self.assertIn('overlapping curve and data entries', str(context.exception))
+        rec = model.Record(id="data_test", type="test", data=complete_data,
+                           curve_sets=complete_curvesets)
+        self.assertEqual(40, rec.data['density']['value'])
+        self.assertListEqual([3, 4],
+                             rec.curve_sets['set_1']['dependent']['density']['value'])
 
     def test_record_access(self):
         """Ensure accessing record attribs using rec["spam"]."""
@@ -288,6 +317,16 @@ class TestModel(unittest.TestCase):
                       "application": "skillet",
                       "version": "1.2",
                       "user_defined": {"water": "bread"},
+                      "curve_sets": {
+                          "set_1": {
+                              "independent": {
+                                  "time": {"value": [1, 2]}
+                              },
+                              "dependent": {
+                                  "density": {"value": [1, 2]}
+                              }
+                          }
+                      },
                       "data": {"eggs": {"value": 12,
                                         "units": "cm",
                                         "tags": ["runny"]}},
@@ -301,6 +340,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(json_input['version'], run.version)
         self.assertEqual(json_input['user_defined'], run.user_defined)
         self.assertEqual(json_input['data'], run.data)
+        self.assertEqual(json_input['curve_sets'], run.curve_sets)
         self.assertEqual(json_input['files'], run.files)
 
     def test_gen_run_from_json_bad(self):
