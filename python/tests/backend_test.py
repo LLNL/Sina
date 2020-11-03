@@ -3,7 +3,6 @@
 
 import os
 import unittest
-import json
 import csv
 import itertools
 import logging
@@ -20,6 +19,7 @@ from mock import patch  # pylint: disable=import-error
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, all_in, any_in, exists)
 from sina.model import Run, Record, Relationship
+import sina.json as json
 
 LOGGER = logging.getLogger(__name__)
 TARGET = None
@@ -1029,7 +1029,7 @@ class TestImportExport(unittest.TestCase):
         relation = self.factory.create_relationship_dao().get(object_id="child_1")
         rec_handler = self.factory.create_record_dao()
         child = rec_handler.get("child_1")
-        canonical = json.load(io.open(json_path, encoding='utf-8'))
+        canonical = json.loads(io.open(json_path, encoding='utf-8').read())
         self.assertEqual(canonical['records'][0]['type'], parent.type)
         self.assertEqual(canonical['records'][1]['type'], child.type)
         child_from_uri = list(rec_handler.get_given_document_uri("foo.png"))

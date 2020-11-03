@@ -5,7 +5,6 @@ import logging
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
 from collections import defaultdict
-import json
 
 import six
 
@@ -20,6 +19,7 @@ import sina.dao as dao
 import sina.model as model
 import sina.datastores.cass_schema as schema
 import sina.utils as utils
+import sina.json as json
 
 # Disable pylint checks due to ubiquitous use of id
 # pylint: disable=invalid-name,redefined-builtin
