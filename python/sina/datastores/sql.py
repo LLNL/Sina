@@ -133,7 +133,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param record: The SQL schema record to associate the data to.
         :param curve_sets: The dictionary of curve sets to insert.
-        :param data: the dictionary containing data items
+        :param data: The dictionary containing data items
         """
         LOGGER.debug('Inserting %i curve set entries to Record ID %s.',
                      len(curve_sets), record.id)

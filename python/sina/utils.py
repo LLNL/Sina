@@ -345,10 +345,8 @@ def resolve_curve_sets(curve_sets, data):
             raise ValueError(msg)
         else:
             resolved_units = new_units
-        if new_curve.get("tags") is None:
-            resolved_tags = old_curve.get("tags")
-        else:
-            resolved_tags = list(set(old_curve.get("tags")).union(new_curve.get("tags")))
+        resolved_tags = list(set(old_curve.get("tags", [])).union(
+            new_curve.get("tags", [])))
         available_values = old_curve["value"] + new_curve["value"]
         resolved_curve = {"value": [min(available_values), max(available_values)]}
         if resolved_tags:

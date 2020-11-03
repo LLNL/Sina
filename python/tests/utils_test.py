@@ -369,6 +369,24 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
         self.assertEqual(resolved_curves['scalar_in_middle']['value'][0], 10)
         self.assertEqual(resolved_curves['scalar_in_middle']['value'][1], 12)
 
+    def test_resolve_curves_tags_on_data_not_on_curveset(self):
+        """Test tags on data without tags on the curve set"""
+        curve_sets = {
+            'cs1': {
+                'independent': {'time': {'value': [1, 2, 3]}},
+                'dependent': {'length': {'value': [4, 5, 6]}},
+            }
+        }
+        data = {
+            'length': {
+                'value': 100,
+                'tags': ['t1', 't2']
+            },
+        }
+        resolved_curves = sina.utils.resolve_curve_sets(curve_sets, data)
+
+        six.assertCountEqual(self, ['t1', 't2'], resolved_curves['length']['tags'])
+
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""
         basic_case = DataRange(1, 2)
