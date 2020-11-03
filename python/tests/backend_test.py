@@ -46,7 +46,7 @@ def populate_database_with_data(record_dao):
     Add test data to a database in a backend-independent way.
 
     :param record_dao: The RecordDAO used to insert records into a database.
-    :return: a map of all the inserted records, where the IDs are the keys
+    :return: a dict of all the inserted records, where the IDs are the keys
     """
     spam_record = Run(id="spam", application="breakfast_maker")
     spam_record["user"] = "Bob"
