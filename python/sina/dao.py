@@ -7,13 +7,13 @@ datastore.py for up-to-date user-level descriptions of what everything should
 do.
 """
 from abc import ABCMeta, abstractmethod
-import json
 import logging
 import numbers
 
 import six
 
 import sina.model
+import sina.json as json
 from sina.utils import DataRange
 
 LOGGER = logging.getLogger(__name__)

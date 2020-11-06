@@ -2,7 +2,6 @@
 import os
 import numbers
 import logging
-import json
 from collections import defaultdict
 
 import six
@@ -12,6 +11,7 @@ import sqlalchemy  # pylint: disable=import-error
 from sqlalchemy.pool import NullPool  # pylint: disable=import-error
 
 import sina.dao as dao
+import sina.json as json
 import sina.model as model
 import sina.datastores.sql_schema as schema
 from sina.utils import sort_and_standardize_criteria

@@ -3,7 +3,6 @@ from __future__ import print_function
 import abc
 import copy
 import logging
-import json
 import os
 import errno
 import uuid
@@ -19,6 +18,7 @@ from collections import OrderedDict, defaultdict
 import six
 
 import sina.model as model
+import sina.json as json
 
 LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
@@ -69,7 +69,7 @@ def convert_json_to_records_and_relationships(json_path):
         records = []
         relationships = []
         local = {}
-        data = json.load(file_)
+        data = json.loads(file_.read())
         for entry in data.get('records', []):
             if 'id' not in entry:
                 id = str(uuid.uuid4())

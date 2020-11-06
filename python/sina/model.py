@@ -1,11 +1,12 @@
 """Contains toplevel, abstract objects mirroring the Sina schema."""
 from __future__ import print_function
-import json
 import logging
 import collections
 import numbers
 
 import six
+
+import sina.json as json
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
