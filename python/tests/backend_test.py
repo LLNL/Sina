@@ -3,7 +3,6 @@
 
 import os
 import unittest
-import json
 import csv
 import itertools
 import logging
@@ -20,6 +19,7 @@ from mock import patch  # pylint: disable=import-error
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, all_in, any_in, exists)
 from sina.model import Run, Record, Relationship
+import sina.json as json
 
 LOGGER = logging.getLogger(__name__)
 TARGET = None
@@ -46,6 +46,7 @@ def populate_database_with_data(record_dao):
     Add test data to a database in a backend-independent way.
 
     :param record_dao: The RecordDAO used to insert records into a database.
+    :return: a dict of all the inserted records, where the IDs are the keys
     """
     spam_record = Run(id="spam", application="breakfast_maker")
     spam_record["user"] = "Bob"
@@ -107,8 +108,22 @@ def populate_database_with_data(record_dao):
     egg_record = Record(id="eggs", type="eggrec")
     egg_record.data["eggs_scal"] = {"value": 0}
 
-    record_dao.insert([spam_record_3, spam_record_4, spam_record_6, egg_record,
-                       spam_record, spam_record_2, spam_record_5])
+    record_with_shared_scalar_data_and_curve = Record(
+        id='shared_curve_set_and_matching_scalar_data', type='overlap')
+    record_with_shared_scalar_data_and_curve.add_data('shared_scalar', 1000)
+    record_with_shared_scalar_data_and_curve.curve_sets = {
+        'cs1': {
+            'independent': {'time': {'value': [1, 2, 3]}},
+            'dependent': {'shared_scalar': {'value': [400, 500, 600]}}
+        }
+    }
+
+    records = [spam_record_3, spam_record_4, spam_record_6, egg_record,
+               spam_record, spam_record_2, spam_record_5,
+               record_with_shared_scalar_data_and_curve]
+    record_dao.insert(records)
+
+    return {record.id: record for record in records}
 
 
 def remove_file(filename):
@@ -233,7 +248,7 @@ class TestModify(unittest.TestCase):
         self.assertIn('Tried to set units', str(context.exception))
 
     def test_recorddao_insert_overlapped_curve_and_data(self):
-        """Test that we raise an error if a curve and data item overlap."""
+        """Test that we can insert a record if a curve and data item overlap."""
         rec = Record(id="spam", type="eggs")
         rec.curve_sets = {
             "spam_curve": {
@@ -242,9 +257,10 @@ class TestModify(unittest.TestCase):
                                          "tags": ["misc"],
                                          "units": "seconds"}}}}
         rec.data["time"] = {"value": 1}
-        with self.assertRaises(ValueError) as context:
-            self.factory.create_record_dao().insert(rec)
-        self.assertIn("Data and curve name overlap", str(context.exception))
+        record_dao = self.factory.create_record_dao()
+        record_dao.insert(rec)
+        retrieved = record_dao.get('spam')
+        self.assertIsNotNone(retrieved)
 
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
@@ -314,6 +330,40 @@ class TestModify(unittest.TestCase):
         self.assertFalse(relationship_dao.get(object_id="rec_2"))
         self.assertFalse(relationship_dao.get(subject_id="rec_3"))
         self.assertEqual(len(relationship_dao.get(object_id="rec_4")), 1)
+
+    def test_recorddao_get_raw(self):
+        """Verify we can get the raw JSON. This is useful for bad data"""
+        record_dao = self.factory.create_record_dao()
+        rec = Record(id="rec1", type="eggs",
+                     data={"eggs": {"value": 12, "units": None, "tags": ["runny"]},
+                           "recipes": {"value": []}},
+                     files={"eggs.break": {"mimetype": "egg", "tags": ["fried"]}},
+                     user_defined={})
+        record_dao.insert(rec)
+        returned_json = record_dao.get_raw("rec1")
+        raw = json.loads(returned_json)
+        self.assertDictEqual(raw, {
+            'id': 'rec1',
+            'type': 'eggs',
+            'data': {
+                'eggs': {
+                    'value': 12,
+                    'tags': ['runny'],
+                    'units': None
+                },
+                'recipes': {
+                    'value': []
+                }
+            },
+            'files': {
+                'eggs.break': {
+                    'mimetype': 'egg',
+                    'tags': ['fried']
+                }
+            },
+            'curve_sets': {},
+            'user_defined': {}
+        })
 
     # RelationshipDAO
     # pylint: disable=fixme
@@ -448,7 +498,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """
         cls.record_dao = None
         create_daos(cls)
-        populate_database_with_data(cls.record_dao)
+        cls.inserted_records = populate_database_with_data(cls.record_dao)
 
     @classmethod
     def tearDownClass(cls):
@@ -598,7 +648,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_get_available_types(self):
         """Make sure that we return a correct list of the types in a datebase."""
         types_found = self.record_dao.get_available_types()
-        six.assertCountEqual(self, types_found, ["run", "spamrec", "bar", "foo", "eggrec"])
+        six.assertCountEqual(self, types_found,
+                             ["run", "spamrec", "bar", "foo", "eggrec", "overlap"])
 
     # ########################### basic data_query ##########################
     def test_recorddao_scalar_datum_query(self):
@@ -637,6 +688,31 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         none = self.record_dao.data_query(spam_scal=spam_and_spam_3,
                                           nonexistant=10101010)
         self.assertFalse(list(none))
+
+    def test_recorddao_data_query_shared_data_and_curve_set(self):
+        """Test that RecordDAO's data query is retrieving on multiple scalars correctly."""
+        # ensure data matches our expectations
+        inserted_record = self.inserted_records['shared_curve_set_and_matching_scalar_data']
+        scalar_value = inserted_record.data['shared_scalar']['value']
+        self.assertEqual(1000, scalar_value)
+        inserted_cs_values =\
+            inserted_record.curve_sets['cs1']['dependent']['shared_scalar']['value']
+        list_min = min(inserted_cs_values)
+        list_max = max(inserted_cs_values)
+        self.assertEqual(400, list_min)
+        self.assertEqual(600, list_max)
+
+        matching_records = self.record_dao.data_query(
+            shared_scalar=any_in(DataRange(min=list_min - 10, max=list_min + 10)))
+        six.assertCountEqual(self, list(matching_records), [inserted_record.id])
+
+        matching_records = self.record_dao.data_query(
+            shared_scalar=any_in(DataRange(min=list_max - 10, max=list_max + 10)))
+        six.assertCountEqual(self, list(matching_records), [inserted_record.id])
+
+        matching_records = self.record_dao.data_query(
+            shared_scalar=any_in(DataRange(min=scalar_value - 10, max=scalar_value + 10)))
+        six.assertCountEqual(self, list(matching_records), [inserted_record.id])
 
     def test_recorddao_string_datum_query(self):
         """Test that the RecordDAO data query is retrieving based on one string correctly."""
@@ -852,7 +928,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_recorddao_get_all(self):
         """Test the RecordDAO is retrieving all Records."""
         all_records = list(self.record_dao.get_all())
-        self.assertEqual(len(all_records), 7)
+        self.assertEqual(len(all_records), len(self.inserted_records))
         self.assertIsInstance(all_records[0], Record)
 
     def test_recorddao_get_all_returns_generator(self):
@@ -864,9 +940,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_recorddao_get_all_matches_many(self):
         """Test the RecordDAO type query correctly returns multiple Records."""
         all_ids = self.record_dao.get_all(ids_only=True)
-        six.assertCountEqual(self, list(all_ids), ["spam", "spam2", "spam3",
-                                                   "spam4", "spam5", "spam6",
-                                                   "eggs"])
+        six.assertCountEqual(self, list(all_ids), list(self.inserted_records.keys()))
 
     # ###################### get_data_for_records ########################
     def test_recorddao_get_datum_for_record(self):
@@ -1029,7 +1103,7 @@ class TestImportExport(unittest.TestCase):
         relation = self.factory.create_relationship_dao().get(object_id="child_1")
         rec_handler = self.factory.create_record_dao()
         child = rec_handler.get("child_1")
-        canonical = json.load(io.open(json_path, encoding='utf-8'))
+        canonical = json.loads(io.open(json_path, encoding='utf-8').read())
         self.assertEqual(canonical['records'][0]['type'], parent.type)
         self.assertEqual(canonical['records'][1]['type'], child.type)
         child_from_uri = list(rec_handler.get_given_document_uri("foo.png"))

@@ -148,6 +148,10 @@ class DatastoreTests(unittest.TestCase):
         """Test the RecordOperation exist()."""
         self.assert_record_method_is_passthrough("exist", "exist", 1)
 
+    def test_get_raw(self):
+        """Test the RecordOperation get_raw()"""
+        self.assert_record_method_is_passthrough("get_raw", "get_raw", 1)
+
     def test_data_names(self):
         """Test the RecordOperation data_names()."""
         self.assert_record_method_is_passthrough("data_names", "data_names", 2)

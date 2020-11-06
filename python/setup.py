@@ -48,7 +48,9 @@ setup(name='llnl-sina',
       install_requires=[
         'six',
         'sqlalchemy',
-        'enum34;python_version<"3.4"'
+        'enum34;python_version<"3.4"',
+        'orjson;python_version>="3.6"',
+        'ujson;python_version<"3.6"'
       ],
       license='MIT',
       classifiers=[

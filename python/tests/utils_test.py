@@ -278,7 +278,7 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
             "dependent": {"time": {"value": [1, 2, 3, 4],
                                    "tags": ["timer", "protein"]}},
             "independent": {"firmness": {"value": [0, 0, 0.1, 0.3]}}}
-        resolved_curves = sina.utils.resolve_curve_sets(curve_sets)
+        resolved_curves = sina.utils.resolve_curve_sets(curve_sets, {})
         # Make sure they're not equal. If they are, curve_sets was overwritten.
         self.assertNotEqual(curve_sets, resolved_curves)
 
@@ -298,8 +298,94 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
                                      "tags": ["timer", "output"],
                                      "units": "NOT SECONDS"}}}
         with self.assertRaises(ValueError) as context:
-            sina.utils.resolve_curve_sets(curve_sets)
+            sina.utils.resolve_curve_sets(curve_sets, {})
         self.assertIn('Tried to set units', str(context.exception))
+
+    def test_resolve_curves_matching_scalar_data(self):
+        """Test that curves with overlapping scalar data values are handled properly."""
+        curve_sets = {
+            'cs1': {
+                'independent': {'time': {'value': [1, 2, 3]}},
+                'dependent': {
+                    'scalar_smaller': {'value': [4, 5, 6]},
+                    'scalar_bigger': {'value': [7, 8, 9]},
+                    'scalar_in_middle': {'value': [10, 11, 12]},
+                },
+            }
+        }
+        data = {
+            'scalar_smaller': {'value': -100},
+            'scalar_bigger': {'value': 100},
+            'scalar_in_middle': {'value': 11.5},
+        }
+        resolved_curves = sina.utils.resolve_curve_sets(curve_sets, data)
+
+        # Make sure they're not equal. If they are, curve_sets was overwritten.
+        self.assertNotEqual(curve_sets, resolved_curves)
+
+        self.assertEqual(resolved_curves['time']['value'][0], 1)
+        self.assertEqual(resolved_curves['time']['value'][1], 3)
+
+        self.assertEqual(resolved_curves['scalar_smaller']['value'][0], -100)
+        self.assertEqual(resolved_curves['scalar_smaller']['value'][1], 6)
+
+        self.assertEqual(resolved_curves['scalar_bigger']['value'][0], 7)
+        self.assertEqual(resolved_curves['scalar_bigger']['value'][1], 100)
+
+        self.assertEqual(resolved_curves['scalar_in_middle']['value'][0], 10)
+        self.assertEqual(resolved_curves['scalar_in_middle']['value'][1], 12)
+
+    def test_resolve_curves_matching_list_data(self):
+        """Test that curves with overlapping list data values are handled properly."""
+        curve_sets = {
+            'cs1': {
+                'independent': {'time': {'value': [1, 2, 3]}},
+                'dependent': {
+                    'scalar_smaller': {'value': [4, 5, 6]},
+                    'scalar_bigger': {'value': [7, 8, 9]},
+                    'scalar_in_middle': {'value': [10, 11, 12]},
+                },
+            }
+        }
+        data = {
+            'scalar_smaller': {'value': [-100, 5]},
+            'scalar_bigger': {'value': [100, 8]},
+            'scalar_in_middle': {'value': [10.5, 11.5]},
+        }
+        resolved_curves = sina.utils.resolve_curve_sets(curve_sets, data)
+
+        # Make sure they're not equal. If they are, curve_sets was overwritten.
+        self.assertNotEqual(curve_sets, resolved_curves)
+
+        self.assertEqual(resolved_curves['time']['value'][0], 1)
+        self.assertEqual(resolved_curves['time']['value'][1], 3)
+
+        self.assertEqual(resolved_curves['scalar_smaller']['value'][0], -100)
+        self.assertEqual(resolved_curves['scalar_smaller']['value'][1], 6)
+
+        self.assertEqual(resolved_curves['scalar_bigger']['value'][0], 7)
+        self.assertEqual(resolved_curves['scalar_bigger']['value'][1], 100)
+
+        self.assertEqual(resolved_curves['scalar_in_middle']['value'][0], 10)
+        self.assertEqual(resolved_curves['scalar_in_middle']['value'][1], 12)
+
+    def test_resolve_curves_tags_on_data_not_on_curveset(self):
+        """Test tags on data without tags on the curve set"""
+        curve_sets = {
+            'cs1': {
+                'independent': {'time': {'value': [1, 2, 3]}},
+                'dependent': {'length': {'value': [4, 5, 6]}},
+            }
+        }
+        data = {
+            'length': {
+                'value': 100,
+                'tags': ['t1', 't2']
+            },
+        }
+        resolved_curves = sina.utils.resolve_curve_sets(curve_sets, data)
+
+        six.assertCountEqual(self, ['t1', 't2'], resolved_curves['length']['tags'])
 
     def test_basic_data_range_scalar(self):
         """Test basic DataRange creation using scalars."""

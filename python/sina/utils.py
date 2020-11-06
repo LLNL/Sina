@@ -1,8 +1,8 @@
 """Module for handling miscellany."""
 from __future__ import print_function
 import abc
+import copy
 import logging
-import json
 import os
 import errno
 import uuid
@@ -18,6 +18,7 @@ from collections import OrderedDict, defaultdict
 import six
 
 import sina.model as model
+import sina.json as json
 
 LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
@@ -68,7 +69,7 @@ def convert_json_to_records_and_relationships(json_path):
         records = []
         relationships = []
         local = {}
-        data = json.load(file_)
+        data = json.loads(file_.read())
         for entry in data.get('records', []):
             if 'id' not in entry:
                 id = str(uuid.uuid4())
@@ -309,7 +310,7 @@ def intersect_ordered(iterables):
                         return
 
 
-def resolve_curve_sets(curve_sets):
+def resolve_curve_sets(curve_sets, data):
     """
     Given a record's curve sets, return an ingestion-ready version.
 
@@ -325,8 +326,10 @@ def resolve_curve_sets(curve_sets):
     purely used for ingestion.
 
     :param curve_sets: The curve_sets section of a record to resolve.
-    :returns: <curve_sets> if there are no collisions, else a version with
-              collisions resolved.
+    :param data: The data items. If any curve matches a data item, it is
+     the data item is treated as another curve
+    :returns: a version of the curve sets with collisions resolved and only
+     min and max values.
     :raises ValueError: if given curves with unit collisions.
     """
     curves = defaultdict(dict)
@@ -342,10 +345,8 @@ def resolve_curve_sets(curve_sets):
             raise ValueError(msg)
         else:
             resolved_units = new_units
-        if new_curve.get("tags") is None:
-            resolved_tags = old_curve.get("tags")
-        else:
-            resolved_tags = list(set(old_curve.get("tags")).union(new_curve.get("tags")))
+        resolved_tags = list(set(old_curve.get("tags", [])).union(
+            new_curve.get("tags", [])))
         available_values = old_curve["value"] + new_curve["value"]
         resolved_curve = {"value": [min(available_values), max(available_values)]}
         if resolved_tags:
@@ -369,6 +370,15 @@ def resolve_curve_sets(curve_sets):
                     curves[curve_name] = resolve_collision(curve_name,
                                                            curves[curve_name],
                                                            curve_obj)
+
+    for name, curve in six.iteritems(curves):
+        if name in data:
+            datum = data[name]
+            if not isinstance(datum['value'], list):
+                datum = copy.deepcopy(datum)
+                datum['value'] = [datum['value']]
+            curves[name] = resolve_collision(name, curve, datum)
+
     return curves
 
 

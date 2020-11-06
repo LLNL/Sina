@@ -2,7 +2,6 @@
 import os
 import numbers
 import logging
-import json
 from collections import defaultdict
 
 import six
@@ -12,6 +11,7 @@ import sqlalchemy  # pylint: disable=import-error
 from sqlalchemy.pool import NullPool  # pylint: disable=import-error
 
 import sina.dao as dao
+import sina.json as json
 import sina.model as model
 import sina.datastores.sql_schema as schema
 from sina.utils import sort_and_standardize_criteria
@@ -70,7 +70,7 @@ class RecordDAO(dao.RecordDAO):
         if sina_record.data:
             RecordDAO._attach_data(sql_record, sina_record.data)
         if sina_record.curve_sets:
-            RecordDAO._attach_curves(sql_record, sina_record.curve_sets)
+            RecordDAO._attach_curves(sql_record, sina_record.curve_sets, sina_record.data)
         if sina_record.files:
             RecordDAO._attach_files(sql_record, sina_record.files)
 
@@ -127,12 +127,13 @@ class RecordDAO(dao.RecordDAO):
                                                 tags=tags))
 
     @staticmethod
-    def _attach_curves(record, curve_sets):
+    def _attach_curves(record, curve_sets, data):
         """
         Attach the curve entries to the given SQL record.
 
         :param record: The SQL schema record to associate the data to.
         :param curve_sets: The dictionary of curve sets to insert.
+        :param data: The dictionary containing data items
         """
         LOGGER.debug('Inserting %i curve set entries to Record ID %s.',
                      len(curve_sets), record.id)
@@ -141,7 +142,7 @@ class RecordDAO(dao.RecordDAO):
             tags = (json.dumps(curveset_obj['tags']) if 'tags' in curveset_obj else None)
             record.curve_set_meta.append(schema.CurveSetMeta(name=curveset_name,
                                                              tags=tags))
-        resolved_sets = utils.resolve_curve_sets(curve_sets)
+        resolved_sets = utils.resolve_curve_sets(curve_sets, data)
         for entry_name, entry_obj in resolved_sets.items():
             tags = (json.dumps(entry_obj['tags']) if 'tags' in entry_obj else None)
             record.scalar_lists.append(schema.ListScalarData(
@@ -184,6 +185,15 @@ class RecordDAO(dao.RecordDAO):
          .filter(schema.Record.id.in_(ids))
          .delete(synchronize_session='fetch'))
         self.session.commit()
+
+    def get_raw(self, id_):
+        result = (self.session.query(schema.Record)
+                  .filter(schema.Record.id == id_).one_or_none())
+
+        if result is None:
+            raise ValueError("No Record found with id %s" % id_)
+
+        return result.raw
 
     def data_query(self, **kwargs):
         """
@@ -378,26 +388,6 @@ class RecordDAO(dao.RecordDAO):
             query = (query.group_by(table.id)
                      .having(sqlalchemy.func.count(table.id) == len(criteria_pairs)))
         return query
-
-    def _get_one(self, id, _record_builder):
-        """
-        Apply some "get" function to a single Record id.
-
-        Used by the parent get(), this is the SQL-specific implementation of
-        getting a single Record.
-
-        :param id: A Record id to return
-        :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw.
-
-        :returns: A Record object
-        """
-        result = (self.session.query(schema.Record)
-                  .filter(schema.Record.id == id).one_or_none())
-
-        if result is None:
-            raise ValueError("No Record found with id %s" % id)
-        return _record_builder(json_input=json.loads(result.raw))
 
     def _get_many(self, ids, _record_builder, chunk_size):
         """

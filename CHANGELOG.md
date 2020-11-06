@@ -5,6 +5,14 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.9.2
+=====
+- Removed restriction on the same name being used for a data item and the
+  name of a curve in a curve set.
+- Fixed a bug that allowed invalid records to be inserted into the database.
+- Added a method to retrieve invalid records from the database.
+- Sped up processing of JSON files.
+
 1.9.1
 =====
 - Added infrastructure for PyPI release

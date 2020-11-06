@@ -1,11 +1,12 @@
 """Contains toplevel, abstract objects mirroring the Sina schema."""
 from __future__ import print_function
-import json
 import logging
 import collections
 import numbers
 
 import six
+
+import sina.json as json
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
@@ -52,10 +53,6 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
         """
-        # We store curve names specially so we don't need to loop through the
-        # curve sets every time a piece of data is added.
-        self.curve_names = set()
-
         self.raw = {}
         # Items in this block are going to raw behind the scenes (see __setattr__)
         self.id = id
@@ -90,12 +87,6 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
 
     @data.setter
     def data(self, data):
-        if self.curve_names.intersection(data.keys()):
-            msg = ("Record {} has overlapping curve and data entries. Make sure "
-                   "you haven't duplicated your curve values into record.data. "
-                   "Overlapping entries: {}"
-                   .format(self.id, self.curve_names.intersection(self.data.keys())))
-            raise ValueError(msg)
         self['data'] = data
 
     @property
@@ -111,9 +102,7 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         This only works for rec.curve_sets = {"curveset_1" ...}. Indexing in
         won't trigger it.
         """
-        names = self._find_curve_names_and_collisions(curve_sets)
         self['curve_sets'] = curve_sets
-        self.curve_names = names
 
     @property
     def files(self):
@@ -187,11 +176,7 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         if name in self.data:
             raise ValueError('Duplicate datum: "{}" is already an entry in Record "{}".'
                              .format(name, self.id))
-        if name in self.curve_names:
-            raise ValueError('Name collision: "{}" is already the name of a '
-                             'curve entry in Record "{}"'.format(name, self.id))
-        else:
-            self.set_data(name, value, units, tags)
+        self.set_data(name, value, units, tags)
 
     def set_data(self, name, value, units=None, tags=None):
         """
@@ -295,12 +280,6 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
             (warnings.append("Record {}'s data field must be a dictionary!"
                              .format(self.id)))
         else:
-            # We have to do an extra check for collisions in case of
-            # record["data"] usage.
-            data_names = set(self.data.keys())
-            if data_names.intersection(self.curve_names):
-                (warnings.append("Data and curve name overlap: {}"
-                                 .format(data_names.intersection(self.curve_names))))
             for entry in self.data:
                 # Check data entry is a dictionary
                 if not isinstance(self.data[entry], dict):
@@ -350,30 +329,6 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
             LOGGER.warning(warnstring)
             return False, warnings
         return True, warnings
-
-    def _find_curve_names_and_collisions(self, new_curves):
-        """
-        Add names the curve name set if they're not collisions.
-
-        This is used to check datum name collisions.
-
-        :returns: A set of curve names
-        :raises: ValueError if any of the curve names are already datum names.
-        """
-        new_names = set()
-        collision_names = set()
-        for entry in new_curves.values():
-            for subcategory in ["independent", "dependent"]:
-                for name in entry[subcategory].keys():
-                    if name in self.data:
-                        collision_names.add(name)
-                    new_names.add(name)
-        if collision_names:
-            msg = ("Record {} has overlapping curve and data entries. Make sure "
-                   "you haven't duplicated your curve values into record.data. "
-                   "Overlapping entries: {}")
-            raise ValueError(msg.format(self.id, collision_names))
-        return new_names
 
 
 # Disable pylint check to if and until the team decides to address the issue
@@ -437,12 +392,13 @@ class Run(Record):
 
     def __init__(self, id, application,  # pylint: disable=too-many-arguments
                  user=None, version=None, user_defined=None,
-                 data=None, files=None):
+                 data=None, curve_sets=None, files=None):
         """Create Run from Record info plus metadata."""
         super(Run, self).__init__(id=id,
                                   type="run",
                                   user_defined=user_defined,
                                   data=data,
+                                  curve_sets=curve_sets,
                                   files=files)
         self.application = application
         self.user = user
@@ -547,7 +503,7 @@ def generate_record_from_json(json_input):
     # Then set raw to json_input to grab any additional information.
     record.raw.update({key: val for key, val in json_input.items()
                        if key not in ['id', 'type', 'user_defined', 'data',
-                                      'files']})
+                                      'curve_sets', 'files']})
     return record
 
 
@@ -567,6 +523,7 @@ def generate_run_from_json(json_input):
                   version=json_input.get('version'),
                   application=json_input['application'],
                   data=json_input.get('data'),
+                  curve_sets=json_input.get('curve_sets'),
                   files=json_input.get('files'))
     except KeyError as context:
         msg = 'Missing required key <{}>.'.format(context)
@@ -575,7 +532,8 @@ def generate_run_from_json(json_input):
     # Then set raw to json_input to grab any additional information.
     run.raw.update({key: val for key, val in json_input.items()
                     if key not in ['id', 'user', 'user_defined', 'version',
-                                   'type', 'application', 'data', 'files']})
+                                   'type', 'application', 'data', 'curve_sets',
+                                   'files']})
     return run
 
 
