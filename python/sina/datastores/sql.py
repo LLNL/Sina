@@ -193,7 +193,7 @@ class RecordDAO(dao.RecordDAO):
         if result is None:
             raise ValueError("No Record found with id %s" % id_)
 
-        return result.raw
+        return _to_json_string(result.raw)
 
     def data_query(self, **kwargs):
         """
@@ -410,7 +410,7 @@ class RecordDAO(dao.RecordDAO):
 
             for result in results:
                 ids_found += 1
-                yield _record_builder(json_input=json.loads(result.raw))
+                yield _record_builder(json_input=_json_loads(result.raw))
 
             if ids_found != len(chunk):
                 raise ValueError("No Record found with id in chunk %s" % chunk)
@@ -431,7 +431,8 @@ class RecordDAO(dao.RecordDAO):
         else:
             results = self.session.query(schema.Record)
             for result in results:
-                yield model.generate_record_from_json(json_input=json.loads(result.raw))
+                yield model.generate_record_from_json(
+                    json_input=_json_loads(result.raw))
 
     def get_all_of_type(self, type, ids_only=False):
         """
@@ -709,7 +710,7 @@ class RecordDAO(dao.RecordDAO):
                     datapoint["units"] = result.units
                 if result.tags:
                     # Convert from string to ks
-                    datapoint["tags"] = json.loads(result.tags)
+                    datapoint["tags"] = _json_loads(result.tags)
                 data[result.id][result.name] = datapoint
         return data
 
@@ -742,7 +743,7 @@ class RecordDAO(dao.RecordDAO):
         for entry in query:
             # SQL doesn't handle maps. so tags are stored as JSON lists.
             # This converts them to Python.
-            tags = json.loads(entry[3]) if entry[3] else None
+            tags = _json_loads(entry[3]) if entry[3] else None
             scalars[entry[0]] = {'value': entry[1],
                                  'units': entry[2],
                                  'tags': tags}
@@ -897,3 +898,35 @@ class DAOFactory(dao.DAOFactory):
     def close(self):
         """Close the session for this factory and all created DAOs."""
         self.session.close()
+
+
+def _json_loads(data_from_db):
+    """
+    Load json from the given data.
+
+    Because of all the different types that can be returned as, a series
+    of checks is done to ensure we pass is to the json library in the
+    right format.
+
+    :param data_from_db: the data as a string. Could be a buffer object.
+    :returns: the data as json
+    """
+    return json.loads(_to_json_string(data_from_db))
+
+
+def _to_json_string(data_from_db):
+    """
+    Convert the given data from the database to a string. This is needed to
+    handle all the different types that can be returned as from the database
+    where we would expect a string.
+
+    :param data_from_db: the data from the database
+    :returns: the data as a string
+    """
+    # NOTE: When we stop supporting python2 and ujson, we may be able
+    # to get rid of all this
+    if isinstance(data_from_db, bytes):
+        return data_from_db.decode()
+    elif not isinstance(data_from_db, six.string_types):
+        return six.text_type(data_from_db)
+    return data_from_db
