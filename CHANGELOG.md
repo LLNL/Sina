@@ -5,6 +5,12 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.9.3
+=====
+- Fixed a bug which prevented parsing of large json blocks from the database
+  when using python 2.7.
+- Increased allowed URI length for SQL file entries
+
 1.9.2
 =====
 - Removed restriction on the same name being used for a data item and the
