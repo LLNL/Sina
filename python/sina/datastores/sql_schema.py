@@ -15,7 +15,7 @@ from sqlalchemy.schema import Index  # pylint: disable=import-error
 Base = declarative_base()
 
 MAX_STRING_SIZE = 16000  # The version of MySQL used on LC enforces this size
-LARGE_STRING_SIZE = 4096  # Size for longer strings like URIs
+LARGE_STRING_SIZE = 1500  # Size for longer strings like URIs
 
 
 class Record(Base):
