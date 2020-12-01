@@ -23,8 +23,8 @@ DEPLOY_DIR=`realpath $1`/
 DOC_DIR=`realpath $2`/
 # EXAMPLE_DIR is a symlink, so no ending /
 EXAMPLE_LINK=`realpath --no-symlinks $3`
+PERM_GROUP=${SINA_PERM_GROUP:-llnl_emp}
 CPP_DOCS=$DOC_DIR/sina/cpp
-PERM_GROUP=wciuser
 
 if [ ! -d cpp/build/docs/html ]; then
     echo "You must have run the C++ tests and built the docs"
@@ -34,7 +34,7 @@ fi
 cd python
 # Build the Sina python deployment with all the known options
 # NOTE: Cython currently fails on Python 3.7. This is addressed in the Bamboo job (sets python to use 3.6.4).
-./deploy.sh --build-with=cli_tools,jupyter,mysql --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK --skip=git
+./deploy.sh --build-with=cli_tools,jupyter,mysql --deploy-dir=$DEPLOY_DIR --docs-dir=$DOC_DIR --examples-link=$EXAMPLE_LINK --skip=git --group=$PERM_GROUP
 echo "Python deployment complete! Continuing to C++ portion..."
 
 cd ../cpp
