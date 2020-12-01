@@ -24,7 +24,7 @@ VALID_MAKE_TARGETS="cassandra,cli_tools,jupyter,mysql"
 VALID_STEPS="clean,git,tests,venv,docs,examples"
 
 # Default values for LC
-LC_GROUP=wciuser  # Group to be given access to deployed artifacts
+LC_GROUP=llnl_emp  # Group to be given access to deployed artifacts
 LC_DEPLOY_DIR=/collab/usr/gapps/wf/releases  # Release directory (also holds the usage examples)
 LC_DOCS_DIR=/usr/global/web-pages/lc/www/workflow/docs  # Workflow docs
 LC_EXAMPLES_LINK=/collab/usr/gapps/wf/examples  # Link to examples
@@ -303,7 +303,9 @@ DEPLOY_DIR=`realpath $DEPLOY_DIR`
 checkDirectory documentation $DOCS_DIR
 DOCS_DIR=`realpath $DOCS_DIR`
 
-HAVE_GROUP=`grep "^$PERM_GROUP:" /etc/group`
+# Test the group. Note that we run the risk of the grep dying and silently killing the script, hence the ||
+HAVE_GROUP=`grep "^$PERM_GROUP:" /etc/group` || echo 'grep "^$PERM_GROUP:" /etc/group failed.'
+
 if [ "$HAVE_GROUP" == "" ]; then
   echo "ERROR: Group '$PERM_GROUP' does not exist.  Provide a valid group."
   printUsage
