@@ -8,9 +8,8 @@ Contents
     - Creating the Environment
     - Installing Software Dependencies
 
-- Activating the Virtual Environment
-- Deactivating the Virtual Environment
-- Using the Example Notebooks
+- Activating and Deactivating the Virtual Environment
+- Using the Example Notebooks and Datasets
 - Testing
 - Supported Environments
 - Database Support
@@ -62,8 +61,8 @@ install.
 If you run into issues with the LC virtual environment, please email us at siboka@llnl.gov.
 
 
-Standard Setup
-==============
+Standard Non-LC Setup
+=====================
 
 Standard installation, provided by the Makefile, is initiated by entering
 the following at the command line::
@@ -149,8 +148,8 @@ not, run::
     $(venv) pip install -e .
 
 
-Activating the Virtual Environment
-==================================
+Activating and Deactivating the Virtual Environment
+===================================================
 Enter the following command to enter the virtual environment::
 
     $ source $SINA_PYTHON/venv/bin/activate  # use activate.csh if in a [t]csh
@@ -159,9 +158,6 @@ where `SINA_PYTHON` is the python subdirectory of the Sina source code.
 You will need to do this every time you want to start up a session in the named
 virtual environment.
 
-
-Deactivating the Virtual Environment
-====================================
 Enter the following command to deactivate the virtual environment::
 
     (venv) $ deactivate
@@ -169,15 +165,26 @@ Enter the following command to deactivate the virtual environment::
 when you are done.
 
 
-Using the Example Notebooks
-===========================
+Using the Example Notebooks and Datasets
+========================================
 
-Sina contains Jupyter notebooks that demonstrate how to use it with
-sample datasets. Files can be found in the examples directory, and are
-organized by dataset, with data_overview.rst containing descriptions of each
-set. To use the notebooks, you'll first need to run getting_started.ipynb
+Sina contains tutorials in the form of Jupyter notebooks.
+Files are stored in the examples directory (found in the
+sina root folder alongside the python and cpp folders), and are organized by
+dataset, with data_overview.rst containing descriptions of each set.
+To use the notebooks, you'll first need to run getting_started.ipynb
 (also in the examples directory) from the LC Jupyter server at
-lc.llnl.gov/jupyter. After that, you'll be ready to run the rest of the notebooks.
+lc.llnl.gov/jupyter. After that, you'll be ready to run the rest of the
+notebooks. If you're not working on LC, you can also set Jupyter up locally:
+run `make Jupyter` and then `jupyter notebook`. This will open a webpage similar
+to what you'd see accessing LC's Jupyter server.
+
+Most notebooks rely on sample datasets. Pre-built sets are deployed
+with Sina to the LC, but you can build them locally as well to experiment with
+Sina. Go into any dataset folder (the NOAA set is well-sized for experimentation)
+and `./build_db.sh`. Note that you'll need Sina available to do so, see the
+section on virtual environments.
+
 To clean all output from the notebooks::
 
     (venv) $ make clean-notebooks
@@ -204,7 +211,7 @@ Supported Environments
 
 Sina is regularly tested in the following environments:
 
-- **OSX 10.13**: Primary development environment for most team members.
+- **OSX 10.15**: Primary development environment for most team members.
   If you are not on the LC network, be sure to comment out `--no-index` in the
   requirements file.
 - **TOSS 3, RedHat 7.4 (quartz, rzsonar)**: Automated testing environment
@@ -221,7 +228,7 @@ than SQLite. If you wish to connect to other databases (e.g. MySQL, MariaDB,
 or Oracle), you need to install the appropriate drivers for that database.
 You can do this with our Makefile::
 
-    $ make mysql 
+    $ make mysql
 
 After you install the connector, you can connect to these types of databases
 from the command line tools::

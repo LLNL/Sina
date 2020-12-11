@@ -44,6 +44,11 @@ still be unique within a JSON document).
 
 A more fleshed-out example, with field descriptions:
 
+.. warning::
+    Comments are not part of the JSON standard, meaning this example is not
+    valid JSON. See the end of this page for a JSON "skeleton" or one of the
+    example datasets (described in the README) for valid Sina JSON.
+
 .. code-block:: javascript
 
     {

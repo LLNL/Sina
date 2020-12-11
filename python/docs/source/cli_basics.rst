@@ -1,8 +1,9 @@
 CLI Basics
 ==========
 
-The Sina command line interface (CLI) is organized into three subcommands:
-query, ingest, and export. To access these subcommands, make sure you're
+The Sina command line interface (CLI) acts as a simplified and less feature-rich
+companion to the API; its primary use is ingesting data, but it supports three
+subcommands: query, ingest, and export. To access these subcommands, make sure you're
 currently in a virtual environment that has Sina and its dependencies
 installed. You can access general help information using :code:`sina -h` or
 subcommand-specific help with :code:`sina <subcommand_name> -h`. These commands are
