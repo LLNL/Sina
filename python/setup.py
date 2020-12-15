@@ -35,7 +35,7 @@ setup(name='llnl-sina',
             'ipywidgets',
             'tabulate',
             'tornado<5.1',  # Tornado 5.1 gets stuck in a loop
-            'matplotlib'
+            'matplotlib==2.0.2'
         ],
         'cli_tools': [
             'deepdiff',
