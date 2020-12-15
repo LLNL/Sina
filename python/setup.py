@@ -24,7 +24,8 @@ setup(name='llnl-sina',
         'jupyter:python_version<"3"': [
             'wcwidth<0.1.8',
             'ipython>=5,<6',  # ipython 6 drops support for Python 2
-            'ipykernel<5'
+            'ipykernel<5',
+            'matplotlib<3.0'
         ],
         'jupyter:python_version>="3"': [
             'ipython',
@@ -35,7 +36,7 @@ setup(name='llnl-sina',
             'ipywidgets',
             'tabulate',
             'tornado<5.1',  # Tornado 5.1 gets stuck in a loop
-            'matplotlib==2.0.2'
+            'matplotlib'
         ],
         'cli_tools': [
             'deepdiff',
