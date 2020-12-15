@@ -5,7 +5,7 @@ API Basics
 
 .. note::
     This page documents the major concepts of Sina's API; for a hands-on
-    tutorial, see the Jupyter notebooks detailed in the README.
+    tutorial, see the Jupyter notebooks detailed in the :ref:`readme`.
 
 Major API Concepts
 ~~~~~~~~~~~~~~~~~~
