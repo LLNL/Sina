@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 3.7)
 add_definitions(${SINA_CXX_TEST_FLAGS})
 
 include_directories("${PROJECT_SOURCE_DIR}/test/include")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/../include")
 
 # libdl is a requirement of Adiak, not Sina, but conditional inclusion
 # creates issues on CZ. Delete this when Adiak includes libdl
@@ -29,6 +30,7 @@ blt_add_executable(NAME unittests
     SOURCES
         include/sina/testing/ConduitTestUtils.hpp
         include/sina/testing/TestRecord.hpp
+        src/config_test.cpp
         src/CppBridge_test.cpp
         src/ConduitTestUtils.cpp
         src/Curve_test.cpp
