@@ -100,7 +100,8 @@ double toScalar(adiak_value_t *val, adiak_datatype_t *adiak_type){
             return val->v_double;
         case adiak_timeval: {
 	          struct timeval *tval = static_cast<struct timeval *>(val->v_ptr);
-	          return tval->tv_sec + (tval->tv_usec / 1000000.0);
+	          return static_cast<double>(tval->tv_sec)
+                             + (static_cast<double>(tval->tv_usec) / 1000000.0);
         }
         // None of the rest of these should ever be reachable, so special error message
         case adiak_date:
