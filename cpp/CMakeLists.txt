@@ -19,6 +19,7 @@ CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/config/config.hpp.in
         ${CMAKE_CURRENT_BINARY_DIR}/include/sina/config.hpp)
 
 include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/include")
 
 install(DIRECTORY "include/sina"
     DESTINATION "include")

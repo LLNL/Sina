@@ -18,7 +18,6 @@ blt_register_library(NAME libdl
 set(OPTIONAL_SINA_DEPENDENCIES "")
 
 if(${SINA_BUILD_ADIAK_BINDINGS})
-    add_definitions(-DSINA_BUILD_ADIAK_BINDINGS=1)
     set_source_files_properties(AdiakWriter.cpp PROPERTIES COMPILE_FLAGS "${CXX_FLAGS} ${SINA_CXX_ADIAK_WRITER_EXTRA_FLAGS}")
     find_package(adiak REQUIRED)
 

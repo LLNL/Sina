@@ -3,7 +3,6 @@ cmake_minimum_required (VERSION 3.7)
 add_definitions(${SINA_CXX_TEST_FLAGS})
 
 include_directories("${PROJECT_SOURCE_DIR}/test/include")
-include_directories("${CMAKE_CURRENT_BINARY_DIR}/../include")
 
 # libdl is a requirement of Adiak, not Sina, but conditional inclusion
 # creates issues on CZ. Delete this when Adiak includes libdl
