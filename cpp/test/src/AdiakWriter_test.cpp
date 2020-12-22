@@ -1,4 +1,6 @@
-#ifdef SINA_BUILD_ADIAK_BINDINGS
+#include "sina/AdiakWriter.hpp"
+
+#if SINA_BUILD_ADIAK_BINDINGS
 
 #include <stdexcept>
 #include <string>
@@ -16,7 +18,6 @@ extern "C" {
 #include "sina/Datum.hpp"
 #include "sina/ID.hpp"
 #include "sina/Run.hpp"
-#include "sina/AdiakWriter.hpp"
 
 namespace sina { namespace testing { namespace {
 
