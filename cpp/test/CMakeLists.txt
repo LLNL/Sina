@@ -46,5 +46,11 @@ blt_add_executable(NAME unittests
     DEPENDS_ON sina gtest gmock Conduit libdl
 )
 
+blt_add_executable(NAME read_write_json
+    SOURCES
+        src/Read_write_json_util.cpp
+        DEPENDS_ON sina Conduit
+)
+
 blt_add_test(NAME unittests
              COMMAND unittests)
