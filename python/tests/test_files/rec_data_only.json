@@ -1,1 +1,23 @@
-{"records":[{"id":"data_rec","type":"test","data":{"scalar":{"value":12},"string":{"value":"str","tags":["output"]},"string_list":{"value":["a","b","c"]},"scalar_list":{"value":[1,2,3],"units":"km/s","tags":["short"]}}}]}
+{
+	"records": [{
+		"id": "data_rec",
+		"type": "test",
+		"data": {
+			"scalar": {
+				"value": 12
+			},
+			"string": {
+				"value": "str",
+				"tags": ["output"]
+			},
+			"string_list": {
+				"value": ["a", "b", "c"]
+			},
+			"scalar_list": {
+				"value": [1, 2, 3],
+				"units": "km/s",
+				"tags": ["short"]
+			}
+		}
+	}]
+}

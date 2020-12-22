@@ -1,1 +1,10 @@
-{"relationships":[], "records":[{"id": "test_rec", "type": "test"}, {"id": "test_rec_2", "type": "test"}]}
+{
+	"relationships": [],
+	"records": [{
+		"id": "test_rec",
+		"type": "test"
+	}, {
+		"id": "test_rec_2",
+		"type": "test"
+	}]
+}

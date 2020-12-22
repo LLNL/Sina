@@ -7,6 +7,7 @@ Ingests/dumps jsons found in python/test_files with C++ then compares with Pytho
 import unittest
 import tempfile
 import os
+import subprocess
 
 import sina.utils
 
@@ -26,7 +27,7 @@ class IntegrationTests(unittest.TestCase):
             dumped_record = dumped_records_dict[expected_record.id]
             self.assertEqual(expected_record.user_defined, dumped_record.user_defined)
             self.assertEqual(expected_record.type, dumped_record.type)
-            # C++ is allowed to remove empty tag lists.
+            # C++ is allowed to remove empty tag lists, hence "manual" equality check
             for name in expected_record.data.keys():
                 self.assertEqual(expected_record.data[name]["value"],
                                  dumped_record.data[name]["value"])
@@ -35,7 +36,6 @@ class IntegrationTests(unittest.TestCase):
                 if expected_record.data[name].get("tags"):
                     self.assertEqual(expected_record.data[name].get("tags"),
                                      dumped_record.data[name].get("tags"))
-
             self.assertEqual(expected_record.files, dumped_record.files)
             self.assertEqual(expected_record.curve_sets, dumped_record.curve_sets)
 
@@ -56,11 +56,11 @@ class IntegrationTests(unittest.TestCase):
     def _get_recs_and_rels_from_json(self, json_name):
         """Extract records and relationships from C++ and Python from JSON at a path."""
         json_path = os.path.join(TEST_FILE_DIR, json_name)
-        transform_command = "{} {} {}".format(CPP_EXEC, json_path, self.temp_file_name)
-        os.system(transform_command)
-        convert = sina.utils.convert_json_to_records_and_relationships  # handling line length req
-        expected_records, expected_relationships = convert(json_path)
-        dumped_records, dumped_relationships = convert(self.temp_file_name)
+        subprocess.call([CPP_EXEC, json_path, self.temp_file_name])
+        expected_records, expected_relationships = \
+            sina.utils.convert_json_to_records_and_relationships(json_path)
+        dumped_records, dumped_relationships = \
+            sina.utils.convert_json_to_records_and_relationships(self.temp_file_name)
         return ((expected_records, dumped_records), (expected_relationships, dumped_relationships))
 
     def assert_json_is_equal(self, json_path):

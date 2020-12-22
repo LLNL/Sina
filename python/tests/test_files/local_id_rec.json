@@ -1,1 +1,14 @@
-{"relationships":[{"local_subject": "local", "predicate": "processes", "object": "global"}], "records": [{"id": "global", "type": "simple"}, {"local_id": "local", "type": "local_id_rec"}]}
+{
+	"relationships": [{
+		"local_subject": "local",
+		"predicate": "processes",
+		"object": "global"
+	}],
+	"records": [{
+		"id": "global",
+		"type": "simple"
+	}, {
+		"local_id": "local",
+		"type": "local_id_rec"
+	}]
+}
