@@ -1,9 +1,10 @@
-#ifdef SINA_BUILD_ADIAK_BINDINGS
-
 #ifndef SINA_ADIAK_HPP
 #define SINA_ADIAK_HPP
 
 /// @file
+
+#include "sina/config.hpp"
+#if SINA_BUILD_ADIAK_BINDINGS
 
 #include <string>
 #include <type_traits>
@@ -38,6 +39,8 @@ namespace sina {
 void adiakSinaCallback(const char *name, adiak_category_t category, const char *subcategory, adiak_value_t *value, adiak_datatype_t *t, void *opaque_value);
 
 }
-#endif
 
 #endif // SINA_BUILD_ADIAK_BINDINGS
+
+#endif // SINA_ADIAK_HPP
+

@@ -29,6 +29,7 @@ blt_add_executable(NAME unittests
     SOURCES
         include/sina/testing/ConduitTestUtils.hpp
         include/sina/testing/TestRecord.hpp
+        src/config_test.cpp
         src/CppBridge_test.cpp
         src/ConduitTestUtils.cpp
         src/Curve_test.cpp

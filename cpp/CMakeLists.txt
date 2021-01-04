@@ -11,10 +11,21 @@ include(blt/SetupBLT.cmake)
 # main code. If we do this too early, the gtest/gmock builds will fail
 set(CMAKE_CXX_FLAGS ${SINA_CXX_FLAGS})
 
+set(SINA_VERSION_MAJOR 1)
+set(SINA_VERSION_MINOR 9)
+set(SINA_VERSION_PATCH 3)
+
+CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/config/config.hpp.in
+        ${CMAKE_CURRENT_BINARY_DIR}/include/sina/config.hpp)
+
 include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/include")
 
 install(DIRECTORY "include/sina"
     DESTINATION "include")
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/sina/config.hpp"
+    DESTINATION "include/sina")
 
 add_subdirectory(src)
 if (${SINA_BUILD_TESTS})

@@ -12,5 +12,6 @@
 #include "sina/Record.hpp"
 #include "sina/Run.hpp"
 #include "sina/Datum.hpp"
+#include "sina/config.hpp"
 
 #endif // SINA_HPP
