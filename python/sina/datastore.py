@@ -370,3 +370,15 @@ class DataStore(object):
             :param relationships_to_insert: Relationships to insert
             """
             self.relationship_dao.insert(relationships_to_insert)
+
+        def delete(self, subject_id=None, predicate=None, object_id=None):
+            """
+            Given one or more criteria, delete all matching Relationships from the DAO's backend.
+
+            This does not affect records, data, etc. Only Relationships.
+
+            :raise ValueError: if no criteria are specified.
+            """
+            self.relationship_dao.delete(subject_id=subject_id,
+                                         predicate=predicate,
+                                         object_id=object_id)

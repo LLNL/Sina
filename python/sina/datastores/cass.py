@@ -1176,7 +1176,7 @@ class RelationshipDAO(dao.RelationshipDAO):
                     with BatchQuery() as batch_query:
                         for entry in insert_info:
                             (schema.SubjectFromObject
-                             .batch(batch_query).create(obj=obj,
+                             .batch(batch_query).create(object_id=obj,
                                                         predicate=entry[0],
                                                         subject_id=entry[1]))
             for subj, insert_info in six.iteritems(from_subject_batch):
@@ -1191,8 +1191,9 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                         predicate=entry[0],
                                                         object_id=entry[1]))
 
-    def get(self, subject_id=None, object_id=None, predicate=None):
-        """Retrieve relationships fitting some criteria."""
+    @staticmethod
+    def _get_relationships_from_criteria(subject_id=None, object_id=None, predicate=None):
+        """Create a query to find relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)
@@ -1226,8 +1227,36 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         if need_filtering:
             query = query.allow_filtering()
+        return query
 
+    def get(self, subject_id=None, object_id=None, predicate=None):
+        """Retrieve relationships fitting some criteria."""
+        query = self._get_relationships_from_criteria(subject_id, object_id, predicate)
         return self._build_relationships(query.all())
+
+    def delete(self, subject_id=None, object_id=None, predicate=None):
+        """
+        Given one or more criteria, delete all matching Relationships from the DAO's backend.
+
+        This does not affect records, data, etc. Only Relationships.
+
+        :raise ValueError: if no criteria are specified.
+        """
+        LOGGER.debug('Deleting relationships matching criteria: subject_id=%s, '
+                     'predicate=%s, object_id=%s.',
+                     subject_id, predicate, object_id)
+        if subject_id is None and object_id is None and predicate is None:
+            raise ValueError("Must specify at least one of subject_id, object_id, or predicate")
+        affected_rels = self._get_relationships_from_criteria(subject_id,
+                                                              object_id,
+                                                              predicate).all()
+        tables = [schema.ObjectFromSubject, schema.SubjectFromObject]
+        with BatchQuery() as batch:
+            for affected_rel in affected_rels:
+                for table in tables:
+                    table.objects(subject_id=affected_rel.subject_id,
+                                  object_id=affected_rel.object_id,
+                                  predicate=affected_rel.predicate).batch(batch).delete()
 
 
 class DAOFactory(dao.DAOFactory):

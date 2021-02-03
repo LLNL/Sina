@@ -819,6 +819,29 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         return self._build_relationships(query.all())
 
+    def delete(self, subject_id=None, object_id=None, predicate=None):
+        """
+        Given one or more criteria, delete all matching Relationships from the DAO's backend.
+
+        This does not affect records, data, etc. Only Relationships.
+
+        :raise ValueError: if no criteria are specified.
+        """
+        LOGGER.debug('Deleting relationships with subject_id=%s, '
+                     'predicate=%s, object_id=%s.',
+                     subject_id, predicate, object_id)
+        if subject_id is None and object_id is None and predicate is None:
+            raise ValueError("Must specify at least one of subject_id, object_id, or predicate")
+        query = self.session.query(schema.Relationship)
+        if subject_id:
+            query = query.filter(schema.Relationship.subject_id == subject_id)
+        if object_id:
+            query = query.filter(schema.Relationship.object_id == object_id)
+        if predicate:
+            query = query.filter(schema.Relationship.predicate == predicate)
+        query.delete(synchronize_session='fetch')
+        self.session.commit()
+
 
 class DAOFactory(dao.DAOFactory):
     """

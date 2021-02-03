@@ -366,8 +366,6 @@ class TestModify(unittest.TestCase):
         })
 
     # RelationshipDAO
-    # pylint: disable=fixme
-    # TODO: There's no delete method for Relationships. SIBO-781
     def test_relationshipdao_insert_simple_retrieve(self):
         """Test that RelationshipDAO is inserting and getting correctly."""
         relationship_dao = self.factory.create_relationship_dao()
@@ -472,6 +470,58 @@ class TestModify(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             relationship_dao.insert(subject_id="spam", object_id="eggs")
         self.assertIn('Must supply either', str(context.exception))
+
+    def test_relationshipdao_delete(self):
+        """Test that RelationshipDAO is deleting correctly."""
+        relationship_dao = self.factory.create_relationship_dao()
+        record_dao = self.factory.create_record_dao()
+
+        record_dao.insert(Record('spam', 'test_rec'))
+        record_dao.insert(Record('eggs', 'test_rec'))
+
+        relationship = Relationship(subject_id="spam", object_id="eggs", predicate="loves")
+        relationship_2 = Relationship(subject_id="spam", object_id="eggs", predicate="treasures")
+        relationship_dao.insert(relationships=[relationship, relationship_2])
+        rel = relationship_dao.get(subject_id=relationship.subject_id)
+        self.assertEqual(len(rel), 2)
+        relationship_dao.delete(subject_id=relationship.subject_id)
+        rel = relationship_dao.get(subject_id=relationship.subject_id)
+        self.assertEqual(len(rel), 0)
+        # Make sure the Records are still in place
+        self.assertTrue(all(list(record_dao.exist(['spam', 'eggs']))))
+
+    def test_relationshipdao_delete_multiple_criteria(self):
+        """Test that RelationshipDAO is deleting correctly when using multiple criteria."""
+        relationship_dao = self.factory.create_relationship_dao()
+        record_dao = self.factory.create_record_dao()
+
+        record_dao.insert(Record('spam', 'test_rec'))
+        record_dao.insert(Record('eggs', 'test_rec'))
+        record_dao.insert(Record('cheese', 'test_rec'))
+
+        relationships = [Relationship(subject_id="spam", object_id="eggs", predicate="loves"),
+                         Relationship(subject_id="spam", object_id="eggs", predicate="treasures"),
+                         Relationship(subject_id="cheese", object_id="eggs", predicate="loves"),
+                         Relationship(subject_id="spam", object_id="cheese", predicate="loves")]
+        relationship_dao.insert(relationships)
+        rels = relationship_dao.get(subject_id="spam")
+        self.assertEqual(len(rels), 3)
+        relationship_dao.delete(subject_id="spam", object_id="eggs", predicate="loves")
+        rels = relationship_dao.get(subject_id="spam")
+        self.assertEqual(len(rels), 2)
+        rels = relationship_dao.get(object_id="eggs")
+        self.assertEqual(len(rels), 2)
+        rels = relationship_dao.get(subject_id="spam", object_id="eggs", predicate="loves")
+        self.assertEqual(len(rels), 0)
+        self.assertTrue(all(list(record_dao.exist(["spam", "eggs", "cheese"]))))
+
+    def test_relationshipdao_no_criteria(self):
+        """Test that RelationshipDAO raises a ValueError if no criteria are specified."""
+        relationship_dao = self.factory.create_relationship_dao()
+        with self.assertRaises(ValueError) as context:
+            list(relationship_dao.delete())
+        self.assertIn('Must specify at least one of subject_id, object_id, or predicate',
+                      str(context.exception))
 
 
 # Disable the pylint check if and until the team decides to refactor the code
