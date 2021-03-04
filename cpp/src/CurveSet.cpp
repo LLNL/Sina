@@ -57,7 +57,7 @@ conduit::Node createCurveMapNode(CurveSet::CurveMap const &curveMap) {
     conduit::Node mapNode;
     mapNode.set_dtype(conduit::DataType::object());
     for (auto &entry : curveMap) {
-        mapNode[entry.first] = entry.second.toNode();
+        mapNode.add_child(entry.first) = entry.second.toNode();
     }
     return mapNode;
 }

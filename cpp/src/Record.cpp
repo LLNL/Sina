@@ -45,14 +45,14 @@ conduit::Node Record::toNode() const {
       //Loop through vector of data and append Json
       conduit::Node datumRef;
       for(auto &datum : data){
-          datumRef[datum.first] = datum.second.toNode();
+          datumRef.add_child(datum.first) = datum.second.toNode();
       }
       asNode[DATA_FIELD] = datumRef;
     }
     if(!curveSets.empty()){
       conduit::Node curveSetsNode;
       for(auto &entry : curveSets){
-          curveSetsNode[entry.first] = entry.second.toNode();
+          curveSetsNode.add_child(entry.first) = entry.second.toNode();
       }
       asNode[CURVE_SETS_FIELD] = curveSetsNode;
     }
