@@ -102,11 +102,11 @@ TEST(CurveSet, createFromNode_curveSetsDefined) {
     conduit::Node curveSetAsNode = parseJsonValue(R"({
       "independent": {
         "indep1": { "value": [10, 20, 30]},
-        "indep2": { "value": [40, 50, 60]}
+        "indep2/with/slash": { "value": [40, 50, 60]}
       },
       "dependent": {
         "dep1": { "value": [1, 2, 3]},
-        "dep2": { "value": [4, 5, 6]}
+        "dep2/with/slash": { "value": [4, 5, 6]}
       }
     })");
     CurveSet curveSet{"theName", curveSetAsNode};
@@ -114,14 +114,14 @@ TEST(CurveSet, createFromNode_curveSetsDefined) {
 
     std::unordered_map<std::string, Curve> expectedDependents {
         {"dep1", Curve{"dep1", {1, 2, 3}}},
-        {"dep2", Curve{"dep2", {4, 5, 6}}},
+        {"dep2/with/slash", Curve{"dep2/with/slash", {4, 5, 6}}},
     };
     EXPECT_THAT(curveSet.getDependentCurves(),
             ContainerEq(expectedDependents));
 
     std::unordered_map<std::string, Curve> expectedIndependents {
         {"indep1", Curve{"indep1", {10, 20, 30}}},
-        {"indep2", Curve{"indep2", {40, 50, 60}}},
+        {"indep2/with/slash", Curve{"indep2/with/slash", {40, 50, 60}}},
     };
     EXPECT_THAT(curveSet.getIndependentCurves(),
             ContainerEq(expectedIndependents));
@@ -139,15 +139,15 @@ TEST(CurveSet, toNode_empty) {
 TEST(CurveSet, toNode_withCurves) {
     CurveSet curveSet{"theName"};
     curveSet.addIndependentCurve(Curve{"i1", {1, 2, 3}});
-    curveSet.addIndependentCurve(Curve{"i2", {4, 5, 6}});
+    curveSet.addIndependentCurve(Curve{"i2/with/slash", {4, 5, 6}});
     curveSet.addDependentCurve(Curve{"d1", {10, 20, 30}});
-    curveSet.addDependentCurve(Curve{"d2", {40, 50, 60}});
+    curveSet.addDependentCurve(Curve{"d2/with/slash", {40, 50, 60}});
     auto expected = R"({
         "independent": {
             "i1": {
                 "value": [1.0, 2.0, 3.0]
             },
-            "i2": {
+            "i2/with/slash": {
                 "value": [4.0, 5.0, 6.0]
             }
         },
@@ -155,7 +155,7 @@ TEST(CurveSet, toNode_withCurves) {
             "d1": {
                 "value": [10.0, 20.0, 30.0]
             },
-            "d2": {
+            "d2/with/slash": {
                 "value": [40.0, 50.0, 60.0]
             }
         }

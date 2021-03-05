@@ -63,7 +63,7 @@ TEST(Record, create_globalId_data) {
     originalNode[EXPECTED_DATA_KEY];
 
     std::string name1 = "datum name 1";
-    std::string name2 = "datum name 2";
+    std::string name2 = "datum name 2/with/slash";
 
     conduit::Node name1_node;
     name1_node["value"] = "value 1";
@@ -73,7 +73,7 @@ TEST(Record, create_globalId_data) {
     name2_node["units"] = "g/L";
     addStringsToNode(name2_node, "tags", {"tag1","tag2"});
     name2_node["value"] = 2.22;
-    originalNode[EXPECTED_DATA_KEY][name2] = name2_node;
+    originalNode[EXPECTED_DATA_KEY].add_child(name2) = name2_node;
     Record record{originalNode};
     auto &data = record.getData();
     ASSERT_EQ(2u, data.size());
@@ -233,6 +233,18 @@ TEST(Record, toNode_data) {
     EXPECT_TRUE(asNode[EXPECTED_DATA_KEY][name2]["tags"].dtype().is_empty());
 }
 
+TEST(Record, toNode_dataWithSlashes) {
+    ID id{"the id", IDType::Local};
+    Record record{id, "my type"};
+    std::string name = "name/with/slashes";
+    std::string value = "the value";
+    Datum datum = Datum{value};
+    record.add(name, datum);
+    auto asNode = record.toNode();
+    ASSERT_EQ(1u, asNode[EXPECTED_DATA_KEY].number_of_children());
+    EXPECT_EQ("the value", asNode[EXPECTED_DATA_KEY].child(name)["value"].as_string());
+}
+
 TEST(Record, toNode_files) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
@@ -254,14 +266,14 @@ TEST(Record, toNode_files) {
 TEST(Record, toNode_curveSets) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
-    CurveSet cs{"myCurveSet"};
+    CurveSet cs{"myCurveSet/with/slash"};
     cs.addIndependentCurve(Curve{"myCurve", {1, 2, 3}});
     record.add(cs);
     auto expected = R"({
         "local_id": "the id",
         "type": "my type",
         "curve_sets": {
-            "myCurveSet": {
+            "myCurveSet/with/slash": {
                 "independent": {
                      "myCurve": {
                          "value": [1.0, 2.0, 3.0]
