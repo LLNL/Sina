@@ -809,6 +809,16 @@ class RelationshipDAO(dao.RelationshipDAO):
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)
+
+        query = self._get_matching_relationships(subject_id, object_id, predicate)
+        return self._build_relationships(query.all())
+
+    def _get_matching_relationships(self, subject_id=None, object_id=None, predicate=None):
+        """
+        Do the actual retrieval of relationships fitting some criteria.
+
+        Helper method for get() and _do_delete().
+        """
         query = self.session.query(schema.Relationship)
         if subject_id:
             query = query.filter(schema.Relationship.subject_id == subject_id)
@@ -816,10 +826,9 @@ class RelationshipDAO(dao.RelationshipDAO):
             query = query.filter(schema.Relationship.object_id == object_id)
         if predicate:
             query = query.filter(schema.Relationship.predicate == predicate)
+        return query
 
-        return self._build_relationships(query.all())
-
-    def delete(self, subject_id=None, object_id=None, predicate=None):
+    def _do_delete(self, subject_id=None, object_id=None, predicate=None):
         """
         Given one or more criteria, delete all matching Relationships from the DAO's backend.
 
@@ -827,18 +836,7 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :raise ValueError: if no criteria are specified.
         """
-        LOGGER.debug('Deleting relationships with subject_id=%s, '
-                     'predicate=%s, object_id=%s.',
-                     subject_id, predicate, object_id)
-        if subject_id is None and object_id is None and predicate is None:
-            raise ValueError("Must specify at least one of subject_id, object_id, or predicate")
-        query = self.session.query(schema.Relationship)
-        if subject_id:
-            query = query.filter(schema.Relationship.subject_id == subject_id)
-        if object_id:
-            query = query.filter(schema.Relationship.object_id == object_id)
-        if predicate:
-            query = query.filter(schema.Relationship.predicate == predicate)
+        query = self._get_matching_relationships(subject_id, object_id, predicate)
         query.delete(synchronize_session='fetch')
         self.session.commit()
 

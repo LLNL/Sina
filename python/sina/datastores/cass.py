@@ -342,7 +342,6 @@ class RecordDAO(dao.RecordDAO):
         for curveset_name, curveset_obj in curve_sets.items():
             create_meta(name=curveset_name, id=id, tags=curveset_obj.get("tags"))
         for entry_name, entry_obj in six.iteritems(resolved_curves):
-            print(entry_name, entry_obj)
             schema.cross_populate_query_tables(id=id,
                                                name=entry_name,
                                                value=entry_obj['value'],
@@ -1167,29 +1166,19 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                          rel.subject_id))
             # Our dictionaries are populated and ready for batch insertion
             for obj, insert_info in six.iteritems(from_object_batch):
-                # Only having one entry is a common use case. Skip the overhead!
-                if len(insert_info) == 1:
-                    schema.cross_populate_object_and_subject(subject_id=insert_info[0][1],
-                                                             object_id=obj,
-                                                             predicate=insert_info[0][0])
-                else:
-                    with BatchQuery() as batch_query:
-                        for entry in insert_info:
-                            (schema.SubjectFromObject
-                             .batch(batch_query).create(object_id=obj,
-                                                        predicate=entry[0],
-                                                        subject_id=entry[1]))
+                with BatchQuery() as batch_query:
+                    for entry in insert_info:
+                        (schema.SubjectFromObject
+                         .batch(batch_query).create(object_id=obj,
+                                                    predicate=entry[0],
+                                                    subject_id=entry[1]))
             for subj, insert_info in six.iteritems(from_subject_batch):
-                # We already handled this use case with the cross_populate above
-                if len(insert_info) == 1:
-                    pass
-                else:
-                    with BatchQuery() as batch_query:
-                        for entry in insert_info:
-                            (schema.ObjectFromSubject
-                             .batch(batch_query).create(subject_id=subj,
-                                                        predicate=entry[0],
-                                                        object_id=entry[1]))
+                with BatchQuery() as batch_query:
+                    for entry in insert_info:
+                        (schema.ObjectFromSubject
+                         .batch(batch_query).create(subject_id=subj,
+                                                    predicate=entry[0],
+                                                    object_id=entry[1]))
 
     @staticmethod
     def _get_relationships_from_criteria(subject_id=None, object_id=None, predicate=None):
@@ -1234,7 +1223,7 @@ class RelationshipDAO(dao.RelationshipDAO):
         query = self._get_relationships_from_criteria(subject_id, object_id, predicate)
         return self._build_relationships(query.all())
 
-    def delete(self, subject_id=None, object_id=None, predicate=None):
+    def _do_delete(self, subject_id=None, object_id=None, predicate=None):
         """
         Given one or more criteria, delete all matching Relationships from the DAO's backend.
 
@@ -1242,11 +1231,6 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         :raise ValueError: if no criteria are specified.
         """
-        LOGGER.debug('Deleting relationships matching criteria: subject_id=%s, '
-                     'predicate=%s, object_id=%s.',
-                     subject_id, predicate, object_id)
-        if subject_id is None and object_id is None and predicate is None:
-            raise ValueError("Must specify at least one of subject_id, object_id, or predicate")
         affected_rels = self._get_relationships_from_criteria(subject_id,
                                                               object_id,
                                                               predicate).all()

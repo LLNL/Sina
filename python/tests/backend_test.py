@@ -471,24 +471,47 @@ class TestModify(unittest.TestCase):
             relationship_dao.insert(subject_id="spam", object_id="eggs")
         self.assertIn('Must supply either', str(context.exception))
 
-    def test_relationshipdao_delete(self):
-        """Test that RelationshipDAO is deleting correctly."""
+    def test_relationshipdao_delete_single_criteria(self):
+        """Test that RelationshipDAO is deleting correctly based on single criteria."""
         relationship_dao = self.factory.create_relationship_dao()
         record_dao = self.factory.create_record_dao()
 
         record_dao.insert(Record('spam', 'test_rec'))
         record_dao.insert(Record('eggs', 'test_rec'))
+        record_dao.insert(Record('bacon', 'test_rec'))
 
-        relationship = Relationship(subject_id="spam", object_id="eggs", predicate="loves")
+        relationship = Relationship(subject_id="spam", object_id="bacon", predicate="loves")
         relationship_2 = Relationship(subject_id="spam", object_id="eggs", predicate="treasures")
+        relationship_3 = Relationship(subject_id="eggs", object_id="bacon", predicate="treasures")
+        relationship_dao.insert(relationships=[relationship, relationship_2, relationship_3])
+
+        # Test subject id
+        self.assertEqual(len(relationship_dao.get(subject_id="spam")), 2)
+        relationship_dao.delete(subject_id="spam")
+        self.assertEqual(len(relationship_dao.get(subject_id="spam")),
+                         0, "Relationships with the target subject_id not deleted")
+        self.assertEqual(len(relationship_dao.get(subject_id="eggs")),
+                         1, "Relationships without the target subject_id deleted")
+
+        # Test object id
         relationship_dao.insert(relationships=[relationship, relationship_2])
-        rel = relationship_dao.get(subject_id=relationship.subject_id)
-        self.assertEqual(len(rel), 2)
-        relationship_dao.delete(subject_id=relationship.subject_id)
-        rel = relationship_dao.get(subject_id=relationship.subject_id)
-        self.assertEqual(len(rel), 0)
+        relationship_dao.delete(object_id="bacon")
+        self.assertEqual(len(relationship_dao.get(object_id="bacon")),
+                         0, "Relationships with the target object_id not deleted")
+        self.assertEqual(len(relationship_dao.get(object_id="eggs")),
+                         1, "Relationships without the target object_id deleted")
+
+        # Test predicate
+        relationship_dao.insert(relationships=[relationship, relationship_3])
+        relationship_dao.delete(predicate="treasures")
+        self.assertEqual(len(relationship_dao.get(predicate="treasures")),
+                         0, "Relationships with the target predicate not deleted")
+        self.assertEqual(len(relationship_dao.get(predicate="loves")),
+                         1, "Relationships without the target predicate deleted")
+
         # Make sure the Records are still in place
-        self.assertTrue(all(list(record_dao.exist(['spam', 'eggs']))))
+        self.assertTrue(all(list(record_dao.exist(['spam', 'eggs', 'bacon']))),
+                        "Records deleted during Relationship deletion")
 
     def test_relationshipdao_delete_multiple_criteria(self):
         """Test that RelationshipDAO is deleting correctly when using multiple criteria."""
@@ -515,8 +538,8 @@ class TestModify(unittest.TestCase):
         self.assertEqual(len(rels), 0)
         self.assertTrue(all(list(record_dao.exist(["spam", "eggs", "cheese"]))))
 
-    def test_relationshipdao_no_criteria(self):
-        """Test that RelationshipDAO raises a ValueError if no criteria are specified."""
+    def test_relationshipdao_delete_no_criteria(self):
+        """Test that RelationshipDAO raises a ValueError if no delete criteria are specified."""
         relationship_dao = self.factory.create_relationship_dao()
         with self.assertRaises(ValueError) as context:
             list(relationship_dao.delete())

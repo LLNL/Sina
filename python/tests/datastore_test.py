@@ -236,15 +236,15 @@ class DatastoreTests(unittest.TestCase):
         # We need to test that args are properly kwarg'd to reorder
         # Same reorder that happens for .get() but no return value
         self.relationship_dao.delete = Mock(return_value=None)
-        args = ("subject_id", "predicate", "object_id")
-        expected_kwargs = {"subject_id": "subject_id",
-                           "object_id": "object_id",
-                           "predicate": "predicate"}
+        args = ("some_msub", "submits", "some_run")
+        expected_kwargs = {"subject_id": "some_msub",
+                           "object_id": "some_run",
+                           "predicate": "submits"}
         actual_result = self.datastore.relationships.delete(*args)
         self.assertIs(actual_result, None)
         self.relationship_dao.delete.assert_called_with(**expected_kwargs)
-        args = ("subject_id",)
-        expected_kwargs = {"subject_id": "subject_id",
+        args = ("some_msub",)
+        expected_kwargs = {"subject_id": "some_msub",
                            "object_id": None,
                            "predicate": None}
         actual_result = self.datastore.relationships.delete(*args)
