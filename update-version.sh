@@ -4,7 +4,7 @@ set -e
 
 MAJOR=1
 MINOR=9
-PATCH=3
+PATCH=4
 FULL=${MAJOR}.${MINOR}.${PATCH}
 
 # For compatibility between OSX and Unix, we need to set a backup file and then delete it
