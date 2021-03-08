@@ -342,7 +342,6 @@ class RecordDAO(dao.RecordDAO):
         for curveset_name, curveset_obj in curve_sets.items():
             create_meta(name=curveset_name, id=id, tags=curveset_obj.get("tags"))
         for entry_name, entry_obj in six.iteritems(resolved_curves):
-            print(entry_name, entry_obj)
             schema.cross_populate_query_tables(id=id,
                                                name=entry_name,
                                                value=entry_obj['value'],
@@ -1167,32 +1166,23 @@ class RelationshipDAO(dao.RelationshipDAO):
                                                          rel.subject_id))
             # Our dictionaries are populated and ready for batch insertion
             for obj, insert_info in six.iteritems(from_object_batch):
-                # Only having one entry is a common use case. Skip the overhead!
-                if len(insert_info) == 1:
-                    schema.cross_populate_object_and_subject(subject_id=insert_info[0][1],
-                                                             object_id=obj,
-                                                             predicate=insert_info[0][0])
-                else:
-                    with BatchQuery() as batch_query:
-                        for entry in insert_info:
-                            (schema.SubjectFromObject
-                             .batch(batch_query).create(obj=obj,
-                                                        predicate=entry[0],
-                                                        subject_id=entry[1]))
+                with BatchQuery() as batch_query:
+                    for entry in insert_info:
+                        (schema.SubjectFromObject
+                         .batch(batch_query).create(object_id=obj,
+                                                    predicate=entry[0],
+                                                    subject_id=entry[1]))
             for subj, insert_info in six.iteritems(from_subject_batch):
-                # We already handled this use case with the cross_populate above
-                if len(insert_info) == 1:
-                    pass
-                else:
-                    with BatchQuery() as batch_query:
-                        for entry in insert_info:
-                            (schema.ObjectFromSubject
-                             .batch(batch_query).create(subject_id=subj,
-                                                        predicate=entry[0],
-                                                        object_id=entry[1]))
+                with BatchQuery() as batch_query:
+                    for entry in insert_info:
+                        (schema.ObjectFromSubject
+                         .batch(batch_query).create(subject_id=subj,
+                                                    predicate=entry[0],
+                                                    object_id=entry[1]))
 
-    def get(self, subject_id=None, object_id=None, predicate=None):
-        """Retrieve relationships fitting some criteria."""
+    @staticmethod
+    def _get_relationships_from_criteria(subject_id=None, object_id=None, predicate=None):
+        """Create a query to find relationships fitting some criteria."""
         LOGGER.debug('Getting relationships with subject_id=%s, '
                      'predicate=%s, object_id=%s.',
                      subject_id, predicate, object_id)
@@ -1226,8 +1216,31 @@ class RelationshipDAO(dao.RelationshipDAO):
 
         if need_filtering:
             query = query.allow_filtering()
+        return query
 
+    def get(self, subject_id=None, object_id=None, predicate=None):
+        """Retrieve relationships fitting some criteria."""
+        query = self._get_relationships_from_criteria(subject_id, object_id, predicate)
         return self._build_relationships(query.all())
+
+    def _do_delete(self, subject_id=None, object_id=None, predicate=None):
+        """
+        Given one or more criteria, delete all matching Relationships from the DAO's backend.
+
+        This does not affect records, data, etc. Only Relationships.
+
+        :raise ValueError: if no criteria are specified.
+        """
+        affected_rels = self._get_relationships_from_criteria(subject_id,
+                                                              object_id,
+                                                              predicate).all()
+        tables = [schema.ObjectFromSubject, schema.SubjectFromObject]
+        with BatchQuery() as batch:
+            for affected_rel in affected_rels:
+                for table in tables:
+                    table.objects(subject_id=affected_rel.subject_id,
+                                  object_id=affected_rel.object_id,
+                                  predicate=affected_rel.predicate).batch(batch).delete()
 
 
 class DAOFactory(dao.DAOFactory):

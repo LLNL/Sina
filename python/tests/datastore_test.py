@@ -231,6 +231,26 @@ class DatastoreTests(unittest.TestCase):
         self.assertIs(actual_result, expected_result)
         self.relationship_dao.get.assert_called_with(**expected_kwargs)
 
+    def test_delete(self):
+        """Test the RelationshipOperation delete()."""
+        # We need to test that args are properly kwarg'd to reorder
+        # Same reorder that happens for .get() but no return value
+        self.relationship_dao.delete = Mock(return_value=None)
+        args = ("some_msub", "submits", "some_run")
+        expected_kwargs = {"subject_id": "some_msub",
+                           "object_id": "some_run",
+                           "predicate": "submits"}
+        actual_result = self.datastore.relationships.delete(*args)
+        self.assertIs(actual_result, None)
+        self.relationship_dao.delete.assert_called_with(**expected_kwargs)
+        args = ("some_msub",)
+        expected_kwargs = {"subject_id": "some_msub",
+                           "object_id": None,
+                           "predicate": None}
+        actual_result = self.datastore.relationships.delete(*args)
+        self.assertIs(actual_result, None)
+        self.relationship_dao.delete.assert_called_with(**expected_kwargs)
+
     def test_insert_relationship(self):
         """Test the RelationshipOperation insert()."""
         self.assert_relationship_method_is_passthrough("insert", "insert",

@@ -358,7 +358,13 @@ class DataStore(object):
             self.relationship_dao = connection.create_relationship_dao()
 
         def find(self, subject_id=None, predicate=None, object_id=None):
-            """Return all relationships that fulfill one or more criteria."""
+            """
+            Return all relationships that fulfill one or more criteria.
+
+            Note that the arg order here was "naturalized" to be in the order that people
+            would read this in an English sentence ("Carmen helps Danny"); this differs
+            from the older dao equivalent (get()).
+            """
             return self.relationship_dao.get(subject_id=subject_id,
                                              predicate=predicate,
                                              object_id=object_id)
@@ -370,3 +376,20 @@ class DataStore(object):
             :param relationships_to_insert: Relationships to insert
             """
             self.relationship_dao.insert(relationships_to_insert)
+
+        def delete(self, subject_id=None, predicate=None, object_id=None):
+            """
+            Given one or more criteria, delete all matching Relationships from the DAO's backend.
+
+            This does not affect records, data, etc. Only Relationships.
+
+            Note that the arg order here was "naturalized" to be in the order that people
+            would read this in an English sentence ("Carmen helps Danny"), same as
+            find(); this differs from the dao delete()'s order, which matches the
+            older dao.get().
+
+            :raise ValueError: if no criteria are specified.
+            """
+            self.relationship_dao.delete(subject_id=subject_id,
+                                         predicate=predicate,
+                                         object_id=object_id)

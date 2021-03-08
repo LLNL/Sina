@@ -470,6 +470,26 @@ class RelationshipDAO(object):
         """
         raise NotImplementedError
 
+    def delete(self, subject_id=None, object_id=None, predicate=None):
+        """
+        Given one or more criteria, delete all matching Relationships from the DAO's backend.
+
+        This does not affect records, data, etc. Only Relationships.
+
+        :raise ValueError: if no criteria are specified.
+        """
+        LOGGER.debug('Deleting relationships with subject_id=%s, '
+                     'predicate=%s, object_id=%s.',
+                     subject_id, predicate, object_id)
+        if subject_id is None and object_id is None and predicate is None:
+            raise ValueError("Must specify at least one of subject_id, object_id, or predicate")
+        self._do_delete(subject_id, object_id, predicate)
+
+    @abstractmethod
+    def _do_delete(self, subject_id=None, object_id=None, predicate=None):
+        """Handle the actual deletion process."""
+        raise NotImplementedError
+
 
 class DAOFactory(object):
     """Builds DAOs used for interacting with Sina data objects."""
