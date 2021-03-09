@@ -1,7 +1,7 @@
 """Logic for handling inserting, extracting, and transforming data between backends."""
 
 # Note that the C++ spack package builder references this version string
-__VERSION__ = "1.9.3"
+__VERSION__ = "1.9.4"
 
 
 def get_version():

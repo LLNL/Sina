@@ -5,6 +5,14 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.9.4
+=====
+- Fixed parsing of scalar names with slashes in C++
+- Added Relationship deletion function
+- Fixed a bug involving dropped inserts when mass-inserting Relationships in Cassandra
+- Added integration tests for C++ and Python
+- Made version number readable through C++
+
 1.9.3
 =====
 - Fixed a bug which prevented parsing of large json blocks from the database
