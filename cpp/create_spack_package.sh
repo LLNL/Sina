@@ -11,7 +11,7 @@ version=${version%?}
 
 # Assemble names
 versioned_dir=sina-cpp-"${version}"
-versioned_tar=${versioned_dir}.tgz
+versioned_tar=${versioned_dir}.tar.gz
 
 set -e
 mkdir ${versioned_dir}
@@ -21,6 +21,7 @@ ln -s ../CMakeLists.txt .
 ln -s ../README.md .
 ln -s ../blt .
 ln -s ../src .
+ln -s ../config .
 ln -s ../include .
 ln -s ../test .
 cd ..
