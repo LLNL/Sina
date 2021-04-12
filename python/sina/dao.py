@@ -107,6 +107,26 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def update(self, records):
+        """
+        Given one or more Records, update them in the backend.
+
+        :param records: A Record or iterable of Records to update.
+        """
+        if isinstance(records, sina.model.Record):
+            LOGGER.debug('Updating record with id=%s', records.id)
+            ids = [records.id]
+            records = [records]
+        else:
+            ids = [record.id for record in records]
+            LOGGER.debug('Updating records with ids=%s', ids)
+        if not all(self.exist(ids)):
+            raise ValueError("Can't update a record that hasn't been inserted!")
+        # A thought: these include their own commit()ing. Would we want a
+        # "safer" update to try updating and deleting in a single transaction?
+        self.delete(ids)
+        self.insert(records)
+
     @abstractmethod
     def insert(self, records):
         """
