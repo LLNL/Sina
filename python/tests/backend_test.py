@@ -166,7 +166,12 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.factory.close()
 
     def _assert_records_equal(self, rec_1, rec_2):
-        """Test for a limited version of the question "are these two records equal?"."""
+        """
+        Test for a limited version of the question "are these two records equal?".
+
+        ID, type, data, files, and user_defined are independently checked for
+        exact equality. Not suitable for use with doubles math.
+        """
         # Done instead of __dict__ to make it clearer what part fails (if any)
         self.assertEqual(rec_1.id, rec_2.id)
         self.assertEqual(rec_1.type, rec_2.type)
@@ -369,7 +374,7 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         rec.type = "tofeggs"
         rec2.data["source"]["tags"] = ["applewood smoked"]
         rec3.files["image/of/toast.png"] = {}
-        record_dao.update([rec, rec2, rec3])
+        record_dao.update(rec for rec in [rec, rec2, rec3])  # test against generator
         upd_rec, upd_rec2, upd_rec3 = list(record_dao.get(["spam", "spam2", "spam3"]))
         self._assert_records_equal(upd_rec, rec)
         self._assert_records_equal(upd_rec2, rec2)

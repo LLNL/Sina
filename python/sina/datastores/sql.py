@@ -40,18 +40,22 @@ class RecordDAO(dao.RecordDAO):
         """Initialize RecordDAO with session for its SQL database."""
         self.session = session
 
-    def insert(self, records):
-        """
-        Given a(n iterable of) Record(s), insert into the current SQL database.
-
-        :param records: Record or iterable of Records to insert
-        """
+    def _insert_no_commit(self, records):
+        """Insert without committing; for shared functionality."""
         if isinstance(records, model.Record):
             records = [records]
         for record in records:
             LOGGER.debug('Inserting record %s into SQL.', record.id or record.local_id)
             sql_record = self.create_sql_record(record)
             self.session.add(sql_record)
+
+    def insert(self, records):
+        """
+        Given a(n iterable of) Record(s), insert into the current SQL database.
+
+        :param records: Record or iterable of Records to insert
+        """
+        self._insert_no_commit(records)
         self.session.commit()
 
     @staticmethod
@@ -167,6 +171,15 @@ class RecordDAO(dao.RecordDAO):
                                                     mimetype=file_info.get('mimetype'),
                                                     tags=tags))
 
+    def _delete_no_commit(self, ids):
+        """Delete without committing; for shared functionality."""
+        if isinstance(ids, six.string_types):
+            ids = [ids]
+        LOGGER.debug('Deleting records with ids in: %s', ids)
+        (self.session.query(schema.Record)
+         .filter(schema.Record.id.in_(ids))
+         .delete(synchronize_session='fetch'))
+
     def delete(self, ids):
         """
         Given a(n iterable of) Record id(s), delete all mention from the SQL database.
@@ -178,12 +191,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param ids: The id or iterable of ids of the Record(s) to delete.
         """
-        if isinstance(ids, six.string_types):
-            ids = [ids]
-        LOGGER.debug('Deleting records with ids in: %s', ids)
-        (self.session.query(schema.Record)
-         .filter(schema.Record.id.in_(ids))
-         .delete(synchronize_session='fetch'))
+        self._delete_no_commit(ids)
         self.session.commit()
 
     def get_raw(self, id_):
@@ -194,6 +202,16 @@ class RecordDAO(dao.RecordDAO):
             raise ValueError("No Record found with id %s" % id_)
 
         return _to_json_string(result.raw)
+
+    def _do_update(self, records):
+        """
+        Given a list of Records, update them in the backend in a single transaction.
+
+        :param records: A list of Records to update.
+        """
+        self._delete_no_commit(record.id for record in records)
+        self._insert_no_commit(records)
+        self.session.commit()
 
     def data_query(self, **kwargs):
         """

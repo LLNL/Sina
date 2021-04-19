@@ -118,14 +118,17 @@ class RecordDAO(object):
             ids = [records.id]
             records = [records]
         else:
+            records = list(records)  # In case it's a generator
             ids = [record.id for record in records]
             LOGGER.debug('Updating records with ids=%s', ids)
         if not all(self.exist(ids)):
             raise ValueError("Can't update a record that hasn't been inserted!")
-        # A thought: these include their own commit()ing. Would we want a
-        # "safer" update to try updating and deleting in a single transaction?
-        self.delete(ids)
-        self.insert(records)
+        self._do_update(records)
+
+    @abstractmethod
+    def _do_update(self, records):
+        """Handle the logic of the upate itself."""
+        raise NotImplementedError
 
     @abstractmethod
     def insert(self, records):
