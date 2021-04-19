@@ -107,6 +107,29 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def update(self, records):
+        """
+        Given one or more Records, update them in the backend.
+
+        :param records: A Record or iterable of Records to update.
+        """
+        if isinstance(records, sina.model.Record):
+            LOGGER.debug('Updating record with id=%s', records.id)
+            ids = [records.id]
+            records = [records]
+        else:
+            records = list(records)  # In case it's a generator
+            ids = [record.id for record in records]
+            LOGGER.debug('Updating records with ids=%s', ids)
+        if not all(self.exist(ids)):
+            raise ValueError("Can't update a record that hasn't been inserted!")
+        self._do_update(records)
+
+    @abstractmethod
+    def _do_update(self, records):
+        """Handle the logic of the upate itself."""
+        raise NotImplementedError
+
     @abstractmethod
     def insert(self, records):
         """

@@ -444,6 +444,15 @@ class RecordDAO(dao.RecordDAO):
         except DoesNotExist:  # Raise a more familiar, descriptive error.
             raise ValueError("No Record found with id {}".format(id_))
 
+    def _do_update(self, records):
+        """
+        Given a list of Records, update them in the backend.
+
+        :param records: A list of Records to update.
+        """
+        self.delete(record.id for record in records)
+        self.insert(records)
+
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
