@@ -5,6 +5,14 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.9.5
+=====
+- Fixed a bug in add() methods
+- Set version of importlib_metadata for compatibility with python2
+- Improve docs and test for update() routine
+- Add a basic QoL method for updating Records
+- Make deployed tarball contain config folder and deploy to cpp_releases
+
 1.9.4
 =====
 - Fixed parsing of scalar names with slashes in C++
