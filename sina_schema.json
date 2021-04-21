@@ -204,19 +204,19 @@
             "description": "User-defined associations of curves",
             "type": "object",
             "properties": {
-                "independents": {
+                "independent": {
                     "type": "object",
                     "additionalProperties": { "$ref": "#/definitions/curveEntryType" }
                 },
-                "dependents": {
+                "dependent": {
                     "type": "object",
                     "additionalProperties": { "$ref": "#/definitions/curveEntryType" }
                 },
-                "dependents_order": { "$ref": "#/definitions/stringDataArray"},
-                "independents_order": { "$ref": "#/definitions/stringDataArray"},
+                "dependent_order": { "$ref": "#/definitions/stringDataArray"},
+                "independent_order": { "$ref": "#/definitions/stringDataArray"},
                 "tags": { "$ref": "#/definitions/tagArray" }
             },
-            "required" :  [ "independents", "dependents" ]
+            "required" :  [ "independent", "dependent" ]
         },
         "curveEntryType" : {
             "description": "Data for a single entry in a curve set",

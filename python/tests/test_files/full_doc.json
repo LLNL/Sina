@@ -39,9 +39,9 @@
 						},
 						"curve_sets": {
 							"my_nested_curve_set": {
-								"independents": {"time": {"value": [1, 2, 3]}},
-								"dependents": {"distance": {"value": [5, 10, 25],
-																					  "tags": ["output"]}}
+								"independent": {"time": {"value": [1, 2, 3]}},
+								"dependent": {"distance": {"value": [5, 10, 25],
+            	                                                                            "tags": ["output"]}}
 							}
 						}
 					}
