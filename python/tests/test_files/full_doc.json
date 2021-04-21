@@ -26,6 +26,28 @@
 		}],
 		"application": "fake",
 		"version": "Unknown",
+		"library_data": {
+			"my_toplevel_lib": {
+				"data": {
+					"scalar_40": {"value": 42}
+				},
+				"library_data": {
+					"my_nested_lib": {
+						"data": {
+							"scalar_1": {"value": 99.9,
+												   "units": "F"}
+						},
+						"curve_sets": {
+							"my_nested_curve_set": {
+								"independents": {"time": {"value": [1, 2, 3]}},
+								"dependents": {"distance": {"value": [5, 10, 25],
+																					  "tags": ["output"]}}
+							}
+						}
+					}
+				}
+			}
+		},
 		"data": {
 			"scalar_1": {
 				"value": 387.6,

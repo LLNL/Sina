@@ -9,6 +9,20 @@
           "description": "Dictionary of additional misc. values not belonging elsewhere.",
           "type": "object"
         },
+        "libraryDataDict" : {
+            "description": "Dictionary of libraries and associated data",
+            "type": "object",
+            "additionalProperties": {"$ref": "#/definitions/libraryType" }
+        },
+        "libraryType" : {
+            "description": "Library with associated data",
+            "type": "object",
+            "properties": {
+              "data": {"$ref": "#/definitions/dataDict" },
+              "curve_sets": {"$ref": "#/definitions/curveSetDict" },
+              "library_data": {"$ref": "#/definitions/libraryDataDict" }
+            }
+        },
         "fileDict" : {
             "description": "Dictionary of files associated with Record",
             "type": "object",
@@ -67,6 +81,7 @@
             "properties": {
                 "files": { "$ref": "#/definitions/fileDict" },
                 "data": { "$ref": "#/definitions/dataDict" },
+                "library_data": { "$ref": "#/definitions/libraryDataDict" },
                 "curve_sets": { "$ref": "#/definitions/curveSetDict" },
                 "user_defined": { "$ref": "#/definitions/userDefDict"}
             }
