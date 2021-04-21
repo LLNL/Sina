@@ -35,13 +35,13 @@
 					"my_nested_lib": {
 						"data": {
 							"scalar_1": {"value": 99.9,
-												   "units": "F"}
+								     "units": "F"}
 						},
 						"curve_sets": {
 							"my_nested_curve_set": {
 								"independent": {"time": {"value": [1, 2, 3]}},
 								"dependent": {"distance": {"value": [5, 10, 25],
-            	                                                                            "tags": ["output"]}}
+                                                                                           "tags": ["output"]}}
 							}
 						}
 					}
