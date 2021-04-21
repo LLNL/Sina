@@ -7,7 +7,7 @@ https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
 1.9.5
 =====
-- Fixed a bug in add() methods
+- Fixed a bug in C++ add() methods
 - Set version of importlib_metadata for compatibility with python2
 - Improve docs and test for update() routine
 - Add a basic QoL method for updating Records
