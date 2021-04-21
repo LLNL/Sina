@@ -17,6 +17,7 @@ using ::testing::ElementsAre;
 using ::testing::Key;
 using ::testing::HasSubstr;
 using ::testing::DoubleEq;
+using ::testing::Not;
 
 char const EXPECTED_TYPE_KEY[] = "type";
 char const EXPECTED_LOCAL_ID_KEY[] = "local_id";
@@ -36,6 +37,55 @@ TEST(Record, create_typeMissing) {
     }
 }
 
+TEST(Record, add_data_existing_key) {
+    Record record{ID{"the id", IDType::Local}, "test_record"};
+    record.add("key1", Datum{"val1"});
+    EXPECT_EQ("val1", record.getData().at("key1").getValue());
+    record.add("key1", Datum{"val2"});
+    EXPECT_EQ("val2", record.getData().at("key1").getValue());
+}
+
+TEST(Record, add_curve_set_existing_key) {
+    Record record{ID{"the id", IDType::Local}, "test_record"};
+
+    CurveSet cs1{"cs1"};
+    cs1.addDependentCurve(Curve{"original", {1, 2, 3}});
+    record.add(cs1);
+
+    auto &csAfterFirstInsert = record.getCurveSets();
+    ASSERT_THAT(csAfterFirstInsert, Contains(Key("cs1")));
+    EXPECT_THAT(csAfterFirstInsert.at("cs1").getDependentCurves(),
+                Contains(Key("original")));
+    
+    CurveSet cs2{"cs1"};
+    cs2.addDependentCurve(Curve{"new", {1, 2, 3}});
+    record.add(cs2);
+
+    auto &csAfterSecondInsert = record.getCurveSets();
+    ASSERT_THAT(csAfterSecondInsert, Contains(Key("cs1")));
+    EXPECT_THAT(csAfterSecondInsert.at("cs1").getDependentCurves(),
+                Not(Contains(Key("original"))));
+    EXPECT_THAT(csAfterSecondInsert.at("cs1").getDependentCurves(),
+                Contains(Key("new")));
+}
+
+TEST(Record, add_file_existing_key) {
+    Record record{ID{"the id", IDType::Local}, "test_record"};
+    std::string path = "the/path.txt";
+
+    File original{path};
+    original.setMimeType("txt");
+    record.add(original);
+    EXPECT_EQ(1u, record.getFiles().size());
+    EXPECT_EQ("txt", record.getFiles().find(File{path})->getMimeType());
+
+    File replacement{path};
+    replacement.setMimeType("image");
+    record.add(replacement);
+    EXPECT_EQ(1u, record.getFiles().size());
+    EXPECT_EQ("image", record.getFiles().find(File{path})->getMimeType());
+}
+
 TEST(Record, create_localId_fromNode) {
     conduit::Node originalNode;
     originalNode[EXPECTED_LOCAL_ID_KEY] = "the ID";
@@ -44,7 +94,7 @@ TEST(Record, create_localId_fromNode) {
     EXPECT_EQ("my type", record.getType());
     EXPECT_EQ("the ID", record.getId().getId());
     EXPECT_EQ(IDType::Local, record.getId().getType());
-  }
+}
 
 TEST(Record, create_globalId_fromNode) {
     conduit::Node originalNode;
