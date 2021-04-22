@@ -25,6 +25,7 @@ DOC_DIR=`realpath $2`/
 EXAMPLE_LINK=`realpath --no-symlinks $3`
 PERM_GROUP=${SINA_PERM_GROUP:-llnl_emp}
 CPP_DOCS=$DOC_DIR/sina/cpp
+CPP_DEPLOY_DIR=$DEPLOY_DIR../cpp-releases
 
 if [ ! -d cpp/build/docs/html ]; then
     echo "You must have run the C++ tests and built the docs"
@@ -42,7 +43,7 @@ CREATED_TAR=$(sh create_spack_package.sh)
 chown :$PERM_GROUP $CREATED_TAR
 chmod 640 $CREATED_TAR
 
-mv $CREATED_TAR $DEPLOY_DIR
+mv $CREATED_TAR $CPP_DEPLOY_DIR
 rm -rf $CPP_DOCS
 mkdir -p $CPP_DOCS
 mv build/docs/html/* $CPP_DOCS

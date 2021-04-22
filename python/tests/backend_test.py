@@ -138,7 +138,7 @@ def remove_file(filename):
         pass
 
 
-class TestModify(unittest.TestCase):
+class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """
     Unit tests that modify the database.
 
@@ -165,6 +165,20 @@ class TestModify(unittest.TestCase):
     def tearDown(self):
         self.factory.close()
 
+    def _assert_records_equal(self, rec_1, rec_2):
+        """
+        Test for a limited version of the question "are these two records equal?".
+
+        ID, type, data, files, and user_defined are independently checked for
+        exact equality. Not suitable for use with doubles math.
+        """
+        # Done instead of __dict__ to make it clearer what part fails (if any)
+        self.assertEqual(rec_1.id, rec_2.id)
+        self.assertEqual(rec_1.type, rec_2.type)
+        self.assertEqual(rec_1.data, rec_2.data)
+        self.assertEqual(rec_1.files, rec_2.files)
+        self.assertEqual(rec_1.user_defined, rec_2.user_defined)
+
     def test_recorddao_insert_retrieve(self):
         """Test that RecordDAO is inserting and getting correctly."""
         record_dao = self.factory.create_record_dao()
@@ -175,13 +189,7 @@ class TestModify(unittest.TestCase):
                      user_defined={})
         record_dao.insert(rec)
         returned_record = record_dao.get("spam")
-        # Test one definition of Record equivalence.
-        # Done instead of __dict__ to make it clearer what part fails (if any)
-        self.assertEqual(returned_record.id, rec.id)
-        self.assertEqual(returned_record.type, rec.type)
-        self.assertEqual(returned_record.data, rec.data)
-        self.assertEqual(returned_record.files, rec.files)
-        self.assertEqual(returned_record.user_defined, rec.user_defined)
+        self._assert_records_equal(returned_record, rec)
 
     def test_recorddao_insert_many(self):
         """Test that RecordDAO is inserting a generator of several Records correctly."""
@@ -330,6 +338,47 @@ class TestModify(unittest.TestCase):
         self.assertFalse(relationship_dao.get(object_id="rec_2"))
         self.assertFalse(relationship_dao.get(subject_id="rec_3"))
         self.assertEqual(len(relationship_dao.get(object_id="rec_4")), 1)
+
+    def test_recorddao_update_one(self):
+        """Test that RecordDAO is updating correctly."""
+        record_dao = self.factory.create_record_dao()
+        rec = Record(id="spam", type="eggs",
+                     data={"eggs": {"value": 12, "units": None, "tags": ["runny"]},
+                           "recipes": {"value": 5}},
+                     files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
+                     user_defined={})
+        record_dao.insert(rec)
+        returned_record = record_dao.get("spam")
+        self.assertEqual(returned_record.data, rec.data)
+        rec["data"]["eggs"]["value"] = 144
+        rec["type"] = "gross_eggs"
+        record_dao.update(rec)
+        updated_record = record_dao.get("spam")
+        self.assertEqual(returned_record.id, updated_record.id)
+        self.assertEqual(returned_record.files, updated_record.files)
+        self.assertEqual(returned_record.user_defined, updated_record.user_defined)
+        self.assertEqual(returned_record.data["recipes"]["value"],
+                         updated_record.data["recipes"]["value"])
+        self.assertNotEqual(returned_record.type, updated_record.type)
+        self.assertNotEqual(returned_record.data["eggs"]["value"],
+                            updated_record.data["eggs"]["value"])
+        self._assert_records_equal(updated_record, rec)
+
+    def test_recorddao_update_many(self):
+        """Test that RecordDAO is updating multiple Records at once correctly."""
+        record_dao = self.factory.create_record_dao()
+        rec = Record(id="spam", type="eggs", data={"count": {"value": 12}})
+        rec2 = Record(id="spam2", type="bacon", data={"source": {"value": "pig"}})
+        rec3 = Record(id="spam3", type="toast", data={"doneness": {"value": "very"}})
+        record_dao.insert([rec, rec2, rec3])
+        rec.type = "tofeggs"
+        rec2.data["source"]["tags"] = ["applewood smoked"]
+        rec3.files["image/of/toast.png"] = {}
+        record_dao.update(rec for rec in [rec, rec2, rec3])  # test against generator
+        upd_rec, upd_rec2, upd_rec3 = list(record_dao.get(["spam", "spam2", "spam3"]))
+        self._assert_records_equal(upd_rec, rec)
+        self._assert_records_equal(upd_rec2, rec2)
+        self._assert_records_equal(upd_rec3, rec3)
 
     def test_recorddao_get_raw(self):
         """Verify we can get the raw JSON. This is useful for bad data"""

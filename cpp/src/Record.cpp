@@ -102,15 +102,29 @@ Record::Record(conduit::Node const &asNode) :
 }
 
 void Record::add(std::string name, Datum datum) {
-    data.emplace(std::make_pair(name, datum));
+    auto existing = data.find(name);
+    if (existing == data.end()) {
+        data.emplace(std::make_pair(name, datum));
+    } else {
+        existing->second = datum;
+    }
 }
 
 void Record::add(File file) {
+    auto existing = files.find(file);
+    if (existing != files.end()) {
+        files.erase(existing);
+    }
     files.insert(std::move(file));
 }
 void Record::add(CurveSet curveSet) {
-    std::string name = curveSet.getName();
-    curveSets.emplace(std::move(name), std::move(curveSet));
+    auto name = curveSet.getName();
+    auto existing = curveSets.find(name);
+    if (existing == curveSets.end()) {
+        curveSets.emplace(name, std::move(curveSet));
+    } else {
+        existing->second = std::move(curveSet);
+    }
 }
 
 void Record::setUserDefinedContent(conduit::Node userDefined_) {
