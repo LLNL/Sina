@@ -77,10 +77,10 @@ A more fleshed-out example, with field descriptions:
           // Each set of curves needs a name
           "timeplot_1": {
               // Each set has independent(s) and dependent(s)
-              "independents": {
+              "independent": {
                   // Individual curves take the same format as lists of scalars in "data"
                   "time": {"value": [0, 1, 2]}},
-              "dependents": {
+              "dependent": {
                   "mass": {"value": [12, 11, 8], "tags": ["physics"]},
                   "volume": {"value": [10, 14, 22.2], "units": "m^3"}}
           }
