@@ -38,6 +38,7 @@ bool operator==(Curve const &lhs, Curve const &rhs) {
 namespace testing { namespace {
 
 using ::testing::ContainerEq;
+using ::testing::ElementsAre;
 
 TEST(CurveSet, initialState) {
     CurveSet const cs{"theName"};
@@ -62,6 +63,20 @@ TEST(CurveSet, addIndependentCurves) {
     EXPECT_THAT(cs.getIndependentCurves(), ContainerEq(expectedCurves));
 }
 
+TEST(CurveSet, addIndependentCurves_replaceExisting) {
+    CurveSet cs{"testSet"};
+
+    Curve i1{"theName", {1, 2, 3}};
+    cs.addIndependentCurve(i1);
+    EXPECT_THAT(cs.getIndependentCurves().at("theName").getValues(),
+                ElementsAre(1, 2, 3));
+
+    Curve i2{"theName", {4, 5, 6}};
+    cs.addIndependentCurve(i2);
+    EXPECT_THAT(cs.getIndependentCurves().at("theName").getValues(),
+                ElementsAre(4, 5, 6));
+}
+
 TEST(CurveSet, addDpendentCurves) {
     CurveSet cs{"testSet"};
     std::unordered_map<std::string, Curve> expectedCurves;
@@ -75,6 +90,20 @@ TEST(CurveSet, addDpendentCurves) {
     cs.addDependentCurve(i2);
     expectedCurves.insert(std::make_pair(i2.getName(), i2));
     EXPECT_THAT(cs.getDependentCurves(), ContainerEq(expectedCurves));
+}
+
+TEST(CurveSet, addDependentCurves_replaceExisting) {
+    CurveSet cs{"testSet"};
+
+    Curve d1{"theName", {1, 2, 3}};
+    cs.addDependentCurve(d1);
+    EXPECT_THAT(cs.getDependentCurves().at("theName").getValues(),
+                ElementsAre(1, 2, 3));
+
+    Curve d2{"theName", {4, 5, 6}};
+    cs.addDependentCurve(d2);
+    EXPECT_THAT(cs.getDependentCurves().at("theName").getValues(),
+                ElementsAre(4, 5, 6));
 }
 
 TEST(CurveSet, createFromNode_empty) {

@@ -18,8 +18,13 @@ constexpr auto DEPENDENT_KEY = "dependent";
  * @param curves the CurveMap to which to add the curve
  */
 void addCurve(Curve &&curve, CurveSet::CurveMap &curves) {
-    std::string curveName = curve.getName();
-    curves.insert(std::make_pair(std::move(curveName), curve));
+    auto &curveName = curve.getName();
+    auto existing = curves.find(curveName);
+    if (existing == curves.end()) {
+        curves.insert(std::make_pair(curveName, curve));
+    } else {
+        existing->second = curve;
+    }
 }
 
 /**
