@@ -315,7 +315,6 @@ class TestModel(unittest.TestCase):
 
     def test_flatten_library_content_raw(self):
         """Ensure that library flattening does not affect the raw."""
-<<<<<<< HEAD
         flat_rec = model.flatten_library_content(self.libdata_rec)
         string_raw = json.dumps(flat_rec.raw)
         self.assertIn('"runtime": {"value": 87', string_raw)
@@ -324,8 +323,6 @@ class TestModel(unittest.TestCase):
         self.assertNotIn('"outer_lib/runtime"', string_raw)
         self.assertNotIn('"inner_lib/runtime"', string_raw)
         self.assertNotIn('"outer_lib/inner_lib/distance"', string_raw)
-=======
->>>>>>> 82714a49fb9fe2bbdd1d3bdca7d6788697b967f0
 
     def test_generate_json(self):
         """Ensure JSON is generating properly."""
