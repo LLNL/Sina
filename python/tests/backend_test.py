@@ -411,6 +411,7 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
                 }
             },
             'curve_sets': {},
+            'library_data': {},
             'user_defined': {}
         })
 

@@ -3,6 +3,7 @@ from __future__ import print_function
 import logging
 import collections
 import numbers
+import copy
 
 import six
 
@@ -35,7 +36,7 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
 
     # Disable the pylint check if and until the team decides to refactor the code
     def __init__(self, id, type, data=None,  # pylint: disable=too-many-arguments
-                 curve_sets=None, files=None, user_defined=None):
+                 curve_sets=None, library_data=None, files=None, user_defined=None):
         """
         Create Record with its id, type, and optional args.
 
@@ -49,6 +50,7 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
                             children, see sina.model.RESERVED_TYPES
         :param data: A dict of dicts representing the Record's data.
         :param curve_sets: A dict of dicts representing the Record's curve sets.
+        :param library_data: A dict of dicts representing the Record's library data.
         :param files: A list of dicts representing the Record's files
         :param user_defined: A dictionary of additional miscellaneous data to
                              store, such as notes. The backend will not index on this.
@@ -59,6 +61,7 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         self.type = type
         self.data = data if data else {}
         self.curve_sets = curve_sets if curve_sets else {}
+        self.library_data = library_data if library_data else {}
         self.files = files if files else {}
         self.user_defined = user_defined if user_defined else {}
 
@@ -103,6 +106,15 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         won't trigger it.
         """
         self['curve_sets'] = curve_sets
+
+    @property
+    def library_data(self):
+        """Get or set the Record's data dictionary."""
+        return self['library_data']
+
+    @library_data.setter
+    def library_data(self, library_data):
+        self['library_data'] = library_data
 
     @property
     def files(self):
@@ -239,6 +251,74 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         """
         return json.dumps(self.raw)
 
+    def library_data_is_valid(self, library_data, prefix=""):
+        """
+        Test whether library data is valid.
+
+        Library data can be nested, and is thus tested recursively.
+        """
+        warnings = []
+        if not isinstance(library_data, dict):
+            (warnings.append("Record {}'s {}library_data field must be a dictionary!"
+                             .format(self.id, prefix)))
+        else:
+            for library_name, library in library_data.items():
+                prefix = prefix + library_name + "/"
+                if library.get("data"):
+                    warnings += self.data_is_valid(library["data"], prefix)
+                # There's no special validation on curve sets, presumably because we
+                # don't object to name collision between curve sets and data.
+                if library.get("library_data"):
+                    warnings += self.library_data_is_valid(library["library_data"], prefix)
+        return warnings
+
+    def data_is_valid(self, data, prefix=""):
+        """
+        Test whether data is valid.
+
+        Data blocks exist potentially in the record and any libraries.
+        """
+        warnings = []
+        if not isinstance(data, dict):
+            (warnings.append("Record {}'s {}data field must be a dictionary!"
+                             .format(self.id, prefix)))
+        else:
+            for entry in data:
+                # Check data entry is a dictionary
+                if not isinstance(data[entry], dict):
+                    (warnings.append("At least one {}data entry belonging to "
+                                     "Record {} is not a dictionary. "
+                                     "Value: {}".format(prefix, self.id, entry)))
+                    break
+                if "value" not in data[entry]:
+                    (warnings.append("At least one {}data entry belonging "
+                                     "to Record {} is missing a value. "
+                                     "Value: {}".format(prefix, self.id, entry)))
+                    break
+                if isinstance(data[entry]['value'], list):
+                    try:
+                        (validated_list,
+                         scalar_index,
+                         string_index) = _is_valid_list(
+                             list_of_data=data[entry]["value"])
+                    except ValueError as context:
+                        warnings.append(str(context))
+                        break
+                    if not validated_list:
+                        (warnings.append(
+                            "A {}data entry may not have a list of different types. "
+                            "They must all be scalars or all strings. Check "
+                            "indicies: {}, {}".format(prefix, scalar_index, string_index)))
+                        break
+                if (data[entry].get("tags") and
+                        (isinstance(data[entry].get("tags"), six.string_types)
+                         or not isinstance(data[entry].get("tags"),
+                                           collections.Sequence))):
+                    (warnings.append("At least one {}data value entry belonging "
+                                     "to Record {} has a malformed tag "
+                                     "list. Value: {}".format(prefix, self.id, entry)))
+        return warnings
+
     # Disable the pylint check if and until the team decides to refactor the code
     def is_valid(self, print_warnings=None):  # pylint: disable=too-many-branches
         """Test whether a Record's members are formatted correctly.
@@ -275,46 +355,13 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
                 (warnings.append("At least one file entry belonging to "
                                  "Record {} has a malformed tag list. File: {}"
                                  .format(self.id, file_info)))
+        # Test data
+        warnings += self.data_is_valid(self.data)
 
-        if not isinstance(self.data, dict):
-            (warnings.append("Record {}'s data field must be a dictionary!"
-                             .format(self.id)))
-        else:
-            for entry in self.data:
-                # Check data entry is a dictionary
-                if not isinstance(self.data[entry], dict):
-                    (warnings.append("At least one data entry belonging to "
-                                     "Record {} is not a dictionary. "
-                                     "Value: {}".format(self.id, entry)))
-                    break
-                if "value" not in self.data[entry]:
-                    (warnings.append("At least one data entry belonging "
-                                     "to Record {} is missing a value. "
-                                     "Value: {}".format(self.id, entry)))
-                    break
-                if isinstance(self.data[entry]['value'], list):
-                    try:
-                        (validated_list,
-                         scalar_index,
-                         string_index) = _is_valid_list(
-                             list_of_data=self.data[entry]["value"])
-                    except ValueError as context:
-                        warnings.append(str(context))
-                        break
-                    if not validated_list:
-                        (warnings.append(
-                            "A data entry may not have a list of different types. "
-                            "They must all be scalars or all strings. Check "
-                            "indicies: {}, {}".format(scalar_index, string_index)))
-                        break
-                if (self.data[entry].get("tags") and
-                        (isinstance(self.data[entry].get("tags"),
-                                    six.string_types) or
-                         not isinstance(self.data[entry].get("tags"),
-                                        collections.Sequence))):
-                    (warnings.append("At least one value entry belonging "
-                                     "to Record {} has a malformed tag "
-                                     "list. Value: {}".format(self.id, entry)))
+        # Test library_data
+        warnings += self.library_data_is_valid(self.library_data)
+
+        # Test as JSON
         try:
             json.dumps(self.raw)
         except ValueError:
@@ -480,6 +527,48 @@ def _is_valid_list(list_of_data):
     return (True, None, None)
 
 
+def flatten_library_content(record):
+    """
+    Extract all library data, curve_sets, etc. into the path-like form used by backends.
+
+    Ex: a record that has "library_data": "my_lib": {"runtime": {"value: 223}} would
+    have that added to its "data" field as "my_lib/runtime": {"value: 223}.
+
+    :returns: The record, now modified to have library data and curve sets brought
+              to the "top level" using path-like naming. The raw is unaltered, meaning
+              it does not strictly match the data.
+    """
+    if not record.library_data:
+        return record
+    old_raw = copy.deepcopy(record.raw)
+
+    def extract_to_data(library_data, prefix):
+        """Flatten nested library_data up into the toplevel data."""
+        lib_prefix = prefix
+        for library_name, library in library_data.items():
+            lib_prefix += (library_name + "/")
+            if library.get("data"):
+                for datum_name, datum in library["data"].items():
+                    record.data[lib_prefix+datum_name] = datum
+            if library.get("curve_sets"):
+                for curve_set_name, curve_set in library["curve_sets"].items():
+                    record.curve_sets[lib_prefix+curve_set_name] = curve_set
+                    for curve_type in ["independent", "dependent"]:
+                        updated_curves = {}
+                        for name in curve_set[curve_type].keys():
+                            updated_curves[lib_prefix+name] = curve_set[curve_type][name]
+                        curve_set[curve_type] = copy.deepcopy(updated_curves)
+                        curve_order = curve_type+"_order"
+                        if curve_set.get(curve_order):
+                            curve_set[curve_order] = [lib_prefix+x for x in curve_set[curve_order]]
+            if library.get("library_data"):
+                extract_to_data(library["library_data"], lib_prefix)
+
+    extract_to_data(record.library_data, "")
+    record["raw"] = old_raw
+    return record
+
+
 def generate_record_from_json(json_input):
     """
     Generate a Record from the json input.
@@ -494,6 +583,7 @@ def generate_record_from_json(json_input):
                         type=json_input['type'],
                         user_defined=json_input.get('user_defined'),
                         data=json_input.get('data'),
+                        library_data=json_input.get('library_data'),
                         curve_sets=json_input.get('curve_sets'),
                         files=json_input.get('files'))
     except KeyError as context:
@@ -503,7 +593,7 @@ def generate_record_from_json(json_input):
     # Then set raw to json_input to grab any additional information.
     record.raw.update({key: val for key, val in json_input.items()
                        if key not in ['id', 'type', 'user_defined', 'data',
-                                      'curve_sets', 'files']})
+                                      'library_data', 'curve_sets', 'files']})
     return record
 
 
