@@ -251,11 +251,21 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         """
         return json.dumps(self.raw)
 
-    def library_data_is_valid(self, library_data, prefix=""):
+    def _library_data_is_valid(self, library_data, prefix=""):
         """
         Test whether library data is valid.
 
-        Library data can be nested, and is thus tested recursively.
+        This is called on a library_data arg rather than self.library_data
+        because library_data can occur at multiple levels (the library data of
+        library data, etc). This method will recursively check the validity of
+        any library data nested within the provided library_data arg.
+
+        :param library_data: A set of data describing a library attached to a record,
+            potentially including library_data of its own.
+        :param prefix: A prefix describing the location of the library_data within
+            a nested structure. Used in warnings to help users find malformed entries.
+
+        :returns: a list of any warnings, to be used in is_valid()
         """
         warnings = []
         if not isinstance(library_data, dict):
@@ -264,36 +274,43 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         else:
             for library_name, library in library_data.items():
                 inner_prefix = prefix + library_name + "/"
-                if library.get("data"):
-                    warnings += self.data_is_valid(library["data"], inner_prefix)
+                if "data" in library:
+                    warnings += self._data_is_valid(library["data"], inner_prefix)
                 # There's no special validation on curve sets, presumably because we
                 # don't object to name collision between curve sets and data.
-                if library.get("library_data"):
-                    warnings += self.library_data_is_valid(library["library_data"], inner_prefix)
+                if "library_data" in library:
+                    warnings += self._library_data_is_valid(library["library_data"], inner_prefix)
         return warnings
 
-    def data_is_valid(self, data, prefix=""):
+    def _data_is_valid(self, data, prefix=""):
         """
         Test whether data is valid.
 
-        Data blocks exist potentially in the record and any libraries.
+        This is called on a data arg rather than self.data because data can occur
+        at multiple levels (a record's data, a record's library's data, etc).
+
+        :param data: A set of data for a record or library.
+        :param prefix: A prefix describing the location of the data within
+            a nested structure. Used in warnings to help users find malformed entries.
+
+        :returns: a list of any warnings, to be used in is_valid()
         """
         warnings = []
         if not isinstance(data, dict):
-            (warnings.append("Record {}'s {}data field must be a dictionary!"
-                             .format(self.id, prefix)))
+            warnings.append("Record {}'s {}data field must be a dictionary!"
+                            .format(self.id, prefix))
         else:
             for entry in data:
                 # Check data entry is a dictionary
                 if not isinstance(data[entry], dict):
-                    (warnings.append("At least one {}data entry belonging to "
-                                     "Record {} is not a dictionary. "
-                                     "Value: {}".format(prefix, self.id, entry)))
+                    warnings.append("At least one {}data entry belonging to "
+                                    "Record {} is not a dictionary. "
+                                    "Value: {}".format(prefix, self.id, entry))
                     break
                 if "value" not in data[entry]:
-                    (warnings.append("At least one {}data entry belonging "
-                                     "to Record {} is missing a value. "
-                                     "Value: {}".format(prefix, self.id, entry)))
+                    warnings.append("At least one {}data entry belonging "
+                                    "to Record {} is missing a value. "
+                                    "Value: {}".format(prefix, self.id, entry))
                     break
                 if isinstance(data[entry]['value'], list):
                     try:
@@ -356,10 +373,10 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
                                  "Record {} has a malformed tag list. File: {}"
                                  .format(self.id, file_info)))
         # Test data
-        warnings += self.data_is_valid(self.data)
+        warnings += self._data_is_valid(self.data)
 
         # Test library_data
-        warnings += self.library_data_is_valid(self.library_data)
+        warnings += self._library_data_is_valid(self.library_data)
 
         # Test as JSON
         try:
@@ -531,8 +548,8 @@ class _FlatRecord(Record):
     """
     A faux Record used in the final step of insertion.
 
-    FlatRecord removes the relationship between the raw and other data, allowing
-    "flattened" Records (see: library_data) to be inserted into a non-
+    FlatRecord removes the relationship between the record.raw and other data, allowing
+    "hierarchical" Records (see: library_data) to be flattened for insertion into a non-
     hierarchical backend. These are not meant to be accessed by the user, and
     live for only a short time, existing purely to separate the responsibility of
     flattening data from the backend.
@@ -544,7 +561,6 @@ class _FlatRecord(Record):
 
     def __setitem__(self, key, value):
         """Override Record behavior to avoid raw access."""
-        # super(object, self).__setitem__(key, value)
         self.__dict__[key] = value
 
     def __delitem__(self, key):
@@ -575,10 +591,10 @@ def flatten_library_content(record):
         lib_prefix = prefix
         for library_name, library in library_data.items():
             lib_prefix += (library_name + "/")
-            if library.get("data"):
+            if "data" in library:
                 for datum_name, datum in library["data"].items():
                     record["data"][lib_prefix+datum_name] = datum
-            if library.get("curve_sets"):
+            if "curve_sets" in library:
                 for curve_set_name, curve_set in library["curve_sets"].items():
                     record["curve_sets"][lib_prefix+curve_set_name] = curve_set
                     for curve_type in ["independent", "dependent"]:
@@ -589,7 +605,7 @@ def flatten_library_content(record):
                         curve_order = curve_type+"_order"
                         if curve_set.get(curve_order):
                             curve_set[curve_order] = [lib_prefix+x for x in curve_set[curve_order]]
-            if library.get("library_data"):
+            if "library_data" in library:
                 extract_to_data(library["library_data"], lib_prefix)
 
     extract_to_data(record["library_data"], "")

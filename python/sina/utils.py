@@ -80,11 +80,9 @@ def convert_json_to_records_and_relationships(json_path):
                 except KeyError:
                     raise ValueError("Record requires one of: local_id, id: {}".format(entry))
             if entry["type"] == 'run':
-                records.append(model.flatten_library_content(
-                    model.generate_run_from_json(json_input=entry)))
+                records.append(model.generate_run_from_json(json_input=entry))
             else:
-                records.append(model.flatten_library_content(
-                    model.generate_record_from_json(json_input=entry)))
+                records.append(model.generate_record_from_json(json_input=entry))
         relationships = []
         for entry in data.get('relationships', []):
             subj, obj = _process_relationship_entry(entry=entry, local_ids=local)
@@ -108,7 +106,7 @@ def import_json(factory, json_paths):
     if not factory.supports_parallel_ingestion or len(json_paths) < 2:
         for json_path in json_paths:
             records, relationships = convert_json_to_records_and_relationships(json_path)
-            factory.create_record_dao().insert(records)
+            factory.create_record_dao().insert(model.flatten_library_content(x) for x in records)
             factory.create_relationship_dao().insert(relationships)
     else:
         LOGGER.debug('Factory supports parallel ingest, building thread pool.')
