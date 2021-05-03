@@ -7,8 +7,9 @@
 # but use of the py2&3--compatible version is not enforced otherwise
 more-itertools<=5.0.0
 # As with more-itertools, we need a version that keeps python 2 support.
-# importlib is not a direct dependency of sina.
+# importlib and pyrsistent are not direct dependencies of sina.
 importlib_metadata==1.7.0
+pyrsistent<=0.16.1
 tox<3.14
 flake8
 mock
