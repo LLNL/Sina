@@ -85,6 +85,21 @@ A more fleshed-out example, with field descriptions:
                   "volume": {"value": [10, 14, 22.2], "units": "m^3"}}
           }
       },
+      // Data that comes from any libraries associated with a Record. This allows data
+      // from nested libraries to be grouped, as well as avoiding name collisions.
+      "library_data": {
+          "outer_lib": {
+              // libraries can have curve_sets and data sections just like the greater Record.
+              // They cannot have files or user_defined; those still belong to the greater Record.
+              "data": {"total_energy": 2.2},
+              // libraries can be nested to whatever depth is required
+              "library_data": {
+                  "inner_lib": {
+                      "data": {"total_energy": 0.2}
+                  }
+              }
+          }
+      },
       // A dictionary of information that does not make sense as a data or file entry
       "user_defined": {
           // None of this will be interpreted by Sina. Instead, it will simply
@@ -204,6 +219,11 @@ actual name of the datum (such as "density" or "max_volume").
           },
           "data": {
               "datum_name": {"value": [], "units": "", "tags": []}
+          },
+          "library_data": {
+              "outer_lib": {
+                  "data": {"datum_name": {"value": [], "units": "", "tags": []}}
+              }
           },
           "user_defined": {}
         }
