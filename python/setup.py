@@ -28,9 +28,10 @@ setup(name='llnl-sina',
             'matplotlib<3.0'
         ],
         'jupyter:python_version>="3"': [
+            'nbconvert==5.4.0',
             'ipython',
             'ipykernel>=5',
-            'matplotlib'
+            'matplotlib',
         ],
         'jupyter': [
             'pyzmq<18',   # pyzmq 18.0 has bug on Python 3, use anything below
