@@ -1117,10 +1117,11 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_recorddao_get_library_data_for_record(self):
         """Test that we're able to access library data with path notation."""
-        lib_rec = self.record_dao.get_data_for_records(id_list=["spam"],
-                                                       data_list=["spam_scal",
-                                                                  "main_lib/lib_scalar",
-                                                                  "main_lib/nested_lib/lib_scalar"])
+        lib_rec = self.record_dao.get_data_for_records(
+            id_list=["spam"],
+            data_list=["spam_scal",
+                       "main_lib/lib_scalar",
+                       "main_lib/nested_lib/lib_scalar"])
         self.assertEqual(lib_rec["spam"]["spam_scal"]["value"], 10)
         self.assertEqual(lib_rec["spam"]["main_lib/lib_scalar"]["value"], 12)
         self.assertEqual(lib_rec["spam"]["main_lib/nested_lib/lib_scalar"]["value"], 22)
