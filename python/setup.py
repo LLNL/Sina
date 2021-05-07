@@ -28,7 +28,7 @@ setup(name='llnl-sina',
             'matplotlib<3.0'
         ],
         'jupyter:python_version>="3"': [
-            'nbconvert==5.4.0',
+            'nbconvert<=5.4.0',
             'ipython',
             'ipykernel>=5',
             'matplotlib',
