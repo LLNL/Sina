@@ -205,6 +205,29 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(returned_records[1].data["eggs"]["value"],
                          rec_2["data"]["eggs"]["value"])
 
+    def test_recorddao_insert_bad(self):
+        """
+        Test that the RecordDAO can still be used to query records after an
+        exception was raised."""
+        record_dao = self.factory.create_record_dao()
+        rec_1 = Record(id='spam1', type='eggs',
+                       data={'eggs': {'value': 12}})
+        rec_2 = Record(id='spam2', type='eggs',
+                       data={'eggs': {'value': 32}})
+        record_dao.insert((x for x in (rec_1, rec_2)))
+        returned_ids = set(rec.id for rec in record_dao.get(['spam1', 'spam2']))
+        self.assertEqual(returned_ids, {'spam1', 'spam2'})
+
+        bad_record = Record(id='bad_one', type='eggs',
+                            data={'eggs': {'value': float('NaN')}})
+
+        # Different DAOs can raise different exceptions, so we can't be
+        # more specific here
+        self.assertRaises(Exception, record_dao.insert, bad_record)
+
+        returned_ids = set(rec.id for rec in record_dao.get(['spam1', 'spam2']))
+        self.assertEqual(returned_ids, {'spam1', 'spam2'})
+
     def test_recorddao_insert_overlapped_curves(self):
         """Test that curves with overlapping values are handled properly."""
         record_dao = self.factory.create_record_dao()
@@ -276,6 +299,13 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         record_dao.insert(Record(id="rec_1", type="sample"))
         record_dao.delete("rec_1")
         self.assertEqual(list(record_dao.get_all_of_type("sample")), [])
+
+    def test_recorddao_delete_invalid(self):
+        """Verify that the RecordDAO can still be used after a failed deletion"""
+        record_dao = self.factory.create_record_dao()
+        record_dao.insert(Record(id="rec_1", type="sample"))
+        record_dao.delete("no_such_id")
+        self.assertIsNotNone(record_dao.get("rec_1"))
 
     def test_recorddao_delete_data_cascade(self):
         """Test that deletion of a Record correctly cascades to data and files."""
@@ -363,6 +393,28 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertNotEqual(returned_record.data["eggs"]["value"],
                             updated_record.data["eggs"]["value"])
         self._assert_records_equal(updated_record, rec)
+
+    def test_recorddao_update_with_invalid_data(self):
+        """
+        Test that RecordDAO can still be used after tyring to update a record
+        with invalid data.
+        """
+        record_dao = self.factory.create_record_dao()
+        rec = Record(id="spam", type="eggs",
+                     data={"eggs": {"value": 12}})
+        record_dao.insert(rec)
+        returned_record = record_dao.get("spam")
+        self.assertEqual(returned_record.data, rec.data)
+        rec["data"]["eggs"]["value"] = float('NaN')
+        rec["data"]["new_item"] = {
+            'value': 15
+        }
+        self.assertRaises(Exception, record_dao.update, rec)
+
+        returned_record = record_dao.get("spam")
+        self.assertEqual(returned_record.id, rec.id)
+        self.assertEqual(returned_record.data["eggs"]["value"], 12)
+        self.assertNotIn("new_item", returned_record.data)
 
     def test_recorddao_update_many(self):
         """Test that RecordDAO is updating multiple Records at once correctly."""
