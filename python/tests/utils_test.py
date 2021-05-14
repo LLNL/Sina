@@ -9,13 +9,16 @@ written such that this should not be a testing issue.
 import os
 import shutil
 import unittest
+from tempfile import NamedTemporaryFile
 from types import GeneratorType
 
+import io
 import six
 
 import sina.utils
 from sina.utils import (DataRange, StringListCriteria, ScalarListCriteria,
-                        sort_and_standardize_criteria)
+                        sort_and_standardize_criteria,
+                        convert_json_to_records_and_relationships)
 
 # Path to the directory for running tests involving temporary files.  (Use this
 # file's directory as the basis for the path for now.)
@@ -754,3 +757,75 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
         self.assertEqual(flipped_inclusivity, few_dict["speed"])
         self.assertEqual(both_sides_equal, few_dict["quadrant"])
         self.assertFalse(sina.utils.parse_data_string(none))
+
+
+class LoadDocumentTest(unittest.TestCase):
+    """Tests for load_document()"""
+
+    contents = six.text_type("""
+    {
+        "records": [
+            {
+                "id": "rec1",
+                "type": "test_rec"
+            },
+            {
+                "id": "rec2",
+                "type": "test_rec"
+            }
+        ],
+        "relationships": [
+            {"subject": "rec1", "object": "rec2","predicate": "related to"}
+        ]
+    }
+    """)
+
+    def test_load_file_path(self):
+        """Load from a file path"""
+        with NamedTemporaryFile('w') as temp:
+            temp.write(LoadDocumentTest.contents)
+            temp.flush()
+            records, relationships = sina.utils.load_document(temp.name)
+
+        self.assertContentsAreCorrect(records, relationships)
+
+    def test_load_open_file(self):
+        """Load from an open file"""
+        with NamedTemporaryFile('w') as temp:
+            temp.write(LoadDocumentTest.contents)
+            temp.flush()
+            with io.open(temp.name, 'r', encoding='utf-8') as fp:
+                records, relationships = sina.utils.load_document(fp)
+
+        self.assertContentsAreCorrect(records, relationships)
+
+    def test_load_stringio(self):
+        """Load from a StringIO object"""
+        records, relationships = sina.utils.load_document(
+            io.StringIO(LoadDocumentTest.contents))
+        self.assertContentsAreCorrect(records, relationships)
+
+    def test_convert_json_to_records_and_relationships(self):
+        """Verify test_convert_json_to_records_and_relationships is deprecated"""
+        with NamedTemporaryFile('w') as temp:
+            temp.write(LoadDocumentTest.contents)
+            temp.flush()
+            records, relationships = convert_json_to_records_and_relationships(temp.name)
+
+        self.assertContentsAreCorrect(records, relationships)
+
+    def assertContentsAreCorrect(self, records, relationships):
+        """
+        Assert that the records and relationships are as expected
+
+        :param records: the actual recrods
+        :param relationships: the actual relationships
+        """
+        self.assertEqual(2, len(records))
+        self.assertEqual("rec1", records[0].id)
+        self.assertEqual("rec2", records[1].id)
+
+        self.assertEqual(1, len(relationships))
+        self.assertEqual("rec1", relationships[0].subject_id)
+        self.assertEqual("rec2", relationships[0].object_id)
+        self.assertEqual("related to", relationships[0].predicate)
