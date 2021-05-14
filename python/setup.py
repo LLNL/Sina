@@ -51,8 +51,9 @@ setup(name='llnl-sina',
         'six',
         'sqlalchemy',
         'enum34;python_version<"3.4"',
-        'orjson;python_version>="3.6"',
-        'ujson;python_version<"3.6"'
+        'orjson;python_version>="3.6" and platform_machine!="ppc64le"',
+        'ujson;python_version>="3.6" and platform_machine=="ppc64le"',
+        'ujson;python_version<"3.6" and platform_machine!="ppc64le"',
       ],
       license='MIT',
       classifiers=[

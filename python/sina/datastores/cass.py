@@ -19,7 +19,7 @@ import sina.dao as dao
 import sina.model as model
 import sina.datastores.cass_schema as schema
 import sina.utils as utils
-import sina.json as json
+import sina.sjson as json
 
 # Disable pylint checks due to ubiquitous use of id
 # pylint: disable=invalid-name,redefined-builtin
