@@ -456,14 +456,15 @@ class Run(Record):
 
     def __init__(self, id, application,  # pylint: disable=too-many-arguments
                  user=None, version=None, user_defined=None,
-                 data=None, curve_sets=None, files=None):
+                 data=None, curve_sets=None, files=None, library_data=None):
         """Create Run from Record info plus metadata."""
         super(Run, self).__init__(id=id,
                                   type="run",
                                   user_defined=user_defined,
                                   data=data,
                                   curve_sets=curve_sets,
-                                  files=files)
+                                  files=files,
+                                  library_data=library_data)
         self.application = application
         self.user = user
         self.version = version
@@ -568,6 +569,26 @@ class _FlatRecord(Record):
         del self.__dict__[key]
 
 
+class _FlatRun(Run):
+    """
+    A faux Run used in the same way as _FlatRecord.
+
+    Provided only for safety and compatability. Runs are deprecated.
+    """
+
+    def __getitem__(self, key):
+        """Override Run behavior to avoid raw access."""
+        return self.__dict__[key]
+
+    def __setitem__(self, key, value):
+        """Override Run behavior to avoid raw access."""
+        self.__dict__[key] = value
+
+    def __delitem__(self, key):
+        """Override Run behavior to avoid raw access."""
+        del self.__dict__[key]
+
+
 def flatten_library_content(record):
     """
     Extract all library data, curve_sets, etc. into the path-like form used by backends.
@@ -583,7 +604,12 @@ def flatten_library_content(record):
         return record
 
     old_raw = copy.deepcopy(record.raw)
-    record = _FlatRecord(**record.raw)
+
+    if isinstance(record, Run):
+        record.raw.pop("type")
+        record = _FlatRun(**record.raw)
+    else:
+        record = _FlatRecord(**record.raw)
     record.raw = old_raw
 
     def extract_to_data(library_data, prefix):

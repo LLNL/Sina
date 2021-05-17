@@ -18,7 +18,7 @@ from mock import patch  # pylint: disable=import-error
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, all_in, any_in, exists)
-from sina.model import Run, Record, Relationship
+from sina.model import Run, Record, Relationship, flatten_library_content
 import sina.json as json
 
 LOGGER = logging.getLogger(__name__)
@@ -57,6 +57,11 @@ def populate_database_with_data(record_dao):
     spam_record.data["val_data_2"] = {"value": "double yolks"}
     spam_record.files = {"beep.wav": {},
                          "beep.pong": {}}
+    spam_record.library_data["main_lib"] = {"data": {"lib_scalar": {"value": 12},
+                                                     "lib_string": {"value": "eggs"}},
+                                            "library_data": {
+                                                "nested_lib":
+                                                    {"data": {"lib_scalar": {"value": 22}}}}}
     spam_record.curve_sets["spam_curve"] = {
         "independent": {"time": {"value": [1, 2, 3], "tags": ["misc"]}},
         "dependent": {"internal_temp": {"value": [80, 95, 120], "units": "F"},
@@ -70,12 +75,19 @@ def populate_database_with_data(record_dao):
                                       "tags": ["gross"]}},
         "tags": ["food"]}
 
+    spam_record = flatten_library_content(spam_record)
+
     spam_record_2 = Run(id="spam2", application="scal_generator")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
     spam_record_2.files = {"beep/png": {}}
     spam_record_2.curve_sets["spam_curve"] = {
         "independent": {"time": {"value": [1, 2, 3]}},
         "dependent": {"internal_temp": {"value": [80, 95, 120]}}}
+    spam_record_2.library_data["main_lib"] = {"data": {"lib_scalar": {"value": 22}},
+                                              "library_data": {
+                                                  "nested_lib": {
+                                                      "data": {"lib_scalar": {"value": 12}}}}}
+    spam_record_2 = flatten_library_content(spam_record_2)
 
     spam_record_3 = Record(id="spam3", type="foo")
     spam_record_3.data["spam_scal"] = {"value": 10.5}
@@ -812,6 +824,15 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                           nonexistant=10101010)
         self.assertFalse(list(none))
 
+    def test_recorddao_nested_data_query(self):
+        """Ensure that a properly-flattened record can be queried."""
+        one = list(self.record_dao.data_query(**{"main_lib/lib_scalar": 12}))
+        self.assertEqual(len(one), 1)
+        self.assertEqual(one, ["spam"])
+        another = list(self.record_dao.data_query(**{"main_lib/nested_lib/lib_scalar": 12}))
+        self.assertEqual(len(another), 1)
+        self.assertEqual(another, ["spam2"])
+
     def test_recorddao_data_query_shared_data_and_curve_set(self):
         """Test that RecordDAO's data query is retrieving on multiple scalars correctly."""
         # ensure data matches our expectations
@@ -1093,6 +1114,17 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                               "spam_scal_2",
                                                               "val_data"])
         self.assertEqual(for_many["spam3"]["val_data"]["tags"], ["edible", "simple"])
+
+    def test_recorddao_get_library_data_for_record(self):
+        """Test that we're able to access library data with path notation."""
+        lib_rec = self.record_dao.get_data_for_records(
+            id_list=["spam"],
+            data_list=["spam_scal",
+                       "main_lib/lib_scalar",
+                       "main_lib/nested_lib/lib_scalar"])
+        self.assertEqual(lib_rec["spam"]["spam_scal"]["value"], 10)
+        self.assertEqual(lib_rec["spam"]["main_lib/lib_scalar"]["value"], 12)
+        self.assertEqual(lib_rec["spam"]["main_lib/nested_lib/lib_scalar"]["value"], 22)
 
     def test_recorddao_get_data_for_gen_of_records(self):
         """Test that we're getting data for a generator of many records correctly."""

@@ -49,7 +49,7 @@ class RecordDAO(dao.RecordDAO):
             sql_record = self.create_sql_record(record)
             self.session.add(sql_record)
 
-    def insert(self, records):
+    def _do_insert(self, records):
         """
         Given a(n iterable of) Record(s), insert into the current SQL database.
 
