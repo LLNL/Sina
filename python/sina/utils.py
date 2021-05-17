@@ -70,18 +70,18 @@ def convert_json_to_records_and_relationships(json_path):
     return load_document(json_path)
 
 
-def _load_document(document_contents):
+def _load_document(document_as_string):
     """
     Read a Sina document from the given string.
 
-    :param document_contents: a string containing the contents of the document
+    :param document_as_string: a string containing the contents of the document
     :return: a tuple consisting of the list of records and the list of
      relationships
     """
     records = []
     local = {}
-    data = json.loads(document_contents)
-    for entry in data.get('records', []):
+    document_as_dict = json.loads(document_as_string)
+    for entry in document_as_dict.get('records', []):
         if 'id' not in entry:
             id = str(uuid.uuid4())
             try:
@@ -96,7 +96,7 @@ def _load_document(document_contents):
             records.append(model.generate_record_from_json(json_input=entry))
 
     relationships = []
-    for entry in data.get('relationships', []):
+    for entry in document_as_dict.get('relationships', []):
         subj, obj = _process_relationship_entry(entry=entry, local_ids=local)
         relationships.append(model.Relationship(subject_id=subj,
                                                 object_id=obj,

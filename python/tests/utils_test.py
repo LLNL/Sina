@@ -806,7 +806,7 @@ class LoadDocumentTest(unittest.TestCase):
         self.assertContentsAreCorrect(records, relationships)
 
     def test_convert_json_to_records_and_relationships(self):
-        """Verify test_convert_json_to_records_and_relationships is deprecated"""
+        """Verify test_convert_json_to_records_and_relationships works"""
         with NamedTemporaryFile('w') as temp:
             temp.write(LoadDocumentTest.contents)
             temp.flush()
