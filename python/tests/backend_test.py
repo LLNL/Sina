@@ -19,7 +19,7 @@ from mock import patch  # pylint: disable=import-error
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, all_in, any_in, exists)
 from sina.model import Run, Record, Relationship
-import sina.json as json
+import sina.sjson as json
 
 LOGGER = logging.getLogger(__name__)
 TARGET = None

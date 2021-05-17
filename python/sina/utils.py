@@ -18,7 +18,7 @@ from collections import OrderedDict, defaultdict
 import six
 
 import sina.model as model
-import sina.json as json
+import sina.sjson as json
 
 LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
