@@ -2,6 +2,7 @@
 #define SINA_DATAHOLDER_HPP
 
 #include <string>
+#include <memory>
 #include <unordered_map>
 
 #include "conduit.hpp"
@@ -25,7 +26,7 @@ class DataHolder {
 public:
     using DatumMap = std::unordered_map<std::string, Datum>;
     using CurveSetMap = std::unordered_map<std::string, CurveSet>;
-    using LibraryDatumMap = std::unordered_map<std::string, DataHolder>;
+    using LibraryDatumMap = std::unordered_map<std::string, std::shared_ptr<DataHolder>>;
 
     /**
      * Construct an empty DataHolder.
@@ -80,7 +81,7 @@ public:
      * @return a pointer to a new DataHolder for a library
      * of the given name.
      */
-    DataHolder &add_library_data(std::string const &name);
+    std::shared_ptr<DataHolder> add_library_data(std::string const &name);
 
     /**
      * Get the library data associated with this DataHolder.

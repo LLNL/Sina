@@ -32,11 +32,11 @@ void DataHolder::add(CurveSet curveSet) {
     }
 }
 
-DataHolder &DataHolder::add_library_data(std::string const &name) {
+std::shared_ptr<DataHolder> DataHolder::add_library_data(std::string const &name) {
   // TODO: if the library already exists, should we error?
   auto existing = libraryData.find(name);
   if (existing == libraryData.end()) {
-      libraryData.emplace(name, DataHolder{});
+      libraryData.emplace(name, std::make_shared<DataHolder>(DataHolder{}));
   }
   return libraryData.at(name);
 }
@@ -48,7 +48,7 @@ conduit::Node DataHolder::toNode() const {
       //Loop through vector of data and append Json
       conduit::Node libRef;
       for(auto &lib : libraryData){
-          libRef.add_child(lib.first) = lib.second.toNode();
+          libRef.add_child(lib.first) = lib.second->toNode();
       }
       asNode[LIBRARY_DATA_FIELD] = libRef;
     }
@@ -94,7 +94,7 @@ DataHolder::DataHolder(conduit::Node const &asNode) {
           auto &libraryDataNode = libraryIter.next();
           std::string name = libraryIter.name();
           DataHolder lib{libraryDataNode};
-          libraryData.emplace(std::make_pair(std::move(name), std::move(lib)));
+          libraryData.emplace(std::make_pair(std::move(name), std::make_shared<DataHolder>(std::move(lib))));
       }
     }
   }

@@ -54,18 +54,18 @@ TEST(DataHolder, add_curve_set_existing_key) {
 
 TEST(DataHolder, add_new_library) {
     DataHolder dh{};
-    auto &outer = dh.add_library_data("outer");
+    auto outer = dh.add_library_data("outer");
     auto &libDataAfterFirstInsert = dh.getLibraryData();
     ASSERT_THAT(libDataAfterFirstInsert, Contains(Key("outer")));
     dh.add_library_data("other_outer");
     auto &libDataAfterSecondInsert = dh.getLibraryData();
     ASSERT_THAT(libDataAfterSecondInsert, Contains(Key("outer")));
     ASSERT_THAT(libDataAfterSecondInsert, Contains(Key("other_outer")));
-    outer.add_library_data("inner");
+    outer->add_library_data("inner");
     auto &libDataAfterThirdInsert = dh.getLibraryData();
-    ASSERT_THAT(libDataAfterThirdInsert.at("outer").getLibraryData(),
+    ASSERT_THAT(libDataAfterThirdInsert.at("outer")->getLibraryData(),
                 Contains(Key("inner")));
-    ASSERT_THAT(libDataAfterThirdInsert.at("other_outer").getLibraryData(),
+    ASSERT_THAT(libDataAfterThirdInsert.at("other_outer")->getLibraryData(),
                 Not(Contains(Key("inner"))));
 }
 
@@ -126,9 +126,9 @@ TEST(DataHolder, create_fromNode_libraryData) {
     DataHolder dh{dataHolderAsNode};
     auto &fullLibData = dh.getLibraryData();
     ASSERT_THAT(fullLibData, Contains(Key("outer_lib")));
-    auto &outerLibData = fullLibData.at("outer_lib").getLibraryData();
+    auto outerLibData = fullLibData.at("outer_lib")->getLibraryData();
     ASSERT_THAT(outerLibData, Contains(Key("inner_lib")));
-    auto &innerData = outerLibData.at("inner_lib").getData();
+    auto &innerData = outerLibData.at("inner_lib")->getData();
     EXPECT_EQ("good morning!", innerData.at("i2").getValue());
 }
 
@@ -197,10 +197,10 @@ TEST(DataHolder, toNode_curveSets) {
 
 TEST(DataHolder, toNode_libraryData) {
     DataHolder dh{};
-    auto &outer = dh.add_library_data("outer");
-    outer.add("scal", Datum{"goodbye!"});
-    auto &inner = outer.add_library_data("inner");
-    inner.add("str", Datum{"hello!"});
+    auto outer = dh.add_library_data("outer");
+    outer->add("scal", Datum{"goodbye!"});
+    auto inner = outer->add_library_data("inner");
+    inner->add("str", Datum{"hello!"});
     auto expected = R"({
         "library_data": {
             "outer": {

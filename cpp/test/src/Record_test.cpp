@@ -101,7 +101,7 @@ TEST(Record, create_globalId_withContent) {
     EXPECT_EQ("value 1", data.at(name1).getValue());
     auto &libdata = record.getLibraryData();
     EXPECT_THAT(libdata, Contains(Key(libName)));
-    EXPECT_EQ("value 2", libdata.at(libName).getData().at(name2).getValue());
+    EXPECT_EQ("value 2", libdata.at(libName)->getData().at(name2).getValue());
 }
 
 TEST(Record, create_globalId_files) {
