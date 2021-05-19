@@ -15,7 +15,7 @@ namespace sina {
 /**
  * A DataHolder is a basic container for certain types of information.
  *
- * DataHolders contain curves, libraries, and/or data (\see Datum), and represent
+ * DataHolders contain curves, libraries, and data (\see Datum), and represent
  * all the information a library can have associated with it. Records expand
  * on DataHolders to contain additional info.
  *
@@ -26,12 +26,12 @@ class DataHolder {
 public:
     using DatumMap = std::unordered_map<std::string, Datum>;
     using CurveSetMap = std::unordered_map<std::string, CurveSet>;
-    using LibraryDatumMap = std::unordered_map<std::string, std::shared_ptr<DataHolder>>;
+    using LibraryDataMap = std::unordered_map<std::string, std::shared_ptr<DataHolder>>;
 
     /**
      * Construct an empty DataHolder.
      */
-    DataHolder(){}
+    DataHolder() = default;
 
     /**
      * Construct a DataHolder from its conduit Node representation.
@@ -73,23 +73,36 @@ public:
         return curveSets;
     }
 
-    // TODO: should there be an add() for a completed LibraryData?
-
     /**
      * Add a new library to this DataHolder.
+     *
+     * If you try to add a library with a name that already exists, the old
+     * library will be replaced.
      *
      * @return a pointer to a new DataHolder for a library
      * of the given name.
      */
-    std::shared_ptr<DataHolder> add_library_data(std::string const &name);
+    std::shared_ptr<DataHolder> addLibraryData(std::string const &name);
 
     /**
-     * Get the library data associated with this DataHolder.
+     * Get all library data associated with this DataHolder.
      *
      * @return the dataholder's library data
      */
-    LibraryDatumMap const &getLibraryData() const noexcept {
+    LibraryDataMap const &getLibraryData() const noexcept {
         return libraryData;
+    }
+
+    /**
+     * Get a specific library associated with this DataHolder.
+     *
+     * @return the dataholder's library data
+     */
+    std::shared_ptr<DataHolder> getLibraryData(std::string const &libraryName) {
+      return libraryData.at(libraryName);
+    }
+    std::shared_ptr<DataHolder> const getLibraryData(std::string const &libraryName) const {
+      return libraryData.at(libraryName);
     }
 
     /**
@@ -103,7 +116,7 @@ public:
 private:
     CurveSetMap curveSets;
     DatumMap data;
-    LibraryDatumMap libraryData;
+    LibraryDataMap libraryData;
 };
 
 }

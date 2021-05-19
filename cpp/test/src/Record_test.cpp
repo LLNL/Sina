@@ -38,6 +38,38 @@ TEST(Record, create_typeMissing) {
     }
 }
 
+TEST(Record, add_data_existing_key) {
+    Record record{ID{"the id", IDType::Local}, "test_record"};
+    record.add("key1", Datum{"val1"});
+    EXPECT_EQ("val1", record.getData().at("key1").getValue());
+    record.add("key1", Datum{"val2"});
+    EXPECT_EQ("val2", record.getData().at("key1").getValue());
+}
+
+TEST(Record, add_curve_set_existing_key) {
+    Record record{ID{"the id", IDType::Local}, "test_record"};
+
+    CurveSet cs1{"cs1"};
+    cs1.addDependentCurve(Curve{"original", {1, 2, 3}});
+    record.add(cs1);
+
+    auto &csAfterFirstInsert = record.getCurveSets();
+    ASSERT_THAT(csAfterFirstInsert, Contains(Key("cs1")));
+    EXPECT_THAT(csAfterFirstInsert.at("cs1").getDependentCurves(),
+                Contains(Key("original")));
+
+    CurveSet cs2{"cs1"};
+    cs2.addDependentCurve(Curve{"new", {1, 2, 3}});
+    record.add(cs2);
+
+    auto &csAfterSecondInsert = record.getCurveSets();
+    ASSERT_THAT(csAfterSecondInsert, Contains(Key("cs1")));
+    EXPECT_THAT(csAfterSecondInsert.at("cs1").getDependentCurves(),
+                Not(Contains(Key("original"))));
+    EXPECT_THAT(csAfterSecondInsert.at("cs1").getDependentCurves(),
+                Contains(Key("new")));
+}
+
 TEST(Record, add_file_existing_key) {
     Record record{ID{"the id", IDType::Local}, "test_record"};
     std::string path = "the/path.txt";
@@ -83,25 +115,40 @@ TEST(Record, create_globalId_withContent) {
     originalNode[EXPECTED_LIBRARY_DATA_KEY];
 
     std::string name1 = "datum name 1";
+    std::string name2 = "datum name 2/with/slash";
+
     conduit::Node name1_node;
     name1_node["value"] = "value 1";
     originalNode[EXPECTED_DATA_KEY][name1] = name1_node;
 
+    conduit::Node name2_node;
+    name2_node["value"] = 2.22;
+    name2_node["units"] = "g/L";
+    addStringsToNode(name2_node, "tags", {"tag1","tag2"});
+    name2_node["value"] = 2.22;
+    originalNode[EXPECTED_DATA_KEY].add_child(name2) = name2_node;
+
     std::string libName = "my_lib";
     conduit::Node libNode;
-    std::string name2 = "datum name 2";
-    conduit::Node name2_node;
-    name2_node["value"] = "value 2";
+    std::string name3 = "datum name 3";
+    conduit::Node name3_node;
+    name3_node["value"] = "value 3";
     libNode[EXPECTED_DATA_KEY];
-    libNode[EXPECTED_DATA_KEY][name2] = name2_node;
+    libNode[EXPECTED_DATA_KEY][name3] = name3_node;
     originalNode[EXPECTED_LIBRARY_DATA_KEY][libName] = libNode;
 
     Record record{originalNode};
     auto &data = record.getData();
+    ASSERT_EQ(2u, data.size());
     EXPECT_EQ("value 1", data.at(name1).getValue());
+    EXPECT_THAT(2.22, DoubleEq(data.at(name2).getScalar()));
+    EXPECT_EQ("g/L", data.at(name2).getUnits());
+    EXPECT_EQ("tag1", data.at(name2).getTags()[0]);
+    EXPECT_EQ("tag2", data.at(name2).getTags()[1]);
+
     auto &libdata = record.getLibraryData();
     EXPECT_THAT(libdata, Contains(Key(libName)));
-    EXPECT_EQ("value 2", libdata.at(libName)->getData().at(name2).getValue());
+    EXPECT_EQ("value 3", libdata.at(libName)->getData().at(name3).getValue());
 }
 
 TEST(Record, create_globalId_files) {
@@ -122,6 +169,27 @@ TEST(Record, create_globalId_files) {
     EXPECT_EQ(1, files.count(File{uri1}));
     EXPECT_EQ(1, files.count(File{uri2}));
     EXPECT_EQ(1, files.count(File{uri3}));
+}
+
+
+TEST(Record, create_fromNode_curveSets) {
+    conduit::Node recordAsNode = parseJsonValue(R"({
+        "id": "myId",
+        "type": "myType",
+        "curve_sets": {
+            "cs1": {
+                "independent": {
+                    "i1": { "value": [1, 2, 3]}
+                },
+                "dependent": {
+                    "d1": { "value": [4, 5, 6]}
+                }
+            }
+        }
+    })");
+    Record record{recordAsNode};
+    auto &curveSets = record.getCurveSets();
+    ASSERT_THAT(curveSets, Contains(Key("cs1")));
 }
 
 TEST(Record, create_fromNode_userDefined) {
@@ -209,6 +277,41 @@ TEST(Record, toNode_userDefined) {
     EXPECT_THAT(udef_ints, ElementsAre(1, 2, 3));
 }
 
+TEST(Record, toNode_data) {
+    ID id{"the id", IDType::Local};
+    Record record{id, "my type"};
+    std::string name1 = "name1";
+    std::string value1 = "value1";
+    Datum datum1 = Datum{value1};
+    datum1.setUnits("some units");
+    datum1.setTags({"tag1"});
+    record.add(name1, datum1);
+    std::string name2 = "name2";
+    record.add(name2, Datum{2.});
+    auto asNode = record.toNode();
+    ASSERT_EQ(2u, asNode[EXPECTED_DATA_KEY].number_of_children());
+    EXPECT_EQ("value1", asNode[EXPECTED_DATA_KEY][name1]["value"].as_string());
+    EXPECT_EQ("some units", asNode[EXPECTED_DATA_KEY][name1]["units"].as_string());
+    EXPECT_EQ("tag1", asNode[EXPECTED_DATA_KEY][name1]["tags"][0].as_string());
+
+    EXPECT_THAT(asNode[EXPECTED_DATA_KEY][name2]["value"].as_double(),
+                DoubleEq(2.));
+    EXPECT_TRUE(asNode[EXPECTED_DATA_KEY][name2]["units"].dtype().is_empty());
+    EXPECT_TRUE(asNode[EXPECTED_DATA_KEY][name2]["tags"].dtype().is_empty());
+}
+
+TEST(Record, toNode_dataWithSlashes) {
+    ID id{"the id", IDType::Local};
+    Record record{id, "my type"};
+    std::string name = "name/with/slashes";
+    std::string value = "the value";
+    Datum datum = Datum{value};
+    record.add(name, datum);
+    auto asNode = record.toNode();
+    ASSERT_EQ(1u, asNode[EXPECTED_DATA_KEY].number_of_children());
+    EXPECT_EQ("the value", asNode[EXPECTED_DATA_KEY].child(name)["value"].as_string());
+}
+
 TEST(Record, toNode_files) {
     ID id{"the id", IDType::Local};
     Record record{id, "my type"};
@@ -225,6 +328,29 @@ TEST(Record, toNode_files) {
     auto &child_with_slashes = asNode[EXPECTED_FILES_KEY].child(uri1);
     EXPECT_EQ("mt1", child_with_slashes["mimetype"].as_string());
     EXPECT_TRUE(asNode[EXPECTED_FILES_KEY][uri2]["mimetype"].dtype().is_empty());
+}
+
+TEST(Record, toNode_curveSets) {
+    ID id{"the id", IDType::Local};
+    Record record{id, "my type"};
+    CurveSet cs{"myCurveSet/with/slash"};
+    cs.addIndependentCurve(Curve{"myCurve", {1, 2, 3}});
+    record.add(cs);
+    auto expected = R"({
+        "local_id": "the id",
+        "type": "my type",
+        "curve_sets": {
+            "myCurveSet/with/slash": {
+                "independent": {
+                     "myCurve": {
+                         "value": [1.0, 2.0, 3.0]
+                     }
+                 },
+                 "dependent": {}
+            }
+        }
+    })";
+    EXPECT_THAT(record.toNode(), MatchesJson(expected));
 }
 
 TEST(RecordLoader, load_missingLoader) {

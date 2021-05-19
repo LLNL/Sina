@@ -54,19 +54,31 @@ TEST(DataHolder, add_curve_set_existing_key) {
 
 TEST(DataHolder, add_new_library) {
     DataHolder dh{};
-    auto outer = dh.add_library_data("outer");
+    auto outer = dh.addLibraryData("outer");
     auto &libDataAfterFirstInsert = dh.getLibraryData();
     ASSERT_THAT(libDataAfterFirstInsert, Contains(Key("outer")));
-    dh.add_library_data("other_outer");
+    dh.addLibraryData("other_outer");
     auto &libDataAfterSecondInsert = dh.getLibraryData();
     ASSERT_THAT(libDataAfterSecondInsert, Contains(Key("outer")));
     ASSERT_THAT(libDataAfterSecondInsert, Contains(Key("other_outer")));
-    outer->add_library_data("inner");
+    outer->addLibraryData("inner");
     auto &libDataAfterThirdInsert = dh.getLibraryData();
     ASSERT_THAT(libDataAfterThirdInsert.at("outer")->getLibraryData(),
                 Contains(Key("inner")));
     ASSERT_THAT(libDataAfterThirdInsert.at("other_outer")->getLibraryData(),
                 Not(Contains(Key("inner"))));
+}
+
+TEST(DataHolder, add_library_existing_key) {
+    std::string libName = "outer";
+    DataHolder dh{};
+    auto outer = dh.addLibraryData(libName);
+    outer->add("key1", Datum{"val1"});
+    ASSERT_THAT(dh.getLibraryData(libName)->getData(),
+                Contains(Key("key1")));
+    dh.addLibraryData(libName);
+    ASSERT_THAT(dh.getLibraryData(libName)->getData(),
+                Not(Contains(Key("key1"))));
 }
 
 TEST(DataHolder, create_fromNode_data) {
@@ -197,9 +209,9 @@ TEST(DataHolder, toNode_curveSets) {
 
 TEST(DataHolder, toNode_libraryData) {
     DataHolder dh{};
-    auto outer = dh.add_library_data("outer");
+    auto outer = dh.addLibraryData("outer");
     outer->add("scal", Datum{"goodbye!"});
-    auto inner = outer->add_library_data("inner");
+    auto inner = outer->addLibraryData("inner");
     inner->add("str", Datum{"hello!"});
     auto expected = R"({
         "library_data": {

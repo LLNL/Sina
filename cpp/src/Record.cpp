@@ -23,6 +23,7 @@ char const USER_DEFINED_FIELD[] = "user_defined";
 namespace sina {
 
 Record::Record(ID id_, std::string type_) :
+        DataHolder{},
         id{std::move(id_), LOCAL_ID_FIELD, GLOBAL_ID_FIELD},
         type{std::move(type_)} {}
 

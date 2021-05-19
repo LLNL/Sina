@@ -32,12 +32,13 @@ void DataHolder::add(CurveSet curveSet) {
     }
 }
 
-std::shared_ptr<DataHolder> DataHolder::add_library_data(std::string const &name) {
-  // TODO: if the library already exists, should we error?
+std::shared_ptr<DataHolder> DataHolder::addLibraryData(std::string const &name) {
   auto existing = libraryData.find(name);
   if (existing == libraryData.end()) {
-      libraryData.emplace(name, std::make_shared<DataHolder>(DataHolder{}));
-  }
+      libraryData.emplace(name, std::make_shared<DataHolder>());
+    } else {
+        existing->second = std::make_shared<DataHolder>();
+    }
   return libraryData.at(name);
 }
 
