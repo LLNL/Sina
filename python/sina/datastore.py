@@ -1,4 +1,6 @@
 """Defines the DataStore, Sina's toplevel data interaction object."""
+import warnings
+
 import sina.datastores.sql as sina_sql
 try:
     import sina.datastores.cass as sina_cass
@@ -10,16 +12,16 @@ except ImportError:
     HAS_CASSANDRA = False
 
 
-def create_datastore(database=None, keyspace=None, database_type=None,
-                     allow_connection_pooling=False):
+def connect(database=None, keyspace=None, database_type=None,
+            allow_connection_pooling=False):
     """
-    Create a DataStore for handling some type of backend.
+    Connect to a database.
 
     Given a uri/path (and, if required, the name of a keyspace),
-    figures out which backend is required. You can also provide it with an
-    existing DAOFactory if you'd like to reuse a connection.
+    figures out which backend is required.
 
-    :param database: The URI of the database to connect to.
+    :param database: The URI of the database to connect to. If empty, an
+     in-memory sqlite3 database will be used.
     :param keyspace: The keyspace to connect to (Cassandra only).
     :param database_type: Type of backend to connect to. If not provided, Sina
                           will infer this from <database>. One of "sql" or
@@ -27,6 +29,7 @@ def create_datastore(database=None, keyspace=None, database_type=None,
     :param allow_connection_pooling: Allow "pooling" behavior that recycles connections,
                                      which may prevent them from closing fully on .close().
                                      Only used for the sql backend.
+    :return: a DataStore object connected to the specified database
     """
     # Determine a backend
     if database_type is None:
@@ -47,6 +50,34 @@ def create_datastore(database=None, keyspace=None, database_type=None,
     else:
         raise ValueError("Given unrecognized database type: {}".format(database_type))
     return DataStore(connection)
+
+
+def create_datastore(database=None, keyspace=None, database_type=None,
+                     allow_connection_pooling=False):
+    """
+    Create a DataStore for handling some type of backend.
+
+    Given a uri/path (and, if required, the name of a keyspace),
+    figures out which backend is required.
+
+    .. deprecated:: 1.10
+        Use :func:`connect` instead.
+
+    :param database: The URI of the database to connect to.
+    :param keyspace: The keyspace to connect to (Cassandra only).
+    :param database_type: Type of backend to connect to. If not provided, Sina
+                          will infer this from <database>. One of "sql" or
+                          "cassandra".
+    :param allow_connection_pooling: Allow "pooling" behavior that recycles connections,
+                                     which may prevent them from closing fully on .close().
+                                     Only used for the sql backend.
+    :return: a DataStore object connected to the specified database
+    """
+    warnings.warn('This function is deprecated. Use connect() instead.',
+                  DeprecationWarning)
+    return connect(database=database, keyspace=keyspace,
+                   database_type=database_type,
+                   allow_connection_pooling=allow_connection_pooling)
 
 
 class DataStore(object):

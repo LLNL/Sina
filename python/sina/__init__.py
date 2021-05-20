@@ -4,6 +4,12 @@
 __VERSION__ = "1.9.5"
 
 
+from sina.datastore import connect
+
+
 def get_version():
     """Get the version of the package."""
     return __VERSION__
+
+
+__all__ = ['connect']
