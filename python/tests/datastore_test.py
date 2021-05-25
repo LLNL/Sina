@@ -12,7 +12,10 @@ import unittest
 from mock import Mock, patch  # pylint: disable=import-error
 from nose.plugins.attrib import attr  # pylint: disable=import-error
 
-from sina.datastore import create_datastore, DataStore
+import sina
+import sina.datastore
+
+from sina.datastore import connect, create_datastore, DataStore
 
 
 class DatastoreTests(unittest.TestCase):
@@ -293,36 +296,53 @@ class CreateDatastore(unittest.TestCase):
 
     @patch('sina.datastore.DataStore.__init__')
     @patch('sina.datastores.sql.DAOFactory.__init__')
-    def test_create_sql_datastore(self, mock_factory_init, mock_datastore_init):
-        """Make sure create_datastore() targets the backend when appropriate."""
+    def test_connect_sql_datastore(self, mock_factory_init, mock_datastore_init):
+        """Make sure connect() targets the backend when appropriate."""
         # Python gets confused if __init__ returns a MagicMock
         mock_factory_init.return_value = None
         # Because of that, we have to short-circuit the other init, too.
         mock_datastore_init.return_value = None
-        create_datastore()
+        connect()
         self.assertEqual(mock_factory_init.call_count, 1)
-        create_datastore("127.0.0.1")
+        connect("127.0.0.1")
         self.assertEqual(mock_factory_init.call_count, 2)
-        create_datastore(database_type="sql")
+        connect(database_type="sql")
         self.assertEqual(mock_factory_init.call_count, 3)
 
     @attr('cassandra')
     @patch('sina.datastore.DataStore.__init__')
     @patch('sina.datastores.cass.DAOFactory.__init__')
-    def test_create_cass_datastore(self, mock_factory_init,
-                                   mock_datastore_init):
-        """Make sure create_datastore() targets the backend when appropriate."""
+    def test_connect_cass_datastore(self, mock_factory_init,
+                                    mock_datastore_init):
+        """Make sure connect() targets the backend when appropriate."""
         mock_factory_init.return_value = None
         mock_datastore_init.return_value = None
-        create_datastore()
-        create_datastore("127.0.0.1")
+        connect()
+        connect("127.0.0.1")
         self.assertEqual(mock_factory_init.call_count, 0)
-        create_datastore(keyspace="my cool keyspace")
+        connect(keyspace="my cool keyspace")
         self.assertEqual(mock_factory_init.call_count, 1)
-        create_datastore(database_type="cassandra",
-                         keyspace="my other cool keyspace")
+        connect(database_type="cassandra",
+                keyspace="my other cool keyspace")
         self.assertEqual(mock_factory_init.call_count, 2)
         with self.assertRaises(ValueError) as context:
-            create_datastore(database_type="cassandra")
+            connect(database_type="cassandra")
         self.assertIn('keyspace must be provided', str(context.exception))
         self.assertEqual(mock_factory_init.call_count, 2)
+
+    @patch('sina.datastore.connect')
+    def test_create_datastore_sql_datastore(self, mock_connect):
+        """Verify create_datastore() delegates to connect()."""
+        expected_result = object()
+        mock_connect.return_value = expected_result
+        result = create_datastore(database='my_db', keyspace='my_keyspace',
+                                  database_type='my_type',
+                                  allow_connection_pooling=True)
+        mock_connect.assert_called_with(
+            database='my_db', keyspace='my_keyspace', database_type='my_type',
+            allow_connection_pooling=True)
+        self.assertEqual(expected_result, result)
+
+    def test_connect_defined_at_sina(self):
+        """Verify sina.connect() is defined and the same as sina.datastore.connect()"""
+        self.assertEqual(sina.connect, sina.datastore.connect)
