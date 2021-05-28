@@ -53,7 +53,7 @@ setup(name='llnl-sina',
         'enum34;python_version<"3.4"',
         'orjson;python_version>="3.6" and platform_machine!="ppc64le"',
         'ujson;python_version>="3.6" and platform_machine=="ppc64le"',
-        'ujson;python_version<"3.6" and platform_machine!="ppc64le"',
+        'ujson<4;python_version<"3.6" and platform_machine!="ppc64le"',
       ],
       license='MIT',
       classifiers=[
