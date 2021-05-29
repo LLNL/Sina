@@ -127,7 +127,7 @@ class RecordDAO(object):
 
     @abstractmethod
     def _do_update(self, records):
-        """Handle the logic of the upate itself."""
+        """Handle the logic of the update itself."""
         raise NotImplementedError
 
     @abstractmethod
@@ -201,16 +201,26 @@ class RecordDAO(object):
                             .format(criteria))
         return criterion_is_for_scalars[0]
 
-    @abstractmethod
-    def get_all_of_type(self, type, ids_only=False):
+    def get_all_of_type(self, types, ids_only=False, id_pool=None):
         """
-        Given a type of Record, return all Records of that type.
+        Given a(n iterable of) type(s) of Record, return all Records of that type(s).
 
-        :param type: The type of Record to return
+        :param types: A(n iterable of) types of Records to return
         :param ids_only: whether to return only the ids of matching Records
+        :param id_pool: Used when combining queries: a pool of ids to restrict
+                        the query to. Only records with ids in this pool can be
+                        returned.
 
         :returns: A generator of matching Records.
         """
+        if isinstance(types, six.string_types):
+            types = [types]
+        LOGGER.debug('Getting all records with types in %s.', types)
+        return self._get_all_of_type(types, ids_only, id_pool)
+
+    @abstractmethod
+    def _get_all_of_type(self, types, ids_only=False, id_pool=None):
+        """Handle the logic of the type query."""
         raise NotImplementedError
 
     def get_all(self, ids_only):
