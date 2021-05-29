@@ -126,13 +126,13 @@ class DatastoreTests(unittest.TestCase):
         self.assert_record_method_is_passthrough("delete", "delete", 1,
                                                  has_result=False)
 
-    def test_find_with_type(self):
+    def test_find_with_types(self):
         """Test the RecordOperation find_with_type()."""
-        self.assert_record_method_is_passthrough("find_with_type",
-                                                 "get_all_of_type", 2)
-        self.assert_record_method_is_passthrough("find_with_type",
+        self.assert_record_method_is_passthrough("find_with_types",
+                                                 "get_all_of_type", 3)
+        self.assert_record_method_is_passthrough("find_with_types",
                                                  "get_all_of_type", 1,
-                                                 opt_args=(False,))
+                                                 opt_args=(False, None))
 
     def test_get_all(self):
         """Test the RecordOperation get_all()."""

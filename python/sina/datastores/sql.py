@@ -20,6 +20,8 @@ from sina import utils
 
 # Disable redefined-builtin, invalid-name due to ubiquitous use of id
 # pylint: disable=invalid-name,redefined-builtin
+# Disable too-many-lines, as a refactor's currently out of scope
+# pylint: disable=too-many-lines
 
 LOGGER = logging.getLogger(__name__)
 
