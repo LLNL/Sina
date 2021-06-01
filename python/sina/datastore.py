@@ -213,8 +213,6 @@ class DataStore(object):
             return self.record_dao.get_all(ids_only)
 
         # ------------------ Operations tied to Record type -------------------
-        # It's safe to redefine "type" within the scope of this function.
-        # pylint: disable=redefined-builtin
         def find_with_type(self, types, ids_only=False, id_pool=None):
             """
             Given a(n iterable of) type(s) of Record, return all Records of that type(s).

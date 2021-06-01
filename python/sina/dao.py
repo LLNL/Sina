@@ -215,6 +215,11 @@ class RecordDAO(object):
         """
         if isinstance(types, six.string_types):
             types = [types]
+        else:
+            types = list(types)  # safety cast for gens
+        # safety cast for id_pool as well
+        if id_pool is not None:
+            id_pool = list(id_pool)  # safety cast for gens
         LOGGER.debug('Getting all records with types in %s.', types)
         return self._get_all_of_type(types, ids_only, id_pool)
 
