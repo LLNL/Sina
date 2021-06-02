@@ -20,6 +20,8 @@ from sina import utils
 
 # Disable redefined-builtin, invalid-name due to ubiquitous use of id
 # pylint: disable=invalid-name,redefined-builtin
+# Disable too-many-lines, as a refactor's currently out of scope
+# pylint: disable=too-many-lines
 
 LOGGER = logging.getLogger(__name__)
 
@@ -480,20 +482,25 @@ class RecordDAO(dao.RecordDAO):
                 yield model.generate_record_from_json(
                     json_input=_json_loads(result.raw))
 
-    def get_all_of_type(self, type, ids_only=False):
+    def _get_all_of_type(self, types, ids_only=False, id_pool=None):
         """
-        Given a type of record, return all Records of that type.
+        Given an iterable of types of Record, return all Records of those types.
 
-        :param type: The type of record to return, ex: run
+        :param types: An iterable of types of Records to return
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
+        :param id_pool: Used when combining queries: a pool of ids to restrict
+                        the query to. Only records with ids in this pool can be
+                        returned.
 
         :returns: A generator of Records of that type or (if ids_only) a
                   generator of their ids
         """
-        LOGGER.debug('Getting all records of type %s.', type)
         query = (self.session.query(schema.Record.id)
-                 .filter(schema.Record.type == type))
+                 .filter(schema.Record.type.in_(types)))
+        if id_pool is not None:
+            query = query.filter(schema.Record.id.in_(id_pool))
+
         if ids_only:
             for record_id in query.all():
                 yield str(record_id[0])

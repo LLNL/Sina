@@ -213,18 +213,21 @@ class DataStore(object):
             return self.record_dao.get_all(ids_only)
 
         # ------------------ Operations tied to Record type -------------------
-        # It's safe to redefine "type" within the scope of this function.
-        # pylint: disable=redefined-builtin
-        def find_with_type(self, type, ids_only=False):
+        def find_with_type(self, types, ids_only=False, id_pool=None):
             """
-            Given a type of Record, return all Records of that type.
+            Given a(n iterable of) type(s) of Record, return all Records of that type(s).
 
-            :param type: The type of Record to return
+            :param types: A(n iterable of) types of Records to return
             :param ids_only: whether to return only the ids of matching Records
+            :param id_pool: Used when combining queries: a pool of ids to restrict
+                            the query to. Only records with ids in this pool can be
+                            returned.
 
             :returns: A generator of matching Records.
             """
-            return self.record_dao.get_all_of_type(type, ids_only)
+            return self.record_dao.get_all_of_type(types, ids_only, id_pool)
+
+        find_with_types = find_with_type
 
         def get_types(self):
             """

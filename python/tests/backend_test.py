@@ -1072,6 +1072,30 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         ids_only = self.record_dao.get_all_of_type("run", ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam5"])
 
+    def test_recorddao_multiple_types_match(self):
+        """Test the RecordDAO type query correctly returns Records for multiple types."""
+        ids_only = self.record_dao.get_all_of_type(["run", "foo", "spamrec"], ids_only=True)
+        six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam3", "spam5", "spam6"])
+
+    def test_recorddao_types_match_id_pool(self):
+        """Test the RecordDAO type query correctly only returns Records from a pool."""
+        ids_only = self.record_dao.get_all_of_type(["run"], ids_only=True,
+                                                   id_pool=["spam", "spam2", "spam6"])
+        six.assertCountEqual(self, list(ids_only), ["spam", "spam2"])
+
+    def test_recorddao_types_match_id_pool_empty(self):
+        """Test the RecordDAO type query correctly returns no Records from an empty pool."""
+        ids_only = self.record_dao.get_all_of_type(["run"], ids_only=True,
+                                                   id_pool=[])
+        six.assertCountEqual(self, list(ids_only), [])
+
+    def test_recorddao_types_match_with_generators(self):
+        """Test the RecordDAO type query acts as expected when given generators."""
+        ids_only = self.record_dao.get_all_of_type((x for x in ["run", "foo", "spamrec"]),
+                                                   id_pool=(x for x in ["spam2", "spam5", "egg"]),
+                                                   ids_only=True)
+        six.assertCountEqual(self, list(ids_only), ["spam2", "spam5"])
+
     # ######################### get_with_curve_set #########################
     def test_recorddao_get_with_curve_set(self):
         """Test that the RecordDAO is retrieving based on curve name."""

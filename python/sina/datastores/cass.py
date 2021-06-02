@@ -780,21 +780,24 @@ class RecordDAO(dao.RecordDAO):
             for result in results:
                 yield model.generate_record_from_json(json_input=json.loads(result.raw))
 
-    def get_all_of_type(self, type, ids_only=False):
+    def _get_all_of_type(self, types, ids_only=False, id_pool=None):
         """
-        Given a type of Record, return all Records of that type.
+        Given an iterable of types of Record, return all Records of those types.
 
-        :param type: The type of Record to return, ex: run
+        :param types: An iterable of types of Records to return
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
         :returns: A generator of Records of that type or (if ids_only) a
                   generator of their ids
         """
-        LOGGER.debug('Getting all records of type %s.', type)
         # There's an index on type, which should be alright as type is expected
         # to have low cardinality. If speed becomes an issue, a dedicated query table might help.
-        query = (schema.Record.objects.filter(type=type).values_list('id', flat=True))
+        query = schema.Record.objects.filter(schema.Record.type.in_(types))
+        if id_pool is not None:
+            query = query.filter(schema.Record.id.in_(id_pool))
+
+        query = query.values_list('id', flat=True)
         if ids_only:
             for id in query:
                 yield str(id)
@@ -855,7 +858,7 @@ class RecordDAO(dao.RecordDAO):
 
         query_tables = [type_name_to_tables[type] for type in data_types]
 
-        ids = list(self.get_all_of_type(record_type, ids_only=True))
+        ids = list(self._get_all_of_type(record_type, ids_only=True))
 
         for query_table in query_tables:
             results = set(query_table.objects
