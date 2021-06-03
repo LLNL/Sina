@@ -302,21 +302,24 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
-    @abstractmethod
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
-        Return all records associated with documents whose uris match some arg.
+        Handle shared backend logic for datastore's find_with_file_uris().
 
-        Supports the use of % as a wildcard character. Note that you may or may
-        not get duplicates depending on the backend.
-
-        :param uri: The uri to use as a search term, such as "foo.png"
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
-        :param ids_only: whether to return only the ids of matching Records
-
-        :returns: A generator of matching Records
+        NOTE: Args were moved and cleaned up for datastore version. This old
+        version uses accepted_ids_list instead of id_pool.
         """
+        LOGGER.debug('Getting record with uris matching uri criterion %s', uri)
+        if accepted_ids_list is not None:
+            id_pool = list(accepted_ids_list)
+            LOGGER.debug('Restricting to %i ids.', len(id_pool))
+        return self._do_get_given_document_uri(uri=uri,
+                                               accepted_ids_list=accepted_ids_list,
+                                               ids_only=ids_only)
+
+    @abstractmethod
+    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+        """Handle backend-specific logic for datastore's find_with_file_uris()."""
         raise NotImplementedError
 
     @abstractmethod

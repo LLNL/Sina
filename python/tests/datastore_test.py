@@ -197,11 +197,24 @@ class DatastoreTests(unittest.TestCase):
 
     def test_find_with_file_uri(self):
         """Test the RecordOperation find_with_file_uri()."""
-        self.assert_record_method_is_passthrough("find_with_file_uri",
-                                                 "get_given_document_uri", 3)
-        self.assert_record_method_is_passthrough("find_with_file_uri",
-                                                 "get_given_document_uri", 1,
-                                                 opt_args=(None, False))
+        # We need to test whether kwargs are properly provided and reordered.
+        expected_result = "test return"
+        self.record_dao.get_given_document_uri = Mock(return_value=expected_result)
+        arg = "*.png"
+        expected_kwargs = {"uri": "*.png",
+                           "ids_only": False,
+                           "accepted_ids_list": None}
+        actual_result = self.datastore.records.find_with_file_uri(arg)
+        self.assertIs(actual_result, expected_result)
+        self.record_dao.get_given_document_uri.assert_called_with(**expected_kwargs)
+
+        args = ("*.png", True, ["test_rec", "other_test_rec"])
+        expected_kwargs = {"uri": "*.png",
+                           "ids_only": True,
+                           "accepted_ids_list": ["test_rec", "other_test_rec"]}
+        actual_result = self.datastore.records.find_with_file_uri(*args)
+        self.assertIs(actual_result, expected_result)
+        self.record_dao.get_given_document_uri.assert_called_with(**expected_kwargs)
 
     def test_find_with_file_mimetype(self):
         """Test the RecordOperation find_with_file_mimetype()."""

@@ -867,7 +867,7 @@ class RecordDAO(dao.RecordDAO):
             for result in results:
                 yield result
 
-    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 

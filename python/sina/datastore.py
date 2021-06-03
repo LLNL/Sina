@@ -343,25 +343,30 @@ class DataStore(object):
             return self.record_dao.get_with_min(scalar_name, count, ids_only)
 
         # ------------------ Operations tied to Record files -------------------
-        def find_with_file_uri(self, uri, accepted_ids_list=None,
-                               ids_only=False):
+        def find_with_file_uri(self, uri, ids_only=False, id_pool=None):
             """
-            Return all records associated with files whose uris match some arg.
+            Given a uri criterion, return Records with files whose uris match.
+
+            The simplest case for <criterion> is to provide a string (possibly including
+            one or more wildcards, see below). You may also use Sina's has_any
+            or has_all constructs, ex find_with_file_uris(uri=has_any("%.png", "%.jpg"))
 
             Supports the use of % as a wildcard character. Note that you may or
             may not get duplicates depending on the backend; call set() to
             collapse the returned generator if required.
 
-            :param uri: The uri to use as a search term, such as "foo.png"
-            :param accepted_ids_list: A list of ids to restrict the search to.
-                                      If not provided, all ids will be used.
+            :param uri: A uri or criterion describing what to match. Either a string,
+                        a has_all, or a has_any.
             :param ids_only: whether to return only the ids of matching Records
+            :param id_pool: Used when combining queries: a pool of ids to restrict
+                            the query to. Only records with ids in this pool can be
+                            returned.
 
-            :returns: A generator of matching Records
+            :returns: A generator of matching Records.
             """
-            return self.record_dao.get_given_document_uri(uri,
-                                                          accepted_ids_list,
-                                                          ids_only)
+            return self.record_dao.get_given_document_uri(uri=uri,
+                                                          accepted_ids_list=id_pool,
+                                                          ids_only=ids_only)
 
         def find_with_file_mimetype(self, mimetype, ids_only=False):
             """
