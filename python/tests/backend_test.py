@@ -763,15 +763,15 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_recorddao_uri_any_wildcard(self):
         """Test that RecordDAO is retrieving based on has_any with wildcards."""
-        two_match = self.record_dao.get_given_document_uri(uri=has_any("%png", "beeq.%"),
-                                                           ids_only=True)
-        six.assertCountEqual(self, (list(two_match)), ["spam2", "spam3", "spam4"])
+        matched_ids = self.record_dao.get_given_document_uri(uri=has_any("%png", "beeq.%"),
+                                                             ids_only=True)
+        six.assertCountEqual(self, (list(matched_ids)), ["spam2", "spam3", "spam4"])
 
     def test_recorddao__uri_all(self):
         """Test that RecordDAO is retrieving based on has_all correctly."""
-        one_match = self.record_dao.get_given_document_uri(uri=has_all("beep.png", "eggs.count"),
-                                                           ids_only=True)
-        six.assertCountEqual(self, (list(one_match)), ["spam4"])
+        matched_ids = self.record_dao.get_given_document_uri(uri=has_all("beep.png", "eggs.count"),
+                                                             ids_only=True)
+        six.assertCountEqual(self, (list(matched_ids)), ["spam4"])
 
     def test_recorddao__uri_all_wildcard(self):
         """Test that RecordDAO is retrieving based on has_all correctly with wildcards."""
