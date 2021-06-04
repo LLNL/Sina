@@ -1,3 +1,6 @@
 [submodule "blt"]
 	path = cpp/blt
 	url = https://github.com/LLNL/blt.git
+[submodule "cpp/uberenv"]
+	path = cpp/uberenv
+	url = https://github.com/LLNL/uberenv.git

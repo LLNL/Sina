@@ -1,0 +1,126 @@
+packages:
+  all:
+    # This defaults us to machine specific flags of ivybridge which allows
+    # us to run on broadwell as well
+    target: [ivybridge]
+    compiler: [gcc, intel, clang]
+    providers:
+      mpi: [mvapich2]
+
+# Lock down which MPI we are using
+  mpi:
+    buildable: false
+  mvapich2:
+    buildable: false
+    externals:
+    - spec: mvapich2@2.3%clang@9.0.0 process_managers=slurm arch=linux-rhel7-ivybridge
+      prefix: /usr/tce/packages/mvapich2/mvapich2-2.3-clang-9.0.0
+    - spec: mvapich2@2.3%clang@10.0.0 process_managers=slurm arch=linux-rhel7-ivybridge
+      prefix: /usr/tce/packages/mvapich2/mvapich2-2.3-clang-10.0.0
+    - spec: mvapich2@2.3%clang@11.0.1 process_managers=slurm arch=linux-rhel7-ivybridge
+      prefix: /usr/tce/packages/mvapich2/mvapich2-2.3-clang-11.0.1
+    - spec: mvapich2@2.3%gcc@10.2.1 process_managers=slurm arch=linux-rhel7-ivybridge
+      prefix: /usr/tce/packages/mvapich2/mvapich2-2.3-gcc-10.2.1
+    - spec: mvapich2@2.3%gcc@10.2.1_no_fortran process_managers=slurm arch=linux-rhel7-ivybridge
+      prefix: /usr/tce/packages/mvapich2/mvapich2-2.3-gcc-10.2.1
+    - spec: mvapich2@2.3%gcc@10.2.1_no_fortran process_managers=slurm arch=linux-rhel7-ivybridge
+      prefix: /usr/tce/packages/mvapich2/mvapich2-2.3-gcc-10.2.1
+    - spec: mvapich2@2.3%intel@18.0.2 process_managers=slurm arch=linux-rhel7-ivybridge
+      prefix: /usr/tce/packages/mvapich2/mvapich2-2.3-intel-18.0.2
+    - spec: mvapich2@2.3%intel@19.0.4 process_managers=slurm arch=linux-rhel7-ivybridge
+      prefix: /usr/tce/packages/mvapich2/mvapich2-2.3-intel-19.0.4
+
+  # Standard packages
+  perl:
+    buildable: false
+    version: [5.16.3]
+    externals:
+    - spec: perl
+      prefix: /usr
+  autoconf:
+    buildable: false
+    version: [2.69]
+    externals:
+    - spec: autoconf
+      prefix: /usr
+  automake:
+    buildable: false
+    version: [1.13.4]
+    externals:
+    - spec: automake
+      prefix: /usr
+  diffutils:
+    buildable: false
+    version: [3.3]
+    externals:
+    - spec: diffutils
+      prefix: /usr
+  findutils:
+    buildable: false
+    version: [4.5.11]
+    externals:
+    - spec: findutils
+      prefix: /usr
+  pkg-config:
+    buildable: false
+    version: [0.27.1]
+    externals:
+    - spec: pkg-config
+      prefix: /usr
+  tar:
+    buildable: false
+    version: [1.26]
+    externals:
+    - spec: tar
+      prefix: /usr
+#  python:
+#    buildable: false
+#    version: [3.7.2, 2.7.16]
+#    externals:
+#    - spec: python@:2.999999
+#      prefix: /usr/tce
+#    - spec: python@3:
+#      prefix: /usr/tce
+  python:
+    buildable: false
+    version: [3.7.2]
+    externals:
+    - spec: 'python@3:'
+      prefix: /usr/tce
+  m4:
+    buildable: false
+    version: [1.4.16]
+    externals:
+    - spec: m4
+      prefix: /usr
+  bzip2:
+    buildable: false
+    version: [1.0.6]
+    externals:
+    - spec: bzip2
+      prefix: /usr
+  gettext:
+    buildable: false
+    version: [0.19.8.1]
+    externals:
+    - spec: gettext
+      prefix: /usr
+  libtool:
+    buildable: false
+    version: [2.4.2]
+    externals:
+    - spec: libtool
+      prefix: /usr
+  cmake:
+    buildable: false
+    version: [3.14.5]
+    externals:
+    - spec: cmake
+      prefix: /usr/tce
+  doxygen:
+    buildable: false
+    version: [1.8.5]
+    externals:
+    - spec: doxygen
+      prefix: /usr
+
