@@ -82,12 +82,14 @@ def populate_database_with_data(record_dao):
     spam_record_3.data["spam_scal_2"] = {"value": 10.5}
     spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
     spam_record_3.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_3.files = {"beeq.png": {"mimetype": 'image/png'}}
+    spam_record_3.files = {"beeq.png": {"mimetype": 'image/png'},
+                           "many.eggs.narf": {}}
 
     spam_record_4 = Record(id="spam4", type="bar")
     spam_record_4.data["val_data_list_1"] = {"value": [-11, -9]}
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
-    spam_record_4.files = {"beep.png": {"mimetype": 'image/png'}}
+    spam_record_4.files = {"beep.png": {"mimetype": 'image/png'},
+                           "eggs.count": {}}
 
     spam_record_5 = Run(id="spam5", application="breakfast_maker")
     spam_record_5.data["spam_scal_3"] = {"value": 46}
@@ -97,7 +99,8 @@ def populate_database_with_data(record_dao):
     spam_record_5.data["val_data_list_1"] = {"value": [0, 8]}
     spam_record_5.data["val_data_list_2"] = {"value": ['eggs', 'pancake']}
     spam_record_5.files = {"beep.wav": {"tags": ["output", "eggs"],
-                                        "mimetype": 'audio/wav'}}
+                                        "mimetype": 'audio/wav'},
+                           "eggs.count": {}}
 
     spam_record_6 = Record(id="spam6", type="spamrec")
     spam_record_6.data["flex_data_1"] = {"value": "orange juice"}
@@ -751,6 +754,30 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Ensure that a uri=% (wildcard) uri query matches all Records with files."""
         all_wildcard = self.record_dao.get_given_document_uri(uri="%")
         self.assertEqual(len(list(all_wildcard)), 5)
+
+    def test_recorddao_uri_any(self):
+        """Test that RecordDAO is retrieving based on has_any correctly."""
+        two_match = self.record_dao.get_given_document_uri(uri=has_any("beep.png", "beep.wav"),
+                                                           ids_only=True)
+        six.assertCountEqual(self, (list(two_match)), ["spam", "spam4", "spam5"])
+
+    def test_recorddao_uri_any_wildcard(self):
+        """Test that RecordDAO is retrieving based on has_any with wildcards."""
+        matched_ids = self.record_dao.get_given_document_uri(uri=has_any("%png", "beeq.%"),
+                                                             ids_only=True)
+        six.assertCountEqual(self, (list(matched_ids)), ["spam2", "spam3", "spam4"])
+
+    def test_recorddao__uri_all(self):
+        """Test that RecordDAO is retrieving based on has_all correctly."""
+        matched_ids = self.record_dao.get_given_document_uri(uri=has_all("beep.png", "eggs.count"),
+                                                             ids_only=True)
+        six.assertCountEqual(self, (list(matched_ids)), ["spam4"])
+
+    def test_recorddao__uri_all_wildcard(self):
+        """Test that RecordDAO is retrieving based on has_all correctly with wildcards."""
+        one_match = self.record_dao.get_given_document_uri(uri=has_all("bee%.png", "%eggs%"),
+                                                           ids_only=True)
+        six.assertCountEqual(self, (list(one_match)), ["spam3", "spam4"])
 
     # ############### get_given_document_uri for Runs ################
     def test_rundao_uri_one_wildcard(self):

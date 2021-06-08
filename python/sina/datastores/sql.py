@@ -630,13 +630,41 @@ class RecordDAO(dao.RecordDAO):
             for result in results:
                 yield result[0]
 
-    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+    def _build_query_given_uri_has_any(self, uri_list):
+        """Perform get_given_document_uri when we have a has_any criterion."""
+        query = self.session.query(schema.Document.id)
+        filters = []
+        for uri in uri_list:
+            # Note: Mixed results on whether SQLAlchemy's optimizer is smart enough
+            # to have %-less LIKE operate on par with ==, hence this:
+            if '%' in uri:
+                filters.append(schema.Document.uri.like(uri))
+            else:
+                filters.append(schema.Document.uri.__eq__(uri))
+        return query.filter(sqlalchemy.or_(*filters)).group_by(schema.Document.id)
+
+    def _build_query_given_uri_has_all(self, uri_list):
+        """Perform get_given_document_uri when we have a has_all criterion."""
+        def do_filter(query, uri):
+            """Apply the correct filter for a uri."""
+            if '%' in uri:
+                return query.filter(schema.Document.uri.like(uri))
+            return query.filter(schema.Document.uri.__eq__(uri))
+
+        query = do_filter(self.session.query(schema.Document.id, schema.Document.uri), uri_list[0])
+        for uri in uri_list[1:]:
+            sub_query = do_filter(self.session.query(schema.Document.id), uri).subquery()
+            query = query.join(sub_query, schema.Document.id == sub_query.c.id)
+        return query
+
+    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
         Supports the use of % as a wildcard character.
 
-        :param uri: The uri to use as a search term, such as "foo.png"
+        :param uri: The uri or uri criterion to use as a search term, such as
+                    "foo.png" or has_any("%success.jpg", "%success.png")
         :param accepted_ids_list: A list of ids to restrict the search to.
                                   If not provided, all ids will be used.
         :param ids_only: whether to return only the ids of matching Records
@@ -645,17 +673,17 @@ class RecordDAO(dao.RecordDAO):
         :returns: A generator of matching records or (if ids_only) a
                   generator of their ids. Returns distinct items.
         """
-        LOGGER.debug('Getting all records related to uri=%s.', uri)
-        if accepted_ids_list:
-            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
-        # Note: Mixed results on whether SQLAlchemy's optimizer is smart enough
-        # to have %-less LIKE operate on par with ==, hence this:
-        if '%' in uri:
-            query = (self.session.query(schema.Document.id)
-                     .filter(schema.Document.uri.like(uri)).distinct())
+        query = self.session.query(schema.Document.id,
+                                   sqlalchemy.func.count(schema.Document.id))
+
+        if isinstance(uri, utils.StringListCriteria):
+            if uri.operation == utils.ListQueryOperation.HAS_ANY:
+                query = self._build_query_given_uri_has_any(uri.value)
+            else:
+                query = self._build_query_given_uri_has_all(uri.value)
         else:
-            query = (self.session.query(schema.Document.id)
-                     .filter(schema.Document.uri == uri).distinct())
+            # Logic is identical for the case of just one uri
+            query = self._build_query_given_uri_has_any([uri])
         if accepted_ids_list is not None:
             query = query.filter(schema.Document
                                  .id.in_(accepted_ids_list))
