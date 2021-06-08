@@ -399,7 +399,7 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_recorddao_update_with_invalid_data(self):
         """
-        Test that RecordDAO can still be used after tyring to update a record
+        Test that RecordDAO can still be used after trying to update a record
         with invalid data.
         """
         record_dao = self.factory.create_record_dao()
