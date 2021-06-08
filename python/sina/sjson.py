@@ -11,12 +11,13 @@ time with dropping Py2 support. It should be safe to delete this module and
 import orjson in its place.
 """
 
-import sys
-
-if sys.version_info[:3] >= (3, 6):
+try:
     import orjson as json  # pylint: disable=import-error
-else:
-    import ujson as json  # pylint: disable=import-error
+except ImportError:
+    try:
+        import ujson as json  # pylint: disable=import-error
+    except ImportError:
+        import json
 
 
 def loads(*args, **kwargs):

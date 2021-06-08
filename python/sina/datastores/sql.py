@@ -3,6 +3,7 @@ import os
 import numbers
 import logging
 from collections import defaultdict
+import functools
 
 import six
 
@@ -11,7 +12,7 @@ import sqlalchemy  # pylint: disable=import-error
 from sqlalchemy.pool import NullPool  # pylint: disable=import-error
 
 import sina.dao as dao
-import sina.json as json
+import sina.sjson as json
 import sina.model as model
 import sina.datastores.sql_schema as schema
 from sina.utils import sort_and_standardize_criteria
@@ -33,6 +34,33 @@ DATA_TABLES = [schema.ScalarData, schema.StringData,
 CHUNK_SIZE = 999
 
 
+def _commit_or_rollback(func):
+    """
+    Create a wrapper which calls the given function, committing a session
+    if it succeeds, or rolling it back if it (or the commit) fails. The first
+    argument to the function must be an object with a "session" field.
+    This is intended to be used only on the member functions of DAOs below.
+    The return value of the wrapped function will be returned by the wrapper.
+
+    :param func: the function to wrap
+    :return: the wrapped function
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        """Wrapper function for the passed-in function."""
+        session = args[0].session
+        try:
+            result = func(*args, **kwargs)
+            session.commit()
+            return result
+        # need to roll back on anything, so use bare except
+        except:  # noqa: E722
+            session.rollback()
+            raise
+
+    return wrapper
+
+
 class RecordDAO(dao.RecordDAO):
     """The DAO specifically responsible for handling Records in SQL."""
 
@@ -49,6 +77,7 @@ class RecordDAO(dao.RecordDAO):
             sql_record = self.create_sql_record(record)
             self.session.add(sql_record)
 
+    @_commit_or_rollback
     def _do_insert(self, records):
         """
         Given a(n iterable of) Record(s), insert into the current SQL database.
@@ -56,7 +85,6 @@ class RecordDAO(dao.RecordDAO):
         :param records: Record or iterable of Records to insert
         """
         self._insert_no_commit(records)
-        self.session.commit()
 
     @staticmethod
     def create_sql_record(sina_record):
@@ -180,6 +208,7 @@ class RecordDAO(dao.RecordDAO):
          .filter(schema.Record.id.in_(ids))
          .delete(synchronize_session='fetch'))
 
+    @_commit_or_rollback
     def delete(self, ids):
         """
         Given a(n iterable of) Record id(s), delete all mention from the SQL database.
@@ -192,7 +221,6 @@ class RecordDAO(dao.RecordDAO):
         :param ids: The id or iterable of ids of the Record(s) to delete.
         """
         self._delete_no_commit(ids)
-        self.session.commit()
 
     def get_raw(self, id_):
         result = (self.session.query(schema.Record)
@@ -203,6 +231,7 @@ class RecordDAO(dao.RecordDAO):
 
         return _to_json_string(result.raw)
 
+    @_commit_or_rollback
     def _do_update(self, records):
         """
         Given a list of Records, update them in the backend in a single transaction.
@@ -211,7 +240,6 @@ class RecordDAO(dao.RecordDAO):
         """
         self._delete_no_commit(record.id for record in records)
         self._insert_no_commit(records)
-        self.session.commit()
 
     def data_query(self, **kwargs):
         """
@@ -789,6 +817,7 @@ class RelationshipDAO(dao.RelationshipDAO):
         """Initialize RelationshipDAO with session for its SQL database."""
         self.session = session
 
+    @_commit_or_rollback
     def insert(self, relationships=None, subject_id=None, object_id=None,
                predicate=None):
         """
@@ -819,7 +848,6 @@ class RelationshipDAO(dao.RelationshipDAO):
                 self.session.add(schema.Relationship(subject_id=rel.subject_id,
                                                      object_id=rel.object_id,
                                                      predicate=rel.predicate))
-        self.session.commit()
 
     # Note that get() is implemented by its parent.
     def get(self, subject_id=None, object_id=None, predicate=None):
@@ -846,6 +874,7 @@ class RelationshipDAO(dao.RelationshipDAO):
             query = query.filter(schema.Relationship.predicate == predicate)
         return query
 
+    @_commit_or_rollback
     def _do_delete(self, subject_id=None, object_id=None, predicate=None):
         """
         Given one or more criteria, delete all matching Relationships from the DAO's backend.
@@ -856,7 +885,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         """
         query = self._get_matching_relationships(subject_id, object_id, predicate)
         query.delete(synchronize_session='fetch')
-        self.session.commit()
 
 
 class DAOFactory(dao.DAOFactory):

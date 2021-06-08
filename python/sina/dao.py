@@ -13,7 +13,7 @@ import numbers
 import six
 
 import sina.model
-import sina.json as json
+import sina.sjson as json
 from sina.utils import DataRange
 
 LOGGER = logging.getLogger(__name__)

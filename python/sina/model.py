@@ -7,7 +7,7 @@ import copy
 
 import six
 
-import sina.json as json
+import sina.sjson as json
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
