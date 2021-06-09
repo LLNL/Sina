@@ -78,7 +78,7 @@ class RecordDAO(dao.RecordDAO):
             self.session.add(sql_record)
 
     @_commit_or_rollback
-    def insert(self, records):
+    def _do_insert(self, records):
         """
         Given a(n iterable of) Record(s), insert into the current SQL database.
 
