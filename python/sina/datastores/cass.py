@@ -807,16 +807,27 @@ class RecordDAO(dao.RecordDAO):
         """
         # There's an index on type, which should be alright as type is expected
         # to have low cardinality. If speed becomes an issue, a dedicated query table might help.
-        query = schema.Record.objects.filter(schema.Record.type.in_(types))
-        if id_pool is not None:
-            query = query.filter(schema.Record.id.in_(id_pool))
 
-        query = query.values_list('id', flat=True)
+        # Cassandra won't let us to an in_ on type, so we chain (a Record can only have
+        # one type, so we're guaranteed no duplicates).
+        generators = []
+        for type in types:
+            query = schema.Record.objects.filter(type=type).values_list('id', flat=True)
+            generators.append(query)
+
+        # Cassandra also doesn't want to let us filter in_ on record ID currently
+        # (though this may change in the future), and so:
+        if id_pool is not None:
+            id_pool = set(id_pool)
+            match_ids = (x for x in itertools.chain(*generators) if x in id_pool)
+        else:
+            match_ids = itertools.chain(*generators)
+
         if ids_only:
-            for id in query:
+            for id in match_ids:
                 yield str(id)
         else:
-            for record in self.get(query):
+            for record in self.get(match_ids):
                 yield record
 
     def get_with_curve_set(self, curve_set_name, ids_only=False):
@@ -872,7 +883,7 @@ class RecordDAO(dao.RecordDAO):
 
         query_tables = [type_name_to_tables[type] for type in data_types]
 
-        ids = list(self._get_all_of_type(record_type, ids_only=True))
+        ids = list(self._get_all_of_type([record_type], ids_only=True))
 
         for query_table in query_tables:
             results = set(query_table.objects
@@ -881,7 +892,8 @@ class RecordDAO(dao.RecordDAO):
             for result in results:
                 yield result
 
-    def _get_records_for_some_uri(self, uri, accepted_ids_list=None):
+    @staticmethod
+    def _get_records_for_some_uri(uri, accepted_ids_list=None):
         """
         Handle the logic for a single URI in _do_get_given_document_uri.
 
@@ -956,8 +968,12 @@ class RecordDAO(dao.RecordDAO):
                 generators.append(self._get_records_for_some_uri(criterion_entry,
                                                                  accepted_ids_list))
             if uri.operation == utils.ListQueryOperation.HAS_ALL:
-                # Cassandra result order is deterministic
-                match_ids = utils.intersect_ordered(generators)
+                # While a natural choice would be to ORDER_BY and use utils.intersect_ordered,
+                # Cassandra currently (June 2021) doesn't support ordering by partition key
+                # OR ordering by clustering key when partition key is unrestricted, meaning
+                # we can't do that here. Hopefully we don't run into memory issues.
+                match_ids = (x for x in set.intersection(*[set(x) for x in generators]))
+
             else:
                 match_ids = itertools.chain(*generators)
         else:
