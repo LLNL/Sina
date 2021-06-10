@@ -73,14 +73,6 @@ packages:
     externals:
     - spec: tar
       prefix: /usr
-#  python:
-#    buildable: false
-#    version: [3.7.2, 2.7.16]
-#    externals:
-#    - spec: python@:2.999999
-#      prefix: /usr/tce
-#    - spec: python@3:
-#      prefix: /usr/tce
   python:
     buildable: false
     version: [3.7.2]
