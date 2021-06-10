@@ -22,7 +22,7 @@ make -j all test
 ```
 
 # Detailed Instructions
-The Sinal C++ library uses CMake with BLT to configure and build. Technically,
+The Sina C++ library uses CMake with BLT to configure and build. Technically,
 that is all that is really needed. To make development easier, it also uses
 [Uberenv](https://uberenv.readthedocs.io/) and
 [Spack](https://spack.readthedocs.io/) to build needed command-line tools
@@ -32,13 +32,13 @@ The basic build steps are as follows:
 1. If there isn't a configuration file for your system, run Uberenv to make
    it and to build the needed libraries
 2. Create a directory in which to do the build.
-3. Run "cmake" with the configuration file from step 1.
-4. Run make to build the library.
-5. Run "make test"
+3. Run `cmake` with the configuration file from step 1.
+4. Run `make` to build the library.
+5. Run `make test`
 
 
 ## Testing all CTS compilers
-To simplify testing will all the different compilers on CTS systems,
+To simplify testing with all the different compilers on CTS systems,
 you can simply run the `run-builds.py` script in the `cpp` directory.
 This will build and test with each of the pre-existing host configurations
 for LC CTS systems.
