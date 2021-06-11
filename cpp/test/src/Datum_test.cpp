@@ -56,7 +56,7 @@ TEST(Datum, createFromNode) {
     // Conduit has some special treatment of arrays
     int int_array [] = {-2, 2, 4, 8};
     std::vector<double> array_equiv = {-2, 2, 4, 8};
-    char coerced_to_string [] = {'a', 'b', 'c'};
+    char coerced_to_string [] = {'a', 'b', 'c', '\0'};
     //Empty lists are valid
     conduit::Node empty_list(conduit::DataType::list());
 
