@@ -43,6 +43,7 @@ blt_add_library(NAME sina
         ../include/sina/Relationship.hpp
         ../include/sina/Run.hpp
         ../include/sina/Datum.hpp
+        ../include/sina/DataHolder.hpp
         ../include/sina/AdiakWriter.hpp
     SOURCES
         Curve.cpp
@@ -55,6 +56,7 @@ blt_add_library(NAME sina
         Relationship.cpp
         Run.cpp
         Datum.cpp
+        DataHolder.cpp
         AdiakWriter.cpp
     DEPENDS_ON
         Conduit

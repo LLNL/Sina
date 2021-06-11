@@ -13,6 +13,7 @@
 #include "conduit.hpp"
 
 #include "sina/ID.hpp"
+#include "sina/DataHolder.hpp"
 #include "sina/CurveSet.hpp"
 #include "sina/Datum.hpp"
 #include "sina/File.hpp"
@@ -61,11 +62,9 @@ struct FileHashByURI {
  * {"local_id":"my_record","type":"my_type","data":{"my_scalar":{"tags":["input"],"value":12.0}}}
  * \endcode
  */
-class Record {
+class Record : public DataHolder {
 public:
-    using DatumMap = std::unordered_map<std::string, Datum>;
     using FileSet = std::unordered_set<File, FileHashByURI, FileEqualByURI>;
-    using CurveSetMap = std::unordered_map<std::string, CurveSet>;
 
     /**
      * Construct a new Record.
@@ -104,29 +103,15 @@ public:
         return type;
     }
 
-    /**
-     * Get the Record's data.
-     *
-     * @return the Record's data
-     */
-    DatumMap const &getData() const noexcept {
-        return data;
-    }
 
-    /**
-     * Add a Datum to this record.
-     *
-     * @param name the key for the Datum to add
-     * @param datum the Datum to add
-     */
-    void add(std::string name, Datum datum);
-
+    using DataHolder::add;
     /**
      * Add a File to this record.
      *
      * @param file the File to add
      */
     void add(File file);
+
 
     /**
      * Get the files associated with this record.
@@ -135,22 +120,6 @@ public:
      */
     FileSet const &getFiles() const noexcept {
         return files;
-    }
-
-    /**
-     * Add a CurveSet to this record.
-     *
-     * @param curveSet the CurveSet to add
-     */
-    void add(CurveSet curveSet);
-
-    /**
-     * Get the curve sets associated with this record.
-     *
-     * @return the record's curve sets
-     */
-    CurveSetMap const &getCurveSets() const noexcept {
-        return curveSets;
     }
 
     /**

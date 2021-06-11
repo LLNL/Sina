@@ -23,6 +23,7 @@ char const EXPECTED_TYPE_KEY[] = "type";
 char const EXPECTED_LOCAL_ID_KEY[] = "local_id";
 char const EXPECTED_GLOBAL_ID_KEY[] = "id";
 char const EXPECTED_DATA_KEY[] = "data";
+char const EXPECTED_LIBRARY_DATA_KEY[] = "library_data";
 char const EXPECTED_FILES_KEY[] = "files";
 char const EXPECTED_USER_DEFINED_KEY[] = "user_defined";
 
@@ -56,7 +57,7 @@ TEST(Record, add_curve_set_existing_key) {
     ASSERT_THAT(csAfterFirstInsert, Contains(Key("cs1")));
     EXPECT_THAT(csAfterFirstInsert.at("cs1").getDependentCurves(),
                 Contains(Key("original")));
-    
+
     CurveSet cs2{"cs1"};
     cs2.addDependentCurve(Curve{"new", {1, 2, 3}});
     record.add(cs2);
@@ -106,11 +107,12 @@ TEST(Record, create_globalId_fromNode) {
     EXPECT_EQ(IDType::Global, record.getId().getType());
 }
 
-TEST(Record, create_globalId_data) {
+TEST(Record, create_globalId_withContent) {
     conduit::Node originalNode;
     originalNode[EXPECTED_GLOBAL_ID_KEY] = "the ID";
     originalNode[EXPECTED_TYPE_KEY] = "my type";
     originalNode[EXPECTED_DATA_KEY];
+    originalNode[EXPECTED_LIBRARY_DATA_KEY];
 
     std::string name1 = "datum name 1";
     std::string name2 = "datum name 2/with/slash";
@@ -118,12 +120,23 @@ TEST(Record, create_globalId_data) {
     conduit::Node name1_node;
     name1_node["value"] = "value 1";
     originalNode[EXPECTED_DATA_KEY][name1] = name1_node;
+
     conduit::Node name2_node;
     name2_node["value"] = 2.22;
     name2_node["units"] = "g/L";
     addStringsToNode(name2_node, "tags", {"tag1","tag2"});
     name2_node["value"] = 2.22;
     originalNode[EXPECTED_DATA_KEY].add_child(name2) = name2_node;
+
+    std::string libName = "my_lib";
+    conduit::Node libNode;
+    std::string name3 = "datum name 3";
+    conduit::Node name3_node;
+    name3_node["value"] = "value 3";
+    libNode[EXPECTED_DATA_KEY];
+    libNode[EXPECTED_DATA_KEY][name3] = name3_node;
+    originalNode[EXPECTED_LIBRARY_DATA_KEY][libName] = libNode;
+
     Record record{originalNode};
     auto &data = record.getData();
     ASSERT_EQ(2u, data.size());
@@ -132,6 +145,10 @@ TEST(Record, create_globalId_data) {
     EXPECT_EQ("g/L", data.at(name2).getUnits());
     EXPECT_EQ("tag1", data.at(name2).getTags()[0]);
     EXPECT_EQ("tag2", data.at(name2).getTags()[1]);
+
+    auto &libdata = record.getLibraryData();
+    EXPECT_THAT(libdata, Contains(Key(libName)));
+    EXPECT_EQ("value 3", libdata.at(libName)->getData().at(name3).getValue());
 }
 
 TEST(Record, create_globalId_files) {

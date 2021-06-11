@@ -34,6 +34,7 @@ blt_add_executable(NAME unittests
         src/ConduitTestUtils.cpp
         src/Curve_test.cpp
         src/CurveSet_test.cpp
+        src/DataHolder_test.cpp
         src/Document_test.cpp
         src/File_test.cpp
         src/ID_test.cpp

@@ -74,7 +74,12 @@ a :code:`quadrant` of "NW"::
   records = ds.records.find_with_data(final_volume=310, quadrant="NW")
 
 This will find all the records record_dao knows about (so those in
-:code:`somefile.sqlite`) that fit our specifications.
+:code:`somefile.sqlite`) that fit our specifications. To access nested library
+data, simply specify the owning library/libraries with path notation::
+
+  # This would find records with a library named "outer_lib" that has a library
+  # named "inner_lib", that itself has a data item "final volume" equal to 310
+  records = ds.records.find_with_data(**{"outer_lib/inner_lib/final_volume"=310})
 
 IMPORTANT NOTE: when providing multiple criteria, only entries fulfilling all criteria
 will be returned (boolean AND). If OR-like functionality is desired, see the next

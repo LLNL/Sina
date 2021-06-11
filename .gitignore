@@ -24,6 +24,7 @@ python/requirements/links.txt
 
 # Build directories
 cpp/build/
+cpp/build-*
 python/build/
 python/docs/build/
 
