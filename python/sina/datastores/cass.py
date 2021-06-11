@@ -808,7 +808,7 @@ class RecordDAO(dao.RecordDAO):
         # There's an index on type, which should be alright as type is expected
         # to have low cardinality. If speed becomes an issue, a dedicated query table might help.
 
-        # Cassandra won't let us to an in_ on type, so we chain (a Record can only have
+        # Cassandra won't let us do an in_ on type, so we chain (a Record can only have
         # one type, so we're guaranteed no duplicates).
         generators = []
         for type in types:
