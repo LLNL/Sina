@@ -4,6 +4,7 @@ import numbers
 import logging
 # Used for temporary implementation of LIKE-ish functionality
 import fnmatch
+import itertools
 from collections import defaultdict
 
 import six
@@ -398,10 +399,16 @@ class RecordDAO(dao.RecordDAO):
         all the files, etc. We add those deletions to a batchquery for later
         execution.
 
+        Note that if we fail to find the record in the Records table, we assume
+        it doesn't exist and abort our attempt to delete it.
+
         :param batch: the batch to add the deletions to
         :param record_id: the id of the record we're deleting
         """
         LOGGER.debug("Generating batch deletion commands for %s", record_id)
+        if not self._one_exists(record_id):
+            LOGGER.debug("Record with id %s not found. Aborting deletion.", record_id)
+            return
         record = self.get(record_id)
         # Delete from the record table itself
         schema.Record.objects(id=record_id).batch(batch).delete()
@@ -448,8 +455,15 @@ class RecordDAO(dao.RecordDAO):
         """
         Given a list of Records, update them in the backend.
 
+        This is not ACID-safe!
+
         :param records: A list of Records to update.
         """
+        # Try to at least minimize the chance of a bad deletion.
+        for record in records:
+            is_valid, warnings = record.is_valid()
+            if not is_valid:
+                raise ValueError(warnings)
         self.delete(record.id for record in records)
         self.insert(records)
 
@@ -781,16 +795,27 @@ class RecordDAO(dao.RecordDAO):
         """
         # There's an index on type, which should be alright as type is expected
         # to have low cardinality. If speed becomes an issue, a dedicated query table might help.
-        query = schema.Record.objects.filter(schema.Record.type.in_(types))
-        if id_pool is not None:
-            query = query.filter(schema.Record.id.in_(id_pool))
 
-        query = query.values_list('id', flat=True)
+        # Cassandra won't let us do an in_ on type, so we chain (a Record can only have
+        # one type, so we're guaranteed no duplicates).
+        generators = []
+        for type in types:
+            query = schema.Record.objects.filter(type=type).values_list('id', flat=True)
+            generators.append(query)
+
+        # Cassandra also doesn't want to let us filter in_ on record ID currently
+        # (though this may change in the future), and so:
+        if id_pool is not None:
+            id_pool = set(id_pool)
+            match_ids = (x for x in itertools.chain(*generators) if x in id_pool)
+        else:
+            match_ids = itertools.chain(*generators)
+
         if ids_only:
-            for id in query:
+            for id in match_ids:
                 yield str(id)
         else:
-            for record in self.get(query):
+            for record in self.get(match_ids):
                 yield record
 
     def get_with_curve_set(self, curve_set_name, ids_only=False):
@@ -846,7 +871,7 @@ class RecordDAO(dao.RecordDAO):
 
         query_tables = [type_name_to_tables[type] for type in data_types]
 
-        ids = list(self._get_all_of_type(record_type, ids_only=True))
+        ids = list(self._get_all_of_type([record_type], ids_only=True))
 
         for query_table in query_tables:
             results = set(query_table.objects
@@ -855,33 +880,13 @@ class RecordDAO(dao.RecordDAO):
             for result in results:
                 yield result
 
-    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+    @staticmethod
+    def _get_records_for_some_uri(uri, accepted_ids_list=None):
         """
-        Return all records associated with documents whose uris match some arg.
+        Handle the logic for a single URI in _do_get_given_document_uri.
 
-        Temporary implementation. THIS IS A VERY SLOW, BRUTE-FORCE STRATEGY!
-        You use it at your own risk! Do not expect it to be performant or
-        particularly stable. To avoid duplications, while it does return
-        a generator, it actually returns a generator of a set (so there's
-        no memory conserved).
-
-        Supports the use of % as a wildcard character.
-
-        :param uri: The uri to use as a search term, such as "foo.png"
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of unique found records or (if ids_only) a
-                  generator of their ids.
+        Returns a generator of all records that match the uri.
         """
-        LOGGER.debug('Getting all records related to uri=%s.', uri)
-        if accepted_ids_list:
-            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
-        LOGGER.warning('Temporary implementation of getting Records based on '
-                       'Document URI. This is a very slow, brute-force '
-                       'strategy.')
         if accepted_ids_list is not None:
             base_query = schema.DocumentFromRecord.objects.filter(id__in=accepted_ids_list)
         else:
@@ -916,6 +921,51 @@ class RecordDAO(dao.RecordDAO):
         else:
             match_ids = base_query.filter(uri=uri).values_list('id', flat=True)
 
+        return match_ids
+
+    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+        """
+        Return all records associated with documents whose uris match some arg.
+
+        Temporary implementation. THIS IS A VERY SLOW, BRUTE-FORCE STRATEGY!
+        You use it at your own risk! Do not expect it to be performant or
+        particularly stable. To avoid duplications, while it does return
+        a generator, it actually returns a generator of a set (so there's
+        no memory conserved).
+
+        Supports the use of % as a wildcard character.
+
+        :param uri: The uri to use as a search term, such as "foo.png"
+        :param accepted_ids_list: A list of ids to restrict the search to.
+                                  If not provided, all ids will be used.
+        :param ids_only: whether to return only the ids of matching Records
+                         (used for further filtering)
+
+        :returns: A generator of unique found records or (if ids_only) a
+                  generator of their ids.
+        """
+        LOGGER.debug('Getting all records related to uri=%s.', uri)
+        if accepted_ids_list:
+            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
+        LOGGER.warning('Temporary implementation of getting Records based on '
+                       'Document URI. This is a very slow, brute-force '
+                       'strategy.')
+        if isinstance(uri, utils.StringListCriteria):
+            generators = []
+            for criterion_entry in uri.value:
+                generators.append(self._get_records_for_some_uri(criterion_entry,
+                                                                 accepted_ids_list))
+            if uri.operation == utils.ListQueryOperation.HAS_ALL:
+                # While a natural choice would be to ORDER_BY and use utils.intersect_ordered,
+                # Cassandra currently (June 2021) doesn't support ordering by partition key
+                # OR ordering by clustering key when partition key is unrestricted, meaning
+                # we can't do that here. Hopefully we don't run into memory issues.
+                match_ids = (x for x in set.intersection(*[set(x) for x in generators]))
+
+            else:
+                match_ids = itertools.chain(*generators)
+        else:
+            match_ids = self._get_records_for_some_uri(uri, accepted_ids_list)
         if ids_only:
             for id in set(match_ids):
                 yield id

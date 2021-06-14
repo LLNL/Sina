@@ -295,7 +295,8 @@ def intersect_ordered(iterables):
     ids. Important to avoid too much being stored in memory; here, we only store
     the generator stack plus (len(iterables)+C) values.
 
-    :param gen_list: A list of iterators. Must be ordered by the same criteria!
+    :param gen_list: A list of iterators. Must be ordered ascending with respect
+                     to python's comparators (ex: numerically for scalars)
 
     :returns: A generator that crawls through the iterators and returns
               values that all of them share.
