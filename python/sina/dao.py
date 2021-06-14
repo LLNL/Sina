@@ -150,7 +150,6 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
-    @abstractmethod
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
@@ -173,6 +172,15 @@ class RecordDAO(object):
         :raises ValueError: if not supplied at least one criterion or given
                             a criterion it does not support
         """
+        LOGGER.debug('Finding all records fulfilling criteria: %s', kwargs.items())
+        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
+        if not kwargs.items():
+            raise ValueError("You must supply at least one criterion.")
+        return self._do_data_query(criteria=kwargs)
+
+    @abstractmethod
+    def _do_data_query(self, criteria, id_pool=None):
+        """Handle the backend dependent logic of data_query."""
         raise NotImplementedError
 
     def get_given_data(self, **kwargs):

@@ -453,41 +453,26 @@ class RecordDAO(dao.RecordDAO):
         self.delete(record.id for record in records)
         self.insert(records)
 
-    def data_query(self, **kwargs):
+    def _do_data_query(self, criteria, id_pool=None):
         """
-        Return the ids of all Records whose data fulfill some criteria.
+        Handle the backend-specific logic for the dao data_query.
 
-        Criteria are expressed as keyword arguments. Each keyword
-        is the name of an entry in a Record's data field, and it's set
-        equal to either a single value or a DataRange (see utils.DataRanges
-        for more info) that expresses the desired value/range of values.
-        All criteria must be satisfied for an ID to be returned:
-
-            # Return ids of all Records with a volume of 12, a quadrant of
-            # "NW", AND a max_height >=30 and <40.
-            data_query(volume=12, quadrant="NW", max_height=DataRange(30,40))
-
-        :param kwargs: Pairs of the names of data and the criteria that data
-                         must fulfill.
+        :param criteria: Dict of {data_name: criteria_to_fulfill}
+        :param id_pool: List of ids to restrict results to.
         :returns: A generator of Record ids that fulfill all criteria.
 
         :raises ValueError: if not supplied at least one criterion or given
                             a criterion it does not support.
         """
-        LOGGER.debug('Finding all records fulfilling criteria: %s', kwargs.items())
-        # No kwargs is bad usage. Bad kwargs are caught in sort_and_standardize_criteria().
-        # We will always have at least one entry in one of scalar, string, scalarlist, etc.
-        if not kwargs.items():
-            raise ValueError("You must supply at least one criterion.")
         (scalar, string, scalarlist,
-         stringlist, universal) = utils.sort_and_standardize_criteria(kwargs)
+         stringlist, universal) = utils.sort_and_standardize_criteria(criteria)
         result_ids = []
 
         # String and scalar values can be passed directly to _apply_ranges_to_query
-        for criteria, table_type in ((scalar, "scalar"),
-                                     (string, "string")):
-            if criteria:
-                result_ids.append(self._apply_ranges_to_query(criteria,
+        for criteria_group, table_type in ((scalar, "scalar"),
+                                           (string, "string")):
+            if criteria_group:
+                result_ids.append(self._apply_ranges_to_query(criteria_group,
                                                               table_type))
 
         # List values have special logic per type
@@ -503,6 +488,9 @@ class RecordDAO(dao.RecordDAO):
         # Universal values come in only one type for now.
         if universal:
             result_ids.append(self._universal_query(universal))
+
+        if id_pool is not None:
+            result_ids.append(id_pool)
 
         # If we have more than one set of data, we need to find the intersect.
         for id in utils.intersect_lists(result_ids):
