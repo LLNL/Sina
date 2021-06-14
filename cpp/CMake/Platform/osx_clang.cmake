@@ -1,6 +1,4 @@
-string(CONCAT SINA_BASE_CXX_FLAGS "-std=c++11")
-
-string(CONCAT SINA_CXX_FLAGS "${SINA_BASE_CXX_FLAGS} "
+string(CONCAT SINA_CXX_FLAGS 
         "-Wall -Weverything -Werror "
         "-Wno-c++98-compat -Wno-c++98-compat-pedantic "
         "-Wno-padded "

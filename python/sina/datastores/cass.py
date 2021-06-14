@@ -68,7 +68,7 @@ class RecordDAO(dao.RecordDAO):
 
     # pylint: disable=arguments-differ
     # Args differ because SQL doesn't support force_overwrite yet, SIBO-307
-    def insert(self, records, force_overwrite=False):
+    def _do_insert(self, records, force_overwrite=False):
         """
         Given a(n iterable of) Record(s), insert it into the current Cassandra database.
 

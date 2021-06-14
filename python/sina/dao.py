@@ -130,13 +130,19 @@ class RecordDAO(object):
         """Handle the logic of the update itself."""
         raise NotImplementedError
 
-    @abstractmethod
     def insert(self, records):
         """
         Given one or more Records, insert them into the DAO's backend.
 
         :param records: A Record or iter of Records to insert
         """
+        if isinstance(records, (sina.model.Record, sina.model.Run)):
+            records = [records]
+        self._do_insert(sina.model.flatten_library_content(record) for record in records)
+
+    @abstractmethod
+    def _do_insert(self, records):
+        """Handle the logic of the insert itself."""
         raise NotImplementedError
 
     @abstractmethod

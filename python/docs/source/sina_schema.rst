@@ -77,12 +77,27 @@ A more fleshed-out example, with field descriptions:
           // Each set of curves needs a name
           "timeplot_1": {
               // Each set has independent(s) and dependent(s)
-              "independents": {
+              "independent": {
                   // Individual curves take the same format as lists of scalars in "data"
                   "time": {"value": [0, 1, 2]}},
-              "dependents": {
+              "dependent": {
                   "mass": {"value": [12, 11, 8], "tags": ["physics"]},
                   "volume": {"value": [10, 14, 22.2], "units": "m^3"}}
+          }
+      },
+      // Data that comes from any libraries associated with a Record. This allows data
+      // from nested libraries to be grouped, as well as avoiding name collisions.
+      "library_data": {
+          "outer_lib": {
+              // libraries can have curve_sets and data sections just like the greater Record.
+              // They cannot have files or user_defined; those still belong to the greater Record.
+              "data": {"total_energy": 2.2},
+              // libraries can be nested to whatever depth is required
+              "library_data": {
+                  "inner_lib": {
+                      "data": {"total_energy": 0.2}
+                  }
+              }
           }
       },
       // A dictionary of information that does not make sense as a data or file entry
@@ -204,6 +219,11 @@ actual name of the datum (such as "density" or "max_volume").
           },
           "data": {
               "datum_name": {"value": [], "units": "", "tags": []}
+          },
+          "library_data": {
+              "outer_lib": {
+                  "data": {"datum_name": {"value": [], "units": "", "tags": []}}
+              }
           },
           "user_defined": {}
         }

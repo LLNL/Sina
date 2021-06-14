@@ -38,6 +38,30 @@ class TestModel(unittest.TestCase):
                                  files={"ham.png": {"mimetype": "png"},
                                         "ham.curve": {"tags": ["hammy"]}},
                                  user_defined={})
+        self.library_data = {"outer_lib": {
+            "data": {"runtime": {"value": 44, "tags": ["output"]}},
+            "library_data": {
+                "inner_lib": {
+                    "data": {"runtime": {"value": 32},
+                             "mark_distances": {"value": [0, 5], "units": "km"}},
+                    "curve_sets": {
+                        "dist": {
+                            "independent": {"time": {"value": [0, 0.5]}},
+                            "dependent": {"distance": {"value": [0, 6],
+                                                       "units": "km"},
+                                          "speed": {"value": [0, 2]}},
+                            "independent_order": ["time"],
+                            "dependent_order": ["distance", "speed"]
+                        }
+                    }}}}}
+        self.libdata_rec = Record(id="lotsalibs",
+                                  type="lib_pal",
+                                  data={"runtime": {"value": 87}},
+                                  curve_sets={"dist": {
+                                      "independent": {"time": {"value": [1, 2]}},
+                                      "dependent": {"distance": {"value": [0, 10]}}}},
+                                  library_data=self.library_data,
+                                  user_defined={})
         self.relationship_one = Relationship(subject_id="spam",
                                              predicate="supersedes",
                                              object_id="spam2")
@@ -85,6 +109,14 @@ class TestModel(unittest.TestCase):
         spam.user_defined = {"hello": "greeting"}
         # all previous errors fixed: "maximal" valid run
         self.assertTrue(spam.is_valid()[0])
+
+    def test__is_valid_library_data(self):
+        """Test that we're properly validating library data."""
+        self.library_data["malformed_lib"] = {"data": 2}
+        spam = model.Record(id="spam", type="eggs", library_data=self.library_data)
+        self.assertFalse(spam.is_valid()[0])
+        self.assertIn(spam.is_valid()[1][0], "Record spam's malformed_lib/data field "
+                                             "must be a dictionary!")
 
     def test__is_valid_list_good(self):
         """Test we report a list as valid when it is."""
@@ -234,11 +266,70 @@ class TestModel(unittest.TestCase):
         del rec["eggs"]
         self.assertTrue('eggs' not in rec.__dict__["raw"])
 
+    def test_flatten_library_content_data(self):
+        """Ensure that library flattening is happening for data."""
+        flat_rec = model.flatten_library_content(self.libdata_rec)
+        # Check basic existence
+        self.assertTrue("runtime" in flat_rec.data.keys())
+        self.assertTrue("outer_lib/runtime" in flat_rec.data.keys())
+        self.assertTrue("outer_lib/inner_lib/runtime" in flat_rec.data.keys())
+        # Check that the values are correct
+        self.assertEqual(flat_rec.data["runtime"]["value"], 87)
+        self.assertEqual(flat_rec.data["outer_lib/runtime"]["value"], 44)
+        self.assertEqual(flat_rec.data["outer_lib/inner_lib/runtime"]["value"], 32)
+        # Check that other keys/info are preserved
+        self.assertEqual(flat_rec.data["outer_lib/inner_lib/mark_distances"]["value"], [0, 5])
+        self.assertEqual(flat_rec.data["outer_lib/inner_lib/mark_distances"]["units"], "km")
+        self.assertEqual(flat_rec.data["outer_lib/runtime"]["tags"], ["output"])
+
+    def test_flatten_library_content_curves(self):
+        """Ensure that library flattening is happening for curves."""
+        flat_rec = model.flatten_library_content(self.libdata_rec)
+        # Check basic existence
+        self.assertTrue("dist" in flat_rec.curve_sets.keys())
+        self.assertTrue("time" in flat_rec.curve_sets["dist"]["independent"].keys())
+        self.assertTrue("distance" in flat_rec.curve_sets["dist"]["dependent"].keys())
+        nest_curve = "outer_lib/inner_lib/dist"
+        self.assertTrue(nest_curve in flat_rec.curve_sets.keys())
+        self.assertTrue("outer_lib/inner_lib/time"
+                        in flat_rec.curve_sets[nest_curve]["independent"].keys())
+        self.assertTrue("outer_lib/inner_lib/distance"
+                        in flat_rec.curve_sets[nest_curve]["dependent"].keys())
+        self.assertTrue("outer_lib/inner_lib/speed"
+                        in flat_rec.curve_sets[nest_curve]["dependent"].keys())
+        # Check that the values are correct
+        self.assertEqual(flat_rec.curve_sets["dist"]["independent"]["time"]["value"], [1, 2])
+        prefix = "outer_lib/inner_lib/"
+        nest_curve = prefix+"dist"
+        self.assertEqual(flat_rec.curve_sets[nest_curve]["independent"][prefix+"time"]["value"],
+                         [0, 0.5])
+        self.assertEqual(flat_rec.curve_sets[nest_curve]["dependent"][prefix+"distance"]["value"],
+                         [0, 6])
+        self.assertEqual(flat_rec.curve_sets[nest_curve]["dependent"][prefix+"speed"]["value"],
+                         [0, 2])
+        # Check that other info is preserved
+        self.assertEqual(flat_rec.curve_sets[nest_curve]["dependent_order"], [prefix+"distance",
+                                                                              prefix+"speed"])
+        self.assertEqual(flat_rec.curve_sets[nest_curve]["dependent"][prefix+"distance"]["units"],
+                         "km")
+
+    def test_flatten_library_content_raw(self):
+        """Ensure that library flattening does not affect the raw."""
+        flat_rec = model.flatten_library_content(self.libdata_rec)
+        string_raw = json.dumps(flat_rec.raw)
+        self.assertIn('"runtime": {"value": 87', string_raw)
+        self.assertIn('"runtime": {"value": 32', string_raw)
+        self.assertIn('"speed": {"value": [0, 2]', string_raw)
+        self.assertNotIn('"outer_lib/runtime"', string_raw)
+        self.assertNotIn('"inner_lib/runtime"', string_raw)
+        self.assertNotIn('"outer_lib/inner_lib/distance"', string_raw)
+
     def test_generate_json(self):
         """Ensure JSON is generating properly."""
         target_json = ('{"id":"hello", "type":"greeting", '
                        '"data":{"language": {"value": "english"},'
                        '"mood": {"value": "friendly"}},'
+                       '"library_data": {"my_lib": {"data": {"mood": {"value": "joyful"}}}},'
                        '"curve_sets":{"learning": {'
                        '"independent":{"time": {"value": [1, 2, 3]}},'
                        '"dependent": {"words": {"value": [0, 6, 12]}}}},'
@@ -247,6 +338,10 @@ class TestModel(unittest.TestCase):
         test_record = model.Record("hello", "greeting")
         test_record.data = {"language": {"value": "english"},
                             "mood": {"value": "friendly"}}
+        test_record.curve_sets = {"learning": {
+            "independent": {"time": {"value": [1, 2, 3]}},
+            "dependent": {"words": {"value": [0, 6, 12]}}}}
+        test_record.library_data = {"my_lib": {"data": {"mood": {"value": "joyful"}}}}
         test_record.files = {"pronounce.wav": {}}
         test_record.user_defined = {"good": "morning"}
         # Raw is explicitly not reproduced in to_json()
@@ -260,6 +355,7 @@ class TestModel(unittest.TestCase):
                        '"application":"foo", "user":"JohnD", "version":0,'
                        '"data": {"language": {"value":"english"},'
                        '"mood": {"value":"friendly"}},'
+                       '"library_data": {"my_lib": {"data": {"mood": {"value": "joyful"}}}},'
                        '"curve_sets":{"learning": {'
                        '"independent":{"time": {"value": [1, 2, 3]}},'
                        '"dependent": {"words": {"value": [0, 6, 12]}}}},'
@@ -268,6 +364,7 @@ class TestModel(unittest.TestCase):
         test_run = model.Run("hello", "foo", user="JohnD", version=0)
         test_run.data = {"language": {"value": "english"},
                          "mood": {"value": "friendly"}}
+        test_run.library_data = {"my_lib": {"data": {"mood": {"value": "joyful"}}}}
         test_run.files = {"pronounce.wav": {}}
         test_run.user_defined = {"good": "morning"}
         self.assertTrue(test_run.is_valid())
@@ -282,6 +379,7 @@ class TestModel(unittest.TestCase):
                       "data": {"eggs": {"value": 12,
                                         "units": "cm",
                                         "tags": ["runny"]}},
+                      "library_data": self.library_data,
                       "files": {"eggs.brek": {"mimetype": "egg",
                                               "tags": ["fried"]}}}
         record = model.generate_record_from_json(json_input=json_input)
@@ -289,6 +387,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(json_input['type'], record.type)
         self.assertEqual(json_input['user_defined'], record.user_defined)
         self.assertEqual(json_input['data'], record.data)
+        self.assertEqual(json_input['library_data'], record.library_data)
         self.assertEqual(json_input['files'], record.files)
 
     def test_gen_record_from_json_bad(self):
@@ -370,6 +469,7 @@ class TestModel(unittest.TestCase):
                       "application": "foo",
                       "user": "John Doe",
                       "data": {}, "curve_sets": {},
+                      "library_data": {},
                       "user_defined": {},
                       "files": {}, "version": None}
         rec = model.generate_record_from_json(json_input=raw_record)
