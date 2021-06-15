@@ -1071,6 +1071,38 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(len(just_6), 1)
         self.assertEqual(just_6[0], "spam6")
 
+    # Usage of _do_data_query() can be replaced by universal query once implemented.
+    # pylint: disable=protected-access
+    def test_recorddao_data_query_id_pool(self):
+        """Test that data query can be restricted by id_pool."""
+        just_4_and_5 = list(self.record_dao._do_data_query(
+            criteria={
+                "val_data_list_1": any_in(DataRange(min=-100))},
+            id_pool=["spam4", "spam5"]))  # 5 and 6
+        six.assertCountEqual(self, list(just_4_and_5), ["spam4", "spam5"])
+
+    # pylint: disable=protected-access
+    def test_recorddao_data_query_id_pool_exists(self):
+        """
+        Test that data query can be restricted by id_pool using universal criteria.
+
+        Currently, the universal criteria are done through Python logic and combine
+        with id_pool a bit differently than other criteria.
+        """
+        just_5 = list(self.record_dao._do_data_query(criteria={"flex_data_1": exists()},
+                                                     id_pool=["spam5"]))
+        six.assertCountEqual(self, list(just_5), ["spam5"])
+
+    # pylint: disable=protected-access
+    def test_recorddao_data_query_id_pool_multi(self):
+        """Test that data query can be restricted by id_pool in a more complicated query."""
+        just_5_and_6 = list(self.record_dao._do_data_query(
+            criteria={
+                "val_data_list_1": any_in(DataRange(min=-100)),
+                "flex_data_1": exists()},
+            id_pool=["spam3", "spam5", "spam6"]))  # 5 and 6
+        six.assertCountEqual(self, list(just_5_and_6), ["spam5", "spam6"])
+
     def test_recorddao_data_query_all_list_criteria(self):
         """
         Test that the RecordDAO is retrieving on mixed data criteria.

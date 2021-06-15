@@ -243,67 +243,59 @@ class RecordDAO(dao.RecordDAO):
         self._delete_no_commit(record.id for record in records)
         self._insert_no_commit(records)
 
-    def data_query(self, **kwargs):
+    def _do_data_query(self, criteria, id_pool=None):
         """
-        Return the ids of all Records whose data fulfill some criteria.
+        Handle the backend-specific logic for the dao data_query.
 
-        Criteria are expressed as keyword arguments. Each keyword
-        is the name of an entry in a Record's data field, and it's set
-        equal to either a single value or a DataRange (see utils.DataRanges
-        for more info) that expresses the desired value/range of values.
-        All criteria must be satisfied for an ID to be returned:
-
-            # Return ids of all Records with a volume of 12, a quadrant of
-            # "NW", AND a max_height >=30 and <40.
-            data_query(volume=12, quadrant="NW", max_height=DataRange(30,40))
-
-        :param kwargs: Pairs of the names of data and the criteria that data
-                         must fulfill.
+        :param criteria: Dict of {data_name: criteria_to_fulfill}
+        :param id_pool: List of ids to restrict results to.
         :returns: A generator of Record ids that fulfill all criteria.
 
         :raises ValueError: if not supplied at least one criterion or given
                             a criterion it does not support
         """
-        LOGGER.debug('Finding all records fulfilling criteria: %s', kwargs.items())
-        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
-        if not kwargs.items():
-            raise ValueError("You must supply at least one criterion.")
         (scalar_criteria,
          string_criteria,
          scalar_list_criteria,
          string_list_criteria,
-         universal_criteria) = sort_and_standardize_criteria(kwargs)
-        result_ids = []
+         universal_criteria) = sort_and_standardize_criteria(criteria)
+        sub_queries = []
 
         # First handle scalar and string criteria
-        for criteria, table in ((scalar_criteria, schema.ScalarData),
-                                (string_criteria, schema.StringData)):
-            if criteria:
-                query = self._generate_data_table_query(criteria, table)
-                result_ids.append(str(x[0]) for x in query.all())
+        if scalar_criteria:
+            sub_queries.append(self._generate_data_table_query(scalar_criteria, schema.ScalarData))
+        if string_criteria:
+            sub_queries.append(self._generate_data_table_query(string_criteria, schema.StringData))
 
         # Move on to any list criteria
-        result_ids += [self._string_list_query(datum_name=datum_name,
-                                               string_list=list_criteria.value,
-                                               operation=list_criteria.operation)
-                       for datum_name, list_criteria in string_list_criteria]
-        result_ids += [self._scalar_list_query(datum_name=datum_name,
-                                               data_range=list_criteria.value,
-                                               operation=list_criteria.operation)
-                       for datum_name, list_criteria in scalar_list_criteria]
+        sub_queries += [self._string_list_query(datum_name=datum_name,
+                                                string_list=list_criteria.value,
+                                                operation=list_criteria.operation)
+                        for datum_name, list_criteria in string_list_criteria]
+        sub_queries += [self._scalar_list_query(datum_name=datum_name,
+                                                data_range=list_criteria.value,
+                                                operation=list_criteria.operation)
+                        for datum_name, list_criteria in scalar_list_criteria]
 
-        # Now any universal criteria.
+        joined_query = self.session.query(schema.Record.id)
+        if id_pool is not None:
+            joined_query = joined_query.filter(schema.Record.id.in_(id_pool))
+        for sub_query in sub_queries:
+            sub_query = sub_query.subquery()
+            joined_query = joined_query.join(sub_query, schema.Record.id == sub_query.c.id)
+
+        # Universal criteria currently go cross-table and have to be handled
+        # with Python logic
         if universal_criteria:
-            result_ids.append(self._universal_query(universal_criteria))
+            universal_pool = self._universal_query(universal_criteria)
+            if not sub_queries and id_pool is None:
+                return universal_pool
+            universal_pool = set(universal_pool)
+            return (x[0] for x in joined_query.all() if x[0] in universal_pool)
 
-        # If we have more than one set of data, we need to find the intersection.
-        for rec_id in utils.intersect_lists(result_ids):
-            yield rec_id
+        return (x[0] for x in joined_query.all())
 
-    def _scalar_list_query(self,
-                           datum_name,
-                           data_range,
-                           operation):
+    def _scalar_list_query(self, datum_name, data_range, operation):
         """
         Return all Records where [datum_name] fulfills [operation] for [data_range].
 
@@ -312,7 +304,7 @@ class RecordDAO(dao.RecordDAO):
         :param datum_name: The name of the datum
         :param data_range: A datarange to be used with <operation>
         :pram operation: What kind of ListQueryOperation to do.
-        :returns: A generator of ids of matching Records.
+        :returns: A query object returning ids of matching Records.
 
         :raises ValueError: if given an invalid operation for a datarange
         """
@@ -341,9 +333,7 @@ class RecordDAO(dao.RecordDAO):
             col_op = lt_crit_max.__le__ if data_range.max_inclusive else lt_crit_max.__lt__
             filters.append(col_op(data_range.max))
 
-        record_ids = query.filter(*filters)
-        for record_id in record_ids:
-            yield record_id[0]
+        return query.filter(*filters)
 
     def _string_list_query(self, datum_name, string_list, operation):
         """
@@ -354,7 +344,7 @@ class RecordDAO(dao.RecordDAO):
         :param datum_name: The name of the datum
         :param string_list: A list of strings datum_name must contain.
         :param operation: What kind of ListQueryOperation to do.
-        :returns: A generator of ids of matching Records or the Records
+        :returns: A query object returning matching Records or the Records
                   themselves (see ids_only).
 
         :raises ValueError: if given an invalid operation for a string list
@@ -374,8 +364,7 @@ class RecordDAO(dao.RecordDAO):
             # of strings but is not supported by string_list_query.
             raise ValueError("Given an invalid operation for a string list query: {}"
                              .format(operation.value))
-        for query_result in query:
-            yield query_result[0]  # yield the id
+        return query
 
     @staticmethod
     def _generate_criterion_filters(criterion_pair, table):
@@ -423,18 +412,19 @@ class RecordDAO(dao.RecordDAO):
         criteria_queries = [self._generate_criterion_filters(pair, table)
                             for pair in criteria_pairs]
 
-        if not fulfill_all:
-            return query.filter(sqlalchemy.or_(*criteria_queries))
+        query = query.filter(sqlalchemy.or_(*criteria_queries))
 
         # Since we don't know the possible data names a priori, we have a row per datum
         # and have to "or" them together and then group by record ID, selecting the records
         # that have a matching row for each queried criterion (# rows == # criteria).
-        query = query.filter(sqlalchemy.or_(*criteria_queries))
-
-        # For performance reasons, we skip the "group by" stage when not needed
+        # This is why the OR and AND queries use the same basic query; the AND
+        # query just takes it a step further.
         if len(criteria_pairs) > 1:
-            query = (query.group_by(table.id)
-                     .having(sqlalchemy.func.count(table.id) == len(criteria_pairs)))
+            query = query.group_by(table.id)
+
+            if fulfill_all:
+                query = query.having(sqlalchemy.func.count(table.id) == len(criteria_pairs))
+
         return query
 
     def _get_many(self, ids, _record_builder, chunk_size):
