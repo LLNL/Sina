@@ -11,8 +11,6 @@ if (NOT BLT_CXX_STD)
     set(BLT_CXX_STD "c++11" CACHE STRING "")
 endif()
 
-MESSAGE(INFO, "${CONDUIT_DIR}")
-
 include(blt/SetupBLT.cmake)
 
 # Now that BLT has built gtest and gmock, we can use our own flags for our
