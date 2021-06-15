@@ -259,41 +259,41 @@ class RecordDAO(dao.RecordDAO):
          scalar_list_criteria,
          string_list_criteria,
          universal_criteria) = sort_and_standardize_criteria(criteria)
-        queries = []
+        sub_queries = []
 
         # First handle scalar and string criteria
         if scalar_criteria:
-            queries.append(self._generate_data_table_query(scalar_criteria, schema.ScalarData))
+            sub_queries.append(self._generate_data_table_query(scalar_criteria, schema.ScalarData))
         if string_criteria:
-            queries.append(self._generate_data_table_query(string_criteria, schema.StringData))
+            sub_queries.append(self._generate_data_table_query(string_criteria, schema.StringData))
 
         # Move on to any list criteria
-        queries += [self._string_list_query(datum_name=datum_name,
-                                            string_list=list_criteria.value,
-                                            operation=list_criteria.operation)
-                    for datum_name, list_criteria in string_list_criteria]
-        queries += [self._scalar_list_query(datum_name=datum_name,
-                                            data_range=list_criteria.value,
-                                            operation=list_criteria.operation)
-                    for datum_name, list_criteria in scalar_list_criteria]
+        sub_queries += [self._string_list_query(datum_name=datum_name,
+                                                string_list=list_criteria.value,
+                                                operation=list_criteria.operation)
+                        for datum_name, list_criteria in string_list_criteria]
+        sub_queries += [self._scalar_list_query(datum_name=datum_name,
+                                                data_range=list_criteria.value,
+                                                operation=list_criteria.operation)
+                        for datum_name, list_criteria in scalar_list_criteria]
 
-        query = self.session.query(schema.Record.id)
+        joined_query = self.session.query(schema.Record.id)
         if id_pool is not None:
-            query = query.filter(schema.Record.id.in_(id_pool))
-        for sub_query in queries:
+            joined_query = joined_query.filter(schema.Record.id.in_(id_pool))
+        for sub_query in sub_queries:
             sub_query = sub_query.subquery()
-            query = query.join(sub_query, schema.Record.id == sub_query.c.id)
+            joined_query = joined_query.join(sub_query, schema.Record.id == sub_query.c.id)
 
         # Universal criteria currently go cross-table and have to be handled
         # with Python logic
         if universal_criteria:
             universal_pool = self._universal_query(universal_criteria)
-            if not queries and id_pool is None:
+            if not sub_queries and id_pool is None:
                 return universal_pool
             universal_pool = set(universal_pool)
-            return (x[0] for x in query.all() if x[0] in universal_pool)
+            return (x[0] for x in joined_query.all() if x[0] in universal_pool)
 
-        return (x[0] for x in query.all())
+        return (x[0] for x in joined_query.all())
 
     def _scalar_list_query(self, datum_name, data_range, operation):
         """
