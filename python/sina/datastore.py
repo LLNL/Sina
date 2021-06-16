@@ -13,7 +13,7 @@ except ImportError:
 
 
 def connect(database=None, keyspace=None, database_type=None,
-            allow_connection_pooling=False):
+            allow_connection_pooling=False, read_only=False):
     """
     Connect to a database.
 
@@ -29,6 +29,7 @@ def connect(database=None, keyspace=None, database_type=None,
     :param allow_connection_pooling: Allow "pooling" behavior that recycles connections,
                                      which may prevent them from closing fully on .close().
                                      Only used for the sql backend.
+    :param read_only: whether to create a read-only store
     :return: a DataStore object connected to the specified database
     """
     # Determine a backend
@@ -49,6 +50,8 @@ def connect(database=None, keyspace=None, database_type=None,
                               "environment. See the README.")
     else:
         raise ValueError("Given unrecognized database type: {}".format(database_type))
+    if read_only:
+        return ReadOnlyDataStore(connection)
     return DataStore(connection)
 
 
@@ -80,18 +83,19 @@ def create_datastore(database=None, keyspace=None, database_type=None,
                    allow_connection_pooling=allow_connection_pooling)
 
 
-class DataStore(object):
+class ReadOnlyDataStore(object):
     """
-    Mediates interactions between users and data.
+    Mediates interactions between users and data, providing read-only
+    capabilities.
 
-    DataStores grant access to a selection of operations for both Records and
-    Relationships. They're used like this:
+    DataStore and ReadOnlyDataStore grant access to a selection of operations
+    for both Records and Relationships. They're used like this:
 
-        ds = create_datastore(path_to_my_database)
+        ds = connect(path_to_my_database)
         my_runs = ds.records.find_with_type("runs")
         submission_rels = ds.relationships.get(predicate="submitted")
 
-    Note the use of create_datastore in place of manually creating a DataStore
+    Note the use of connect() in place of manually creating a DataStore
     object. For information on all the operations available, see
     RecordOperations and RelationshipOperations below.
     """
@@ -100,7 +104,7 @@ class DataStore(object):
         """
         Define attributes needed by a datastore.
 
-        Generally create_datastore() is preferred.
+        Generally connect() is preferred.
 
         :param dao_factory: The DAOFactory that will provide the backend
                             connection.
@@ -170,25 +174,6 @@ class DataStore(object):
             :raises: ValueError if the record does not exist
             """
             return self.record_dao.get_raw(id_)
-
-        def insert(self, records_to_insert):
-            """
-            Given one or more Records, insert them into the DAO's backend.
-
-            :param records: A Record or iter of Records to insert
-            """
-            self.record_dao.insert(records_to_insert)
-
-        def delete(self, ids_to_delete):
-            """
-            Given one or more Record ids, delete all mention from the DAO's backend.
-
-            This includes removing all data, raw(s), any relationships
-            involving it/them, etc.
-
-            :param ids_to_delete: A Record id or iterable of Record ids to delete.
-            """
-            return self.record_dao.delete(ids_to_delete)
 
         def exist(self, ids_to_check):
             """
@@ -373,7 +358,7 @@ class DataStore(object):
             # mime_type. We follow the schema above for consistency.
             return self.record_dao.get_with_mime_type(mimetype, ids_only)
 
-    class RelationshipOperations(object):
+    class RelationshipOperations(object):  # pylint: disable=too-few-public-methods
         """
         Defines the queries users can perform on Relationships.
 
@@ -399,6 +384,79 @@ class DataStore(object):
             return self.relationship_dao.get(subject_id=subject_id,
                                              predicate=predicate,
                                              object_id=object_id)
+
+
+class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
+    """
+    Mediates interactions between users and data. Adds operations that
+    modify the data store to ReadOnlyDataStore.
+
+    DataStore and ReadOnlyDataStore grant access to a selection of operations
+    for both Records and Relationships. They're used like this:
+
+        ds = connect(path_to_my_database)
+        my_runs = ds.records.find_with_type("runs")
+        submission_rels = ds.relationships.get(predicate="submitted")
+
+    Note the use of connect() in place of manually creating a DataStore
+    object. For information on all the operations available, see
+    RecordOperations and RelationshipOperations below.
+    """
+
+    def __init__(self, dao_factory):
+        """
+        Define attributes needed by a datastore.
+
+        Generally connect() is preferred.
+
+        :param dao_factory: The DAOFactory that will provide the backend
+                            connection.
+        """
+        super(DataStore, self).__init__(dao_factory)
+        self.records = self.RecordOperations(dao_factory)
+        self.relationships = self.RelationshipOperations(dao_factory)
+
+    class RecordOperations(ReadOnlyDataStore.RecordOperations):
+        """
+        Defines the queries users can perform on Records.
+
+        This should be considered the "source of truth" in terms of what Record
+        operations are available to users and what each does.
+
+        This doesn't handle implementation, helper methods, etc; it's for
+        defining the user interface.
+        """
+
+        # -------------------- Basic operations ---------------------
+        def insert(self, records_to_insert):
+            """
+            Given one or more Records, insert them into the DAO's backend.
+
+            :param records: A Record or iter of Records to insert
+            """
+            self.record_dao.insert(records_to_insert)
+
+        def delete(self, ids_to_delete):
+            """
+            Given one or more Record ids, delete all mention from the DAO's backend.
+
+            This includes removing all data, raw(s), any relationships
+            involving it/them, etc.
+
+            :param ids_to_delete: A Record id or iterable of Record ids to delete.
+            """
+            return self.record_dao.delete(ids_to_delete)
+
+    class RelationshipOperations(ReadOnlyDataStore.RelationshipOperations):
+        """
+        Defines the queries users can perform on Relationships.
+
+        This should be considered the "source of truth" in terms of what
+        Relationship operations are available to users and what each does.
+
+        This doesn't handle implementation, helper methods, etc; it's for
+        defining the user interface.
+        """
 
         def insert(self, relationships_to_insert):
             """
