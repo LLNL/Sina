@@ -20,6 +20,7 @@ using ::testing::Not;
 char const EXPECTED_DATA_KEY[] = "data";
 char const EXPECTED_CURVE_SETS_KEY[] = "curve_sets";
 char const EXPECTED_LIBRARY_DATA_KEY[] = "library_data";
+char const EXPECTED_USER_DEFINED_KEY[] = "user_defined";
 
 TEST(DataHolder, add_data_existing_key) {
     DataHolder dh{};
@@ -50,6 +51,36 @@ TEST(DataHolder, add_curve_set_existing_key) {
                 Not(Contains(Key("original"))));
     EXPECT_THAT(csAfterSecondInsert.at("cs1").getDependentCurves(),
                 Contains(Key("new")));
+}
+
+TEST(DataHolder, create_fromNode_userDefined) {
+    conduit::Node originalNode;
+    originalNode[EXPECTED_USER_DEFINED_KEY]["k1"] = "v1";
+    originalNode[EXPECTED_USER_DEFINED_KEY]["k2"] = 123;
+    std::vector<int> k3_vals{1, 2, 3};
+    originalNode[EXPECTED_USER_DEFINED_KEY]["k3"] = k3_vals;
+
+    DataHolder holder{originalNode};
+    auto const &userDefined = holder.getUserDefinedContent();
+    EXPECT_EQ("v1", userDefined["k1"].as_string());
+    EXPECT_EQ(123, userDefined["k2"].as_int());
+    auto int_array = userDefined["k3"].as_int_ptr();
+    std::vector<double>udef_ints(int_array, int_array+userDefined["k3"].dtype().number_of_elements());
+    EXPECT_THAT(udef_ints, ElementsAre(1, 2, 3));
+}
+
+TEST(DataHolder, getUserDefined_initialConst) {
+    DataHolder const holder;
+    conduit::Node const &userDefined = holder.getUserDefinedContent();
+    EXPECT_TRUE(userDefined.dtype().is_empty());
+}
+
+TEST(DataHolder, getUserDefined_initialNonConst) {
+    DataHolder holder;
+    conduit::Node &initialUserDefined = holder.getUserDefinedContent();
+    EXPECT_TRUE(initialUserDefined.dtype().is_empty());
+    initialUserDefined["foo"] = 123;
+    EXPECT_EQ(123, holder.getUserDefinedContent()["foo"].as_int());
 }
 
 TEST(DataHolder, add_new_library) {
@@ -226,6 +257,25 @@ TEST(DataHolder, toNode_libraryData) {
         }
     })";
     EXPECT_THAT(dh.toNode(), MatchesJson(expected));
+}
+
+TEST(DataHolder, toNode_userDefined) {
+    DataHolder holder;
+    conduit::Node userDef;
+    userDef["k1"] = "v1";
+    userDef["k2"] = 123;
+    std::vector<int> int_vals{1, 2, 3};
+    userDef["k3"] = int_vals;
+    holder.setUserDefinedContent(userDef);
+
+    auto asNode = holder.toNode();
+
+    auto userDefined = asNode[EXPECTED_USER_DEFINED_KEY];
+    EXPECT_EQ("v1", userDefined["k1"].as_string());
+    EXPECT_EQ(123, userDefined["k2"].as_int());
+    auto int_array = userDefined["k3"].as_int_ptr();
+    std::vector<double>udef_ints(int_array, int_array+userDefined["k3"].dtype().number_of_elements());
+    EXPECT_THAT(udef_ints, ElementsAre(1, 2, 3));
 }
 
 }}}

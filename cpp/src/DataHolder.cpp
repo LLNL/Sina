@@ -8,6 +8,7 @@ namespace {
 char const DATA_FIELD[] = "data";
 char const CURVE_SETS_FIELD[] = "curve_sets";
 char const LIBRARY_DATA_FIELD[] = "library_data";
+char const USER_DEFINED_FIELD[] = "user_defined";
 
 }
 
@@ -16,7 +17,7 @@ namespace sina {
 void DataHolder::add(std::string name, Datum datum) {
       auto existing = data.find(name);
       if (existing == data.end()) {
-          data.emplace(std::make_pair(name, datum));
+          data.emplace(std::make_pair(std::move(name), datum));
       } else {
           existing->second = datum;
       }
@@ -40,6 +41,10 @@ std::shared_ptr<DataHolder> DataHolder::addLibraryData(std::string const &name) 
         existing->second = std::make_shared<DataHolder>();
     }
   return libraryData.at(name);
+}
+
+void DataHolder::setUserDefinedContent(conduit::Node userDefined_) {
+    userDefined = std::move(userDefined_);
 }
 
 conduit::Node DataHolder::toNode() const {
@@ -68,6 +73,9 @@ conduit::Node DataHolder::toNode() const {
       }
       asNode[DATA_FIELD] = datumRef;
     }
+    if(!userDefined.dtype().is_empty()){
+      asNode[USER_DEFINED_FIELD] = userDefined;
+    }
     return asNode;
 }
 
@@ -90,13 +98,16 @@ DataHolder::DataHolder(conduit::Node const &asNode) {
         }
     }
     if(asNode.has_child(LIBRARY_DATA_FIELD)) {
-      auto libraryIter = asNode[LIBRARY_DATA_FIELD].children();
-      while(libraryIter.has_next()){
-          auto &libraryDataNode = libraryIter.next();
-          std::string name = libraryIter.name();
-          DataHolder lib{libraryDataNode};
-          libraryData.emplace(std::make_pair(std::move(name), std::make_shared<DataHolder>(std::move(lib))));
-      }
+        auto libraryIter = asNode[LIBRARY_DATA_FIELD].children();
+        while(libraryIter.has_next()){
+            auto &libraryDataNode = libraryIter.next();
+            std::string name = libraryIter.name();
+            libraryData.emplace(std::make_pair(std::move(name),
+                    std::make_shared<DataHolder>(libraryDataNode)));
+        }
+    }
+    if(asNode.has_child(USER_DEFINED_FIELD)) {
+        userDefined = asNode[USER_DEFINED_FIELD];
     }
   }
 }
