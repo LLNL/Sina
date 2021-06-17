@@ -3,6 +3,8 @@
 #include "sina/ConduitUtil.hpp"
 #include "sina/Datum.hpp"
 
+#include <stdexcept>
+
 namespace {
 
 char const DATA_FIELD[] = "data";
@@ -108,6 +110,9 @@ DataHolder::DataHolder(conduit::Node const &asNode) {
     }
     if(asNode.has_child(USER_DEFINED_FIELD)) {
         userDefined = asNode[USER_DEFINED_FIELD];
+        if (!userDefined.dtype().is_object()) {
+            throw std::invalid_argument("user_defined must be an object Node");
+        }
     }
   }
 }

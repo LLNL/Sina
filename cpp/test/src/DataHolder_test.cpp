@@ -69,6 +69,12 @@ TEST(DataHolder, create_fromNode_userDefined) {
     EXPECT_THAT(udef_ints, ElementsAre(1, 2, 3));
 }
 
+TEST(DataHolder, create_fromNode_userDefined_not_object) {
+    conduit::Node originalNode;
+    originalNode[EXPECTED_USER_DEFINED_KEY] = "not an object";
+    EXPECT_THROW(DataHolder{originalNode}, std::invalid_argument);
+}
+
 TEST(DataHolder, getUserDefined_initialConst) {
     DataHolder const holder;
     conduit::Node const &userDefined = holder.getUserDefinedContent();
