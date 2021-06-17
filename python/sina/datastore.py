@@ -212,6 +212,34 @@ class DataStore(object):
             """
             return self.record_dao.get_all(ids_only)
 
+        def find(self, types=None, data=None, file_uri=None,
+                 id_pool=None, ids_only=False, query_order=["data", "file_uri", "types"]):
+            """
+            Return Records that match multiple different types of criteria.
+
+            A convenience method, this allows you to combine Sina's different types
+            of queries into a single call. Using the method with only one of the criteria
+            args is equivalent to using that dedicated query method. Using more performs
+            an "AND" operation; returned Records must fulfill ALL criteria.
+
+            :param types: Functionality of find_with_type, an iterable of types of Records to
+                          return.
+            :param data: Functionality of find_with_data, dictionary of name:criteria a Record's
+                         data must fulfill
+            :param file_uri: Functionality of find_with_file_uri, a uri criterion (optionally with
+                             wildcards) a Record's files must fulfill, ex: having at least one .png
+            :param id_pool: A pool of IDs to restrict the query to. Only a Record whose id is in
+                            this pool can be returned
+            :param ids_only: Whether to return only the ids of the matching Records
+            :param query_order: The order in which to perform the queries. Advanced usage,
+                                the default should be fine for many cases. To optimize
+                                performance, order queries in ascending order of expected
+                                number of matches (ex: if your database has very few Records
+                                with the desired type(s), you may wish to put "type" first).
+                                Query names are "types", "file_uri", and "data".
+            """
+            return self.record_dao.find(types, data, file_uri, id_pool, ids_only, query_order)
+
         # ------------------ Operations tied to Record type -------------------
         def find_with_type(self, types, ids_only=False, id_pool=None):
             """

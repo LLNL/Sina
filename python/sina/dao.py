@@ -235,10 +235,10 @@ class RecordDAO(object):
         if id_pool is not None:
             id_pool = list(id_pool)  # safety cast for gens
         LOGGER.debug('Getting all records with types in %s.', types)
-        return self._get_all_of_type(types, ids_only, id_pool)
+        return self._do_get_all_of_type(types, ids_only, id_pool)
 
     @abstractmethod
-    def _get_all_of_type(self, types, ids_only=False, id_pool=None):
+    def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
         """Handle the logic of the type query."""
         raise NotImplementedError
 
@@ -328,11 +328,11 @@ class RecordDAO(object):
             id_pool = list(accepted_ids_list)
             LOGGER.debug('Restricting to %i ids.', len(id_pool))
         return self._do_get_given_document_uri(uri=uri,
-                                               accepted_ids_list=accepted_ids_list,
+                                               id_pool=accepted_ids_list,
                                                ids_only=ids_only)
 
     @abstractmethod
-    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+    def _do_get_given_document_uri(self, uri, id_pool=None, ids_only=False):
         """Handle backend-specific logic for datastore's find_with_file_uris()."""
         raise NotImplementedError
 
@@ -425,6 +425,29 @@ class RecordDAO(object):
         :returns: Record object or IDs fitting the criteria.
         """
         raise NotImplementedError
+
+    def find(self, types=None, data=None, file_uri=None,
+             id_pool=None, ids_only=False, query_order=["data", "file_uri", "types"]):
+        """Implement cross-backend logic for the DataStore method of the same name."""
+        LOGGER.debug('Performing a general find() query with order %s', query_order)
+        query_map = {"data": (self._do_data_query, data),
+                     "file_uri": (self._do_get_given_document_uri, file_uri),
+                     "types": (self._do_get_all_of_type, types)}
+        for query_type in query_order:
+            func, arg = query_map[query_type]
+            if arg:
+                if query_type is "data":
+                    # Data has no ids_only
+                    id_pool = list(func(arg, id_pool=id_pool))
+                else:
+                    id_pool = list(func(arg, id_pool=id_pool, ids_only=True))
+                # Break early, as an empty id_pool is bad usage for a query.
+                if not id_pool:
+                    return (x for x in [])
+        if ids_only:
+            return (x for x in id_pool)
+        else:
+            return self.get(id_pool)
 
 
 class RelationshipDAO(object):

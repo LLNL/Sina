@@ -224,6 +224,15 @@ class DatastoreTests(unittest.TestCase):
                                                  "get_with_mime_type", 1,
                                                  opt_args=(False,))
 
+    def test_record_find(self):
+        """Test the RecordOperation find()."""
+        self.assert_record_method_is_passthrough("find",
+                                                 "find", 6)
+        self.assert_record_method_is_passthrough("find",
+                                                 "find", 0,
+                                                 opt_args=(None, None, None, None,
+                                                           False, ["data", "file_uri", "types"]))
+
     # #############  RelationshipOperations  ############# #
     def test_find(self):
         """Test the RelationshipOperation find()."""

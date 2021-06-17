@@ -14,7 +14,7 @@ import tempfile
 import six
 
 # Disable pylint check due to its issue with virtual environments
-from mock import patch  # pylint: disable=import-error
+from mock import patch, Mock, call  # pylint: disable=import-error
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, all_in, any_in, exists)
@@ -1343,6 +1343,83 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         get_no_ids = list(self.record_dao.get_with_mime_type(mimetype="nope/nonexist",
                                                              ids_only=True))
         self.assertFalse(get_no_ids)
+
+    # ###################### find ########################
+    def test_recorddao_find_basic(self):
+        """
+        Test that the RecordDAO is able to do basic find() queries.
+
+        They should get the same results as their component queries.
+        """
+        just_5 = list(self.record_dao.data_query(flex_data_1=exists(),
+                                                 flex_data_2=exists()))
+        also_just_5 = list(self.record_dao.find(data={"flex_data_1": exists(),
+                                                      "flex_data_2": exists()},
+                                                ids_only=True))
+        six.assertCountEqual(self, just_5, also_just_5)
+        just_4 = list(self.record_dao.get_all_of_type("bar", ids_only=True))
+        also_just_4 = list(self.record_dao.find(types=["bar"], ids_only=True))
+        six.assertCountEqual(self, just_4, also_just_4)
+        matches_2_3_4 = list(self.record_dao.get_given_document_uri(has_any("%png", "beeq.%"),
+                                                                    ids_only=True))
+        also_matches_2_3_4 = list(self.record_dao.find(file_uri=has_any("%png", "beeq.%"),
+                                                       ids_only=True))
+        six.assertCountEqual(self, matches_2_3_4, also_matches_2_3_4)
+
+    @patch('sina.dao.RecordDAO._do_data_query')
+    @patch('sina.dao.RecordDAO._do_get_given_document_uri')
+    @patch('sina.dao.RecordDAO._do_get_all_of_type')
+    def test_recorddao_find_order_default(self, type_query, uri_query, data_query):
+        """Test that the RecordDAO find() queries in the correct default order."""
+        manager = Mock()
+        manager.attach_mock(data_query, 'data_query')
+        manager.attach_mock(uri_query, 'uri_query')
+        manager.attach_mock(type_query, 'type_query')
+
+        self.record_dao.find(data={"flex_data_1": exists(),
+                                   "flex_data_2": exists()},
+                             file_uri=has_any("%png", "beeq.%"),
+                             types=["bar"])
+
+        expected_calls = [call.data_query('data_query'),
+                          call.uri_query('uri_query'),
+                          call.type_query('type_query')]
+        self.assertEqual(manager.mock_calls, expected_calls)
+
+    @patch('sina.dao.RecordDAO._do_data_query')
+    @patch('sina.dao.RecordDAO._do_get_given_document_uri')
+    @patch('sina.dao.RecordDAO._do_get_all_of_type')
+    def test_recorddao_find_order_non_default(self, type_query, uri_query, data_query):
+        """Test that the RecordDAO find() correctly reorders queries."""
+        manager = Mock()
+        manager.attach_mock(data_query, 'data_query')
+        manager.attach_mock(uri_query, 'uri_query')
+        manager.attach_mock(type_query, 'type_query')
+
+        self.record_dao.find(data={"flex_data_1": exists(),
+                                   "flex_data_2": exists()},
+                             file_uri=has_any("%png", "beeq.%"),
+                             types=["bar"],
+                             query_order=["file_uri", "types", "data"])
+
+        expected_calls = [call.uri_query(has_any("%png", "beeq.%")),
+                          call.type_query('type_query'),
+                          call.data_query('data_query')]
+        self.assertEqual(manager.mock_calls, expected_calls)
+
+    def test_recorddao_find_multi(self):
+        """Test that the RecordDAO find() combines queries."""
+        get_none = self.record_dao.find(data={"flex_data_1": exists(),
+                                              "flex_data_2": exists()},
+                                        file_uri=has_any("%png", "beeq.%"),
+                                        types=["bar"],
+                                        query_order=["file_uri", "types", "data"])
+        six.assertCountEqual(self, list(get_none), [])
+        get_one = self.record_dao.find(data={"flex_data_1": exists()},
+                                       file_uri="%wav",
+                                       types=["run", "bar"],
+                                       ids_only=False)
+        six.assertCountEqual(self, list(get_one)[0].id, self.record_dao.get("spam5").id)
 
 
 class TestImportExport(unittest.TestCase):

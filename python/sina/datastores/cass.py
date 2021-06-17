@@ -782,7 +782,7 @@ class RecordDAO(dao.RecordDAO):
             for result in results:
                 yield model.generate_record_from_json(json_input=json.loads(result.raw))
 
-    def _get_all_of_type(self, types, ids_only=False, id_pool=None):
+    def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
         """
         Given an iterable of types of Record, return all Records of those types.
 
@@ -881,7 +881,7 @@ class RecordDAO(dao.RecordDAO):
                 yield result
 
     @staticmethod
-    def _get_records_for_some_uri(uri, accepted_ids_list=None):
+    def _get_records_for_some_uri(uri, id_pool=None):
         """
         Handle the logic for a single URI in _do_get_given_document_uri.
 
@@ -923,7 +923,7 @@ class RecordDAO(dao.RecordDAO):
 
         return match_ids
 
-    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+    def _do_get_given_document_uri(self, uri, id_pool=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
@@ -945,8 +945,8 @@ class RecordDAO(dao.RecordDAO):
                   generator of their ids.
         """
         LOGGER.debug('Getting all records related to uri=%s.', uri)
-        if accepted_ids_list:
-            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
+        if id_pool:
+            LOGGER.debug('Restricting to %i ids.', len(id_pool))
         LOGGER.warning('Temporary implementation of getting Records based on '
                        'Document URI. This is a very slow, brute-force '
                        'strategy.')
@@ -954,7 +954,7 @@ class RecordDAO(dao.RecordDAO):
             generators = []
             for criterion_entry in uri.value:
                 generators.append(self._get_records_for_some_uri(criterion_entry,
-                                                                 accepted_ids_list))
+                                                                 id_pool))
             if uri.operation == utils.ListQueryOperation.HAS_ALL:
                 # While a natural choice would be to ORDER_BY and use utils.intersect_ordered,
                 # Cassandra currently (June 2021) doesn't support ordering by partition key
@@ -965,7 +965,7 @@ class RecordDAO(dao.RecordDAO):
             else:
                 match_ids = itertools.chain(*generators)
         else:
-            match_ids = self._get_records_for_some_uri(uri, accepted_ids_list)
+            match_ids = self._get_records_for_some_uri(uri, id_pool)
         if ids_only:
             for id in set(match_ids):
                 yield id
