@@ -16,7 +16,6 @@ char const LOCAL_ID_FIELD[] = "local_id";
 char const GLOBAL_ID_FIELD[] = "id";
 char const TYPE_FIELD[] = "type";
 char const FILES_FIELD[] = "files";
-char const USER_DEFINED_FIELD[] = "user_defined";
 
 }
 
@@ -40,9 +39,6 @@ conduit::Node Record::toNode() const {
       asNode[FILES_FIELD] = fileRef;
       }
     }
-    if(!userDefined.dtype().is_empty()){
-      asNode[USER_DEFINED_FIELD] = userDefined;
-    }
     return asNode;
 }
 
@@ -58,16 +54,6 @@ Record::Record(conduit::Node const &asNode) :
             files.insert(File(filesIter.name(), namedFile));
         }
     }
-    if(asNode.has_child(USER_DEFINED_FIELD)){
-        auto userDefinedNode = asNode[USER_DEFINED_FIELD];
-        if (!userDefinedNode.dtype().is_empty()) {
-            // Enforce that user_defined must be an object
-            if (!userDefinedNode.dtype().is_object()) {
-                throw std::invalid_argument("User_defined must be an object Node");
-            }
-            userDefined = userDefinedNode;
-        }
-    }
 }
 
 void Record::add(File file) {
@@ -76,10 +62,6 @@ void Record::add(File file) {
         files.erase(existing);
     }
     files.insert(std::move(file));
-}
-
-void Record::setUserDefinedContent(conduit::Node userDefined_) {
-    userDefined = std::move(userDefined_);
 }
 
 void RecordLoader::addTypeLoader(std::string const &type, TypeLoader loader) {
