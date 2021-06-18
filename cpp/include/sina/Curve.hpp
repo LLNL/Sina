@@ -1,6 +1,12 @@
 #ifndef SINA_CURVE_HPP
 #define SINA_CURVE_HPP
 
+/**
+ * @file
+ *
+ * Contains the definition of the Curve class. 
+ */
+
 #include <string>
 #include <vector>
 
