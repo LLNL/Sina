@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.7)
 find_package(Conduit REQUIRED)
 
 blt_register_library(NAME Conduit
-        INCLUDES "${Conduit_DIR}/../../../include/conduit"
+        INCLUDES "${CONDUIT_INCLUDE_DIRS}"
         LIBRARIES "conduit"
         TREAT_INCLUDES_AS_SYSTEM ON
         )
@@ -23,7 +23,7 @@ if(${SINA_BUILD_ADIAK_BINDINGS})
 
     blt_register_library(NAME adiak
         TREAT_INCLUDES_AS_SYSTEM ON
-        INCLUDES "${adiak_DIR}/../../../include"
+        INCLUDES "${adiak_INCLUDE_DIR}"
         LIBRARIES adiak
     )
     string(CONCAT OPTIONAL_SINA_DEPENDENCIES "adiak")
