@@ -222,12 +222,12 @@ class DataStore(object):
             A convenience method, this allows you to combine Sina's different types
             of queries into a single call. Using the method with only one of the criteria
             args is equivalent to using that dedicated query method. Using more performs
-            an "AND" operation; returned Records must fulfill ALL criteria.
+            an "AND" operation: returned Records must fulfill ALL criteria.
 
-            :param types: Functionality of find_with_type, an iterable of types of Records to
-                          return.
-            :param data: Functionality of find_with_data, dictionary of name:criteria a Record's
-                         data must fulfill
+            :param types: Functionality of find_with_type, an iterable of types of Records
+                          (e.g. "msub", "test", "run") to return.
+            :param data: Functionality of find_with_data, dictionary of {<name>:<criteria>} entries
+                         a Record's data must fulfill
             :param file_uri: Functionality of find_with_file_uri, a uri criterion (optionally with
                              wildcards) a Record's files must fulfill, ex: having at least one .png
             :param id_pool: A pool of IDs to restrict the query to. Only a Record whose id is in

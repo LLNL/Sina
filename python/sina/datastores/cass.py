@@ -892,7 +892,7 @@ class RecordDAO(dao.RecordDAO):
         if id_pool is not None:
             base_query = schema.DocumentFromRecord.objects.filter(id__in=id_pool)
         else:
-            # If we haven't had an accepted_ids_list passed, any filtering we do
+            # If we haven't had an id_pool passed, any filtering we do
             # will NOT include the partition key, so we need to allow filtering.
             base_query = schema.DocumentFromRecord.objects.allow_filtering()
         # If there's a wildcard
@@ -938,8 +938,8 @@ class RecordDAO(dao.RecordDAO):
         Supports the use of % as a wildcard character.
 
         :param uri: The uri to use as a search term, such as "foo.png"
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
+        :param id_pool: A list of ids to restrict the search to. If not provided,
+                        all ids will be used.
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 

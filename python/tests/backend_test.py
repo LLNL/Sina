@@ -1374,10 +1374,12 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         dao._do_get_given_document_uri = MagicMock()
         dao._do_get_given_document_uri.return_value = ["rec_1", "rec_2"]
         dao._do_get_all_of_type = MagicMock()
-        dao.find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
-                 data="foo",
-                 file_uri="bar",
-                 types="baz")
+        dao._do_get_all_of_type.return_value = ["rec_1"]
+        result = dao.find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
+                          data="foo",
+                          file_uri="bar",
+                          types="baz",
+                          ids_only=True)
 
         dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2", "rec_3", "rec_4"])
         dao._do_get_given_document_uri.assert_called_with("bar",
@@ -1385,6 +1387,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                           ids_only=True)
         dao._do_get_all_of_type.assert_called_with("baz", id_pool=["rec_1", "rec_2"],
                                                    ids_only=True)
+        self.assertEquals(list(result), ["rec_1"])  # Should match the final id_pool returned.
 
     def test_recorddao_find_order_non_default(self):
         """Test that the RecordDAO find() correctly reorders queries."""
@@ -1394,11 +1397,13 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         dao._do_get_all_of_type = MagicMock()
         dao._do_get_all_of_type.return_value = ["rec_1", "rec_2"]
         dao._do_data_query = MagicMock()
-        dao.find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
-                 data="foo",
-                 file_uri="bar",
-                 types="baz",
-                 query_order=["file_uri", "types", "data"])
+        dao._do_data_query.return_value = ["rec_1"]
+        result = dao.find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
+                          data="foo",
+                          file_uri="bar",
+                          types="baz",
+                          ids_only=True,
+                          query_order=["file_uri", "types", "data"])
 
         dao._do_get_given_document_uri.assert_called_with(
             "bar", id_pool=["rec_1", "rec_2", "rec_3", "rec_4"], ids_only=True)
@@ -1406,6 +1411,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                    id_pool=["rec_1", "rec_2", "rec_3"],
                                                    ids_only=True)
         dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2"])
+        self.assertEquals(list(result), ["rec_1"])  # Should match the final id_pool returned.
 
     def test_recorddao_find_multi(self):
         """Test that the RecordDAO find() combines queries."""
