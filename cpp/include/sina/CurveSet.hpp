@@ -1,6 +1,12 @@
 #ifndef SINA_CURVESET_HPP
 #define SINA_CURVESET_HPP
 
+/**
+ * @file
+ *
+ * Contains the definition of the CurveSet class. 
+ */
+
 #include <string>
 #include <unordered_map>
 

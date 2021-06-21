@@ -1,6 +1,12 @@
 #ifndef SINA_DATAHOLDER_HPP
 #define SINA_DATAHOLDER_HPP
 
+/**
+ * @file
+ *
+ * Contains the definition of the DataHolder class. 
+ */
+
 #include <string>
 #include <memory>
 #include <unordered_map>
