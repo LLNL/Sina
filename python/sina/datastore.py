@@ -212,8 +212,10 @@ class DataStore(object):
             """
             return self.record_dao.get_all(ids_only)
 
+        # High arg count is inherent to the functionality.
+        # pylint: disable=too-many-arguments
         def find(self, types=None, data=None, file_uri=None,
-                 id_pool=None, ids_only=False, query_order=["data", "file_uri", "types"]):
+                 id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
             """
             Return Records that match multiple different types of criteria.
 

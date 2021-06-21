@@ -231,7 +231,7 @@ class DatastoreTests(unittest.TestCase):
         self.assert_record_method_is_passthrough("find",
                                                  "find", 0,
                                                  opt_args=(None, None, None, None,
-                                                           False, ["data", "file_uri", "types"]))
+                                                           False, ("data", "file_uri", "types")))
 
     # #############  RelationshipOperations  ############# #
     def test_find(self):

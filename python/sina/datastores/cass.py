@@ -270,6 +270,8 @@ class RecordDAO(dao.RecordDAO):
         for partition, data_list in six.iteritems(from_scalar_list_batch):
             with BatchQuery() as batch_query:
                 for entry in data_list:
+                    if not entry[0]:
+                        continue  # Empty lists should not be inserted, they can't be queried.
                     # We track only the min and max, that's all we need for queries
                     table.batch(batch_query).create(name=partition,
                                                     min=min(entry[0]),
@@ -871,7 +873,7 @@ class RecordDAO(dao.RecordDAO):
 
         query_tables = [type_name_to_tables[type] for type in data_types]
 
-        ids = list(self._get_all_of_type([record_type], ids_only=True))
+        ids = list(self._do_get_all_of_type([record_type], ids_only=True))
 
         for query_table in query_tables:
             results = set(query_table.objects
@@ -887,8 +889,8 @@ class RecordDAO(dao.RecordDAO):
 
         Returns a generator of all records that match the uri.
         """
-        if accepted_ids_list is not None:
-            base_query = schema.DocumentFromRecord.objects.filter(id__in=accepted_ids_list)
+        if id_pool is not None:
+            base_query = schema.DocumentFromRecord.objects.filter(id__in=id_pool)
         else:
             # If we haven't had an accepted_ids_list passed, any filtering we do
             # will NOT include the partition key, so we need to allow filtering.

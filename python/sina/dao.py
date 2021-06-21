@@ -426,28 +426,34 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    # High arg count is inherent to the functionality.
+    # pylint: disable=too-many-arguments
     def find(self, types=None, data=None, file_uri=None,
-             id_pool=None, ids_only=False, query_order=["data", "file_uri", "types"]):
+             id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
         """Implement cross-backend logic for the DataStore method of the same name."""
         LOGGER.debug('Performing a general find() query with order %s', query_order)
         query_map = {"data": (self._do_data_query, data),
                      "file_uri": (self._do_get_given_document_uri, file_uri),
                      "types": (self._do_get_all_of_type, types)}
         for query_type in query_order:
-            func, arg = query_map[query_type]
+            query_func, arg = query_map[query_type]
             if arg:
-                if query_type is "data":
+                if query_type == "data":
                     # Data has no ids_only
-                    id_pool = list(func(arg, id_pool=id_pool))
+                    id_pool = list(query_func(arg, id_pool=id_pool))
                 else:
-                    id_pool = list(func(arg, id_pool=id_pool, ids_only=True))
+                    # This usage of query_func seems to confuse pylint; it complains as
+                    # long as I'm using ids_only=True, maybe it's "seeing" the call above.
+                    id_pool = list(
+                        query_func(arg,  # pylint: disable=unexpected-keyword-arg
+                                   id_pool=id_pool,
+                                   ids_only=True))
                 # Break early, as an empty id_pool is bad usage for a query.
                 if not id_pool:
                     return (x for x in [])
         if ids_only:
             return (x for x in id_pool)
-        else:
-            return self.get(id_pool)
+        return self.get(id_pool)
 
 
 class RelationshipDAO(object):

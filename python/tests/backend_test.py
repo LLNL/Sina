@@ -14,7 +14,7 @@ import tempfile
 import six
 
 # Disable pylint check due to its issue with virtual environments
-from mock import patch, Mock, call  # pylint: disable=import-error
+from mock import patch, MagicMock  # pylint: disable=import-error
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, all_in, any_in, exists)
@@ -1366,46 +1366,46 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                        ids_only=True))
         six.assertCountEqual(self, matches_2_3_4, also_matches_2_3_4)
 
-    @patch('sina.dao.RecordDAO._do_data_query')
-    @patch('sina.dao.RecordDAO._do_get_given_document_uri')
-    @patch('sina.dao.RecordDAO._do_get_all_of_type')
-    def test_recorddao_find_order_default(self, type_query, uri_query, data_query):
-        """Test that the RecordDAO find() queries in the correct default order."""
-        manager = Mock()
-        manager.attach_mock(data_query, 'data_query')
-        manager.attach_mock(uri_query, 'uri_query')
-        manager.attach_mock(type_query, 'type_query')
+    def test_recorddao_find_order_default(self):
+        """Test that the RecordDAO find() runs queries in the correct default order."""
+        dao = self.factory.create_record_dao()
+        dao._do_data_query = MagicMock()
+        dao._do_data_query.return_value = ["rec_1", "rec_2", "rec_3"]
+        dao._do_get_given_document_uri = MagicMock()
+        dao._do_get_given_document_uri.return_value = ["rec_1", "rec_2"]
+        dao._do_get_all_of_type = MagicMock()
+        dao.find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
+                 data="foo",
+                 file_uri="bar",
+                 types="baz")
 
-        self.record_dao.find(data={"flex_data_1": exists(),
-                                   "flex_data_2": exists()},
-                             file_uri=has_any("%png", "beeq.%"),
-                             types=["bar"])
+        dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2", "rec_3", "rec_4"])
+        dao._do_get_given_document_uri.assert_called_with("bar",
+                                                          id_pool=["rec_1", "rec_2", "rec_3"],
+                                                          ids_only=True)
+        dao._do_get_all_of_type.assert_called_with("baz", id_pool=["rec_1", "rec_2"],
+                                                   ids_only=True)
 
-        expected_calls = [call.data_query('data_query'),
-                          call.uri_query('uri_query'),
-                          call.type_query('type_query')]
-        self.assertEqual(manager.mock_calls, expected_calls)
-
-    @patch('sina.dao.RecordDAO._do_data_query')
-    @patch('sina.dao.RecordDAO._do_get_given_document_uri')
-    @patch('sina.dao.RecordDAO._do_get_all_of_type')
-    def test_recorddao_find_order_non_default(self, type_query, uri_query, data_query):
+    def test_recorddao_find_order_non_default(self):
         """Test that the RecordDAO find() correctly reorders queries."""
-        manager = Mock()
-        manager.attach_mock(data_query, 'data_query')
-        manager.attach_mock(uri_query, 'uri_query')
-        manager.attach_mock(type_query, 'type_query')
+        dao = self.factory.create_record_dao()
+        dao._do_get_given_document_uri = MagicMock()
+        dao._do_get_given_document_uri.return_value = ["rec_1", "rec_2", "rec_3"]
+        dao._do_get_all_of_type = MagicMock()
+        dao._do_get_all_of_type.return_value = ["rec_1", "rec_2"]
+        dao._do_data_query = MagicMock()
+        dao.find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
+                 data="foo",
+                 file_uri="bar",
+                 types="baz",
+                 query_order=["file_uri", "types", "data"])
 
-        self.record_dao.find(data={"flex_data_1": exists(),
-                                   "flex_data_2": exists()},
-                             file_uri=has_any("%png", "beeq.%"),
-                             types=["bar"],
-                             query_order=["file_uri", "types", "data"])
-
-        expected_calls = [call.uri_query(has_any("%png", "beeq.%")),
-                          call.type_query('type_query'),
-                          call.data_query('data_query')]
-        self.assertEqual(manager.mock_calls, expected_calls)
+        dao._do_get_given_document_uri.assert_called_with(
+            "bar", id_pool=["rec_1", "rec_2", "rec_3", "rec_4"], ids_only=True)
+        dao._do_get_all_of_type.assert_called_with("baz",
+                                                   id_pool=["rec_1", "rec_2", "rec_3"],
+                                                   ids_only=True)
+        dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2"])
 
     def test_recorddao_find_multi(self):
         """Test that the RecordDAO find() combines queries."""
