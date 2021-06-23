@@ -15,17 +15,16 @@ from nose.plugins.attrib import attr  # pylint: disable=import-error
 import sina
 import sina.datastore
 
-from sina.datastore import connect, create_datastore, DataStore
+from sina.datastore import connect, create_datastore, DataStore, ReadOnlyDataStore
 
 
-class DatastoreTests(unittest.TestCase):
-    """
-    Tests for datastore functionality.
+class AbstractDataStoreTest(unittest.TestCase):
+    """Base class for testing data stores"""
 
-    These don't test the functionality of the methods (see instead
-    backend_test), they just make sure that the datastore is wrapping methods
-    correctly.
-    """
+    __test__ = False
+
+    # Set to the DataStore class in sub tests
+    data_store_class = None
 
     def setUp(self):
         """Assemble all our mock objects."""
@@ -34,7 +33,7 @@ class DatastoreTests(unittest.TestCase):
         self.relationship_dao = Mock()
         self.dao_factory.create_record_dao = Mock(return_value=self.record_dao)
         self.dao_factory.create_relationship_dao = Mock(return_value=self.relationship_dao)
-        self.datastore = DataStore(self.dao_factory)
+        self.datastore = self.data_store_class(self.dao_factory)  # pylint: disable=not-callable
 
     def assert_method_is_passthrough(self, method_name, method_owner,
                                      delegate_method_name,
@@ -95,6 +94,20 @@ class DatastoreTests(unittest.TestCase):
                                           self.dao_factory, num_args, opt_args,
                                           has_result)
 
+
+class ReadOnlyDatastoreTests(AbstractDataStoreTest):
+    """
+    Tests for datastore functionality.
+
+    These don't test the functionality of the methods (see instead
+    backend_test), they just make sure that the datastore is wrapping methods
+    correctly.
+    """
+
+    __test__ = True
+
+    data_store_class = ReadOnlyDataStore
+
     # #############  RecordOperations  ############# #
     def test_get_record(self):
         """Test the RecordOperation get()."""
@@ -116,17 +129,7 @@ class DatastoreTests(unittest.TestCase):
         self.assertIs(actual_result, expected_result)
         self.record_dao.get.assert_called_with(*expected_args, **expected_kwargs)
 
-    def test_insert_record(self):
-        """Test the RecordOperation insert()."""
-        self.assert_record_method_is_passthrough("insert", "insert", 1,
-                                                 has_result=False)
-
-    def test_delete_record(self):
-        """Test the RecordOperation delete()."""
-        self.assert_record_method_is_passthrough("delete", "delete", 1,
-                                                 has_result=False)
-
-    def test_find_with_types(self):
+    def test_find_with_type(self):
         """Test the RecordOperation find_with_type()."""
         self.assert_record_method_is_passthrough("find_with_types",
                                                  "get_all_of_type", 3)
@@ -247,31 +250,6 @@ class DatastoreTests(unittest.TestCase):
         self.assertIs(actual_result, expected_result)
         self.relationship_dao.get.assert_called_with(**expected_kwargs)
 
-    def test_delete(self):
-        """Test the RelationshipOperation delete()."""
-        # We need to test that args are properly kwarg'd to reorder
-        # Same reorder that happens for .get() but no return value
-        self.relationship_dao.delete = Mock(return_value=None)
-        args = ("some_msub", "submits", "some_run")
-        expected_kwargs = {"subject_id": "some_msub",
-                           "object_id": "some_run",
-                           "predicate": "submits"}
-        actual_result = self.datastore.relationships.delete(*args)
-        self.assertIs(actual_result, None)
-        self.relationship_dao.delete.assert_called_with(**expected_kwargs)
-        args = ("some_msub",)
-        expected_kwargs = {"subject_id": "some_msub",
-                           "object_id": None,
-                           "predicate": None}
-        actual_result = self.datastore.relationships.delete(*args)
-        self.assertIs(actual_result, None)
-        self.relationship_dao.delete.assert_called_with(**expected_kwargs)
-
-    def test_insert_relationship(self):
-        """Test the RelationshipOperation insert()."""
-        self.assert_relationship_method_is_passthrough("insert", "insert",
-                                                       num_args=1)
-
     # #############  DataStore Operations  ############# #
     def test_close(self):
         """Test the DataStore's close() method."""
@@ -299,6 +277,55 @@ class DatastoreTests(unittest.TestCase):
         self.assertEqual(test_ds.relationships.relationship_dao, rel_dao)
 
 
+class DataStoreTest(AbstractDataStoreTest):
+    """
+    Tests for datastore functionality.
+
+    These don't test the functionality of the methods (see instead
+    backend_test), they just make sure that the datastore is wrapping methods
+    correctly.
+    """
+
+    __test__ = True
+
+    data_store_class = DataStore
+
+    def test_insert_record(self):
+        """Test the RecordOperation insert()."""
+        self.assert_record_method_is_passthrough("insert", "insert", 1,
+                                                 has_result=False)
+
+    def test_delete_record(self):
+        """Test the RecordOperation delete()."""
+        self.assert_record_method_is_passthrough("delete", "delete", 1,
+                                                 has_result=False)
+
+    def test_delete_relationship(self):
+        """Test the RelationshipOperation delete()."""
+        # We need to test that args are properly kwarg'd to reorder
+        # Same reorder that happens for .get() but no return value
+        self.relationship_dao.delete = Mock(return_value=None)
+        args = ("some_msub", "submits", "some_run")
+        expected_kwargs = {"subject_id": "some_msub",
+                           "object_id": "some_run",
+                           "predicate": "submits"}
+        actual_result = self.datastore.relationships.delete(*args)
+        self.assertIs(actual_result, None)
+        self.relationship_dao.delete.assert_called_with(**expected_kwargs)
+        args = ("some_msub",)
+        expected_kwargs = {"subject_id": "some_msub",
+                           "object_id": None,
+                           "predicate": None}
+        actual_result = self.datastore.relationships.delete(*args)
+        self.assertIs(actual_result, None)
+        self.relationship_dao.delete.assert_called_with(**expected_kwargs)
+
+    def test_insert_relationship(self):
+        """Test the RelationshipOperation insert()."""
+        self.assert_relationship_method_is_passthrough("insert", "insert",
+                                                       num_args=1)
+
+
 class CreateDatastore(unittest.TestCase):
     """
     These tests can't be separated from the concept of a backend.
@@ -307,20 +334,33 @@ class CreateDatastore(unittest.TestCase):
     expected conditions.
     """
 
+    @patch('sina.datastore.ReadOnlyDataStore.__init__')
     @patch('sina.datastore.DataStore.__init__')
     @patch('sina.datastores.sql.DAOFactory.__init__')
-    def test_connect_sql_datastore(self, mock_factory_init, mock_datastore_init):
+    def test_connect_sql_datastore(self, mock_factory_init, mock_datastore_init,
+                                   mock_read_only_store_init):
         """Make sure connect() targets the backend when appropriate."""
         # Python gets confused if __init__ returns a MagicMock
         mock_factory_init.return_value = None
         # Because of that, we have to short-circuit the other init, too.
         mock_datastore_init.return_value = None
+        mock_read_only_store_init.return_value = None
         connect()
         self.assertEqual(mock_factory_init.call_count, 1)
+        self.assertEqual(mock_datastore_init.call_count, 1)
+        self.assertEqual(mock_read_only_store_init.call_count, 0)
         connect("127.0.0.1")
         self.assertEqual(mock_factory_init.call_count, 2)
+        self.assertEqual(mock_datastore_init.call_count, 2)
+        self.assertEqual(mock_read_only_store_init.call_count, 0)
         connect(database_type="sql")
         self.assertEqual(mock_factory_init.call_count, 3)
+        self.assertEqual(mock_datastore_init.call_count, 3)
+        self.assertEqual(mock_read_only_store_init.call_count, 0)
+        connect(read_only=True)
+        self.assertEqual(mock_factory_init.call_count, 4)
+        self.assertEqual(mock_datastore_init.call_count, 3)
+        self.assertEqual(mock_read_only_store_init.call_count, 1)
 
     @attr('cassandra')
     @patch('sina.datastore.DataStore.__init__')

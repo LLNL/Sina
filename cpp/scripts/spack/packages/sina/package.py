@@ -59,7 +59,7 @@ class Sina(CachedCMakePackage):
         entries.append(cmake_cache_path(
             'Conduit_DIR', '{}/lib/cmake/conduit'.format(conduit_dir)))
 
-        use_adiak = '+adiak' in self.spec
+        use_adiak = '+adiak' in self.spec or '+adiak-no-mpi' in self.spec
         entries.append(cmake_cache_option('SINA_BUILD_ADIAK_BINDINGS', use_adiak))
         if use_adiak:
             adiak_dir = get_spec_path(self.spec, 'adiak', path_replacements)

@@ -123,46 +123,16 @@ public:
     }
 
     /**
-     * Get the user-defined content of the object.
-     *
-     * @return the user-defined content
-     */
-    conduit::Node const &getUserDefinedContent() const noexcept {
-        return userDefined;
-    }
-
-    /**
-     * Get the user-defined content of the object.
-     *
-     * @return the user-defined content
-     */
-    conduit::Node &getUserDefinedContent() noexcept {
-        return userDefined;
-    }
-
-    /**
-     * Set the user-defined content of the object.
-     *
-     * @param userDefined the user-defined content. Must be an object (key/value pairs)
-     */
-    void setUserDefinedContent(conduit::Node userDefined);
-
-    /**
      * Convert this record to its conduit Node representation.
      *
      * @return the Node representation of this record.
      */
-    virtual conduit::Node toNode() const;
-
-    virtual ~Record() = default;
+    conduit::Node toNode() const override;
 
 private:
     internal::IDField id;
     std::string type;
-    DatumMap data;
     FileSet files;
-    CurveSetMap curveSets;
-    conduit::Node userDefined;
 };
 
 
