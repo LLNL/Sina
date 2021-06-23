@@ -225,7 +225,9 @@ class ReadOnlyDataStore(object):
                                 with the desired type(s), you may wish to put "type" first).
                                 Query names are "types", "file_uri", and "data".
             """
-            return self.record_dao.find(types, data, file_uri, id_pool, ids_only, query_order)
+            # We protect _find to disincentize users using the DAO directly.
+            # pylint: disable=protected-access
+            return self.record_dao._find(types, data, file_uri, id_pool, ids_only, query_order)
 
         # ------------------ Operations tied to Record type -------------------
         def find_with_type(self, types, ids_only=False, id_pool=None):

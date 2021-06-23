@@ -428,8 +428,8 @@ class RecordDAO(object):
 
     # High arg count is inherent to the functionality.
     # pylint: disable=too-many-arguments
-    def find(self, types=None, data=None, file_uri=None,
-             id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
+    def _find(self, types=None, data=None, file_uri=None,
+              id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
         """Implement cross-backend logic for the DataStore method of the same name."""
         LOGGER.debug('Performing a general find() query with order %s', query_order)
         query_map = {"data": (self._do_data_query, data),

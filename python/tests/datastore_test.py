@@ -230,9 +230,9 @@ class ReadOnlyDatastoreTests(AbstractDataStoreTest):
     def test_record_find(self):
         """Test the RecordOperation find()."""
         self.assert_record_method_is_passthrough("find",
-                                                 "find", 6)
+                                                 "_find", 6)
         self.assert_record_method_is_passthrough("find",
-                                                 "find", 0,
+                                                 "_find", 0,
                                                  opt_args=(None, None, None, None,
                                                            False, ("data", "file_uri", "types")))
 

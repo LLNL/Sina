@@ -1347,27 +1347,27 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # ###################### find ########################
     def test_recorddao_find_basic(self):
         """
-        Test that the RecordDAO is able to do basic find() queries.
+        Test that the RecordDAO is able to do basic _find() queries.
 
         They should get the same results as their component queries.
         """
         just_5 = list(self.record_dao.data_query(flex_data_1=exists(),
                                                  flex_data_2=exists()))
-        also_just_5 = list(self.record_dao.find(data={"flex_data_1": exists(),
-                                                      "flex_data_2": exists()},
-                                                ids_only=True))
+        also_just_5 = list(self.record_dao._find(data={"flex_data_1": exists(),
+                                                       "flex_data_2": exists()},
+                                                 ids_only=True))
         six.assertCountEqual(self, just_5, also_just_5)
         just_4 = list(self.record_dao.get_all_of_type("bar", ids_only=True))
-        also_just_4 = list(self.record_dao.find(types=["bar"], ids_only=True))
+        also_just_4 = list(self.record_dao._find(types=["bar"], ids_only=True))
         six.assertCountEqual(self, just_4, also_just_4)
         matches_2_3_4 = list(self.record_dao.get_given_document_uri(has_any("%png", "beeq.%"),
                                                                     ids_only=True))
-        also_matches_2_3_4 = list(self.record_dao.find(file_uri=has_any("%png", "beeq.%"),
-                                                       ids_only=True))
+        also_matches_2_3_4 = list(self.record_dao._find(file_uri=has_any("%png", "beeq.%"),
+                                                        ids_only=True))
         six.assertCountEqual(self, matches_2_3_4, also_matches_2_3_4)
 
     def test_recorddao_find_order_default(self):
-        """Test that the RecordDAO find() runs queries in the correct default order."""
+        """Test that the RecordDAO _find() runs queries in the correct default order."""
         dao = self.factory.create_record_dao()
         dao._do_data_query = MagicMock()
         dao._do_data_query.return_value = ["rec_1", "rec_2", "rec_3"]
@@ -1375,11 +1375,11 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         dao._do_get_given_document_uri.return_value = ["rec_1", "rec_2"]
         dao._do_get_all_of_type = MagicMock()
         dao._do_get_all_of_type.return_value = ["rec_1"]
-        result = dao.find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
-                          data="foo",
-                          file_uri="bar",
-                          types="baz",
-                          ids_only=True)
+        result = dao._find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
+                           data="foo",
+                           file_uri="bar",
+                           types="baz",
+                           ids_only=True)
 
         dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2", "rec_3", "rec_4"])
         dao._do_get_given_document_uri.assert_called_with("bar",
@@ -1387,10 +1387,10 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                           ids_only=True)
         dao._do_get_all_of_type.assert_called_with("baz", id_pool=["rec_1", "rec_2"],
                                                    ids_only=True)
-        self.assertEquals(list(result), ["rec_1"])  # Should match the final id_pool returned.
+        self.assertEqual(list(result), ["rec_1"])  # Should match the final id_pool returned.
 
     def test_recorddao_find_order_non_default(self):
-        """Test that the RecordDAO find() correctly reorders queries."""
+        """Test that the RecordDAO _find() correctly reorders queries."""
         dao = self.factory.create_record_dao()
         dao._do_get_given_document_uri = MagicMock()
         dao._do_get_given_document_uri.return_value = ["rec_1", "rec_2", "rec_3"]
@@ -1398,12 +1398,12 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         dao._do_get_all_of_type.return_value = ["rec_1", "rec_2"]
         dao._do_data_query = MagicMock()
         dao._do_data_query.return_value = ["rec_1"]
-        result = dao.find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
-                          data="foo",
-                          file_uri="bar",
-                          types="baz",
-                          ids_only=True,
-                          query_order=["file_uri", "types", "data"])
+        result = dao._find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
+                           data="foo",
+                           file_uri="bar",
+                           types="baz",
+                           ids_only=True,
+                           query_order=["file_uri", "types", "data"])
 
         dao._do_get_given_document_uri.assert_called_with(
             "bar", id_pool=["rec_1", "rec_2", "rec_3", "rec_4"], ids_only=True)
@@ -1411,20 +1411,20 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                    id_pool=["rec_1", "rec_2", "rec_3"],
                                                    ids_only=True)
         dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2"])
-        self.assertEquals(list(result), ["rec_1"])  # Should match the final id_pool returned.
+        self.assertEqual(list(result), ["rec_1"])  # Should match the final id_pool returned.
 
     def test_recorddao_find_multi(self):
-        """Test that the RecordDAO find() combines queries."""
-        get_none = self.record_dao.find(data={"flex_data_1": exists(),
-                                              "flex_data_2": exists()},
-                                        file_uri=has_any("%png", "beeq.%"),
-                                        types=["bar"],
-                                        query_order=["file_uri", "types", "data"])
+        """Test that the RecordDAO _find() combines queries."""
+        get_none = self.record_dao._find(data={"flex_data_1": exists(),
+                                               "flex_data_2": exists()},
+                                         file_uri=has_any("%png", "beeq.%"),
+                                         types=["bar"],
+                                         query_order=["file_uri", "types", "data"])
         six.assertCountEqual(self, list(get_none), [])
-        get_one = self.record_dao.find(data={"flex_data_1": exists()},
-                                       file_uri="%wav",
-                                       types=["run", "bar"],
-                                       ids_only=False)
+        get_one = self.record_dao._find(data={"flex_data_1": exists()},
+                                        file_uri="%wav",
+                                        types=["run", "bar"],
+                                        ids_only=False)
         six.assertCountEqual(self, list(get_one)[0].id, self.record_dao.get("spam5").id)
 
 
