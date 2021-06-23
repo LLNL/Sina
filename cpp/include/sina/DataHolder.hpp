@@ -1,6 +1,12 @@
 #ifndef SINA_DATAHOLDER_HPP
 #define SINA_DATAHOLDER_HPP
 
+/**
+ * @file
+ *
+ * Contains the definition of the DataHolder class. 
+ */
+
 #include <string>
 #include <memory>
 #include <unordered_map>
@@ -32,6 +38,12 @@ public:
      * Construct an empty DataHolder.
      */
     DataHolder() = default;
+
+    virtual ~DataHolder() = default;
+
+    DataHolder(DataHolder const &) = delete;
+
+    DataHolder &operator=(DataHolder const &) = delete;
 
     /**
      * Construct a DataHolder from its conduit Node representation.
@@ -106,17 +118,43 @@ public:
     }
 
     /**
+     * Get the user-defined content of the object.
+     *
+     * @return the user-defined content
+     */
+    conduit::Node const &getUserDefinedContent() const noexcept {
+        return userDefined;
+    }
+
+    /**
+     * Get the user-defined content of the object.
+     *
+     * @return the user-defined content
+     */
+    conduit::Node &getUserDefinedContent() noexcept {
+        return userDefined;
+    }
+
+    /**
+     * Set the user-defined content of the object.
+     *
+     * @param userDefined the user-defined content. Must be an object (key/value pairs)
+     */
+    void setUserDefinedContent(conduit::Node userDefined);
+
+    /**
      * Convert this DataHolder to its conduit Node representation.
      *
      * @return the Node representation of this DataHolder.
      */
-    conduit::Node toNode() const;
+    virtual conduit::Node toNode() const;
 
 
 private:
     CurveSetMap curveSets;
     DatumMap data;
     LibraryDataMap libraryData;
+    conduit::Node userDefined;
 };
 
 }
