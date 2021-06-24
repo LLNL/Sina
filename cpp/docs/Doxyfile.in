@@ -1,5 +1,5 @@
 PROJECT_NAME = Sina
-PROJECT_BRIEF = "A library to write Sina input files"
+PROJECT_BRIEF = "A library to write Sina input files."
 
 INPUT = @CMAKE_CURRENT_SOURCE_DIR@/../src @CMAKE_CURRENT_SOURCE_DIR@/../include @CMAKE_CURRENT_SOURCE_DIR@ @CMAKE_BINARY_DIR@/include
 
@@ -12,3 +12,5 @@ STRIP_CODE_COMMENTS = NO
 EXAMPLE_PATH = @CMAKE_CURRENT_SOURCE_DIR@/examples
 
 JAVADOC_AUTOBRIEF = YES
+
+LAYOUT_FILE = @CMAKE_CURRENT_SOURCE_DIR@/DoxygenLayout.xml
