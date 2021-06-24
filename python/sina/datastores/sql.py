@@ -472,7 +472,7 @@ class RecordDAO(dao.RecordDAO):
                 yield model.generate_record_from_json(
                     json_input=_json_loads(result.raw))
 
-    def _get_all_of_type(self, types, ids_only=False, id_pool=None):
+    def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
         """
         Given an iterable of types of Record, return all Records of those types.
 
@@ -647,7 +647,7 @@ class RecordDAO(dao.RecordDAO):
             query = query.join(sub_query, schema.Document.id == sub_query.c.id)
         return query
 
-    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+    def _do_get_given_document_uri(self, uri, id_pool=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
@@ -655,8 +655,8 @@ class RecordDAO(dao.RecordDAO):
 
         :param uri: The uri or uri criterion to use as a search term, such as
                     "foo.png" or has_any("%success.jpg", "%success.png")
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
+        :param id_pool: A list of ids to restrict the search to.
+                        If not provided, all ids will be used.
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
@@ -674,9 +674,9 @@ class RecordDAO(dao.RecordDAO):
         else:
             # Logic is identical for the case of just one uri
             query = self._build_query_given_uri_has_any([uri])
-        if accepted_ids_list is not None:
+        if id_pool is not None:
             query = query.filter(schema.Document
-                                 .id.in_(accepted_ids_list))
+                                 .id.in_(id_pool))
         if ids_only:
             for record_id in query.all():
                 yield record_id[0]

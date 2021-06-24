@@ -270,6 +270,8 @@ class RecordDAO(dao.RecordDAO):
         for partition, data_list in six.iteritems(from_scalar_list_batch):
             with BatchQuery() as batch_query:
                 for entry in data_list:
+                    if not entry[0]:
+                        continue  # Empty lists should not be inserted, they can't be queried.
                     # We track only the min and max, that's all we need for queries
                     table.batch(batch_query).create(name=partition,
                                                     min=min(entry[0]),
@@ -782,7 +784,7 @@ class RecordDAO(dao.RecordDAO):
             for result in results:
                 yield model.generate_record_from_json(json_input=json.loads(result.raw))
 
-    def _get_all_of_type(self, types, ids_only=False, id_pool=None):
+    def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
         """
         Given an iterable of types of Record, return all Records of those types.
 
@@ -871,7 +873,7 @@ class RecordDAO(dao.RecordDAO):
 
         query_tables = [type_name_to_tables[type] for type in data_types]
 
-        ids = list(self._get_all_of_type([record_type], ids_only=True))
+        ids = list(self._do_get_all_of_type([record_type], ids_only=True))
 
         for query_table in query_tables:
             results = set(query_table.objects
@@ -881,16 +883,16 @@ class RecordDAO(dao.RecordDAO):
                 yield result
 
     @staticmethod
-    def _get_records_for_some_uri(uri, accepted_ids_list=None):
+    def _get_records_for_some_uri(uri, id_pool=None):
         """
         Handle the logic for a single URI in _do_get_given_document_uri.
 
         Returns a generator of all records that match the uri.
         """
-        if accepted_ids_list is not None:
-            base_query = schema.DocumentFromRecord.objects.filter(id__in=accepted_ids_list)
+        if id_pool is not None:
+            base_query = schema.DocumentFromRecord.objects.filter(id__in=id_pool)
         else:
-            # If we haven't had an accepted_ids_list passed, any filtering we do
+            # If we haven't had an id_pool passed, any filtering we do
             # will NOT include the partition key, so we need to allow filtering.
             base_query = schema.DocumentFromRecord.objects.allow_filtering()
         # If there's a wildcard
@@ -923,7 +925,7 @@ class RecordDAO(dao.RecordDAO):
 
         return match_ids
 
-    def _do_get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+    def _do_get_given_document_uri(self, uri, id_pool=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
@@ -936,8 +938,8 @@ class RecordDAO(dao.RecordDAO):
         Supports the use of % as a wildcard character.
 
         :param uri: The uri to use as a search term, such as "foo.png"
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
+        :param id_pool: A list of ids to restrict the search to. If not provided,
+                        all ids will be used.
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
@@ -945,8 +947,8 @@ class RecordDAO(dao.RecordDAO):
                   generator of their ids.
         """
         LOGGER.debug('Getting all records related to uri=%s.', uri)
-        if accepted_ids_list:
-            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
+        if id_pool:
+            LOGGER.debug('Restricting to %i ids.', len(id_pool))
         LOGGER.warning('Temporary implementation of getting Records based on '
                        'Document URI. This is a very slow, brute-force '
                        'strategy.')
@@ -954,7 +956,7 @@ class RecordDAO(dao.RecordDAO):
             generators = []
             for criterion_entry in uri.value:
                 generators.append(self._get_records_for_some_uri(criterion_entry,
-                                                                 accepted_ids_list))
+                                                                 id_pool))
             if uri.operation == utils.ListQueryOperation.HAS_ALL:
                 # While a natural choice would be to ORDER_BY and use utils.intersect_ordered,
                 # Cassandra currently (June 2021) doesn't support ordering by partition key
@@ -965,7 +967,7 @@ class RecordDAO(dao.RecordDAO):
             else:
                 match_ids = itertools.chain(*generators)
         else:
-            match_ids = self._get_records_for_some_uri(uri, accepted_ids_list)
+            match_ids = self._get_records_for_some_uri(uri, id_pool)
         if ids_only:
             for id in set(match_ids):
                 yield id
