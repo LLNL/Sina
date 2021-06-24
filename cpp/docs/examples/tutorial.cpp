@@ -27,9 +27,6 @@ void createRun() {
 }
 //! [create run]
 
-//! [saving]
-//! [saving]
-
 //! [adding data]
 void addData(sina::Record &record) {
     // Add a scalar named "my_scalar" with the value 123.456
@@ -76,44 +73,28 @@ void associateRunToStudy(sina::Document &doc, sina::Record const &uqStudy, sina:
 }
 //! [relationships]
 
-} // unnamed namespace
-
-// Forward declaration to avoid compiler errors
-namespace foo {
-void collectData(sina::DataHolder &fooData);
-}
-
-namespace bar {
-void gatherData(sina::DataHolder &barData);
-}
 
 //! [library data foo]
-namespace foo {
-void collectData(sina::DataHolder &fooData) {
+void foo_collectData(sina::DataHolder &fooData) {
     fooData.add("temperature", sina::Datum{500});
     fooData.add("energy", sina::Datum{1.2e10});
 }
-}
 //! [library data foo]
 
 //! [library data bar]
-namespace bar {
-void gatherData(sina::DataHolder &barData) {
+void bar_gatherData(sina::DataHolder &barData) {
     barData.add("temperature", sina::Datum{400});
     barData.add("mass", sina::Datum{15});
 }
-}
 //! [library data bar]
-
-namespace {
 
 //! [library data host]
 void gatherAllData(sina::Record &record) {
    auto fooData = record.addLibraryData("foo");
    auto barData = record.addLibraryData("bar");
 
-   foo::collectData(*fooData);
-   bar::gatherData(*barData);
+   foo_collectData(*fooData);
+   bar_gatherData(*barData);
 
    record.add("temperature", sina::Datum{450});
 }

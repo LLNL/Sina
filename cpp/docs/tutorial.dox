@@ -66,11 +66,11 @@ offer a capability to collect data in a Sina document, you can leverage that
 to expose this additional data in your records.
 
 For example, suppose you are using libraries named \c foo and \c bar.
-library \c foo defines \c collectData() like this:
+library \c foo defines \c foo_collectData() like this:
 
 \snippet tutorial.cpp library data foo
 
-Library \c bar defines \c gatherData() like this:
+Library \c bar defines \c bar_gatherData() like this:
 
 \snippet tutorial.cpp library data bar
 
