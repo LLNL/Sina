@@ -149,18 +149,30 @@ See examples/basic_usage.ipynb for list queries in use.
 
 .. _Ids_Only:
 
-Combining Filters using "IDs Only" Logic
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Combining Filters
+~~~~~~~~~~~~~~~~~
 
-Filtering methods (such as find_with_type and find_with_file_uri) take an
-optional argument, :code:`ids_only`. If passed as :code:`True`, they'll return
-only the ids of Records that fulfill their criteria, rather than the entire
-Record. This is faster than assembling the entire Record object(s), and is also
-the recommended way of combining queries or implementing more complex logic::
+Sina includes a "unified" query, :code:`find()`, which allows you to to combine
+multiple filters into a single call. It will return every record that fulfills
+all your criteria::
+
+  ...
+  # This would get all Records with a type of "msub" or "sbatch" that have a
+  # num_procs greater than 4. In this instance, find() combines find_with_type()
+  # and find_with_data()
+  ds.records.find(types=["msub", "sbatch"],
+                  data={"num_procs": DataRange(min=4)})
+
+See the :code:`find()` documentation for all supported arguments. For more
+complex combinations, filtering methods (such as :code:`find()`, :code:`find_with_type()`
+and :code:`find_with_file_uri()`) take an optional argument, :code:`ids_only`.
+If passed as :code:`True`, they'll return only the ids of Records that fulfill
+their criteria, rather than the entire Record. This is faster than assembling the
+entire Record object(s), and is useful for set-based filtering::
 
   ...
 
-  type_filter = ds.records.find_with_type("msubs", ids_only=True)
+  type_filter = ds.records.find_with_type("msub", ids_only=True)
   file_filter = ds.records.find_with_file_uri("mock_msub_out.txt", ids_only=True)
 
   # This will print ids of all records which are msubs or are associated with
