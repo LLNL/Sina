@@ -1,0 +1,42 @@
+/**
+
+\page building Building the Library
+
+This page describes how to build the Sina library.
+
+Sina uses the CMake build system. If you are familiar with that, it should
+be fairly easy to build Sina.
+
+To make building easier, Sina uses
+<a href="https://llnl-blt.readthedocs.io/">BLT</a>. This is brought in as
+a sub-module. If you cloned Sina from git and did not bring in sub-modules,
+be sure to bring those in before building.
+
+Before building Sina, you need to build its dependencies. Sina has one required dependency -- <a href=https://llnl-conduit.readthedocs.io/>Conduit</a> -- and
+one optional dependency -- <a href="https://github.com/LLNL/Adiak">Adiak</a>.
+You will have to refer to their documentation for building them.
+
+Once you have the dependencies built, building Sina is pretty easy:
+
+\code{.bash}
+# Point these to where CMake find_package() will be able to find these.
+# Conduit is required.
+> export Conduit_DIR=...
+
+# Adiak is optional
+> export adiak_DIR=...
+
+# Do an out-of-source build
+> cd /path/to/sina/cpp
+> mkdir build
+> cd build
+
+# Enable Adiak bindings if desired
+> cmake .. -DSINA_BUILD_ADIAK_BINDINGS=Yes -DCMAKE_INSTALL_PREFIX=../instal_dir
+
+# Build and install
+> make -j all install
+\endcode
+
+*/
+

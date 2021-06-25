@@ -4,6 +4,7 @@
   <navindex>
     <tab type="mainpage" visible="yes" title=""/>
     <tab type="user" visible="yes" title="Tutorial" url="@ref tutorial" intro=""/>  
+    <tab type="user" visible="yes" title="Building" url="@ref building" intro=""/>  
     <tab type="pages" visible="no" title="" intro=""/>
     <tab type="modules" visible="yes" title="" intro=""/>
     <tab type="namespaces" visible="yes" title="">
