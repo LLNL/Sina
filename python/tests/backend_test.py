@@ -1071,7 +1071,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(len(just_6), 1)
         self.assertEqual(just_6[0], "spam6")
 
-    # Usage of _do_data_query() can be replaced by universal query once implemented.
+    # We have to use the protected "backend logic" version to set id_pool
     # pylint: disable=protected-access
     def test_recorddao_data_query_id_pool(self):
         """Test that data query can be restricted by id_pool."""
@@ -1081,7 +1081,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
             id_pool=["spam4", "spam5"]))  # 5 and 6
         six.assertCountEqual(self, list(just_4_and_5), ["spam4", "spam5"])
 
-    # pylint: disable=protected-access
     def test_recorddao_data_query_id_pool_exists(self):
         """
         Test that data query can be restricted by id_pool using universal criteria.
@@ -1093,7 +1092,6 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                      id_pool=["spam5"]))
         six.assertCountEqual(self, list(just_5), ["spam5"])
 
-    # pylint: disable=protected-access
     def test_recorddao_data_query_id_pool_multi(self):
         """Test that data query can be restricted by id_pool in a more complicated query."""
         just_5_and_6 = list(self.record_dao._do_data_query(
@@ -1345,6 +1343,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertFalse(get_no_ids)
 
     # ###################### find ########################
+    # _find() is protected to discourage users from further direct use of the DAOs.
+    # pylint: disable=protected-access
     def test_recorddao_find_basic(self):
         """
         Test that the RecordDAO is able to do basic _find() queries.
