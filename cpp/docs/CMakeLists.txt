@@ -7,7 +7,7 @@ blt_add_executable(
 )
 
 blt_add_executable(
-    NAME docs_main_page_advanced
-    SOURCES examples/main_page_advanced.cpp
+    NAME docs_tutorial
+    SOURCES examples/tutorial.cpp
     DEPENDS_ON sina
 )

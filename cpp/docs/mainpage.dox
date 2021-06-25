@@ -7,7 +7,8 @@ can be used by simulation applications to summarize run data to be ingested
 into a database using the Sina tool suite.
 
 The top-level object in the Sina schema is the Document. It contains lists
-of Record and Relationship objects.
+of Record and Relationship objects. The example below shows the basics.
+For more details, see the @ref tutorial.
 
 \include main_page_basic.cpp
 
@@ -18,38 +19,17 @@ following:
 {
     "records": [
         {
-            "type": "run",
+            "application": "My Sim Code",
             "local_id": "run1",
-            "application": "My Sim Code",
-            "version": "1.2.3",
-            "user": "jdoe"
-        },
-        {
             "type": "run",
-            "local_id": "run2",
-            "application": "My Sim Code",
-            "version": "1.2.3",
-            "user": "jdoe"
+            "user": "jdoe",
+            "version": "1.2.3"
         }
     ],
-    "relationships": [
-        {
-            "predicate": "comes before",
-            "local_subject": "run1",
-            "local_object": "run2"
-        }
-    ]
+    "relationships": []
 }
+
 \endcode
-
-For creating more complex objects with all the parts of the Sina schema,
-see the documentation for File, Datum, and the user-defined content of Record.
-An example of some more complex functionality can also be found below. When run,
-this will print out example JSON consisting of one task with a global id and ten
-runs with local ids, for a total of eleven Records, plus ten Relationships between
-them.
-
-\include main_page_advanced.cpp
 
 */
 
