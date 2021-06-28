@@ -107,6 +107,15 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def _do_delete_all_records(self):
+        """Implement logic for Datastore's delete_all_contents()."""
+        # Relies on the propagated deletes of the RecordDAO, which also wipe out
+        # relationships. Could be made more efficient with the use of TRUNCATE or the
+        # like, but if this somehow becomes a performance bottleneck and requires
+        # that upgrade, make sure you add backend-specific tests that make sure all
+        # tables are cleared. At that point, it may belong in the DAOFactory.
+        self.delete(self.get_all(ids_only=True))
+
     def update(self, records):
         """
         Given one or more Records, update them in the backend.

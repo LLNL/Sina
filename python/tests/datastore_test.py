@@ -312,6 +312,47 @@ class DataStoreTest(AbstractDataStoreTest):
         self.assert_relationship_method_is_passthrough("insert", "insert",
                                                        num_args=1)
 
+    def test_delete_all_contents(self):
+        """Test that DataStore calls the expected delete method."""
+        fake_factory = Mock()
+        fake_record_dao = Mock()
+        fake_factory.create_record_dao = Mock(return_value=fake_record_dao)
+        test_ds = DataStore(fake_factory)
+        # The function is protected to disincentivize using it from the DAOs.
+        # The _record_dao is truly protected, but needed for mocking.
+        # pylint: disable=protected-access
+        self.assertEqual(test_ds._record_dao, fake_record_dao)
+        # keyword-only args will be a nice safety feature when we're Py3 only.
+        did_delete = test_ds.delete_all_contents(True)
+        fake_record_dao._do_delete_all_records.assert_called_once()
+        self.assertTrue(did_delete)
+
+    @patch('six.moves.input')
+    def test_delete_all_contents_confirmation(self, patched_input):
+        """Test that DataStore respects the confirmation "dialog"."""
+        expected_factory = Mock()
+        fake_record_dao = Mock()
+        # Same protected-access reasoning as in the other test of test_delete_all_data_completely
+        # pylint: disable=protected-access
+        expected_factory.create_record_dao = Mock(return_value=fake_record_dao)
+        test_ds = DataStore(expected_factory)
+        self.assertEqual(test_ds._record_dao, fake_record_dao)
+        # An empty "confirmation" should not result in a deletion.
+        patched_input.return_value = ""
+        did_delete = test_ds.delete_all_contents()
+        fake_record_dao._do_delete_all_records.assert_not_called()
+        self.assertFalse(did_delete)
+        # An incorrect "confirmation" should not result in a deletion.
+        patched_input.return_value = "confirm"
+        did_delete = test_ds.delete_all_contents()
+        fake_record_dao._do_delete_all_records.assert_not_called()
+        self.assertFalse(did_delete)
+        # Only the correct phrase should result in a deletion.
+        patched_input.return_value = "CONFIRM"
+        did_delete = test_ds.delete_all_contents()
+        fake_record_dao._do_delete_all_records.assert_called_once()
+        self.assertTrue(did_delete)
+
 
 class CreateDatastore(unittest.TestCase):
     """
