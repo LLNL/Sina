@@ -35,11 +35,11 @@ Relationships stored within. For a simple demonstration::
   from sina.datastore import create_datastore
 
   ds = create_datastore(db_path="somefile.sqlite")
-  all_sruns = ds.records.find_with_type("srun")
+  all_sruns = ds.records.find(types=["srun", "msub"])
 
 This would set :code:`all_sruns` to a list of all the records contained in
-:code:`somefile.sqlite` with :code:`"type": "srun"`. You can easily pass data
-between supported backends::
+:code:`somefile.sqlite` with :code:`"type": "srun"` or :code:`"type": "msub"`.
+You can easily pass data between supported backends::
 
   ...
 
@@ -71,6 +71,10 @@ is queryable, and can be used to find Records fitting criteria. For example, let
 say we're interested in all Records with a :code:`final_volume` of 310 and with
 a :code:`quadrant` of "NW"::
 
+  records = ds.records.find(data={"final_volume": 310, "quadrant": "NW"}, ids_only=True)
+
+  # Does the same as the above, but you may sometimes find the kwargs more convenient.
+  # Note that this form can't return record objects (no ids_only=False option)
   records = ds.records.find_with_data(final_volume=310, quadrant="NW")
 
 This will find all the records record_dao knows about (so those in
@@ -79,7 +83,7 @@ data, simply specify the owning library/libraries with path notation::
 
   # This would find records with a library named "outer_lib" that has a library
   # named "inner_lib", that itself has a data item "final volume" equal to 310
-  records = ds.records.find_with_data(**{"outer_lib/inner_lib/final_volume"=310})
+  records = ds.records.find(data={"outer_lib/inner_lib/final_volume"=310})
 
 IMPORTANT NOTE: when providing multiple criteria, only entries fulfilling all criteria
 will be returned (boolean AND). If OR-like functionality is desired, see the next
@@ -94,13 +98,14 @@ convention of min-inclusive, max-exclusive, but this can be altered::
   from sina.utils import DataRange
 
   # data_query is aliased to get_given_data, they're interchangeable
-  records = ds.records.find_with_data(final_volume=DataRange(200, 311),
-                                   final_acceleration=DataRange(min=12,
-                                                                max=20,
-                                                                min_inclusive=False,
-                                                                max_inclusive=True),
-                                   schema=DataRange(max="bb_12"),
-                                   quadrant="NW")
+  records = ds.records.find(data={"final_volume": DataRange(200, 311),
+                                  "final_acceleration": DataRange(min=12,
+                                                                  max=20,
+                                                                  min_inclusive=False,
+                                                                  max_inclusive=True),
+                                  "schema": DataRange(max="bb_12"),
+                                  "quadrant": "NW"},
+                            ids_only=True)
 
 Now we've found the ids of all Records that have a :code:`final_volume` >= 200
 and < 310, a :code:`final_acceleration` > 12 and <= 20, a :code:`schema`
@@ -149,22 +154,35 @@ See examples/basic_usage.ipynb for list queries in use.
 
 .. _Ids_Only:
 
-Combining Filters using "IDs Only" Logic
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Combining Filters
+~~~~~~~~~~~~~~~~~
 
-Filtering methods (such as find_with_type and find_with_file_uri) take an
-optional argument, :code:`ids_only`. If passed as :code:`True`, they'll return
-only the ids of Records that fulfill their criteria, rather than the entire
-Record. This is faster than assembling the entire Record object(s), and is also
-the recommended way of combining queries or implementing more complex logic::
+Sina includes a "unified" query, :code:`find()`, which allows you to to combine
+multiple filters into a single call. It will return every record that fulfills
+all your criteria::
+
+  ...
+  # This would get all Records with a type of "msub" or "sbatch" that have a
+  # num_procs greater than 4. In this instance, find() combines find_with_type()
+  # and find_with_data()
+  ds.records.find(types=["msub", "sbatch"],
+                  data={"num_procs": DataRange(min=4)})
+
+See the :code:`find()` documentation for all supported arguments. For more
+complex combinations, filtering methods (like :code:`find()`) take an optional
+argument, :code:`ids_only`. If passed as :code:`True`, they'll return only the
+ids of Records that fulfill their criteria, rather than the entire Record. This
+is faster than assembling the entire Record object(s), and is useful for set-based
+filtering::
 
   ...
 
-  type_filter = ds.records.find_with_type("msubs", ids_only=True)
-  file_filter = ds.records.find_with_file_uri("mock_msub_out.txt", ids_only=True)
+  type_filter = ds.records.find(types=["msub"], ids_only=True)
+  file_filter = ds.records.find(file_uri="mock_msub_out.txt", ids_only=True)
 
   # This will print ids of all records which are msubs or are associated with
-  # a file "mock_msub_out.txt", **but not both** (exclusive OR)
+  # a file "mock_msub_out.txt", **but not both** (exclusive OR).
+  # If you wanted AND, find() would cover that functionality.
   xor_recs = set(type_filter).symmetric_difference(file_filter)
   print(xor_recs)
 
@@ -278,13 +296,13 @@ To delete a Record entirely from one of Sina's backends::
   recs.insert(my_record_to_delete)
 
   # This would print 1
-  print(len(list(recs.find_with_type("fodder_type"))))
+  print(len(list(recs.find(types=["fodder_type"]))))
 
   # Like get() and insert(), delete() takes one or more ids.
   recs.delete("fodder")
 
   # This would print 0
-  print(len(list(recs.find_with_type("fodder_type"))))
+  print(len(list(recs.find(types=["fodder_type"]))))
 
 Be careful, as the deletion will include every Relationship the Record is
 mentioned in, all the scalar data associated with that Record, etc.
