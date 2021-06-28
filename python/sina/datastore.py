@@ -197,19 +197,54 @@ class ReadOnlyDataStore(object):
             """
             return self.record_dao.get_all(ids_only)
 
-        # ------------------ Operations tied to Record type -------------------
-        # It's safe to redefine "type" within the scope of this function.
-        # pylint: disable=redefined-builtin
-        def find_with_type(self, type, ids_only=False):
+        # High arg count is inherent to the functionality.
+        # pylint: disable=too-many-arguments
+        def find(self, types=None, data=None, file_uri=None,
+                 id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
             """
-            Given a type of Record, return all Records of that type.
+            Return Records that match multiple different types of criteria.
 
-            :param type: The type of Record to return
+            A convenience method, this allows you to combine Sina's different types
+            of queries into a single call. Using the method with only one of the criteria
+            args is equivalent to using that dedicated query method. Using more performs
+            an "AND" operation: returned Records must fulfill ALL criteria.
+
+            :param types: Functionality of find_with_type, an iterable of types of Records
+                          (e.g. "msub", "test", "run") to return.
+            :param data: Functionality of find_with_data, dictionary of {<name>:<criteria>} entries
+                         a Record's data must fulfill
+            :param file_uri: Functionality of find_with_file_uri, a uri criterion (optionally with
+                             wildcards) a Record's files must fulfill, ex: having at least one .png
+            :param id_pool: A pool of IDs to restrict the query to. Only a Record whose id is in
+                            this pool can be returned
+            :param ids_only: Whether to return only the ids of the matching Records
+            :param query_order: The order in which to perform the queries. Advanced usage,
+                                the default should be fine for many cases. To optimize
+                                performance, order queries in ascending order of expected
+                                number of matches (ex: if your database has very few Records
+                                with the desired type(s), you may wish to put "type" first).
+                                Query names are "types", "file_uri", and "data".
+            """
+            # We protect _find to disincentize users using the DAO directly.
+            # pylint: disable=protected-access
+            return self.record_dao._find(types, data, file_uri, id_pool, ids_only, query_order)
+
+        # ------------------ Operations tied to Record type -------------------
+        def find_with_type(self, types, ids_only=False, id_pool=None):
+            """
+            Given a(n iterable of) type(s) of Record, return all Records of that type(s).
+
+            :param types: A(n iterable of) types of Records to return
             :param ids_only: whether to return only the ids of matching Records
+            :param id_pool: Used when combining queries: a pool of ids to restrict
+                            the query to. Only records with ids in this pool can be
+                            returned.
 
             :returns: A generator of matching Records.
             """
-            return self.record_dao.get_all_of_type(type, ids_only)
+            return self.record_dao.get_all_of_type(types, ids_only, id_pool)
+
+        find_with_types = find_with_type
 
         def get_types(self):
             """
@@ -325,25 +360,30 @@ class ReadOnlyDataStore(object):
             return self.record_dao.get_with_min(scalar_name, count, ids_only)
 
         # ------------------ Operations tied to Record files -------------------
-        def find_with_file_uri(self, uri, accepted_ids_list=None,
-                               ids_only=False):
+        def find_with_file_uri(self, uri, ids_only=False, id_pool=None):
             """
-            Return all records associated with files whose uris match some arg.
+            Given a uri criterion, return Records with files whose uris match.
+
+            The simplest case for <criterion> is to provide a string (possibly including
+            one or more wildcards, see below). You may also use Sina's has_any
+            or has_all constructs, ex find_with_file_uris(uri=has_any("%.png", "%.jpg"))
 
             Supports the use of % as a wildcard character. Note that you may or
             may not get duplicates depending on the backend; call set() to
             collapse the returned generator if required.
 
-            :param uri: The uri to use as a search term, such as "foo.png"
-            :param accepted_ids_list: A list of ids to restrict the search to.
-                                      If not provided, all ids will be used.
+            :param uri: A uri or criterion describing what to match. Either a string,
+                        a has_all, or a has_any.
             :param ids_only: whether to return only the ids of matching Records
+            :param id_pool: Used when combining queries: a pool of ids to restrict
+                            the query to. Only records with ids in this pool can be
+                            returned.
 
-            :returns: A generator of matching Records
+            :returns: A generator of matching Records.
             """
-            return self.record_dao.get_given_document_uri(uri,
-                                                          accepted_ids_list,
-                                                          ids_only)
+            return self.record_dao.get_given_document_uri(uri=uri,
+                                                          accepted_ids_list=id_pool,
+                                                          ids_only=ids_only)
 
         def find_with_file_mimetype(self, mimetype, ids_only=False):
             """
