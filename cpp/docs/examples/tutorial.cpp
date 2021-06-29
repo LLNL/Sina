@@ -69,7 +69,7 @@ void addCurveSets(sina::Record &record) {
 
 
 //! [file add_and_remove]
-void addAndRemoveFileToRecord(sina::Document &doc, sine::Record const &run) {
+void addAndRemoveFileToRecord(sina::Record const &run) {
     sina::File my_file{"some/path.txt"};
     // Adds the file to the record's file list
     run.add(my_file);
