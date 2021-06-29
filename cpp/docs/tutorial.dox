@@ -48,6 +48,17 @@ variable (e.g. "time"), and possibly multiple dependent variables (e.g.
 
 \snippet tutorial.cpp curve sets
 
+\section files adding files
+It is also useful to add to a record a set of files that it relates to.
+For example your application generated some external data, or you want to
+point to a license file.
+
+Conversely, at times it may be necessary to remove a file from the record's file list.
+For example if the file was deleted or renamed.
+
+\snippet tutorial.cpp file add_and_remove
+
+
 \section relationships Relationships Between Records
 
 Relationships between objects can be captured via the Relationship class.
