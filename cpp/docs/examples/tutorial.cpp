@@ -150,6 +150,7 @@ int main() {
     associateRunToStudy(doc, study, run);
     gatherAllData(run);
     addCurveSets(run);
+    addAndRemoveFileToRecord(run);
     addUserDefined(run);
     save(doc);
     load();
