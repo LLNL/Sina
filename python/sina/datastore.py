@@ -420,28 +420,30 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
 
     # The DAO version is protected to disincentivize using it from the DAOs.
     # pylint: disable=protected-access
-    def delete_all_contents(self, skip_prompt=False):
+    def delete_all_contents(self, force=""):
         """
         Delete EVERYTHING in a datastore; this cannot be undone.
 
-        :param skip_prompt: This is meant to raise a confirmation prompt. If you
-                            want to use it in an automated script (and you're sure of
-                            what you're doing), set this to "True" to skip the confirmation.
+        :param force: This function is meant to raise a confirmation prompt. If you
+                      want to use it in an automated script (and you're sure of
+                      what you're doing), set this to "SKIP PROMPT".
         :returns: whether the deletion happened.
         """
-        if skip_prompt:
+        confirm_phrase = "DELETE ALL DATA"
+        if force == "SKIP PROMPT":
             # Record deletes propagate to Relationships. That currently covers all info
             # in a datastore.
             self._record_dao._do_delete_all_records()
             return True
-        warning = """WARNING: You're about to delete all data in your current
-                  datastore. This cannot be undone! If you're sure you want to
-                  delete all data, enter the word (allcaps) "CONFIRM"."""
+        warning = ("WARNING: You're about to delete all data in your current "
+                   "datastore. This cannot be undone! If you're sure you want to "
+                   "delete all data, enter the phrase {}: ").format(confirm_phrase)
         response = six.moves.input(warning)
-        if response == "CONFIRM":
+        if response == confirm_phrase:
             self._record_dao._do_delete_all_records()
+            print('The database has been purged of all contents.')
             return True
-        print('Response was "{}", not "CONFIRM". Deletion aborted.'.format(response))
+        print('Response was "{}", not "{}". Deletion aborted.'.format(response, confirm_phrase))
         return False
 
     class RecordOperations(ReadOnlyDataStore.RecordOperations):

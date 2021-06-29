@@ -323,7 +323,7 @@ class DataStoreTest(AbstractDataStoreTest):
         # pylint: disable=protected-access
         self.assertEqual(test_ds._record_dao, fake_record_dao)
         # keyword-only args will be a nice safety feature when we're Py3 only.
-        did_delete = test_ds.delete_all_contents(True)
+        did_delete = test_ds.delete_all_contents("SKIP PROMPT")
         fake_record_dao._do_delete_all_records.assert_called_once()
         self.assertTrue(did_delete)
 
@@ -343,12 +343,12 @@ class DataStoreTest(AbstractDataStoreTest):
         fake_record_dao._do_delete_all_records.assert_not_called()
         self.assertFalse(did_delete)
         # An incorrect "confirmation" should not result in a deletion.
-        patched_input.return_value = "confirm"
+        patched_input.return_value = "delete all data"
         did_delete = test_ds.delete_all_contents()
         fake_record_dao._do_delete_all_records.assert_not_called()
         self.assertFalse(did_delete)
         # Only the correct phrase should result in a deletion.
-        patched_input.return_value = "CONFIRM"
+        patched_input.return_value = "DELETE ALL DATA"
         did_delete = test_ds.delete_all_contents()
         fake_record_dao._do_delete_all_records.assert_called_once()
         self.assertTrue(did_delete)
