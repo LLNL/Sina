@@ -384,6 +384,21 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertFalse(relationship_dao.get(subject_id="rec_3"))
         self.assertEqual(len(relationship_dao.get(object_id="rec_4")), 1)
 
+    def test_recorddao_delete_all(self):
+        """Tests _do_delete_all_records, which is called from DataStore to empty a db."""
+        rec = Record(id="spam", type="eggs", data={"eggs": {"value": 12}})
+        rec_2 = Record(id="spam2", type="eggs2", files={"eggs.png": {}})
+        rec_3 = Record(id="eggs", type="run", library_data={})
+        record_dao = self.factory.create_record_dao()
+        record_dao.insert([rec, rec_2, rec_3])
+        six.assertCountEqual(self, list(record_dao.get_all(ids_only=True)),
+                             ["spam", "spam2", "eggs"])
+        # The function is protected to disincentivize using it from the DAOs.
+        # It's supposed to belong to DataStore.
+        # pylint: disable=protected-access
+        record_dao._do_delete_all_records()
+        six.assertCountEqual(self, list(record_dao.get_all(ids_only=True)), [])
+
     def test_recorddao_update_one(self):
         """Test that RecordDAO is updating correctly."""
         record_dao = self.factory.create_record_dao()

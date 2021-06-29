@@ -305,4 +305,8 @@ To delete a Record entirely from one of Sina's backends::
   print(len(list(recs.find(types=["fodder_type"]))))
 
 Be careful, as the deletion will include every Relationship the Record is
-mentioned in, all the scalar data associated with that Record, etc.
+mentioned in, all the scalar data associated with that Record, etc. It's
+also possible to delete ALL a datastore's contents (Records, Relationships, etc.)
+with :code:`ds.delete_all_contents`. This is irrecoverable and will prompt
+confirmation from the user (which can be bypassed with :code:`skip_prompt=True`;
+use with caution).
