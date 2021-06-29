@@ -108,7 +108,7 @@ public:
      *
      * @param file the File to remove
      */
-    void remove(File file);
+    void remove(File const& file);
 
 
 

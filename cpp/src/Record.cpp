@@ -60,7 +60,7 @@ void Record::remove(File const &file) {
     files.erase(file);
 }
 
-void Record::add(File const &file) {
+void Record::add(File file) {
     files.erase(file);
     files.insert(std::move(file));
 }
