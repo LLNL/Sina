@@ -56,6 +56,13 @@ Record::Record(conduit::Node const &asNode) :
     }
 }
 
+void Record::remove(File file) {
+    auto existing = files.find(file);
+    if (existing != files.end()) {
+        files.erase(existing);
+    }
+}
+
 void Record::add(File file) {
     auto existing = files.find(file);
     if (existing != files.end()) {

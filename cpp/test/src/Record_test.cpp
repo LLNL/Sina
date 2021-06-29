@@ -70,6 +70,20 @@ TEST(Record, add_curve_set_existing_key) {
                 Contains(Key("new")));
 }
 
+TEST(Record, remove_file) {
+    Record record{ID{"the id", IDType::Local}, "test_record"};
+    std::string path = "the/path.txt";
+
+    File original{path};
+    original.setMimeType("txt");
+    record.add(original);
+    EXPECT_EQ(1u, record.getFiles().size());
+    EXPECT_EQ("txt", record.getFiles().find(File{path})->getMimeType());
+
+    record.remove(original);
+    EXPECT_EQ(0u, record.getFiles().size());
+}
+
 TEST(Record, add_file_existing_key) {
     Record record{ID{"the id", IDType::Local}, "test_record"};
     std::string path = "the/path.txt";

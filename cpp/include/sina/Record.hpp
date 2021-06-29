@@ -103,6 +103,14 @@ public:
         return type;
     }
 
+    /**
+     * Remove a File from this record.
+     *
+     * @param file the File to remove
+     */
+    void remove(File file);
+
+
 
     using DataHolder::add;
     /**
