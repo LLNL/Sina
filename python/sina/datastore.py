@@ -1,5 +1,7 @@
 """Defines the DataStore, Sina's toplevel data interaction object."""
+from __future__ import print_function
 import warnings
+import six
 
 import sina.datastores.sql as sina_sql
 try:
@@ -110,8 +112,12 @@ class ReadOnlyDataStore(object):
                             connection.
         """
         self.dao_factory = dao_factory
-        self.records = self.RecordOperations(dao_factory)
-        self.relationships = self.RelationshipOperations(dao_factory)
+        # DAOs are created at this level to support DataStore operations that
+        # affect both records AND relationships.
+        self._record_dao = dao_factory.create_record_dao()
+        self._relationship_dao = dao_factory.create_relationship_dao()
+        self.records = self.RecordOperations(self._record_dao)
+        self.relationships = self.RelationshipOperations(self._relationship_dao)
 
     def close(self):
         """Close any resources held by this datastore."""
@@ -142,9 +148,13 @@ class ReadOnlyDataStore(object):
         defining the user interface.
         """
 
-        def __init__(self, connection):
-            """Create object(s) we'll need for performing queries."""
-            self.record_dao = connection.create_record_dao()
+        def __init__(self, record_dao):
+            """
+            Create or assign object(s) we'll need for performing queries.
+
+            :param record_dao: the owning DataStore's RecordDAO
+            """
+            self.record_dao = record_dao
 
         # -------------------- Basic operations ---------------------
         def get(self, ids_to_get, chunk_size=999):
@@ -409,9 +419,13 @@ class ReadOnlyDataStore(object):
         defining the user interface.
         """
 
-        def __init__(self, connection):
-            """Create object(s) we'll need for performing queries."""
-            self.relationship_dao = connection.create_relationship_dao()
+        def __init__(self, relationship_dao):
+            """
+            Create or assign object(s) we'll need for performing queries.
+
+            :param relationship_dao: the owning DataStore's RelationshipDAO
+            """
+            self.relationship_dao = relationship_dao
 
         def find(self, subject_id=None, predicate=None, object_id=None):
             """
@@ -428,8 +442,9 @@ class ReadOnlyDataStore(object):
 
 class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
     """
-    Mediates interactions between users and data. Adds operations that
-    modify the data store to ReadOnlyDataStore.
+    Mediates interactions between users and data.
+
+    Adds operations that modify the data store to ReadOnlyDataStore.
 
     DataStore and ReadOnlyDataStore grant access to a selection of operations
     for both Records and Relationships. They're used like this:
@@ -443,18 +458,33 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
     RecordOperations and RelationshipOperations below.
     """
 
-    def __init__(self, dao_factory):
+    # The DAO version is protected to disincentivize using it from the DAOs.
+    # pylint: disable=protected-access
+    def delete_all_contents(self, force=""):
         """
-        Define attributes needed by a datastore.
+        Delete EVERYTHING in a datastore; this cannot be undone.
 
-        Generally connect() is preferred.
-
-        :param dao_factory: The DAOFactory that will provide the backend
-                            connection.
+        :param force: This function is meant to raise a confirmation prompt. If you
+                      want to use it in an automated script (and you're sure of
+                      what you're doing), set this to "SKIP PROMPT".
+        :returns: whether the deletion happened.
         """
-        super(DataStore, self).__init__(dao_factory)
-        self.records = self.RecordOperations(dao_factory)
-        self.relationships = self.RelationshipOperations(dao_factory)
+        confirm_phrase = "DELETE ALL DATA"
+        if force == "SKIP PROMPT":
+            # Record deletes propagate to Relationships. That currently covers all info
+            # in a datastore.
+            self._record_dao._do_delete_all_records()
+            return True
+        warning = ("WARNING: You're about to delete all data in your current "
+                   "datastore. This cannot be undone! If you're sure you want to "
+                   "delete all data, enter the phrase {}: ").format(confirm_phrase)
+        response = six.moves.input(warning)
+        if response == confirm_phrase:
+            self._record_dao._do_delete_all_records()
+            print('The database has been purged of all contents.')
+            return True
+        print('Response was "{}", not "{}". Deletion aborted.'.format(response, confirm_phrase))
+        return False
 
     class RecordOperations(ReadOnlyDataStore.RecordOperations):
         """
