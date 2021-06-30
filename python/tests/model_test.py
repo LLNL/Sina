@@ -237,7 +237,7 @@ class TestModel(unittest.TestCase):
         self.assertIn('Duplicate file', str(context.exception))
 
     def test_remove_file(self):
-        """Test to make sure that when removing a file that is not in record, an error is raised."""
+        """Test to make sure that, when removing a file in record, an error is raised."""
         complete_files = {"/foo/bar.txt": {}}
         rec = model.Record(id="file_test", type="test")
         rec.add_file("/foo/bar.txt")
