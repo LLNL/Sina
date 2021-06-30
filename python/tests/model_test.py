@@ -237,16 +237,16 @@ class TestModel(unittest.TestCase):
         self.assertIn('Duplicate file', str(context.exception))
 
     def test_remove_file(self):
-        """Test to make sure that, when removing a file in record, an error is raised."""
+        """Test add/remove file to a record"""
         complete_files = {"/foo/bar.txt": {}}
         rec = model.Record(id="file_test", type="test")
         rec.add_file("/foo/bar.txt")
         self.assertEqual(complete_files, rec.files)
         rec.remove_file("/foo/bar.txt")
         self.assertEqual(rec.files, {})
-        with self.assertRaises(ValueError) as context:
-            rec.remove_file("/foo/bar.txt")
-        self.assertIn('Missing file', str(context.exception))
+        # we can remove it even though it's gone
+        rec.remove_file("/foo/bar.txt")
+        self.assertEqual(rec.files, {})
 
     def test_add_data(self):
         """Test to make sure that, when adding a datum that already exists, an error is raised."""
