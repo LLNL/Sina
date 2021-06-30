@@ -208,6 +208,22 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
             datum["tags"] = tags
         self.data[name] = datum
 
+    def remove_file(self, uri):
+        """
+        Remove file info from a Record.
+
+        Will throw an error if a file is not in the Record.
+
+        :param uri: The uri that uniquely describes the file. (ex: "/g/g10/doe/foo.txt")
+
+        :raises ValueError: if a file with that uri is not recorded in the Record.
+        """
+        if uri not in self.files:
+            raise ValueError('Missing file: "{}" is not a file in Record "{}".'
+                             .format(uri, self.id))
+        else:
+            del(self.files[uri])
+
     def add_file(self, uri, mimetype=None, tags=None):
         """
         Add file info to a Record.
