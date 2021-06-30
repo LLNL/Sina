@@ -50,12 +50,12 @@ Once you have the dependencies built, building Sina is pretty easy:
 
 # Enable Adiak bindings if desired (see below if you didn't set paths of
 # Conduit and Adiak as environment variables)
-> cmake .. -DSINA_BUILD_ADIAK_BINDINGS=Yes -DCMAKE_INSTALL_PREFIX=../instal_dir
+> cmake .. -DSINA_BUILD_ADIAK_BINDINGS=Yes -DCMAKE_INSTALL_PREFIX=../install_dir
 
 # If you didn't set the environment variable for the libraries' paths, set
 # them on the command line instead (Just do the above if you set the
 # environment variables)
-> cmake .. -DSINA_BUILD_ADIAK_BINDINGS=Yes -DCMAKE_INSTALL_PREFIX=../instal_dir -DConduit_DIR=/path/to/conduit -Dadiak_DIR=/path/to/adiak
+> cmake .. -DSINA_BUILD_ADIAK_BINDINGS=Yes -DCMAKE_INSTALL_PREFIX=../install_dir -DConduit_DIR=/path/to/conduit -Dadiak_DIR=/path/to/adiak
 
 # Build and install
 > make -j all
