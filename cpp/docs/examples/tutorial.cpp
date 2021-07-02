@@ -67,6 +67,18 @@ void addCurveSets(sina::Record &record) {
 
 //! [curve sets]
 
+
+//! [file add_and_remove]
+void addAndRemoveFileToRecord(sina::Record &run) {
+    sina::File my_file{"some/path.txt"};
+    // Adds the file to the record's file list
+    run.add(my_file);
+    // Removes the file from the record's file list
+    run.remove(my_file);
+}
+
+//! [file add_and_remove]
+
 //! [relationships]
 void associateRunToStudy(sina::Document &doc, sina::Record const &uqStudy, sina::Record const &run) {
     doc.add(sina::Relationship{uqStudy.getId(), "contains", run.getId()});
@@ -138,6 +150,7 @@ int main() {
     associateRunToStudy(doc, study, run);
     gatherAllData(run);
     addCurveSets(run);
+    addAndRemoveFileToRecord(run);
     addUserDefined(run);
     save(doc);
     load();

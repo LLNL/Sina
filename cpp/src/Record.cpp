@@ -56,11 +56,12 @@ Record::Record(conduit::Node const &asNode) :
     }
 }
 
+void Record::remove(File const &file) {
+    files.erase(file);
+}
+
 void Record::add(File file) {
-    auto existing = files.find(file);
-    if (existing != files.end()) {
-        files.erase(existing);
-    }
+    files.erase(file);
     files.insert(std::move(file));
 }
 
