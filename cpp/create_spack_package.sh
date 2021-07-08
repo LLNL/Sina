@@ -18,6 +18,7 @@ mkdir ${versioned_dir}
 cd ${versioned_dir}
 ln -s ../CMake .
 ln -s ../CMakeLists.txt .
+ln -s ../docs/ .
 ln -s ../docs/README_LIB.txt .
 ln -s ../blt .
 ln -s ../src .
