@@ -5,6 +5,31 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.11
+============
+- Added load_records() and load_sole_record() functions.
+- Added QoL for CurveSets and Curves
+- Improved functionality of find():
+    - Functionality with no filters specified
+    - mimetype filter
+- Added initial support for query negation logic
+    - Added NOT functionality for type queries
+- Fixed a memory leak in AdiakWriter
+- Made DAO protected in data stores
+- Fixed issue with update() where Relationships weren't preserved
+- Fixed issue with DataRange handling of zero in SQL
+
+1.10
+====
+- Added a new section to Records, library_data
+- Added a new query, find(), which unifies several existing queries
+- Added sina.connect(), which introduces read-only datastores
+- Added the ability to delete all contents of a datastore
+- Added a function for deleting Files from Records
+- Added id_pool support to several existing queries
+- Fix several misc. Cassandra bugs
+- Expanded URI query to utilize has_any and has_all
+
 1.9.5
 =====
 - Fixed a bug in C++ add() methods

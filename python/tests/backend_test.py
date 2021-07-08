@@ -17,7 +17,7 @@ import six
 from mock import patch, MagicMock  # pylint: disable=import-error
 
 from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
-                        has_any, all_in, any_in, exists)
+                        has_any, all_in, any_in, exists, not_)
 from sina.model import Run, Record, Relationship, flatten_library_content
 import sina.sjson as json
 
@@ -27,7 +27,7 @@ TARGET = None
 
 # Disable pylint invalid-name due to significant number of tests with names
 # exceeding the 30 character limit. Also disable too-many-lines
-# pylint: disable=invalid-name,too-many-lines
+# pylint: disable=invalid-name,too-many-lines,too-many-statements
 
 
 def create_daos(class_):
@@ -122,6 +122,8 @@ def populate_database_with_data(record_dao):
 
     egg_record = Record(id="eggs", type="eggrec")
     egg_record.data["eggs_scal"] = {"value": 0}
+    egg_record.data["spam_scal"] = {"value": -1}
+    egg_record.data["spam_scal_2"] = {"value": 0}
 
     record_with_shared_scalar_data_and_curve = Record(
         id='shared_curve_set_and_matching_scalar_data', type='overlap')
@@ -223,7 +225,11 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_recorddao_insert_bad(self):
         """
         Test that the RecordDAO can still be used to query records after an
-        exception was raised."""
+        exception was raised.
+
+        This is intended to check whether the underlying backend is properly
+        rolled back.
+        """
         record_dao = self.factory.create_record_dao()
         rec_1 = Record(id='spam1', type='eggs',
                        data={'eggs': {'value': 12}})
@@ -234,7 +240,11 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(returned_ids, {'spam1', 'spam2'})
 
         bad_record = Record(id='bad_one', type='eggs',
-                            data={'eggs': {'value': float('NaN')}})
+                            data={'eggs': {'value': [1, 2, "cat", "dog", "fish", 3]}})
+        # We need to test the backend, not the validation, hence mock.
+        bad_record.is_valid = MagicMock()
+        bad_record.is_valid.return_value = (True, [])
+        self.assertTrue(bad_record.is_valid())
 
         # Different DAOs can raise different exceptions, so we can't be
         # more specific here
@@ -328,7 +338,10 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         data = {"eggs": {"value": 12, "tags": ["breakfast"]},
                 "flavor": {"value": "tasty"}}
         files = {"justheretoexist.png": {}}
-        record_dao.insert(Record(id="rec_1", type="sample", data=data, files=files))
+        curve_sets = {"my_set": {"dependent": {"egg_count": {"value": [0, 2, 3]}},
+                                 "independent": {"time": {"value": [0, 1, 2]}}}}
+        record_dao.insert(Record(id="rec_1", type="sample", data=data,
+                                 files=files, curve_sets=curve_sets))
         record_dao.delete("rec_1")
         # Make sure the data, raw, files, and relationships were deleted as well
         dead_data = record_dao.get_data_for_records(id_list=["rec_1"],
@@ -337,6 +350,9 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         dead_files = list(record_dao.get_given_document_uri("justheretoexist.png",
                                                             ids_only=True))
         self.assertEqual(dead_files, [])
+
+        dead_curves = list(record_dao.get_with_curve_set("my_set", ids_only=True))
+        self.assertEqual(dead_curves, [])
 
     def test_recorddao_delete_one_with_relationship(self):
         """Test that RecordDAO deletions include relationships."""
@@ -428,6 +444,8 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """
         Test that RecordDAO can still be used after trying to update a record
         with invalid data.
+
+        This is intended to test the underlying backend, not the DAO object itself.
         """
         record_dao = self.factory.create_record_dao()
         rec = Record(id="spam", type="eggs",
@@ -435,10 +453,15 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         record_dao.insert(rec)
         returned_record = record_dao.get("spam")
         self.assertEqual(returned_record.data, rec.data)
-        rec["data"]["eggs"]["value"] = float('NaN')
+        rec["data"]["eggs"]["value"] = [1, 2, "cat", "dog", "fish", 3]
         rec["data"]["new_item"] = {
             'value': 15
         }
+        # We need to test the backend, not the validation, hence the mock.
+        rec.is_valid = MagicMock()
+        rec.is_valid.return_value = (True, [])
+        self.assertTrue(rec.is_valid())
+
         self.assertRaises(Exception, record_dao.update, rec)
 
         returned_record = record_dao.get("spam")
@@ -462,8 +485,33 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self._assert_records_equal(upd_rec2, rec2)
         self._assert_records_equal(upd_rec3, rec3)
 
+    def test_recorddao_update_with_relationships(self):
+        """Test that RecordDAO doesn't delete relationships when updating records."""
+        record_dao = self.factory.create_record_dao()
+        rel_dao = self.factory.create_relationship_dao()
+        rec = Record(id="spam", type="eggs", data={"count": {"value": 12}})
+        rec2 = Record(id="spam2", type="bacon", data={"source": {"value": "pig"}})
+        rec3 = Record(id="spam3", type="toast", data={"doneness": {"value": "very"}})
+        rec4 = Record(id="spam4", type="juice", data={"pulp": {"value": "extra"}})
+        record_dao.insert([rec, rec2, rec3, rec4])
+        rel_dao.insert(subject_id="spam", object_id="spam3", predicate="served_with")
+        rel_dao.insert(subject_id="spam3", object_id="spam2", predicate="served_with")
+        rel_dao.insert(subject_id="spam4", object_id="spam3", predicate="served_with")
+        rec.type = "this_is_an_alteration"
+        rec2.type = "another_alteration"
+        record_dao.update([rec, rec2])
+
+        def assert_one_relationship_exists(subject_id=None, object_id=None):
+            """Assert that exactly one relationship exists with the provided criteria."""
+            restored_subject_rel = list(rel_dao.get(subject_id=subject_id,
+                                                    object_id=object_id))
+            self.assertEqual(len(restored_subject_rel), 1)
+        assert_one_relationship_exists(subject_id="spam")
+        assert_one_relationship_exists(object_id="spam2")
+        assert_one_relationship_exists(subject_id="spam4")
+
     def test_recorddao_get_raw(self):
-        """Verify we can get the raw JSON. This is useful for bad data"""
+        """Verify we can get the raw JSON. This is useful for bad data."""
         record_dao = self.factory.create_record_dao()
         rec = Record(id="rec1", type="eggs",
                      data={"eggs": {"value": 12, "units": None, "tags": ["runny"]},
@@ -833,14 +881,14 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_get_with_min(self):
         """Test that we return the id of the record with the lowest scalar_name value."""
         min_spam_scal = list(self.record_dao.get_with_min("spam_scal", id_only=True))
-        self.assertEqual(min_spam_scal[0], "spam")
+        self.assertEqual(min_spam_scal[0], "eggs")
 
     def test_get_with_min_multi(self):
         """Test we can return the X smallest in correct order."""
         min_spam_scals = list(self.record_dao.get_with_min("spam_scal",
                                                            count=2,
                                                            id_only=True))
-        self.assertEqual(min_spam_scals, ["spam", "spam3"])
+        self.assertEqual(min_spam_scals, ["eggs", "spam"])
 
     # ####################### test_exist ####################################
     def test_one_exists(self):
@@ -883,9 +931,18 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     # ########################### basic data_query ##########################
     def test_recorddao_scalar_datum_query(self):
         """Test that the RecordDAO data query is retrieving based on one scalar correctly."""
-        just_right_range = DataRange(min=0, max=300, max_inclusive=True)
+        just_right_range = DataRange(min=0, max=300, max_inclusive=True, min_inclusive=False)
         just_right = self.record_dao.data_query(spam_scal=just_right_range)
         self.assertEqual(len(list(just_right)), 3)
+
+    def test_recorddao_scalar_datum_query_zero(self):
+        """Test that the RecordDAO data query is retrieving based on zero correctly."""
+        gt_zero = list(self.record_dao.data_query(spam_scal=DataRange(min=0,
+                                                                      min_inclusive=False)))
+        six.assertCountEqual(self, gt_zero, ["spam", "spam2", "spam3"])
+        lte_zero = list(self.record_dao.data_query(spam_scal_2=DataRange(max=0,
+                                                                         max_inclusive=True)))
+        six.assertCountEqual(self, lte_zero, ["eggs"])
 
     def test_recorddao_scalar_datum_min_max(self):
         """Test that the RecordDAO data query is respecting the inclusivity settings."""
@@ -1190,6 +1247,25 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                    ids_only=True)
         six.assertCountEqual(self, list(ids_only), ["spam2", "spam5"])
 
+    def test_recorddao_not_type(self):
+        """Test the RecordDAO type query works when negated."""
+        get_all_but_one = list(self.record_dao.get_all_of_type(types=not_("run")))
+        self.assertEqual(len(get_all_but_one), 5)
+        self.assertIsInstance(get_all_but_one[0], Record)
+        all_but_one_id = [x.id for x in get_all_but_one]
+        six.assertCountEqual(self, all_but_one_id,
+                             ["spam3", "spam4", "spam6", "eggs",
+                              "shared_curve_set_and_matching_scalar_data"])
+
+    def test_recorddao_not_type_list(self):
+        """Test the RecordDAO type query works on a list of types when negated."""
+        get_several = list(self.record_dao.get_all_of_type(types=not_(["bar", "spamrec",
+                                                                       "eggrec", "run"]),
+                                                           ids_only=True))
+        self.assertEqual(len(get_several), 2)
+        six.assertCountEqual(self, get_several,
+                             ["spam3", "shared_curve_set_and_matching_scalar_data"])
+
     # ######################### get_with_curve_set #########################
     def test_recorddao_get_with_curve_set(self):
         """Test that the RecordDAO is retrieving based on curve name."""
@@ -1385,46 +1461,60 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Test that the RecordDAO _find() runs queries in the correct default order."""
         dao = self.factory.create_record_dao()
         dao._do_data_query = MagicMock()
-        dao._do_data_query.return_value = ["rec_1", "rec_2", "rec_3"]
+        dao._do_data_query.return_value = ["rec_1", "rec_2", "rec_3", "rec_4"]
         dao._do_get_given_document_uri = MagicMock()
-        dao._do_get_given_document_uri.return_value = ["rec_1", "rec_2"]
-        dao._do_get_all_of_type = MagicMock()
-        dao._do_get_all_of_type.return_value = ["rec_1"]
-        result = dao._find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
+        dao._do_get_given_document_uri.return_value = ["rec_1", "rec_2", "rec_3"]
+        dao.get_with_mime_type = MagicMock()
+        dao.get_with_mime_type.return_value = ["rec_1", "rec_2"]
+        dao.get_all_of_type = MagicMock()
+        dao.get_all_of_type.return_value = ["rec_1"]
+        result = dao._find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4", "rec_5"],
                            data="foo",
                            file_uri="bar",
                            types="baz",
+                           mimetype="image/png",
                            ids_only=True)
 
-        dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2", "rec_3", "rec_4"])
+        dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2", "rec_3",
+                                                              "rec_4", "rec_5"])
         dao._do_get_given_document_uri.assert_called_with("bar",
-                                                          id_pool=["rec_1", "rec_2", "rec_3"],
+                                                          id_pool=["rec_1", "rec_2",
+                                                                   "rec_3", "rec_4"],
                                                           ids_only=True)
-        dao._do_get_all_of_type.assert_called_with("baz", id_pool=["rec_1", "rec_2"],
-                                                   ids_only=True)
+        dao.get_with_mime_type.assert_called_with("image/png", id_pool=["rec_1", "rec_2", "rec_3"],
+                                                  ids_only=True)
+        dao.get_all_of_type.assert_called_with("baz", id_pool=["rec_1", "rec_2"],
+                                               ids_only=True)
         self.assertEqual(list(result), ["rec_1"])  # Should match the final id_pool returned.
 
     def test_recorddao_find_order_non_default(self):
         """Test that the RecordDAO _find() correctly reorders queries."""
         dao = self.factory.create_record_dao()
+        dao.get_with_mime_type = MagicMock()
+        dao.get_with_mime_type.return_value = ["rec_1", "rec_2", "rec_3", "rec_4"]
         dao._do_get_given_document_uri = MagicMock()
         dao._do_get_given_document_uri.return_value = ["rec_1", "rec_2", "rec_3"]
-        dao._do_get_all_of_type = MagicMock()
-        dao._do_get_all_of_type.return_value = ["rec_1", "rec_2"]
+        dao.get_all_of_type = MagicMock()
+        dao.get_all_of_type.return_value = ["rec_1", "rec_2"]
         dao._do_data_query = MagicMock()
         dao._do_data_query.return_value = ["rec_1"]
-        result = dao._find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4"],
+        result = dao._find(id_pool=["rec_1", "rec_2", "rec_3", "rec_4", "rec_5"],
                            data="foo",
                            file_uri="bar",
                            types="baz",
+                           mimetype="image/png",
                            ids_only=True,
-                           query_order=["file_uri", "types", "data"])
+                           query_order=["mimetype", "file_uri", "types", "data"])
 
+        dao.get_with_mime_type.assert_called_with("image/png",
+                                                  id_pool=["rec_1", "rec_2", "rec_3",
+                                                           "rec_4", "rec_5"],
+                                                  ids_only=True)
         dao._do_get_given_document_uri.assert_called_with(
             "bar", id_pool=["rec_1", "rec_2", "rec_3", "rec_4"], ids_only=True)
-        dao._do_get_all_of_type.assert_called_with("baz",
-                                                   id_pool=["rec_1", "rec_2", "rec_3"],
-                                                   ids_only=True)
+        dao.get_all_of_type.assert_called_with("baz",
+                                               id_pool=["rec_1", "rec_2", "rec_3"],
+                                               ids_only=True)
         dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2"])
         self.assertEqual(list(result), ["rec_1"])  # Should match the final id_pool returned.
 
@@ -1433,14 +1523,35 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         get_none = self.record_dao._find(data={"flex_data_1": exists(),
                                                "flex_data_2": exists()},
                                          file_uri=has_any("%png", "beeq.%"),
-                                         types=["bar"],
+                                         types="bar",
+                                         mimetype="image/png",
                                          query_order=["file_uri", "types", "data"])
         six.assertCountEqual(self, list(get_none), [])
         get_one = self.record_dao._find(data={"flex_data_1": exists()},
                                         file_uri="%wav",
                                         types=["run", "bar"],
+                                        mimetype="audio/wav",
                                         ids_only=False)
         six.assertCountEqual(self, list(get_one)[0].id, self.record_dao.get("spam5").id)
+
+    def test_recorddao_find_all(self):
+        """Test it's possible to use _find() to return all records."""
+        find_get_all = list(self.record_dao._find(ids_only=True))
+        expected_get_all = list(self.record_dao.get_all(ids_only=True))
+        six.assertCountEqual(self, find_get_all, expected_get_all)
+
+    def test_recorddao_find_all_id_pool(self):
+        """Test it's possible to pass only id_pool and get those ids back."""
+        find_get_pool = list(self.record_dao._find(id_pool=["spam", "spam_no", "spam2"],
+                                                   ids_only=True))
+        # We expect it to only return ids that exist in the db.
+        six.assertCountEqual(self, find_get_pool, ["spam", "spam2"])
+
+    def test_recorddao_find_with_negated_types(self):
+        """Test it's possible to use _find() with not_() on types."""
+        find_get_all = list(self.record_dao._find(types=not_("run"), ids_only=True))
+        expected_get_all = list(self.record_dao.get_all_of_type(not_("run"), ids_only=True))
+        six.assertCountEqual(self, find_get_all, expected_get_all)
 
 
 class TestImportExport(unittest.TestCase):

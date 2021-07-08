@@ -3,7 +3,7 @@
 import unittest
 import json
 
-from sina.model import Record, Run, Relationship
+from sina.model import Record, Run, Relationship, CurveSet
 import sina.model as model
 
 # Accessing "private" methods is necessary for testing them.
@@ -65,6 +65,7 @@ class TestModel(unittest.TestCase):
         self.relationship_one = Relationship(subject_id="spam",
                                              predicate="supersedes",
                                              object_id="spam2")
+        self.curve_set_one = CurveSet("foo", {})
 
     # Record
     def test_is_valid(self):
@@ -177,7 +178,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(complete_data, rec.data)
 
     def test_set_data_item_conflicts_with_curve_set(self):
-        """Test to make sure we can add data when a curve set already has the same name"""
+        """Test to make sure we can add data when a curve set already has the same name."""
         rec = model.Record(id="data_test", type="test")
         curve_sets = {
             'cs1': {
@@ -191,21 +192,18 @@ class TestModel(unittest.TestCase):
         self.assertIn('density', rec.curve_sets['cs1']['dependent'])
 
     def test_set_data_conflicts_with_curve_set(self):
-        """Test to make sure we can set the data when a curve set already has the same name"""
+        """Test to make sure we can set the data when a curve set already has the same name."""
         rec = model.Record(id='data_test', type='test')
-        curve_sets = {
-            'cs1': {
-                'independent': {'time': {'value': [1, 2, 3]}},
-                'dependent': {'density': {'value': [4, 5, 6]}}
-            }
-        }
-        rec.curve_sets = curve_sets
+        cs1 = CurveSet("cs1")
+        cs1.add_independent("time", [1, 2, 3])
+        cs1.add_dependent("density", [4, 5, 6])
+        rec.add_curve_set(cs1)
         rec.data = {'density': {'value': 40}}
         self.assertIn('density', rec.data)
         self.assertIn('density', rec.curve_sets['cs1']['dependent'])
 
     def test_add_data_conflicts_with_curve_set(self):
-        """Test to make sure we can add data when a curve set already has the same name"""
+        """Test to make sure we can add data when a curve set already has the same name."""
         rec = model.Record(id="data_test", type="test")
         curve_sets = {
             'cs1': {
@@ -236,6 +234,38 @@ class TestModel(unittest.TestCase):
             rec.add_file("/foo/bar.txt", mimetype="text")
         self.assertIn('Duplicate file', str(context.exception))
 
+    def test_set_curve_set(self):
+        """Test to make sure that we can update CurveSets for a Record."""
+        foo_curve_set = CurveSet("foo", {"independent": {"time": {"value": [1, 2, 3]}}})
+        rec = model.Record(id="curve_set_test", type="test")
+        rec.set_curve_set(foo_curve_set)
+        self.assertEqual({"foo": foo_curve_set.raw}, rec.curve_sets)
+        # Need to ensure that both are updated
+        vol_vals = [0, 0, 0.1]
+        foo_curve_set.add_dependent(curve_name="volume", value=vol_vals)
+        self.assertEqual(foo_curve_set["dependent"]["volume"]["value"], vol_vals)
+        self.assertEqual(rec.get_curve_set("foo").dependent["volume"]["value"], vol_vals)
+        # and that replacement works
+        foo_2_curve_set = CurveSet("foo", {"independent": {"conc": {"value": [0, 0.5, 2]}}})
+        rec.set_curve_set(foo_2_curve_set)
+        self.assertEqual({"foo": foo_2_curve_set.raw}, rec.curve_sets)
+
+    def test_add_curve_set(self):
+        """
+        Test to make sure that we can add CurveSets to a Record.
+
+        Also test that a ValueError is raised if a CurveSet by that name already exists.
+        """
+        foo_curve_set = CurveSet("foo", {"independent": {"time": {"value": [1, 2, 3]}},
+                                         "dependent": {}})
+        rec = model.Record(id="curve_set_test", type="test")
+        foo_curve_set = rec.add_curve_set("foo")
+        foo_curve_set.add_independent("time", value=[1, 2, 3])
+        self.assertEqual({"foo": foo_curve_set.raw}, rec.curve_sets)
+        with self.assertRaises(ValueError) as context:
+            rec.add_curve_set(foo_curve_set)
+        self.assertIn('Duplicate curve set', str(context.exception))
+
     def test_remove_file(self):
         """Test add/remove file to a record"""
         complete_files = {"/foo/bar.txt": {}}
@@ -259,12 +289,13 @@ class TestModel(unittest.TestCase):
         self.assertIn('Duplicate datum', str(context.exception))
 
     def test_add_curve_with_data_overlap(self):
-        """Allow data and curve sets to have the same name"""
-        complete_curvesets = {"set_1": {"independent": {"time": {"value": [1, 2]}},
-                                        "dependent": {"density": {"value": [3, 4]}}}}
+        """Allow data and curve sets to have the same name."""
+        complete_curveset = CurveSet("set_1")
+        complete_curveset.add_independent("time", [1, 2])
+        complete_curveset.add_dependent("density", [3, 4])
         complete_data = {"density": {"value": 40}}
-        rec = model.Record(id="data_test", type="test", data=complete_data,
-                           curve_sets=complete_curvesets)
+        rec = model.Record(id="data_test", type="test", data=complete_data)
+        rec.add_curve_set(complete_curveset)
         self.assertEqual(40, rec.data['density']['value'])
         self.assertListEqual([3, 4],
                              rec.curve_sets['set_1']['dependent']['density']['value'])
@@ -277,6 +308,25 @@ class TestModel(unittest.TestCase):
         self.assertEqual(rec.__dict__["raw"]["eggs"], "nutritious")
         del rec["eggs"]
         self.assertTrue('eggs' not in rec.__dict__["raw"])
+
+    def test_record_get_curve_set(self):
+        """Ensure accessing via get_curve_set returns CurveSets."""
+        rec = model.Record(id="spam_test", type="test")
+        with self.assertRaises(AttributeError) as context:
+            egg_set = rec.get_curve_set("egg_set")
+        self.assertIn("has no curve set", str(context.exception))
+
+        rec.add_curve_set("egg_set")
+        egg_set = rec.get_curve_set("egg_set")
+        self.assertIsInstance(egg_set, CurveSet)
+        self.assertEqual(egg_set.name, "egg_set")
+        self.assertEqual(egg_set.raw, {"independent": {}, "dependent": {}})
+        num_boiled_vals = [0, 0, 0, 1]
+        egg_set.add_dependent("num_boiled", num_boiled_vals)
+        filled_egg_set = rec.get_curve_set("egg_set")
+        self.assertIsInstance(filled_egg_set, CurveSet)
+        self.assertEqual(filled_egg_set.get_dependent("num_boiled")["value"],
+                         num_boiled_vals)
 
     def test_flatten_library_content_data(self):
         """Ensure that library flattening is happening for data."""
@@ -343,16 +393,16 @@ class TestModel(unittest.TestCase):
                        '"mood": {"value": "friendly"}},'
                        '"library_data": {"my_lib": {"data": {"mood": {"value": "joyful"}}}},'
                        '"curve_sets":{"learning": {'
-                       '"independent":{"time": {"value": [1, 2, 3]}},'
-                       '"dependent": {"words": {"value": [0, 6, 12]}}}},'
+                       '"independent":{"time": {"value": [1, 2, 3], "tags": ["raw"]}},'
+                       '"dependent": {"words": {"value": [0, 6, 12], "units": "sec"}}}},'
                        '"files":{"pronounce.wav": {}},'
                        '"user_defined":{"good": "morning"}}')
         test_record = model.Record("hello", "greeting")
         test_record.data = {"language": {"value": "english"},
                             "mood": {"value": "friendly"}}
-        test_record.curve_sets = {"learning": {
-            "independent": {"time": {"value": [1, 2, 3]}},
-            "dependent": {"words": {"value": [0, 6, 12]}}}}
+        learning_curves = test_record.add_curve_set("learning")
+        learning_curves.add_independent("time", [1, 2, 3], tags=["raw"])
+        learning_curves.add_dependent("words", [0, 6, 12], units="sec")
         test_record.library_data = {"my_lib": {"data": {"mood": {"value": "joyful"}}}}
         test_record.files = {"pronounce.wav": {}}
         test_record.user_defined = {"good": "morning"}
@@ -508,3 +558,93 @@ class TestModel(unittest.TestCase):
         """Test that Relationship's to_json() is working as intended."""
         expected_json = '{"subject": "spam", "predicate": "supersedes", "object": "spam2"}'
         self.assertEqual(json.loads(expected_json), json.loads(self.relationship_one.to_json()))
+
+    # CurveSet
+    def test_init(self):
+        """
+        Test that an empty CurveSet gets an empty dict for independents and dependents.
+
+        Also tests that tags are unset.
+        """
+        self.assertEqual(self.curve_set_one["independent"], {})
+        self.assertEqual(self.curve_set_one["dependent"], {})
+        self.assertIsNone(self.curve_set_one.raw.get("tags"))
+
+    def test_curve_set_add_independent(self):
+        """
+        Test that we can add an independent curve to the CurveSet.
+
+        Also test that an error is raised if an independent curve by that name already exists.
+        """
+        curve = self.curve_set_one.add_independent("time")
+        vals = [1, 2, 3]
+        curve.value = vals
+        self.assertEqual(curve.raw, self.curve_set_one["independent"]["time"], vals)
+        with self.assertRaises(ValueError) as context:
+            self.curve_set_one.add_independent("time")
+        self.assertIn('Duplicate curve', str(context.exception))
+        self.assertIn('independent', str(context.exception))
+
+    def test_curve_set_add_dependent(self):
+        """Test that we can add a dependent curve to the CurveSet."""
+        curve = self.curve_set_one.add_dependent("volume")
+        vals = [0, 0, 0.5]
+        curve.value = vals
+        self.assertEqual(curve.raw, self.curve_set_one.dependent["volume"], vals)
+        with self.assertRaises(ValueError) as context:
+            self.curve_set_one.add_dependent("volume")
+        self.assertIn('Duplicate curve', str(context.exception))
+        self.assertIn('dependent', str(context.exception))
+
+    def test_curve_set_get_dependent(self):
+        """Test that we can get a dependent curve from the CurveSet."""
+        curve = self.curve_set_one.add_dependent("distance")
+        curve.value = [200000, 2000000000]
+        self.assertEqual(curve.raw, self.curve_set_one.get_dependent("distance"))
+        with self.assertRaises(AttributeError) as context:
+            self.curve_set_one.get_dependent("volume")
+        self.assertIn("has no dependent", str(context.exception))
+
+    def test_curve_set_get_independent(self):
+        """Test that we can get an independent curve from the CurveSet."""
+        curve = self.curve_set_one.add_independent("time")
+        curve.value = [1, 2]
+        self.assertEqual(curve.raw, self.curve_set_one.get_independent("time"))
+        with self.assertRaises(AttributeError) as context:
+            self.curve_set_one.get_independent("concentration")
+        self.assertIn("has no independent", str(context.exception))
+
+    def test_curve_set_get(self):
+        """Test that we can get a curve from the CurveSet."""
+        ind_curve = self.curve_set_one.add_independent("time")
+        ind_curve.value = [1, 2]
+        dep_curve = self.curve_set_one.add_dependent("distance")
+        dep_curve.value = [200000, 2000000000]
+        self.assertEqual(ind_curve.raw, self.curve_set_one.get("time"))
+        self.assertEqual(dep_curve.raw, self.curve_set_one.get("distance"))
+        # While the overlap is unsupported, we still do define the behavior
+        weird_curve = self.curve_set_one.add_independent("distance")
+        weird_curve.value = [1, 3]
+        self.assertEqual(weird_curve.raw, self.curve_set_one.get("distance"))
+        with self.assertRaises(AttributeError) as context:
+            self.curve_set_one.get("concentration")
+        self.assertIn("has no curve", str(context.exception))
+
+    def test_curve_set_as_dict(self):
+        """Test that we can transform a dict or CurveSet into a dict."""
+        source_dict = {"independent": {"time": {"value": [1, 2, 3]}},
+                       "dependent": {"volume": {"value": [10, 12, 9]}}}
+        source_curve_set = CurveSet("test", raw=source_dict)
+        self.assertEqual(CurveSet.as_dict(source_dict), source_dict)
+        self.assertEqual(CurveSet.as_dict(source_curve_set), source_dict)
+
+    def test_curve_set_as_curve_set(self):
+        """Test that we can transform a dict or CurveSet into a CurveSet."""
+        source_dict = {"independent": {"time": {"value": [1, 2, 3]}},
+                       "dependent": {"volume": {"value": [10, 12, 9]}}}
+        source_curve_set = CurveSet("test", raw=source_dict)
+        unnamed_curve_set = CurveSet("<unnamed CurveSet>", raw=source_dict)
+        self.assertEqual(CurveSet.as_curve_set(source_dict).name, unnamed_curve_set.name)
+        self.assertEqual(CurveSet.as_curve_set(source_dict).raw, unnamed_curve_set.raw)
+        self.assertEqual(CurveSet.as_curve_set(source_curve_set).name, source_curve_set.name)
+        self.assertEqual(CurveSet.as_curve_set(source_curve_set).raw, source_curve_set.raw)

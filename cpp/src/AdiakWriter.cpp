@@ -114,8 +114,13 @@ double toScalar(adiak_value_t *val, adiak_datatype_t *adiak_type){
         case adiak_tuple:
         case adiak_range:
         case adiak_list:
-        case adiak_type_unset:
-            throw std::runtime_error(std::string("Logic error, contact maintainer: Adiak-to-Sina double converter given ") + adiak_type_to_string(adiak_type, 1)); 
+        case adiak_type_unset: {
+            std::string msg("Logic error, contact maintainer: Adiak-to-Sina double converter given ");
+            char *s = adiak_type_to_string(adiak_type, 1);
+            msg += s;
+            free(s);
+            throw std::runtime_error(msg);
+                               }
         default:
             throw std::runtime_error("Adiak-to-Sina double converter given something not convertible to double");
     }
@@ -149,8 +154,13 @@ std::string toString(adiak_value_t *val, adiak_datatype_t *adiak_type){
         case adiak_tuple:
         case adiak_range:
         case adiak_list:
-        case adiak_type_unset:
-            throw std::runtime_error(std::string("Logic error, contact maintainer: Adiak-to-Sina string converter given ") + adiak_type_to_string(adiak_type, 1)); 
+        case adiak_type_unset:{
+            std::string msg("Logic error, contact maintainer: Adiak-to-Sina string converter given ");
+            char *s = adiak_type_to_string(adiak_type, 1);
+            msg += s;
+            free(s);
+            throw std::runtime_error(msg);
+                              }
         default:
             throw std::runtime_error("Adiak-to-Sina string converter given something not convertible to string");
     }
@@ -198,12 +208,16 @@ void adiakSinaCallback(const char *name, adiak_category_t, const char *subcatego
             // If we don't know what it is, we can't store it, so as above...
             throw std::runtime_error("Unknown Adiak type cannot be added to Sina record.");
         case sina_scalar: {
-            tags.emplace_back(adiak_type_to_string(adiak_type, 1));
-            addDatum(name, toScalar(val, adiak_type), tags, record);
-            break;
+           char * s = adiak_type_to_string(adiak_type, 1);
+           tags.emplace_back(s);
+           free(s);
+           addDatum(name, toScalar(val, adiak_type), tags, record);
+           break;
         }
         case sina_string: {
-           tags.emplace_back(adiak_type_to_string(adiak_type, 1));
+           char * s = adiak_type_to_string(adiak_type, 1);
+           tags.emplace_back(s);
+           free(s);
            addDatum(name, toString(val, adiak_type), tags, record);
            break;
         }
@@ -217,7 +231,9 @@ void adiakSinaCallback(const char *name, adiak_category_t, const char *subcatego
          // should be sent to user_defined
          adiak_value_t *subvals = static_cast<adiak_value_t *>(val->v_ptr);
          SinaType list_type = findSinaType(adiak_type->subtype[0]);
-         tags.emplace_back(adiak_type_to_string(adiak_type->subtype[0], 1));
+         char * s = adiak_type_to_string(adiak_type->subtype[0], 1);
+         tags.emplace_back(s);
+         free(s);
          switch (list_type) {
              case sina_string:
                  addDatum(name, toStringList(subvals, adiak_type), tags, record);

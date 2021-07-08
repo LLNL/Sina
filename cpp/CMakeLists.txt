@@ -18,8 +18,8 @@ include(blt/SetupBLT.cmake)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SINA_CXX_FLAGS}")
 
 set(SINA_VERSION_MAJOR 1)
-set(SINA_VERSION_MINOR 9)
-set(SINA_VERSION_PATCH 5)
+set(SINA_VERSION_MINOR 11)
+set(SINA_VERSION_PATCH 0)
 
 CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/config/config.hpp.in
         ${CMAKE_CURRENT_BINARY_DIR}/include/sina/config.hpp)

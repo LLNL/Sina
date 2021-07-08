@@ -100,11 +100,6 @@ class RecordDAO(dao.RecordDAO):
         is_valid, warnings = record.is_valid()
         if not is_valid:
             raise ValueError(warnings)
-        create = (schema.Record.create if force_overwrite
-                  else schema.Record.if_not_exists().create)
-        create(id=record.id,
-               type=record.type,
-               raw=json.dumps(record.raw))
         if record.data:
             self._insert_data(id=record.id,
                               data=record.data,
@@ -118,6 +113,13 @@ class RecordDAO(dao.RecordDAO):
             self._insert_files(id=record.id,
                                files=record.files,
                                force_overwrite=force_overwrite)
+        # Update the raw last in case anything bad happens.
+        # Remember, Cassandra has no rollback functionality.
+        create = (schema.Record.create if force_overwrite
+                  else schema.Record.if_not_exists().create)
+        create(id=record.id,
+               type=record.type,
+               raw=json.dumps(record.raw))
 
     # Disabled until rework, possibly splitting into the first and second batch types
     # pylint: disable=too-many-locals, too-many-branches, too-many-statements
@@ -141,6 +143,7 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.debug('Inserting records %s to Cassandra with'
                      'force_overwrite=%s and _type_managed=%s.',
                      list_to_insert, force_overwrite, _type_managed)
+        list_to_insert = list(list_to_insert)  # safety cast
         # Because batch is done by partition key, we'll need to store info for
         # tables whose full per-partition info isn't supplied by one Record.
         # Thus, these rec_from_x dicts last for the full insert.
@@ -168,11 +171,6 @@ class RecordDAO(dao.RecordDAO):
             is_valid, warnings = record.is_valid()
             if not is_valid:
                 raise ValueError(warnings)
-            create = (schema.Record.create if force_overwrite
-                      else schema.Record.if_not_exists().create)
-            create(id=record.id,
-                   type=record.type,
-                   raw=json.dumps(record.raw))
 
             if record.curve_sets:
                 # Curve set names are meta, everything else is per-record.
@@ -298,6 +296,18 @@ class RecordDAO(dao.RecordDAO):
                                                     id=entry[0],
                                                     tags=entry[1])
 
+        # Finally, insert the full, raw record.
+        create = (schema.Record.create if force_overwrite
+                  else schema.Record.if_not_exists().create)
+        for record in list_to_insert:
+            if isinstance(record.raw, bytes):  # cassandra doesn't take bytes
+                raw = json.dumps(record.raw).decode("utf-8")
+            else:
+                raw = json.dumps(record.raw)
+            create(id=record.id,
+                   type=record.type,
+                   raw=raw)
+
     @staticmethod
     def _insert_data(data, id, force_overwrite=False):
         """
@@ -378,21 +388,31 @@ class RecordDAO(dao.RecordDAO):
         """
         Given a(n iterable of) Record id(s), delete the Record(s) from the current database.
 
-        Removes everything: data, related relationships, files. Relies on
-        Cassandra batching, one batch per Record if there's only one Record to
-        delete, else one batch overall.
+        Removes everything: data, related relationships, and files.
+        Relies on Cassandra batching.
 
         :param ids: The id or list of ids of the Record(s) to delete
         """
+        self._do_delete(ids)
+
+    def _do_delete(self, ids, delete_relationships=True):
+        """
+        Handle internal deletion logic.
+
+        :param ids: The id or list of ids of the Record(s) to delete
+        :param delete_relationships: Whether to also delete relationships related to the Record
+                                     (ex: set to False if you're deleting in order to update;
+                                     you likely want to use update() instead.)
+        """
         if isinstance(ids, six.string_types):
             with BatchQuery() as batch:
-                self._setup_batch_delete(batch, ids)
+                self._setup_batch_delete(batch, ids, delete_relationships)
         else:
             with BatchQuery() as batch:
                 for id in ids:
-                    self._setup_batch_delete(batch, id)
+                    self._setup_batch_delete(batch, id, delete_relationships)
 
-    def _setup_batch_delete(self, batch, record_id):
+    def _setup_batch_delete(self, batch, record_id, delete_relationships):
         """
         Given a batchquery, add the deletion commands for a given record.
 
@@ -406,6 +426,7 @@ class RecordDAO(dao.RecordDAO):
 
         :param batch: the batch to add the deletions to
         :param record_id: the id of the record we're deleting
+        :param delete_relationships: whether to delete the record's relationships
         """
         LOGGER.debug("Generating batch deletion commands for %s", record_id)
         if not self._one_exists(record_id):
@@ -424,27 +445,32 @@ class RecordDAO(dao.RecordDAO):
                                                    value=datum['value'],
                                                    batch=batch)
 
-        # Because Relationships are created separately from Records, we have to
-        # manually discover all relationships. Because they are mirrored, we
-        # can do this efficiently and without allow_filtering.
-        obj_when_rec_is_subj = (schema.ObjectFromSubject.objects(subject_id=record_id)
-                                .values_list('object_id', 'predicate'))
-        for obj, pred in obj_when_rec_is_subj:
-            (schema.SubjectFromObject.objects(object_id=obj,
-                                              predicate=pred,
-                                              subject_id=record_id)
-             .batch(batch).delete())
-        schema.ObjectFromSubject.objects(subject_id=record_id).batch(batch).delete()
+        # Delete any curve set data
+        for name in record['curve_sets'].keys():
+            schema.RecordFromCurveSetMeta.objects(name=name, id=record_id).batch(batch).delete()
 
-        # Now again with the other table.
-        subj_when_rec_is_obj = (schema.SubjectFromObject.objects(object_id=record_id)
-                                .values_list('subject_id', 'predicate'))
-        for subj, pred in subj_when_rec_is_obj:
-            (schema.ObjectFromSubject.objects(subject_id=subj,
-                                              predicate=pred,
-                                              object_id=record_id)
-             .batch(batch).delete())
-        schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
+        if delete_relationships:
+            # Because Relationships are created separately from Records, we have to
+            # manually discover all relationships. Because they are mirrored, we
+            # can do this efficiently and without allow_filtering.
+            obj_when_rec_is_subj = (schema.ObjectFromSubject.objects(subject_id=record_id)
+                                    .values_list('object_id', 'predicate'))
+            for obj, pred in obj_when_rec_is_subj:
+                (schema.SubjectFromObject.objects(object_id=obj,
+                                                  predicate=pred,
+                                                  subject_id=record_id)
+                 .batch(batch).delete())
+            schema.ObjectFromSubject.objects(subject_id=record_id).batch(batch).delete()
+
+            # Now again with the other table.
+            subj_when_rec_is_obj = (schema.SubjectFromObject.objects(object_id=record_id)
+                                    .values_list('subject_id', 'predicate'))
+            for subj, pred in subj_when_rec_is_obj:
+                (schema.ObjectFromSubject.objects(subject_id=subj,
+                                                  predicate=pred,
+                                                  object_id=record_id)
+                 .batch(batch).delete())
+            schema.SubjectFromObject.objects(object_id=record_id).batch(batch).delete()
 
     def get_raw(self, id_):
         try:
@@ -466,8 +492,20 @@ class RecordDAO(dao.RecordDAO):
             is_valid, warnings = record.is_valid()
             if not is_valid:
                 raise ValueError(warnings)
-        self.delete(record.id for record in records)
-        self.insert(records)
+
+        # Prepare our fake rollback by getting the original records
+        rollback_recs = list(self.get(x.id for x in records))
+
+        # Delete everything
+        self._do_delete((record.id for record in records), delete_relationships=False)
+
+        try:
+            self.insert(records)
+        except Exception as ex:  # We're only passing it along in our fake rollback
+            LOGGER.debug("Insertion raised %s. Rolling back.", type(ex).__name__)
+            self.delete(record.id for record in records)
+            self.insert(rollback_recs)
+            raise ex
 
     def _do_data_query(self, criteria, id_pool=None):
         """
@@ -785,21 +823,15 @@ class RecordDAO(dao.RecordDAO):
                 yield model.generate_record_from_json(json_input=json.loads(result.raw))
 
     def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
-        """
-        Given an iterable of types of Record, return all Records of those types.
+        """Cassandra-specific implementation of DAO's _do_get_all_of_type."""
+        if isinstance(types, utils.Negation):
+            types = set(self.get_available_types()).difference(types.arg)
 
-        :param types: An iterable of types of Records to return
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-
-        :returns: A generator of Records of that type or (if ids_only) a
-                  generator of their ids
-        """
         # There's an index on type, which should be alright as type is expected
         # to have low cardinality. If speed becomes an issue, a dedicated query table might help.
 
-        # Cassandra won't let us do an in_ on type, so we chain (a Record can only have
-        # one type, so we're guaranteed no duplicates).
+        # Cassandra won't let us do an in_ (or not_in, for NOT types) on type, so
+        # we chain (a Record can only have one type, so we're guaranteed no duplicates).
         generators = []
         for type in types:
             query = schema.Record.objects.filter(type=type).values_list('id', flat=True)
@@ -1162,17 +1194,22 @@ class RecordDAO(dao.RecordDAO):
                 pass
         return scalars
 
-    def get_with_mime_type(self, mimetype, ids_only=False):
+    def get_with_mime_type(self, mimetype, ids_only=False, id_pool=None):
         """
         Return all records or IDs with documents of a given mimetype.
 
         :param mimetype: The mimetype to use as a search term
         :param ids_only: Whether to only return the ids
+        :param id_pool: Used when combining queries: a pool of ids to restrict
+                        the query to. Only records with ids in this pool can be
+                        returned.
 
         :returns: Record object or IDs fitting the criteria.
         """
         ids = (schema.DocumentFromRecord.objects.filter(mimetype=mimetype)
                .values_list('id', flat=True))
+        if id_pool is not None:
+            ids = ids.filter(id__in=id_pool)
         return ids if ids_only else self.get(ids)
 
 

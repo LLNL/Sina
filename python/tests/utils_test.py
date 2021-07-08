@@ -15,10 +15,14 @@ from types import GeneratorType
 import io
 import six
 
+# Disable pylint check due to its issue with virtual environments
+from mock import patch  # pylint: disable=import-error
+
 import sina.utils
 from sina.utils import (DataRange, StringListCriteria, ScalarListCriteria,
                         sort_and_standardize_criteria,
-                        convert_json_to_records_and_relationships)
+                        convert_json_to_records_and_relationships,
+                        load_records, load_sole_record)
 
 # Path to the directory for running tests involving temporary files.  (Use this
 # file's directory as the basis for the path for now.)
@@ -712,6 +716,15 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
         exists_op = sina.utils.exists()
         self.assertEqual(exists_op, sina.utils.UniversalQueryOperation.EXISTS)
 
+    def test_not(self):
+        """Test that not_() is able to return a Negation (or negated Negation)."""
+        content = "hello"
+        negation = sina.utils.not_(content)
+        self.assertIsInstance(negation, sina.utils.Negation)
+        self.assertEqual(negation.arg, content)
+        negated_negation = sina.utils.not_(negation)
+        self.assertEqual(negated_negation, content)
+
     def test_sort_and_standardizing(self):
         """Test the function for processing query criteria."""
         criteria = {"numra": DataRange(1, 2),
@@ -814,6 +827,17 @@ class LoadDocumentTest(unittest.TestCase):
 
         self.assertContentsAreCorrect(records, relationships)
 
+    def test_load_records(self):
+        """Verify that load_records() works correctly in at least one case"""
+        # The test class LoadRecordsTest verifies all the delegation happens
+        # correctly. This is just a quick check to ensure we do get the right
+        # list if of records in one case. We do it here since this class
+        # already has the infrastructure to do this.
+        records = sina.utils.load_records(
+            io.StringIO(LoadDocumentTest.contents))
+
+        self.assertRecordsAreCorrect(records)
+
     def assertContentsAreCorrect(self, records, relationships):
         """
         Assert that the records and relationships are as expected
@@ -821,11 +845,72 @@ class LoadDocumentTest(unittest.TestCase):
         :param records: the actual recrods
         :param relationships: the actual relationships
         """
-        self.assertEqual(2, len(records))
-        self.assertEqual("rec1", records[0].id)
-        self.assertEqual("rec2", records[1].id)
+        self.assertRecordsAreCorrect(records)
+        self.assertRelationshipsAreCorrect(relationships)
 
+    def assertRelationshipsAreCorrect(self, relationships):
+        """
+        Assert that the relationships are as expected.
+
+        :param relationships: the actual relationships
+        """
         self.assertEqual(1, len(relationships))
         self.assertEqual("rec1", relationships[0].subject_id)
         self.assertEqual("rec2", relationships[0].object_id)
         self.assertEqual("related to", relationships[0].predicate)
+
+    def assertRecordsAreCorrect(self, records):
+        """
+        Assert that the records are as expected.
+
+        :param records: the actual recrods
+        """
+        self.assertEqual(2, len(records))
+        self.assertEqual("rec1", records[0].id)
+        self.assertEqual("rec2", records[1].id)
+
+
+class LoadRecordsTest(unittest.TestCase):
+    """Contains test cases for load_records() and load_sole_record()"""
+
+    @patch('sina.utils.load_document')
+    def test_load_records(self, mock_load_document):
+        """Verify load_records() delegates to load_document()"""
+        records = [object(), object()]
+        relationships = [object()]
+        mock_load_document.return_value = records, relationships
+        load_location = object()
+        returned_records = load_records(load_location)
+        mock_load_document.assert_called_with(load_location)
+        self.assertIs(returned_records, records)
+
+    @patch('sina.utils.load_records')
+    def test_load_sole_record_only_one(self, mock_load_records):
+        """Verify load_sole_records() delegates to load_document() and returns
+           the single record in the document."""
+        records = [object()]
+        mock_load_records.return_value = records
+        load_location = object()
+        returned_record = load_sole_record(load_location)
+        mock_load_records.assert_called_with(load_location)
+        self.assertIs(returned_record, records[0])
+
+    @patch('sina.utils.load_records')
+    def test_load_sole_record_no_records(self, mock_load_records):
+        """Verify load_sole_records() throws an exception when there are
+           no records."""
+        records = []
+        mock_load_records.return_value = records
+        load_location = object()
+        self.assertRaises(ValueError, load_sole_record, load_location)
+        mock_load_records.assert_called_with(load_location)
+
+    @patch('sina.utils.load_records')
+    def test_load_sole_record_multiple_records(self, mock_load_records):
+        """Verify load_sole_records() throws an exception when there are
+           multiple records."""
+        records = [object(), object()]
+        mock_load_records.return_value = records
+        load_location = object()
+        self.assertRaises(ValueError, load_sole_record, load_location)
+        mock_load_records.assert_called_with(load_location)
