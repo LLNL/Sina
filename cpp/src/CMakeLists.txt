@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.7)
 find_package(Conduit REQUIRED)
 
 blt_register_library(NAME Conduit
-        INCLUDES "${Conduit_DIR}/../../../include/conduit"
+        INCLUDES "${CONDUIT_INCLUDE_DIRS}"
         LIBRARIES "conduit"
         TREAT_INCLUDES_AS_SYSTEM ON
         )
@@ -23,7 +23,7 @@ if(${SINA_BUILD_ADIAK_BINDINGS})
 
     blt_register_library(NAME adiak
         TREAT_INCLUDES_AS_SYSTEM ON
-        INCLUDES "${adiak_DIR}/../../../include"
+        INCLUDES "${adiak_INCLUDE_DIR}"
         LIBRARIES adiak
     )
     string(CONCAT OPTIONAL_SINA_DEPENDENCIES "adiak")
@@ -43,6 +43,7 @@ blt_add_library(NAME sina
         ../include/sina/Relationship.hpp
         ../include/sina/Run.hpp
         ../include/sina/Datum.hpp
+        ../include/sina/DataHolder.hpp
         ../include/sina/AdiakWriter.hpp
     SOURCES
         Curve.cpp
@@ -55,6 +56,7 @@ blt_add_library(NAME sina
         Relationship.cpp
         Run.cpp
         Datum.cpp
+        DataHolder.cpp
         AdiakWriter.cpp
     DEPENDS_ON
         Conduit

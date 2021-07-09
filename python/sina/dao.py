@@ -13,7 +13,7 @@ import numbers
 import six
 
 import sina.model
-import sina.json as json
+import sina.sjson as json
 from sina.utils import DataRange
 
 LOGGER = logging.getLogger(__name__)
@@ -107,6 +107,15 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    def _do_delete_all_records(self):
+        """Implement logic for Datastore's delete_all_contents()."""
+        # Relies on the propagated deletes of the RecordDAO, which also wipe out
+        # relationships. Could be made more efficient with the use of TRUNCATE or the
+        # like, but if this somehow becomes a performance bottleneck and requires
+        # that upgrade, make sure you add backend-specific tests that make sure all
+        # tables are cleared. At that point, it may belong in the DAOFactory.
+        self.delete(self.get_all(ids_only=True))
+
     def update(self, records):
         """
         Given one or more Records, update them in the backend.
@@ -127,16 +136,22 @@ class RecordDAO(object):
 
     @abstractmethod
     def _do_update(self, records):
-        """Handle the logic of the upate itself."""
+        """Handle the logic of the update itself."""
         raise NotImplementedError
 
-    @abstractmethod
     def insert(self, records):
         """
         Given one or more Records, insert them into the DAO's backend.
 
         :param records: A Record or iter of Records to insert
         """
+        if isinstance(records, (sina.model.Record, sina.model.Run)):
+            records = [records]
+        self._do_insert(sina.model.flatten_library_content(record) for record in records)
+
+    @abstractmethod
+    def _do_insert(self, records):
+        """Handle the logic of the insert itself."""
         raise NotImplementedError
 
     @abstractmethod
@@ -150,7 +165,6 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
-    @abstractmethod
     def data_query(self, **kwargs):
         """
         Return the ids of all Records whose data fulfill some criteria.
@@ -173,6 +187,15 @@ class RecordDAO(object):
         :raises ValueError: if not supplied at least one criterion or given
                             a criterion it does not support
         """
+        LOGGER.debug('Finding all records fulfilling criteria: %s', kwargs.items())
+        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
+        if not kwargs.items():
+            raise ValueError("You must supply at least one criterion.")
+        return self._do_data_query(criteria=kwargs)
+
+    @abstractmethod
+    def _do_data_query(self, criteria, id_pool=None):
+        """Handle the backend dependent logic of data_query."""
         raise NotImplementedError
 
     def get_given_data(self, **kwargs):
@@ -201,16 +224,31 @@ class RecordDAO(object):
                             .format(criteria))
         return criterion_is_for_scalars[0]
 
-    @abstractmethod
-    def get_all_of_type(self, type, ids_only=False):
+    def get_all_of_type(self, types, ids_only=False, id_pool=None):
         """
-        Given a type of Record, return all Records of that type.
+        Given a(n iterable of) type(s) of Record, return all Records of that type(s).
 
-        :param type: The type of Record to return
+        :param types: A(n iterable of) types of Records to return
         :param ids_only: whether to return only the ids of matching Records
+        :param id_pool: Used when combining queries: a pool of ids to restrict
+                        the query to. Only records with ids in this pool can be
+                        returned.
 
         :returns: A generator of matching Records.
         """
+        if isinstance(types, six.string_types):
+            types = [types]
+        else:
+            types = list(types)  # safety cast for gens
+        # safety cast for id_pool as well
+        if id_pool is not None:
+            id_pool = list(id_pool)  # safety cast for gens
+        LOGGER.debug('Getting all records with types in %s.', types)
+        return self._do_get_all_of_type(types, ids_only, id_pool)
+
+    @abstractmethod
+    def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
+        """Handle the logic of the type query."""
         raise NotImplementedError
 
     def get_all(self, ids_only):
@@ -287,21 +325,24 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
-    @abstractmethod
     def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
         """
-        Return all records associated with documents whose uris match some arg.
+        Handle shared backend logic for datastore's find_with_file_uris().
 
-        Supports the use of % as a wildcard character. Note that you may or may
-        not get duplicates depending on the backend.
-
-        :param uri: The uri to use as a search term, such as "foo.png"
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
-        :param ids_only: whether to return only the ids of matching Records
-
-        :returns: A generator of matching Records
+        NOTE: Args were moved and cleaned up for datastore version. This old
+        version uses accepted_ids_list instead of id_pool.
         """
+        LOGGER.debug('Getting record with uris matching uri criterion %s', uri)
+        if accepted_ids_list is not None:
+            id_pool = list(accepted_ids_list)
+            LOGGER.debug('Restricting to %i ids.', len(id_pool))
+        return self._do_get_given_document_uri(uri=uri,
+                                               id_pool=accepted_ids_list,
+                                               ids_only=ids_only)
+
+    @abstractmethod
+    def _do_get_given_document_uri(self, uri, id_pool=None, ids_only=False):
+        """Handle backend-specific logic for datastore's find_with_file_uris()."""
         raise NotImplementedError
 
     @abstractmethod
@@ -393,6 +434,35 @@ class RecordDAO(object):
         :returns: Record object or IDs fitting the criteria.
         """
         raise NotImplementedError
+
+    # High arg count is inherent to the functionality.
+    # pylint: disable=too-many-arguments
+    def _find(self, types=None, data=None, file_uri=None,
+              id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
+        """Implement cross-backend logic for the DataStore method of the same name."""
+        LOGGER.debug('Performing a general find() query with order %s', query_order)
+        query_map = {"data": (self._do_data_query, data),
+                     "file_uri": (self._do_get_given_document_uri, file_uri),
+                     "types": (self._do_get_all_of_type, types)}
+        for query_type in query_order:
+            query_func, arg = query_map[query_type]
+            if arg:
+                if query_type == "data":
+                    # Data has no ids_only
+                    id_pool = list(query_func(arg, id_pool=id_pool))
+                else:
+                    # This usage of query_func seems to confuse pylint; it complains as
+                    # long as I'm using ids_only=True, maybe it's "seeing" the call above.
+                    id_pool = list(
+                        query_func(arg,  # pylint: disable=unexpected-keyword-arg
+                                   id_pool=id_pool,
+                                   ids_only=True))
+                # Break early, as an empty id_pool is bad usage for a query.
+                if not id_pool:
+                    return (x for x in [])
+        if ids_only:
+            return (x for x in id_pool)
+        return self.get(id_pool)
 
 
 class RelationshipDAO(object):

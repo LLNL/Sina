@@ -36,7 +36,7 @@ class AdiakWriterTest : public ::testing::Test {
     adiak_register_cb(1, adiak_category_all, AdiakWriterTest::callbackWrapper, 0, &current_test);
   }
 
-  void SetUp() {
+  void SetUp() override {
      current_test=this;
   }
 
@@ -44,12 +44,6 @@ class AdiakWriterTest : public ::testing::Test {
     auto test = static_cast<AdiakWriterTest**>(adiakwriter);
     adiakSinaCallback(name, category, subcategory, val, adiak_type, &((*test)->record));
   }
-
-  ~AdiakWriterTest() {}
-
-  void TestBody() {}
-
-  void TearDown() {}
 
   sina::Record record{sina::ID{"test_run", sina::IDType::Local}, "test_type"};
   static AdiakWriterTest *current_test;

@@ -3,7 +3,7 @@
 
 from setuptools import setup, find_packages
 
-VERSION = __import__('sina').get_version()
+VERSION = "1.10.0"
 
 setup(name='llnl-sina',
       version=VERSION,
@@ -28,9 +28,10 @@ setup(name='llnl-sina',
             'matplotlib<3.0'
         ],
         'jupyter:python_version>="3"': [
+            'nbconvert<=5.4.0',
             'ipython',
             'ipykernel>=5',
-            'matplotlib'
+            'matplotlib',
         ],
         'jupyter': [
             'pyzmq<18',   # pyzmq 18.0 has bug on Python 3, use anything below
@@ -50,8 +51,9 @@ setup(name='llnl-sina',
         'six',
         'sqlalchemy',
         'enum34;python_version<"3.4"',
-        'orjson;python_version>="3.6"',
-        'ujson;python_version<"3.6"'
+        'orjson;python_version>="3.6" and platform_machine!="ppc64le"',
+        'ujson;python_version>="3.6" and platform_machine=="ppc64le"',
+        'ujson<4;python_version<"3.6" and platform_machine!="ppc64le"',
       ],
       license='MIT',
       classifiers=[

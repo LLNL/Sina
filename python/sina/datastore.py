@@ -1,4 +1,8 @@
 """Defines the DataStore, Sina's toplevel data interaction object."""
+from __future__ import print_function
+import warnings
+import six
+
 import sina.datastores.sql as sina_sql
 try:
     import sina.datastores.cass as sina_cass
@@ -10,16 +14,16 @@ except ImportError:
     HAS_CASSANDRA = False
 
 
-def create_datastore(database=None, keyspace=None, database_type=None,
-                     allow_connection_pooling=False):
+def connect(database=None, keyspace=None, database_type=None,
+            allow_connection_pooling=False, read_only=False):
     """
-    Create a DataStore for handling some type of backend.
+    Connect to a database.
 
     Given a uri/path (and, if required, the name of a keyspace),
-    figures out which backend is required. You can also provide it with an
-    existing DAOFactory if you'd like to reuse a connection.
+    figures out which backend is required.
 
-    :param database: The URI of the database to connect to.
+    :param database: The URI of the database to connect to. If empty, an
+     in-memory sqlite3 database will be used.
     :param keyspace: The keyspace to connect to (Cassandra only).
     :param database_type: Type of backend to connect to. If not provided, Sina
                           will infer this from <database>. One of "sql" or
@@ -27,6 +31,8 @@ def create_datastore(database=None, keyspace=None, database_type=None,
     :param allow_connection_pooling: Allow "pooling" behavior that recycles connections,
                                      which may prevent them from closing fully on .close().
                                      Only used for the sql backend.
+    :param read_only: whether to create a read-only store
+    :return: a DataStore object connected to the specified database
     """
     # Determine a backend
     if database_type is None:
@@ -46,21 +52,52 @@ def create_datastore(database=None, keyspace=None, database_type=None,
                               "environment. See the README.")
     else:
         raise ValueError("Given unrecognized database type: {}".format(database_type))
+    if read_only:
+        return ReadOnlyDataStore(connection)
     return DataStore(connection)
 
 
-class DataStore(object):
+def create_datastore(database=None, keyspace=None, database_type=None,
+                     allow_connection_pooling=False):
     """
-    Mediates interactions between users and data.
+    Create a DataStore for handling some type of backend.
 
-    DataStores grant access to a selection of operations for both Records and
-    Relationships. They're used like this:
+    Given a uri/path (and, if required, the name of a keyspace),
+    figures out which backend is required.
 
-        ds = create_datastore(path_to_my_database)
+    .. deprecated:: 1.10
+        Use :func:`connect` instead.
+
+    :param database: The URI of the database to connect to.
+    :param keyspace: The keyspace to connect to (Cassandra only).
+    :param database_type: Type of backend to connect to. If not provided, Sina
+                          will infer this from <database>. One of "sql" or
+                          "cassandra".
+    :param allow_connection_pooling: Allow "pooling" behavior that recycles connections,
+                                     which may prevent them from closing fully on .close().
+                                     Only used for the sql backend.
+    :return: a DataStore object connected to the specified database
+    """
+    warnings.warn('This function is deprecated. Use connect() instead.',
+                  DeprecationWarning)
+    return connect(database=database, keyspace=keyspace,
+                   database_type=database_type,
+                   allow_connection_pooling=allow_connection_pooling)
+
+
+class ReadOnlyDataStore(object):
+    """
+    Mediates interactions between users and data, providing read-only
+    capabilities.
+
+    DataStore and ReadOnlyDataStore grant access to a selection of operations
+    for both Records and Relationships. They're used like this:
+
+        ds = connect(path_to_my_database)
         my_runs = ds.records.find_with_type("runs")
         submission_rels = ds.relationships.get(predicate="submitted")
 
-    Note the use of create_datastore in place of manually creating a DataStore
+    Note the use of connect() in place of manually creating a DataStore
     object. For information on all the operations available, see
     RecordOperations and RelationshipOperations below.
     """
@@ -69,14 +106,18 @@ class DataStore(object):
         """
         Define attributes needed by a datastore.
 
-        Generally create_datastore() is preferred.
+        Generally connect() is preferred.
 
         :param dao_factory: The DAOFactory that will provide the backend
                             connection.
         """
         self.dao_factory = dao_factory
-        self.records = self.RecordOperations(dao_factory)
-        self.relationships = self.RelationshipOperations(dao_factory)
+        # DAOs are created at this level to support DataStore operations that
+        # affect both records AND relationships.
+        self._record_dao = dao_factory.create_record_dao()
+        self._relationship_dao = dao_factory.create_relationship_dao()
+        self.records = self.RecordOperations(self._record_dao)
+        self.relationships = self.RelationshipOperations(self._relationship_dao)
 
     def close(self):
         """Close any resources held by this datastore."""
@@ -107,9 +148,13 @@ class DataStore(object):
         defining the user interface.
         """
 
-        def __init__(self, connection):
-            """Create object(s) we'll need for performing queries."""
-            self.record_dao = connection.create_record_dao()
+        def __init__(self, record_dao):
+            """
+            Create or assign object(s) we'll need for performing queries.
+
+            :param record_dao: the owning DataStore's RecordDAO
+            """
+            self.record_dao = record_dao
 
         # -------------------- Basic operations ---------------------
         def get(self, ids_to_get, chunk_size=999):
@@ -140,25 +185,6 @@ class DataStore(object):
             """
             return self.record_dao.get_raw(id_)
 
-        def insert(self, records_to_insert):
-            """
-            Given one or more Records, insert them into the DAO's backend.
-
-            :param records: A Record or iter of Records to insert
-            """
-            self.record_dao.insert(records_to_insert)
-
-        def delete(self, ids_to_delete):
-            """
-            Given one or more Record ids, delete all mention from the DAO's backend.
-
-            This includes removing all data, raw(s), any relationships
-            involving it/them, etc.
-
-            :param ids_to_delete: A Record id or iterable of Record ids to delete.
-            """
-            return self.record_dao.delete(ids_to_delete)
-
         def exist(self, ids_to_check):
             """
             Given an (iterable of) id(s), return boolean list of whether those
@@ -181,19 +207,54 @@ class DataStore(object):
             """
             return self.record_dao.get_all(ids_only)
 
-        # ------------------ Operations tied to Record type -------------------
-        # It's safe to redefine "type" within the scope of this function.
-        # pylint: disable=redefined-builtin
-        def find_with_type(self, type, ids_only=False):
+        # High arg count is inherent to the functionality.
+        # pylint: disable=too-many-arguments
+        def find(self, types=None, data=None, file_uri=None,
+                 id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
             """
-            Given a type of Record, return all Records of that type.
+            Return Records that match multiple different types of criteria.
 
-            :param type: The type of Record to return
+            A convenience method, this allows you to combine Sina's different types
+            of queries into a single call. Using the method with only one of the criteria
+            args is equivalent to using that dedicated query method. Using more performs
+            an "AND" operation: returned Records must fulfill ALL criteria.
+
+            :param types: Functionality of find_with_type, an iterable of types of Records
+                          (e.g. "msub", "test", "run") to return.
+            :param data: Functionality of find_with_data, dictionary of {<name>:<criteria>} entries
+                         a Record's data must fulfill
+            :param file_uri: Functionality of find_with_file_uri, a uri criterion (optionally with
+                             wildcards) a Record's files must fulfill, ex: having at least one .png
+            :param id_pool: A pool of IDs to restrict the query to. Only a Record whose id is in
+                            this pool can be returned
+            :param ids_only: Whether to return only the ids of the matching Records
+            :param query_order: The order in which to perform the queries. Advanced usage,
+                                the default should be fine for many cases. To optimize
+                                performance, order queries in ascending order of expected
+                                number of matches (ex: if your database has very few Records
+                                with the desired type(s), you may wish to put "type" first).
+                                Query names are "types", "file_uri", and "data".
+            """
+            # We protect _find to disincentize users using the DAO directly.
+            # pylint: disable=protected-access
+            return self.record_dao._find(types, data, file_uri, id_pool, ids_only, query_order)
+
+        # ------------------ Operations tied to Record type -------------------
+        def find_with_type(self, types, ids_only=False, id_pool=None):
+            """
+            Given a(n iterable of) type(s) of Record, return all Records of that type(s).
+
+            :param types: A(n iterable of) types of Records to return
             :param ids_only: whether to return only the ids of matching Records
+            :param id_pool: Used when combining queries: a pool of ids to restrict
+                            the query to. Only records with ids in this pool can be
+                            returned.
 
             :returns: A generator of matching Records.
             """
-            return self.record_dao.get_all_of_type(type, ids_only)
+            return self.record_dao.get_all_of_type(types, ids_only, id_pool)
+
+        find_with_types = find_with_type
 
         def get_types(self):
             """
@@ -309,25 +370,30 @@ class DataStore(object):
             return self.record_dao.get_with_min(scalar_name, count, ids_only)
 
         # ------------------ Operations tied to Record files -------------------
-        def find_with_file_uri(self, uri, accepted_ids_list=None,
-                               ids_only=False):
+        def find_with_file_uri(self, uri, ids_only=False, id_pool=None):
             """
-            Return all records associated with files whose uris match some arg.
+            Given a uri criterion, return Records with files whose uris match.
+
+            The simplest case for <criterion> is to provide a string (possibly including
+            one or more wildcards, see below). You may also use Sina's has_any
+            or has_all constructs, ex find_with_file_uris(uri=has_any("%.png", "%.jpg"))
 
             Supports the use of % as a wildcard character. Note that you may or
             may not get duplicates depending on the backend; call set() to
             collapse the returned generator if required.
 
-            :param uri: The uri to use as a search term, such as "foo.png"
-            :param accepted_ids_list: A list of ids to restrict the search to.
-                                      If not provided, all ids will be used.
+            :param uri: A uri or criterion describing what to match. Either a string,
+                        a has_all, or a has_any.
             :param ids_only: whether to return only the ids of matching Records
+            :param id_pool: Used when combining queries: a pool of ids to restrict
+                            the query to. Only records with ids in this pool can be
+                            returned.
 
-            :returns: A generator of matching Records
+            :returns: A generator of matching Records.
             """
-            return self.record_dao.get_given_document_uri(uri,
-                                                          accepted_ids_list,
-                                                          ids_only)
+            return self.record_dao.get_given_document_uri(uri=uri,
+                                                          accepted_ids_list=id_pool,
+                                                          ids_only=ids_only)
 
         def find_with_file_mimetype(self, mimetype, ids_only=False):
             """
@@ -342,7 +408,7 @@ class DataStore(object):
             # mime_type. We follow the schema above for consistency.
             return self.record_dao.get_with_mime_type(mimetype, ids_only)
 
-    class RelationshipOperations(object):
+    class RelationshipOperations(object):  # pylint: disable=too-few-public-methods
         """
         Defines the queries users can perform on Relationships.
 
@@ -353,9 +419,13 @@ class DataStore(object):
         defining the user interface.
         """
 
-        def __init__(self, connection):
-            """Create object(s) we'll need for performing queries."""
-            self.relationship_dao = connection.create_relationship_dao()
+        def __init__(self, relationship_dao):
+            """
+            Create or assign object(s) we'll need for performing queries.
+
+            :param relationship_dao: the owning DataStore's RelationshipDAO
+            """
+            self.relationship_dao = relationship_dao
 
         def find(self, subject_id=None, predicate=None, object_id=None):
             """
@@ -368,6 +438,95 @@ class DataStore(object):
             return self.relationship_dao.get(subject_id=subject_id,
                                              predicate=predicate,
                                              object_id=object_id)
+
+
+class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
+    """
+    Mediates interactions between users and data.
+
+    Adds operations that modify the data store to ReadOnlyDataStore.
+
+    DataStore and ReadOnlyDataStore grant access to a selection of operations
+    for both Records and Relationships. They're used like this:
+
+        ds = connect(path_to_my_database)
+        my_runs = ds.records.find_with_type("runs")
+        submission_rels = ds.relationships.get(predicate="submitted")
+
+    Note the use of connect() in place of manually creating a DataStore
+    object. For information on all the operations available, see
+    RecordOperations and RelationshipOperations below.
+    """
+
+    # The DAO version is protected to disincentivize using it from the DAOs.
+    # pylint: disable=protected-access
+    def delete_all_contents(self, force=""):
+        """
+        Delete EVERYTHING in a datastore; this cannot be undone.
+
+        :param force: This function is meant to raise a confirmation prompt. If you
+                      want to use it in an automated script (and you're sure of
+                      what you're doing), set this to "SKIP PROMPT".
+        :returns: whether the deletion happened.
+        """
+        confirm_phrase = "DELETE ALL DATA"
+        if force == "SKIP PROMPT":
+            # Record deletes propagate to Relationships. That currently covers all info
+            # in a datastore.
+            self._record_dao._do_delete_all_records()
+            return True
+        warning = ("WARNING: You're about to delete all data in your current "
+                   "datastore. This cannot be undone! If you're sure you want to "
+                   "delete all data, enter the phrase {}: ").format(confirm_phrase)
+        response = six.moves.input(warning)
+        if response == confirm_phrase:
+            self._record_dao._do_delete_all_records()
+            print('The database has been purged of all contents.')
+            return True
+        print('Response was "{}", not "{}". Deletion aborted.'.format(response, confirm_phrase))
+        return False
+
+    class RecordOperations(ReadOnlyDataStore.RecordOperations):
+        """
+        Defines the queries users can perform on Records.
+
+        This should be considered the "source of truth" in terms of what Record
+        operations are available to users and what each does.
+
+        This doesn't handle implementation, helper methods, etc; it's for
+        defining the user interface.
+        """
+
+        # -------------------- Basic operations ---------------------
+        def insert(self, records_to_insert):
+            """
+            Given one or more Records, insert them into the DAO's backend.
+
+            :param records: A Record or iter of Records to insert
+            """
+            self.record_dao.insert(records_to_insert)
+
+        def delete(self, ids_to_delete):
+            """
+            Given one or more Record ids, delete all mention from the DAO's backend.
+
+            This includes removing all data, raw(s), any relationships
+            involving it/them, etc.
+
+            :param ids_to_delete: A Record id or iterable of Record ids to delete.
+            """
+            return self.record_dao.delete(ids_to_delete)
+
+    class RelationshipOperations(ReadOnlyDataStore.RelationshipOperations):
+        """
+        Defines the queries users can perform on Relationships.
+
+        This should be considered the "source of truth" in terms of what
+        Relationship operations are available to users and what each does.
+
+        This doesn't handle implementation, helper methods, etc; it's for
+        defining the user interface.
+        """
 
         def insert(self, relationships_to_insert):
             """

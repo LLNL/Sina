@@ -3,6 +3,7 @@ import os
 import numbers
 import logging
 from collections import defaultdict
+import functools
 
 import six
 
@@ -11,7 +12,7 @@ import sqlalchemy  # pylint: disable=import-error
 from sqlalchemy.pool import NullPool  # pylint: disable=import-error
 
 import sina.dao as dao
-import sina.json as json
+import sina.sjson as json
 import sina.model as model
 import sina.datastores.sql_schema as schema
 from sina.utils import sort_and_standardize_criteria
@@ -19,6 +20,8 @@ from sina import utils
 
 # Disable redefined-builtin, invalid-name due to ubiquitous use of id
 # pylint: disable=invalid-name,redefined-builtin
+# Disable too-many-lines, as a refactor's currently out of scope
+# pylint: disable=too-many-lines
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,6 +34,33 @@ DATA_TABLES = [schema.ScalarData, schema.StringData,
 
 # Set maximum chunk size for id queries
 CHUNK_SIZE = 999
+
+
+def _commit_or_rollback(func):
+    """
+    Create a wrapper which calls the given function, committing a session
+    if it succeeds, or rolling it back if it (or the commit) fails. The first
+    argument to the function must be an object with a "session" field.
+    This is intended to be used only on the member functions of DAOs below.
+    The return value of the wrapped function will be returned by the wrapper.
+
+    :param func: the function to wrap
+    :return: the wrapped function
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        """Wrapper function for the passed-in function."""
+        session = args[0].session
+        try:
+            result = func(*args, **kwargs)
+            session.commit()
+            return result
+        # need to roll back on anything, so use bare except
+        except:  # noqa: E722
+            session.rollback()
+            raise
+
+    return wrapper
 
 
 class RecordDAO(dao.RecordDAO):
@@ -49,14 +79,14 @@ class RecordDAO(dao.RecordDAO):
             sql_record = self.create_sql_record(record)
             self.session.add(sql_record)
 
-    def insert(self, records):
+    @_commit_or_rollback
+    def _do_insert(self, records):
         """
         Given a(n iterable of) Record(s), insert into the current SQL database.
 
         :param records: Record or iterable of Records to insert
         """
         self._insert_no_commit(records)
-        self.session.commit()
 
     @staticmethod
     def create_sql_record(sina_record):
@@ -180,6 +210,7 @@ class RecordDAO(dao.RecordDAO):
          .filter(schema.Record.id.in_(ids))
          .delete(synchronize_session='fetch'))
 
+    @_commit_or_rollback
     def delete(self, ids):
         """
         Given a(n iterable of) Record id(s), delete all mention from the SQL database.
@@ -192,7 +223,6 @@ class RecordDAO(dao.RecordDAO):
         :param ids: The id or iterable of ids of the Record(s) to delete.
         """
         self._delete_no_commit(ids)
-        self.session.commit()
 
     def get_raw(self, id_):
         result = (self.session.query(schema.Record)
@@ -203,6 +233,7 @@ class RecordDAO(dao.RecordDAO):
 
         return _to_json_string(result.raw)
 
+    @_commit_or_rollback
     def _do_update(self, records):
         """
         Given a list of Records, update them in the backend in a single transaction.
@@ -211,69 +242,60 @@ class RecordDAO(dao.RecordDAO):
         """
         self._delete_no_commit(record.id for record in records)
         self._insert_no_commit(records)
-        self.session.commit()
 
-    def data_query(self, **kwargs):
+    def _do_data_query(self, criteria, id_pool=None):
         """
-        Return the ids of all Records whose data fulfill some criteria.
+        Handle the backend-specific logic for the dao data_query.
 
-        Criteria are expressed as keyword arguments. Each keyword
-        is the name of an entry in a Record's data field, and it's set
-        equal to either a single value or a DataRange (see utils.DataRanges
-        for more info) that expresses the desired value/range of values.
-        All criteria must be satisfied for an ID to be returned:
-
-            # Return ids of all Records with a volume of 12, a quadrant of
-            # "NW", AND a max_height >=30 and <40.
-            data_query(volume=12, quadrant="NW", max_height=DataRange(30,40))
-
-        :param kwargs: Pairs of the names of data and the criteria that data
-                         must fulfill.
+        :param criteria: Dict of {data_name: criteria_to_fulfill}
+        :param id_pool: List of ids to restrict results to.
         :returns: A generator of Record ids that fulfill all criteria.
 
         :raises ValueError: if not supplied at least one criterion or given
                             a criterion it does not support
         """
-        LOGGER.debug('Finding all records fulfilling criteria: %s', kwargs.items())
-        # No kwargs is bad usage. Bad kwargs are caught in sort_criteria().
-        if not kwargs.items():
-            raise ValueError("You must supply at least one criterion.")
         (scalar_criteria,
          string_criteria,
          scalar_list_criteria,
          string_list_criteria,
-         universal_criteria) = sort_and_standardize_criteria(kwargs)
-        result_ids = []
+         universal_criteria) = sort_and_standardize_criteria(criteria)
+        sub_queries = []
 
         # First handle scalar and string criteria
-        for criteria, table in ((scalar_criteria, schema.ScalarData),
-                                (string_criteria, schema.StringData)):
-            if criteria:
-                query = self._generate_data_table_query(criteria, table)
-                result_ids.append(str(x[0]) for x in query.all())
+        if scalar_criteria:
+            sub_queries.append(self._generate_data_table_query(scalar_criteria, schema.ScalarData))
+        if string_criteria:
+            sub_queries.append(self._generate_data_table_query(string_criteria, schema.StringData))
 
         # Move on to any list criteria
-        result_ids += [self._string_list_query(datum_name=datum_name,
-                                               string_list=list_criteria.value,
-                                               operation=list_criteria.operation)
-                       for datum_name, list_criteria in string_list_criteria]
-        result_ids += [self._scalar_list_query(datum_name=datum_name,
-                                               data_range=list_criteria.value,
-                                               operation=list_criteria.operation)
-                       for datum_name, list_criteria in scalar_list_criteria]
+        sub_queries += [self._string_list_query(datum_name=datum_name,
+                                                string_list=list_criteria.value,
+                                                operation=list_criteria.operation)
+                        for datum_name, list_criteria in string_list_criteria]
+        sub_queries += [self._scalar_list_query(datum_name=datum_name,
+                                                data_range=list_criteria.value,
+                                                operation=list_criteria.operation)
+                        for datum_name, list_criteria in scalar_list_criteria]
 
-        # Now any universal criteria.
+        joined_query = self.session.query(schema.Record.id)
+        if id_pool is not None:
+            joined_query = joined_query.filter(schema.Record.id.in_(id_pool))
+        for sub_query in sub_queries:
+            sub_query = sub_query.subquery()
+            joined_query = joined_query.join(sub_query, schema.Record.id == sub_query.c.id)
+
+        # Universal criteria currently go cross-table and have to be handled
+        # with Python logic
         if universal_criteria:
-            result_ids.append(self._universal_query(universal_criteria))
+            universal_pool = self._universal_query(universal_criteria)
+            if not sub_queries and id_pool is None:
+                return universal_pool
+            universal_pool = set(universal_pool)
+            return (x[0] for x in joined_query.all() if x[0] in universal_pool)
 
-        # If we have more than one set of data, we need to find the intersection.
-        for rec_id in utils.intersect_lists(result_ids):
-            yield rec_id
+        return (x[0] for x in joined_query.all())
 
-    def _scalar_list_query(self,
-                           datum_name,
-                           data_range,
-                           operation):
+    def _scalar_list_query(self, datum_name, data_range, operation):
         """
         Return all Records where [datum_name] fulfills [operation] for [data_range].
 
@@ -282,7 +304,7 @@ class RecordDAO(dao.RecordDAO):
         :param datum_name: The name of the datum
         :param data_range: A datarange to be used with <operation>
         :pram operation: What kind of ListQueryOperation to do.
-        :returns: A generator of ids of matching Records.
+        :returns: A query object returning ids of matching Records.
 
         :raises ValueError: if given an invalid operation for a datarange
         """
@@ -311,9 +333,7 @@ class RecordDAO(dao.RecordDAO):
             col_op = lt_crit_max.__le__ if data_range.max_inclusive else lt_crit_max.__lt__
             filters.append(col_op(data_range.max))
 
-        record_ids = query.filter(*filters)
-        for record_id in record_ids:
-            yield record_id[0]
+        return query.filter(*filters)
 
     def _string_list_query(self, datum_name, string_list, operation):
         """
@@ -324,7 +344,7 @@ class RecordDAO(dao.RecordDAO):
         :param datum_name: The name of the datum
         :param string_list: A list of strings datum_name must contain.
         :param operation: What kind of ListQueryOperation to do.
-        :returns: A generator of ids of matching Records or the Records
+        :returns: A query object returning matching Records or the Records
                   themselves (see ids_only).
 
         :raises ValueError: if given an invalid operation for a string list
@@ -344,8 +364,7 @@ class RecordDAO(dao.RecordDAO):
             # of strings but is not supported by string_list_query.
             raise ValueError("Given an invalid operation for a string list query: {}"
                              .format(operation.value))
-        for query_result in query:
-            yield query_result[0]  # yield the id
+        return query
 
     @staticmethod
     def _generate_criterion_filters(criterion_pair, table):
@@ -393,18 +412,19 @@ class RecordDAO(dao.RecordDAO):
         criteria_queries = [self._generate_criterion_filters(pair, table)
                             for pair in criteria_pairs]
 
-        if not fulfill_all:
-            return query.filter(sqlalchemy.or_(*criteria_queries))
+        query = query.filter(sqlalchemy.or_(*criteria_queries))
 
         # Since we don't know the possible data names a priori, we have a row per datum
         # and have to "or" them together and then group by record ID, selecting the records
         # that have a matching row for each queried criterion (# rows == # criteria).
-        query = query.filter(sqlalchemy.or_(*criteria_queries))
-
-        # For performance reasons, we skip the "group by" stage when not needed
+        # This is why the OR and AND queries use the same basic query; the AND
+        # query just takes it a step further.
         if len(criteria_pairs) > 1:
-            query = (query.group_by(table.id)
-                     .having(sqlalchemy.func.count(table.id) == len(criteria_pairs)))
+            query = query.group_by(table.id)
+
+            if fulfill_all:
+                query = query.having(sqlalchemy.func.count(table.id) == len(criteria_pairs))
+
         return query
 
     def _get_many(self, ids, _record_builder, chunk_size):
@@ -452,20 +472,25 @@ class RecordDAO(dao.RecordDAO):
                 yield model.generate_record_from_json(
                     json_input=_json_loads(result.raw))
 
-    def get_all_of_type(self, type, ids_only=False):
+    def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
         """
-        Given a type of record, return all Records of that type.
+        Given an iterable of types of Record, return all Records of those types.
 
-        :param type: The type of record to return, ex: run
+        :param types: An iterable of types of Records to return
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
+        :param id_pool: Used when combining queries: a pool of ids to restrict
+                        the query to. Only records with ids in this pool can be
+                        returned.
 
         :returns: A generator of Records of that type or (if ids_only) a
                   generator of their ids
         """
-        LOGGER.debug('Getting all records of type %s.', type)
         query = (self.session.query(schema.Record.id)
-                 .filter(schema.Record.type == type))
+                 .filter(schema.Record.type.in_(types)))
+        if id_pool is not None:
+            query = query.filter(schema.Record.id.in_(id_pool))
+
         if ids_only:
             for record_id in query.all():
                 yield str(record_id[0])
@@ -595,35 +620,63 @@ class RecordDAO(dao.RecordDAO):
             for result in results:
                 yield result[0]
 
-    def get_given_document_uri(self, uri, accepted_ids_list=None, ids_only=False):
+    def _build_query_given_uri_has_any(self, uri_list):
+        """Perform get_given_document_uri when we have a has_any criterion."""
+        query = self.session.query(schema.Document.id)
+        filters = []
+        for uri in uri_list:
+            # Note: Mixed results on whether SQLAlchemy's optimizer is smart enough
+            # to have %-less LIKE operate on par with ==, hence this:
+            if '%' in uri:
+                filters.append(schema.Document.uri.like(uri))
+            else:
+                filters.append(schema.Document.uri.__eq__(uri))
+        return query.filter(sqlalchemy.or_(*filters)).group_by(schema.Document.id)
+
+    def _build_query_given_uri_has_all(self, uri_list):
+        """Perform get_given_document_uri when we have a has_all criterion."""
+        def do_filter(query, uri):
+            """Apply the correct filter for a uri."""
+            if '%' in uri:
+                return query.filter(schema.Document.uri.like(uri))
+            return query.filter(schema.Document.uri.__eq__(uri))
+
+        query = do_filter(self.session.query(schema.Document.id, schema.Document.uri), uri_list[0])
+        for uri in uri_list[1:]:
+            sub_query = do_filter(self.session.query(schema.Document.id), uri).subquery()
+            query = query.join(sub_query, schema.Document.id == sub_query.c.id)
+        return query
+
+    def _do_get_given_document_uri(self, uri, id_pool=None, ids_only=False):
         """
         Return all records associated with documents whose uris match some arg.
 
         Supports the use of % as a wildcard character.
 
-        :param uri: The uri to use as a search term, such as "foo.png"
-        :param accepted_ids_list: A list of ids to restrict the search to.
-                                  If not provided, all ids will be used.
+        :param uri: The uri or uri criterion to use as a search term, such as
+                    "foo.png" or has_any("%success.jpg", "%success.png")
+        :param id_pool: A list of ids to restrict the search to.
+                        If not provided, all ids will be used.
         :param ids_only: whether to return only the ids of matching Records
                          (used for further filtering)
 
         :returns: A generator of matching records or (if ids_only) a
                   generator of their ids. Returns distinct items.
         """
-        LOGGER.debug('Getting all records related to uri=%s.', uri)
-        if accepted_ids_list:
-            LOGGER.debug('Restricting to %i ids.', len(accepted_ids_list))
-        # Note: Mixed results on whether SQLAlchemy's optimizer is smart enough
-        # to have %-less LIKE operate on par with ==, hence this:
-        if '%' in uri:
-            query = (self.session.query(schema.Document.id)
-                     .filter(schema.Document.uri.like(uri)).distinct())
+        query = self.session.query(schema.Document.id,
+                                   sqlalchemy.func.count(schema.Document.id))
+
+        if isinstance(uri, utils.StringListCriteria):
+            if uri.operation == utils.ListQueryOperation.HAS_ANY:
+                query = self._build_query_given_uri_has_any(uri.value)
+            else:
+                query = self._build_query_given_uri_has_all(uri.value)
         else:
-            query = (self.session.query(schema.Document.id)
-                     .filter(schema.Document.uri == uri).distinct())
-        if accepted_ids_list is not None:
+            # Logic is identical for the case of just one uri
+            query = self._build_query_given_uri_has_any([uri])
+        if id_pool is not None:
             query = query.filter(schema.Document
-                                 .id.in_(accepted_ids_list))
+                                 .id.in_(id_pool))
         if ids_only:
             for record_id in query.all():
                 yield record_id[0]
@@ -789,6 +842,7 @@ class RelationshipDAO(dao.RelationshipDAO):
         """Initialize RelationshipDAO with session for its SQL database."""
         self.session = session
 
+    @_commit_or_rollback
     def insert(self, relationships=None, subject_id=None, object_id=None,
                predicate=None):
         """
@@ -819,7 +873,6 @@ class RelationshipDAO(dao.RelationshipDAO):
                 self.session.add(schema.Relationship(subject_id=rel.subject_id,
                                                      object_id=rel.object_id,
                                                      predicate=rel.predicate))
-        self.session.commit()
 
     # Note that get() is implemented by its parent.
     def get(self, subject_id=None, object_id=None, predicate=None):
@@ -846,6 +899,7 @@ class RelationshipDAO(dao.RelationshipDAO):
             query = query.filter(schema.Relationship.predicate == predicate)
         return query
 
+    @_commit_or_rollback
     def _do_delete(self, subject_id=None, object_id=None, predicate=None):
         """
         Given one or more criteria, delete all matching Relationships from the DAO's backend.
@@ -856,7 +910,6 @@ class RelationshipDAO(dao.RelationshipDAO):
         """
         query = self._get_matching_relationships(subject_id, object_id, predicate)
         query.delete(synchronize_session='fetch')
-        self.session.commit()
 
 
 class DAOFactory(dao.DAOFactory):

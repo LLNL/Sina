@@ -1,0 +1,71 @@
+/**
+
+\page building Building the Library
+
+This page describes how to build the Sina library.
+
+Note: This page is for people trying to build Sina to use as a
+library in their project. Developers trying to make changes to Sina should
+instead see README.md in the cpp directory.
+
+Sina uses the CMake build system (version 3.7 or higher is required). If you
+are familiar with that, it should be fairly easy to build Sina.
+
+To make building easier, Sina uses
+<a href="https://llnl-blt.readthedocs.io/">BLT</a>. This is brought in as
+a git submodule. If you cloned Sina from git and did not bring in submodules,
+be sure to bring those in before building.
+
+Before building Sina, you need to build its dependencies. Sina has one required dependency -- <a href=https://llnl-conduit.readthedocs.io/>Conduit</a> -- and
+one optional dependency -- <a href="https://github.com/LLNL/Adiak">Adiak</a>.
+You will have to refer to their documentation for building them.
+
+Once you have the dependencies built, building Sina is pretty easy:
+
+\code{.bash}
+# Point these to where CMake find_package() will be able to find these.
+# If you don't want to set these as environment variables, you can set
+# them later when calling cmake.
+
+# Conduit is required.
+> export Conduit_DIR=...
+
+# Adiak is optional
+> export adiak_DIR=...
+
+# Go to the sina source directory
+# (the cpp directory if you got Sina from source).
+> cd /path/to/sina/cpp
+
+# If you got Sina from source and didn't bring in submodule, do it now
+> git submodule init
+> git submodule update
+
+# Do an out-of-source build
+> mkdir build
+> cd build
+
+# If you want to run Sina's tests, also set -DSINA_BUILD_TESTS=ON in
+# the commands below.
+
+# Enable Adiak bindings if desired (see below if you didn't set paths of
+# Conduit and Adiak as environment variables)
+> cmake .. -DSINA_BUILD_ADIAK_BINDINGS=Yes -DCMAKE_INSTALL_PREFIX=../install_dir
+
+# If you didn't set the environment variable for the libraries' paths, set
+# them on the command line instead (Just do the above if you set the
+# environment variables)
+> cmake .. -DSINA_BUILD_ADIAK_BINDINGS=Yes -DCMAKE_INSTALL_PREFIX=../install_dir -DConduit_DIR=/path/to/conduit -Dadiak_DIR=/path/to/adiak
+
+# Build and install
+> make -j all
+
+# If you set -DSINA_BUILD_TESTS=ON, you can do the below
+> make test
+
+> make install
+
+\endcode
+
+*/
+

@@ -14,11 +14,12 @@ from numbers import Real
 from enum import Enum
 from multiprocessing.pool import ThreadPool
 from collections import OrderedDict, defaultdict
+import warnings
 
 import six
 
 import sina.model as model
-import sina.json as json
+import sina.sjson as json
 
 LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
@@ -65,31 +66,60 @@ def convert_json_to_records_and_relationships(json_path):
     :param json_path: the path to the Sina JSON.
     :returns: a tuple of lists, (list_of_records, list_of_relationships)
     """
-    with io.open(json_path, 'r', encoding='utf-8') as file_:
-        records = []
-        relationships = []
-        local = {}
-        data = json.loads(file_.read())
-        for entry in data.get('records', []):
-            if 'id' not in entry:
-                id = str(uuid.uuid4())
-                try:
-                    local[entry['local_id']] = id
-                    # Save the UUID to be used for record generation
-                    entry['id'] = id
-                except KeyError:
-                    raise ValueError("Record requires one of: local_id, id: {}".format(entry))
-            if entry["type"] == 'run':
-                records.append(model.generate_run_from_json(json_input=entry))
-            else:
-                records.append(model.generate_record_from_json(json_input=entry))
-        relationships = []
-        for entry in data.get('relationships', []):
-            subj, obj = _process_relationship_entry(entry=entry, local_ids=local)
-            relationships.append(model.Relationship(subject_id=subj,
-                                                    object_id=obj,
-                                                    predicate=entry['predicate']))
-    return (records, relationships)
+    warnings.warn('Use load_document() instead', DeprecationWarning)
+    return load_document(json_path)
+
+
+def _load_document(document_as_string):
+    """
+    Read a Sina document from the given string.
+
+    :param document_as_string: a string containing the contents of the document
+    :return: a tuple consisting of the list of records and the list of
+     relationships
+    """
+    records = []
+    local = {}
+    document_as_dict = json.loads(document_as_string)
+    for entry in document_as_dict.get('records', []):
+        if 'id' not in entry:
+            id = str(uuid.uuid4())
+            try:
+                local[entry['local_id']] = id
+                # Save the UUID to be used for record generation
+                entry['id'] = id
+            except KeyError:
+                raise ValueError("Record requires one of: local_id, id: {}".format(entry))
+        if entry["type"] == 'run':
+            records.append(model.generate_run_from_json(json_input=entry))
+        else:
+            records.append(model.generate_record_from_json(json_input=entry))
+
+    relationships = []
+    for entry in document_as_dict.get('relationships', []):
+        subj, obj = _process_relationship_entry(entry=entry, local_ids=local)
+        relationships.append(model.Relationship(subject_id=subj,
+                                                object_id=obj,
+                                                predicate=entry['predicate']))
+    return records, relationships
+
+
+def load_document(path_or_file):
+    """
+    Read a Sina document at the specified location and return the list of
+    records and relationships in it.
+
+    :param path_or_file: the path of a file, or a io.TextIOBase object from
+     which to read the document
+    :return: a tuple consisting of the list of records and the list of
+     relationships
+    """
+    if isinstance(path_or_file, io.TextIOBase):
+        contents = path_or_file.read()
+    else:
+        with io.open(path_or_file, 'r', encoding='utf-8') as fp:
+            contents = fp.read()
+    return _load_document(contents)
 
 
 def import_json(factory, json_paths):
@@ -265,7 +295,8 @@ def intersect_ordered(iterables):
     ids. Important to avoid too much being stored in memory; here, we only store
     the generator stack plus (len(iterables)+C) values.
 
-    :param gen_list: A list of iterators. Must be ordered by the same criteria!
+    :param gen_list: A list of iterators. Must be ordered ascending with respect
+                     to python's comparators (ex: numerically for scalars)
 
     :returns: A generator that crawls through the iterators and returns
               values that all of them share.

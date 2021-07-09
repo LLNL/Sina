@@ -1,0 +1,3 @@
+string(CONCAT SINA_CXX_FLAGS "-Wall -Werror")
+string(CONCAT SINA_CXX_TEST_FLAGS "${SINA_CXX_FLAGS}")
+
