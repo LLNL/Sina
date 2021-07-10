@@ -27,7 +27,7 @@ PERM_GROUP=${SINA_PERM_GROUP:-llnl_emp}
 CPP_DOCS=$DOC_DIR/sina/cpp
 CPP_DEPLOY_DIR=$DEPLOY_DIR../cpp-releases
 
-if [ ! -d cpp/build/docs/html ]; then
+if [ ! -d cpp/build-clang/docs/html ]; then
     echo "You must have run the C++ tests and built the docs"
     exit 1
 fi
@@ -46,7 +46,7 @@ chmod 640 $CREATED_TAR
 mv $CREATED_TAR $CPP_DEPLOY_DIR
 rm -rf $CPP_DOCS
 mkdir -p $CPP_DOCS
-mv build/docs/html/* $CPP_DOCS
+mv build-clang/docs/html/* $CPP_DOCS
 chown -R :$PERM_GROUP $CPP_DOCS
 find $CPP_DOCS -type f -exec chmod 640 {} \;
 find $CPP_DOCS -type d -exec chmod 750 {} \;
