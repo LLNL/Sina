@@ -107,6 +107,22 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         """
         self['curve_sets'] = curve_sets
 
+    def get_curve_set(self, name):
+        """
+        Return the CurveSet object associated with the provided name.
+
+        This is used to get a CurveSet object to manipulate instead of the raw,
+        clunky dict form.
+
+        :param name: The name of the CurveSet to return.
+        :returns: the CurveSet within the record associated with the name.
+        :raises AttributeError: if no such CurveSet exists
+        """
+        try:
+            return CurveSet(name, self.curve_sets[name])
+        except KeyError:
+            raise AttributeError('Record "{}" has no curve set "{}"'.format(self.id, name))
+
     @property
     def library_data(self):
         """Get or set the Record's data dictionary."""
@@ -254,6 +270,40 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
             file_info["tags"] = tags
         self.files[uri] = file_info
 
+    def add_curve_set(self, curve_set):
+        """
+        Add a curve set to the Record.
+
+        :param curve_set: Either a name for a new CurveSet or a pre-created CurveSet
+        :returns: the CurveSet object created/provided. Users can add curves to it directly.
+
+        :raises ValueError: if a CurveSet with that name already exists.
+        :raises ValueError: if neither <curve_set_name> nor <curve_set> are supplied.
+        """
+        curve_set_name = curve_set.name if isinstance(curve_set, CurveSet) else curve_set
+        if curve_set_name in self.curve_sets:
+            raise ValueError('Duplicate curve set: "{}" is already a curve set in Record "{}".'
+                             .format(curve_set_name, self.id))
+        return self.set_curve_set(curve_set)
+
+    def set_curve_set(self, curve_set):
+        """
+        Set a curve set within a Record.
+
+        :param curve_set: Either a name for a new CurveSet or a pre-created CurveSet
+        :returns: the CurveSet object created/provided. Users can add curves to it directly.
+
+        :raises ValueError: if neither <curve_set_name> nor <curve_set> are supplied.
+        """
+        if isinstance(curve_set, CurveSet):
+            curve_set_name = curve_set.name
+            curve_raw = curve_set.raw
+        else:
+            curve_set_name = curve_set
+            curve_raw = {}
+        self.curve_sets[curve_set_name] = curve_raw
+        return CurveSet(curve_set_name, self.curve_sets[curve_set_name])
+
     def to_json(self):
         """
         Create a JSON string from a Record.
@@ -323,6 +373,10 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
                                     "to Record {} is missing a value. "
                                     "Value: {}".format(prefix, self.id, entry))
                     break
+                if isinstance(data[entry]['value'], dict):
+                    warnings.append("At least one {}data entry belonging "
+                                    "to Record {} has a dictionary for a value."
+                                    "Value: {}".format(prefix, self.id, entry))
                 if isinstance(data[entry]['value'], list):
                     try:
                         (validated_list,
@@ -404,6 +458,199 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
             LOGGER.warning(warnstring)
             return False, warnings
         return True, warnings
+
+
+class CurveSet(object):
+    """
+    A set of dependent and independent curves, representing one entry in Record.curve_sets.
+
+    Wraps an existing entry in a Record's curve sets, allowing convenience methods for users
+    to add new curves.
+    """
+
+    def __init__(self, name, raw=None):
+        """
+        Create a curve set that wraps a curveset dict from a Record.
+
+        :param name: The name associated with the curveset.
+        :param raw: The dict to wrap.
+        """
+        if raw is None:
+            raw = {}
+        self.name = name
+        self.raw = raw
+        if self.raw.get("independent") is None:
+            self.raw["independent"] = {}
+        if self.raw.get("dependent") is None:
+            self.raw["dependent"] = {}
+        # For convenient dot notation access
+        self.independent = self.raw["independent"]
+        self.dependent = self.raw["dependent"]
+
+    def __getitem__(self, key):
+        """
+        Get the entry in this curve set with the given key.
+
+        A CurveSet, like a Record, mimics a dictionary in how it's accessed, with the data
+        it represents available within a dictionary called "raw".
+        """
+        return self.raw[key]
+
+    def __setitem__(self, key, value):
+        """Set the entry in this curve set with the given key."""
+        self.raw[key] = value
+
+    # The large number of arguments is to allow users to build a whole curve conveniently.
+    # pylint: disable=too-many-arguments
+    def _add_curve(self, curve_name, value=None, units=None, tags=None, curve_obj=None,
+                   dependent=True):
+        """
+        Handle the logic for creating a new curve.
+
+        <curve> is used before <value>, <units>, and <tags>. That is, if a user
+        supplies both a curve and a set of values, the set of values will be
+        applied to the curve, and then the curve will be set (preserving any
+        units or tags)
+
+        :param curve_name: The name of the curve
+        :param value: The list of scalars making up the curve
+        :param units: The units, if any, associated with <value>
+        :param tags: The tags, if any, associated with this specific curve
+        :param curve_obj: A Curve object, if any, to apply the above to.
+        :param dependent: Whether this curve is dependent. If false, independent.
+
+        :returns: the curve object created or updated.
+        :raises ValueError: if a curve with that name is already in the CurveSet
+        """
+        curve_category = "dependent" if dependent else "independent"
+        if curve_obj is None:
+            preexisting_curve = self.raw[curve_category].get(curve_name)
+            if preexisting_curve is None:
+                curve = {}
+            else:
+                raise ValueError("Duplicate curve: {} is already a[n] {} curve in set {}."
+                                 .format(curve_name, curve_category, self.name))
+        else:
+            # Extract only the dict! We'll recreate the wrapper.
+            curve = curve_obj.raw
+
+        for var, name in ((value, "value"), (units, "units"), (tags, "tags")):
+            if var is not None:
+                curve[name] = var
+        self.raw[curve_category][curve_name] = curve
+
+        return Curve(curve_name, curve)
+
+    def add_dependent(self, curve_name, value=None, units=None, tags=None, curve_obj=None):
+        """
+        Add a dependent curve to the curve set.
+
+        <curve> is used before <value>, <units>, and <tags>. That is, if a user
+        supplies both a curve and a set of values, the set of values will be
+        applied to the curve, and then the curve will be set (preserving any
+        units or tags)
+
+        :param curve_name: The name of the curve
+        :param value: The list of scalars making up the curve
+        :param units: The units, if any, associated with <value>
+        :param tags: The tags, if any, associated with this specific curve
+        :param curve_obj: A Curve object, if any, to apply the above to. If none
+                      is provided, a new curve will be made.
+
+        :raises ValueError: if a dependent curve by that name already exists.
+        """
+        return self._add_curve(curve_name, value, units, tags, curve_obj, dependent=True)
+
+    def add_independent(self, curve_name, value=None, units=None, tags=None, curve_obj=None):
+        """
+        Add an independent curve to the curve set.
+
+        Params are identical to add_dependent().
+
+        :raises ValueError: if an independent curve by that name already exists.
+        """
+        return self._add_curve(curve_name, value, units, tags, curve_obj, dependent=False)
+
+    def get_dependent(self, curve_name):
+        """Return the dependent curve with the given name, raise an error if there's none."""
+        try:
+            return self.dependent[curve_name]
+        except KeyError:
+            raise AttributeError('CurveSet "{}" has no dependent curve "{}"'.format(self.name,
+                                                                                    curve_name))
+
+    def get_independent(self, curve_name):
+        """Return the independent curve with the given name, raise an error if there's none."""
+        try:
+            return self.independent[curve_name]
+        except KeyError:
+            raise AttributeError('CurveSet "{}" has no independent curve "{}"'.format(self.name,
+                                                                                      curve_name))
+
+    def get(self, curve_name):
+        """
+        Return the curve with the given name, raise an error if there's none.
+
+        Note that a CurveSet shouldn't have dependents and independents with the same name, but
+        this method doesn't perform validation; if there is such an overlap, only the independent
+        will be returned.
+        """
+        try:
+            return self.get_independent(curve_name)
+        except AttributeError:
+            try:
+                return self.get_dependent(curve_name)
+            except AttributeError:
+                raise AttributeError('CurveSet "{}" has no curve "{}"'.format(self.name,
+                                                                              curve_name))
+
+    @staticmethod
+    def as_dict(curveset):
+        """
+        Given a CurveSet or dict, return a dict.
+
+        For when you're not sure whether you have a dictionary or CurveSet and want a dict.
+        If it's a dict, it's returned. Else, the name is dropped and the CurveSet's raw returned.
+        """
+        if isinstance(curveset, CurveSet):
+            return curveset.raw
+        return curveset
+
+    @staticmethod
+    def as_curve_set(curveset):
+        """
+        Given a CurveSet or dict, return a CurveSet.
+
+        For when you're not sure whether you have a dictionary or CurveSet and want a CurveSet.
+        If it's a CurveSet, it's returned. Else, the dict is used to make an unnamed CurveSet.
+        """
+        if isinstance(curveset, CurveSet):
+            return curveset
+        return CurveSet(name="<unnamed CurveSet>", raw=curveset)
+
+
+class Curve(object):
+    """A single curve within a CurveSet."""
+
+    def __init__(self, name, raw):
+        """Create a curve that wraps a dict entry from a curveset."""
+        self.name = name
+        self.raw = raw
+        if raw.get("value") is None:
+            self.raw["value"] = []
+
+    def __getitem__(self, key):
+        """
+        Get the entry in this curve with the given key.
+
+        A Curve, like a Record, mimics a dictionary in how it's accessed, with the data
+        it represents available within a dictionary called "raw".
+        """
+        return self.raw[key]
+
+    def __setitem__(self, key, value):
+        """Set the entry in this curve with the given key."""
+        self.raw[key] = value
 
 
 # Disable pylint check to if and until the team decides to address the issue

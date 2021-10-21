@@ -230,11 +230,12 @@ class ReadOnlyDatastoreTests(AbstractDataStoreTest):
     def test_record_find(self):
         """Test the RecordOperation find()."""
         self.assert_record_method_is_passthrough("find",
-                                                 "_find", 6)
+                                                 "_find", 7)
         self.assert_record_method_is_passthrough("find",
                                                  "_find", 0,
-                                                 opt_args=(None, None, None, None,
-                                                           False, ("data", "file_uri", "types")))
+                                                 opt_args=(None, None, None, None, None,
+                                                           False, ("data", "file_uri",
+                                                                   "mimetype", "types")))
 
     # #############  RelationshipOperations  ############# #
     def test_find(self):
@@ -282,8 +283,14 @@ class ReadOnlyDatastoreTests(AbstractDataStoreTest):
         expected_factory.create_record_dao = Mock(return_value=rec_dao)
         expected_factory.create_relationship_dao = Mock(return_value=rel_dao)
         test_ds = DataStore(expected_factory)
-        self.assertEqual(test_ds.records.record_dao, rec_dao)
-        self.assertEqual(test_ds.relationships.relationship_dao, rel_dao)
+        self.assertEqual(test_ds.records._record_dao, rec_dao)  # pylint: disable=protected-access
+        self.assertEqual(
+            test_ds.relationships._relationship_dao,  # pylint: disable=protected-access
+            rel_dao)
+
+    def test_read_only_attribute(self):
+        """Verify that read_only is True on mutable data stores."""
+        self.assertTrue(self.datastore.read_only)
 
 
 class DataStoreTest(AbstractDataStoreTest):
@@ -307,6 +314,11 @@ class DataStoreTest(AbstractDataStoreTest):
     def test_delete_record(self):
         """Test the RecordOperation delete()."""
         self.assert_record_method_is_passthrough("delete", "delete", 1,
+                                                 has_result=False)
+
+    def test_update_record(self):
+        """Test the RecordOperation update()."""
+        self.assert_record_method_is_passthrough("update", "update", 1,
                                                  has_result=False)
 
     def test_delete_relationship(self):
@@ -374,6 +386,10 @@ class DataStoreTest(AbstractDataStoreTest):
         did_delete = test_ds.delete_all_contents()
         fake_record_dao._do_delete_all_records.assert_called_once()
         self.assertTrue(did_delete)
+
+    def test_read_only_attribute(self):
+        """Verify that read_only is False on read-only data stores."""
+        self.assertFalse(self.datastore.read_only)
 
 
 class CreateDatastore(unittest.TestCase):

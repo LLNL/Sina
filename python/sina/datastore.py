@@ -111,7 +111,7 @@ class ReadOnlyDataStore(object):
         :param dao_factory: The DAOFactory that will provide the backend
                             connection.
         """
-        self.dao_factory = dao_factory
+        self._dao_factory = dao_factory
         # DAOs are created at this level to support DataStore operations that
         # affect both records AND relationships.
         self._record_dao = dao_factory.create_record_dao()
@@ -119,9 +119,14 @@ class ReadOnlyDataStore(object):
         self.records = self.RecordOperations(self._record_dao)
         self.relationships = self.RelationshipOperations(self._relationship_dao)
 
+    @property
+    def read_only(self):
+        """Whether this is a read-only datastore."""
+        return True
+
     def close(self):
         """Close any resources held by this datastore."""
-        self.dao_factory.close()
+        self._dao_factory.close()
 
     def __enter__(self):
         """Use the datastore as a context manager."""
@@ -154,7 +159,7 @@ class ReadOnlyDataStore(object):
 
             :param record_dao: the owning DataStore's RecordDAO
             """
-            self.record_dao = record_dao
+            self._record_dao = record_dao
 
         # -------------------- Basic operations ---------------------
         def get(self, ids_to_get, chunk_size=999):
@@ -169,7 +174,7 @@ class ReadOnlyDataStore(object):
 
             :raises ValueError: if no Record is found for some id.
             """
-            return self.record_dao.get(ids_to_get, chunk_size=chunk_size)
+            return self._record_dao.get(ids_to_get, chunk_size=chunk_size)
 
         def get_raw(self, id_):
             """
@@ -183,7 +188,7 @@ class ReadOnlyDataStore(object):
             :return: the raw JSON for the specified record
             :raises: ValueError if the record does not exist
             """
-            return self.record_dao.get_raw(id_)
+            return self._record_dao.get_raw(id_)
 
         def exist(self, ids_to_check):
             """
@@ -195,7 +200,7 @@ class ReadOnlyDataStore(object):
             :returns: If provided an iterable, a generator of bools pertaining to
                       the ids existence, else a single boolean value.
             """
-            return self.record_dao.exist(ids_to_check)
+            return self._record_dao.exist(ids_to_check)
 
         def get_all(self, ids_only=False):
             """
@@ -205,12 +210,13 @@ class ReadOnlyDataStore(object):
 
             :returns: A generator of all Records.
             """
-            return self.record_dao.get_all(ids_only)
+            return self._record_dao.get_all(ids_only)
 
         # High arg count is inherent to the functionality.
         # pylint: disable=too-many-arguments
-        def find(self, types=None, data=None, file_uri=None,
-                 id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
+        def find(self, types=None, data=None, file_uri=None, mimetype=None,
+                 id_pool=None, ids_only=False,
+                 query_order=("data", "file_uri", "mimetype", "types")):
             """
             Return Records that match multiple different types of criteria.
 
@@ -225,6 +231,9 @@ class ReadOnlyDataStore(object):
                          a Record's data must fulfill
             :param file_uri: Functionality of find_with_file_uri, a uri criterion (optionally with
                              wildcards) a Record's files must fulfill, ex: having at least one .png
+            :param mimetype: Functionality of find_with_file_mimetype, a mimetype criterion at
+                             least one of a Record's files must fulfill, ex: having a mimetype
+                             of mimetype "image/png"
             :param id_pool: A pool of IDs to restrict the query to. Only a Record whose id is in
                             this pool can be returned
             :param ids_only: Whether to return only the ids of the matching Records
@@ -233,18 +242,22 @@ class ReadOnlyDataStore(object):
                                 performance, order queries in ascending order of expected
                                 number of matches (ex: if your database has very few Records
                                 with the desired type(s), you may wish to put "type" first).
-                                Query names are "types", "file_uri", and "data".
+                                Query names are "types", "file_uri", "mimetype", and "data".
+                                Note that if any query name is absent from the passed tuple,
+                                that query will not be executed.
             """
             # We protect _find to disincentize users using the DAO directly.
             # pylint: disable=protected-access
-            return self.record_dao._find(types, data, file_uri, id_pool, ids_only, query_order)
+            return self._record_dao._find(types, data, file_uri, mimetype, id_pool,
+                                          ids_only, query_order)
 
         # ------------------ Operations tied to Record type -------------------
         def find_with_type(self, types, ids_only=False, id_pool=None):
             """
             Given a(n iterable of) type(s) of Record, return all Records of that type(s).
 
-            :param types: A(n iterable of) types of Records to return
+            :param types: A(n iterable of) types of Records to filter on. Can be negated with
+                          not_() to return Records not of those types.
             :param ids_only: whether to return only the ids of matching Records
             :param id_pool: Used when combining queries: a pool of ids to restrict
                             the query to. Only records with ids in this pool can be
@@ -252,7 +265,7 @@ class ReadOnlyDataStore(object):
 
             :returns: A generator of matching Records.
             """
-            return self.record_dao.get_all_of_type(types, ids_only, id_pool)
+            return self._record_dao.get_all_of_type(types, ids_only, id_pool)
 
         find_with_types = find_with_type
 
@@ -262,7 +275,7 @@ class ReadOnlyDataStore(object):
 
             :returns: A generator of types of Record.
             """
-            return self.record_dao.get_available_types()
+            return self._record_dao.get_available_types()
 
         def data_names(self, record_type, data_types=None):
             """
@@ -275,7 +288,7 @@ class ReadOnlyDataStore(object):
 
             :returns: A generator of data names.
             """
-            return self.record_dao.data_names(record_type, data_types)
+            return self._record_dao.data_names(record_type, data_types)
 
         # ------------------ Operations tied to Record data -------------------
         def find_with_data(self, **kwargs):
@@ -300,7 +313,7 @@ class ReadOnlyDataStore(object):
             :raises ValueError: if not supplied at least one criterion or given
                                 a criterion it does not support
             """
-            return self.record_dao.data_query(**kwargs)
+            return self._record_dao.data_query(**kwargs)
 
         def get_data(self, data_list, id_list=None):
             """
@@ -331,7 +344,7 @@ class ReadOnlyDataStore(object):
             :returns: a dictionary of dictionaries containing the requested
                       data, keyed by record_id and then data field name.
             """
-            return self.record_dao.get_data_for_records(data_list, id_list)
+            return self._record_dao.get_data_for_records(data_list, id_list)
 
         def find_with_max(self, scalar_name, count=1, ids_only=False):
             """
@@ -349,7 +362,7 @@ class ReadOnlyDataStore(object):
             :returns: An iterator of the Records or ids corresponding to the
                       <count> highest <scalar_name> values in descending order.
             """
-            return self.record_dao.get_with_max(scalar_name, count, ids_only)
+            return self._record_dao.get_with_max(scalar_name, count, ids_only)
 
         def find_with_min(self, scalar_name, count=1, ids_only=False):
             """
@@ -367,7 +380,7 @@ class ReadOnlyDataStore(object):
             :returns: An iterator of the Records or ids corresponding to the
                       <count> lowest <scalar_name> values in ascending order.
             """
-            return self.record_dao.get_with_min(scalar_name, count, ids_only)
+            return self._record_dao.get_with_min(scalar_name, count, ids_only)
 
         # ------------------ Operations tied to Record files -------------------
         def find_with_file_uri(self, uri, ids_only=False, id_pool=None):
@@ -391,9 +404,9 @@ class ReadOnlyDataStore(object):
 
             :returns: A generator of matching Records.
             """
-            return self.record_dao.get_given_document_uri(uri=uri,
-                                                          accepted_ids_list=id_pool,
-                                                          ids_only=ids_only)
+            return self._record_dao.get_given_document_uri(uri=uri,
+                                                           accepted_ids_list=id_pool,
+                                                           ids_only=ids_only)
 
         def find_with_file_mimetype(self, mimetype, ids_only=False):
             """
@@ -406,7 +419,7 @@ class ReadOnlyDataStore(object):
             """
             # It's "mimetype" in the schema, but the method is named
             # mime_type. We follow the schema above for consistency.
-            return self.record_dao.get_with_mime_type(mimetype, ids_only)
+            return self._record_dao.get_with_mime_type(mimetype, ids_only)
 
     class RelationshipOperations(object):  # pylint: disable=too-few-public-methods
         """
@@ -425,7 +438,7 @@ class ReadOnlyDataStore(object):
 
             :param relationship_dao: the owning DataStore's RelationshipDAO
             """
-            self.relationship_dao = relationship_dao
+            self._relationship_dao = relationship_dao
 
         def find(self, subject_id=None, predicate=None, object_id=None):
             """
@@ -435,9 +448,9 @@ class ReadOnlyDataStore(object):
             would read this in an English sentence ("Carmen helps Danny"); this differs
             from the older dao equivalent (get()).
             """
-            return self.relationship_dao.get(subject_id=subject_id,
-                                             predicate=predicate,
-                                             object_id=object_id)
+            return self._relationship_dao.get(subject_id=subject_id,
+                                              predicate=predicate,
+                                              object_id=object_id)
 
 
 class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
@@ -457,6 +470,11 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
     object. For information on all the operations available, see
     RecordOperations and RelationshipOperations below.
     """
+
+    @property
+    def read_only(self):
+        """Whether this is a read-only datastore."""
+        return False
 
     # The DAO version is protected to disincentivize using it from the DAOs.
     # pylint: disable=protected-access
@@ -502,9 +520,17 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
             """
             Given one or more Records, insert them into the DAO's backend.
 
-            :param records: A Record or iter of Records to insert
+            :param records_to_insert: A Record or iter of Records to insert
             """
-            self.record_dao.insert(records_to_insert)
+            self._record_dao.insert(records_to_insert)
+
+        def update(self, records_to_update):
+            """
+            Given one or more Records, update them in the DAO's backend.
+
+            :param records_to_update: A Record or iter of Records to update
+            """
+            self._record_dao.update(records_to_update)
 
         def delete(self, ids_to_delete):
             """
@@ -515,7 +541,7 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
 
             :param ids_to_delete: A Record id or iterable of Record ids to delete.
             """
-            return self.record_dao.delete(ids_to_delete)
+            return self._record_dao.delete(ids_to_delete)
 
     class RelationshipOperations(ReadOnlyDataStore.RelationshipOperations):
         """
@@ -534,7 +560,7 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
 
             :param relationships_to_insert: Relationships to insert
             """
-            self.relationship_dao.insert(relationships_to_insert)
+            self._relationship_dao.insert(relationships_to_insert)
 
         def delete(self, subject_id=None, predicate=None, object_id=None):
             """
@@ -549,6 +575,6 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
 
             :raise ValueError: if no criteria are specified.
             """
-            self.relationship_dao.delete(subject_id=subject_id,
-                                         predicate=predicate,
-                                         object_id=object_id)
+            self._relationship_dao.delete(subject_id=subject_id,
+                                          predicate=predicate,
+                                          object_id=object_id)

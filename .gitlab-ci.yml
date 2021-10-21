@@ -1,0 +1,196 @@
+variables:
+  ALLOC_NAME: "sina_gitlab_runner_build_test_alloc"
+
+stages:
+  - allocate
+  - test
+  - test-integration
+  - deploy
+
+.get-alloc:
+  # Gets an allocation on a target machine.
+  # This is used to avoid doing heavy work on the login node.
+  # Be sure to run this before other jobs to get $JOBID set!
+  tags:
+    - shell
+  script:
+    - echo "===== begin alloc for remaining stages ====="
+    - echo "Cancelling previous allocation, if it exists"
+    - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
+    - if [ -z "${JOBID}" ] ; then scancel $JOBID; fi
+    - salloc -N 1 -c 36 -p pdebug -t 60 --no-shell --job-name=$ALLOC_NAME
+    - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
+    - echo "===== alloc'd JOBID $JOBID ====="
+
+.test-python:
+  # Runs the base set of Sina Python tests. This doesn't include
+  # MySQL or Cassandra.
+  tags:
+    - shell
+  script:
+    - echo "===== begin test_python ====="
+    - pwd
+    - echo "Removing stale Jupyter environment if present"
+    # Potential race condition. If Jupyter tests fail on concurrent tests, see about changing this.
+    - rm -rf ~/.local/share/jupyter/kernels/sina-test
+    - cd python
+    - echo "Running Sina Python tests"
+    - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
+    - srun $( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID}" ) -t 60 -n1 make tests
+  artifacts:
+    paths:
+      - python/tests/test_venv
+    expire_in: 1 week
+
+.test-python-mysql:
+  # Runs the Python MySQL set of tests only.
+  # Relies on $SINA_MYSQL_TEST_CONNECTION being set; tests that extend
+  # should set that suitably for the target machine.
+  tags:
+    - shell
+  script:
+    - echo "===== begin test_python_mysql ===== "
+    - cd python
+    - make test-mysql
+
+.test-cpp:
+  # Tests that extend .test-cpp need to provide $CPP_TEST_TARGET_COMPILER
+  # This should be set to the name of a valid target compiler as specified
+  # in Sina's C++ build scripts, such as clang
+  tags:
+    - shell
+  script:
+    - echo "===== begin test_cpp for $CPP_TEST_TARGET_COMPILER ====="
+    - pwd
+    - set -e
+    - echo "Loading cmake module to avoid automatic use of /usr/bin version"
+    - module load cmake
+    - echo "Updating submodules for C++"
+    - git submodule update --init cpp/blt
+    - git submodule update --init cpp/uberenv
+    - echo "Building for C++"
+    - cd cpp
+    - rm -fr "build-$CPP_TEST_TARGET_COMPILER"
+    - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
+    - srun $( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID}" ) -t 60 -n1 run-builds.py $CPP_TEST_TARGET_COMPILER
+    - cd "build-$CPP_TEST_TARGET_COMPILER"
+    - echo "Running tests for C++"
+    - bin/unittests --gtest_output=xml:test_results.xml
+    - echo "Building C++ docs"
+    - make docs
+  artifacts:
+      paths:
+        - cpp/build-$CPP_TEST_TARGET_COMPILER
+      expire_in: 1 week
+
+.test-integration:
+  # Runs integration tests. Needs the LC wheelhouse and for clang and the python tests to have been built.
+  tags:
+    - shell
+  script:
+    - source python/tests/test_venv/bin/activate
+    - cd cpp
+    - ln -s build-clang build
+    - cd ..
+    - nosetests integration_test.py  --with-xunit
+
+.deploy-all:
+  # Builds a wheel, venv, tarball, examples, and docs.
+  # Only works on LC.
+  tags:
+    - shell
+  variables:
+    CPP_TEST_TARGET_COMPILER: "clang"
+    PERM_GROUP: "llnl_emp"
+    DOC_DIR: "/usr/global/web-pages/lc/www/workflow/docs"
+    EXAMPLE_DIR: "/collab/usr/gapps/wf/examples"
+    RELEASE_DIR: "/collab/usr/gapps/wf/releases"
+  extends: [ .test-cpp ]
+  script:
+    - echo "===== begin sina deployment ====="
+    - echo "Removing existing symlink, if it exists"
+    - rm -f /collab/usr/gapps/wf/releases/sina
+    - chmod -R g+rX .
+    - sh deploy.sh $RELEASE_DIR $DOC_DIR $EXAMPLE_DIR
+
+.test-cpp-clang:
+  extends: [ .test-cpp ]
+  variables:
+    CPP_TEST_TARGET_COMPILER: "clang"
+
+.test-cpp-icc:
+  extends: [ .test-cpp ]
+  variables:
+    CPP_TEST_TARGET_COMPILER: "intel"
+
+.deploy-docs:
+  # Deploys docs ONLY. Only works on LC. Intended for CZ.
+  tags:
+    - shell
+  variables:
+    DOC_DIR: "/usr/global/web-pages/lc/www/workflow/docs"
+  script:
+    - echo "===== begin doc deployment ====="
+    - echo "Making Python docs"
+    - cd python
+    - make docs
+    - rm -rf $DOC_DIR/sina && cd ./docs/build && mv ./html $DOC_DIR/sina
+    - cd ../cpp/build-clang
+    - echo "Making C++ docs"
+    - make docs
+    - cd docs/html
+    - mkdir $DOC_DIR/cpp && mv * $DOC_DIR/cpp
+    - cd $DOC_DIR
+    - chown -R :llnl_emp
+    - find $DOC_DIR -type f -exec chmod 640 {} \;
+    - find $DOC_DIR -type d -exec chmod 750 {} \;
+
+test-cpp-clang-CZ:
+  tags:
+    - quartz
+  stage: test
+  extends: [ .test-cpp-clang ]
+
+test-cpp-icc-CZ:
+  tags:
+    - quartz
+  stage: test
+  extends: [ .test-cpp-icc ]
+
+test-python-CZ:
+  tags:
+    - quartz
+  stage: test
+  extends: [ .test-python ]
+
+test-python-mysql-CZ:
+  tags:
+    - quartz
+  stage: test
+  variables:
+    SINA_MYSQL_TEST_CONNECTION: "mysql+mysqlconnector://cz-wf-dev.apps.czapps.llnl.gov:31706/?read_default_file=$HOME/.my.cnf.test_sina"
+  extends: [ .test-python-mysql]
+
+test-integration-CZ:
+  tags:
+    - quartz
+  stage: test-integration
+  extends: [ .test-cpp-clang, .test-integration]
+
+deploy-RZ:
+  tags:
+    - rzgenie
+  stage: deploy
+  only:
+    variables:
+      - $DO_DEPLOY
+  extends: [.get-alloc, .deploy-all]
+
+deploy-docs-CZ:
+  tags:
+    - quartz
+  stage: deploy
+  only:
+    variables:
+      - $DO_DEPLOY
+  extends: [.get-alloc, .deploy-docs]

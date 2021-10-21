@@ -10,6 +10,7 @@ import six
 # Disable pylint check due to its issue with virtual environments
 import sqlalchemy  # pylint: disable=import-error
 from sqlalchemy.pool import NullPool  # pylint: disable=import-error
+from sqlalchemy.exc import OperationalError  # pylint: disable=import-error
 
 import sina.dao as dao
 import sina.sjson as json
@@ -240,8 +241,10 @@ class RecordDAO(dao.RecordDAO):
 
         :param records: A list of Records to update.
         """
-        self._delete_no_commit(record.id for record in records)
-        self._insert_no_commit(records)
+        # self.session.merge does not yet support bulk merges
+        # https://github.com/sqlalchemy/sqlalchemy/issues/5441
+        for record in records:
+            self.session.merge(self.create_sql_record(record))
 
     def _do_data_query(self, criteria, id_pool=None):
         """
@@ -380,10 +383,10 @@ class RecordDAO(dao.RecordDAO):
         range_criteria = [table.name == datum_name]
         if isinstance(criterion, utils.DataRange):
             if not criterion.is_single_value():
-                if criterion.min:
+                if criterion.min is not None:
                     min_op = table.value.__ge__ if criterion.min_inclusive else table.value.__gt__
                     range_criteria.append(min_op(criterion.min))
-                if criterion.max:
+                if criterion.max is not None:
                     max_op = table.value.__le__ if criterion.max_inclusive else table.value.__lt__
                     range_criteria.append(max_op(criterion.max))
             else:
@@ -473,21 +476,15 @@ class RecordDAO(dao.RecordDAO):
                     json_input=_json_loads(result.raw))
 
     def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
-        """
-        Given an iterable of types of Record, return all Records of those types.
+        """SQL-specific implementation of DAO's _do_get_all_of_type."""
+        if isinstance(types, utils.Negation):
+            filter_func = schema.Record.type.notin_
+            types = types.arg
+        else:
+            filter_func = schema.Record.type.in_
 
-        :param types: An iterable of types of Records to return
-        :param ids_only: whether to return only the ids of matching Records
-                         (used for further filtering)
-        :param id_pool: Used when combining queries: a pool of ids to restrict
-                        the query to. Only records with ids in this pool can be
-                        returned.
-
-        :returns: A generator of Records of that type or (if ids_only) a
-                  generator of their ids
-        """
         query = (self.session.query(schema.Record.id)
-                 .filter(schema.Record.type.in_(types)))
+                 .filter(filter_func(types)))
         if id_pool is not None:
             query = query.filter(schema.Record.id.in_(id_pool))
 
@@ -578,6 +575,65 @@ class RecordDAO(dao.RecordDAO):
         for entry, val in six.iteritems(result_counts):
             if val == expected_result_count:
                 yield entry
+
+    # High arg count is inherent to the functionality.
+    # pylint: disable=too-many-arguments
+    def _find(self, types=None, data=None, file_uri=None,
+              mimetype=None, id_pool=None, ids_only=False,
+              query_order=("data", "file_uri", "mimetype", "types")):
+        """Implement cross-backend logic for the DataStore method of the same name."""
+        try:
+            return super(RecordDAO, self)._find(types=types, data=data, file_uri=file_uri,
+                                                mimetype=mimetype, id_pool=id_pool,
+                                                ids_only=ids_only, query_order=query_order)
+        # We may have issues when too many ids are returned due to the (compile time)
+        # limit on variables, as IN counts every id as a variable. If so, use an
+        # alternate form of query.
+        except OperationalError:
+            return self._find_with_manual_intersection(types=types, data=data, file_uri=file_uri,
+                                                       mimetype=mimetype, id_pool=id_pool,
+                                                       ids_only=ids_only,
+                                                       query_order=query_order)
+
+    # pylint: disable=too-many-arguments
+    def _find_with_manual_intersection(self, types=None, data=None, file_uri=None,
+                                       mimetype=None, id_pool=None, ids_only=False,
+                                       query_order=("data", "file_uri", "mimetype", "types")):
+        """
+        Perform a _find() that uses id_pool intersection.
+
+        Provided as a workaround for large id_pools potentially tripping the compile
+        time SQL limit on maximum variables in a query.
+        """
+        if id_pool is not None:
+            id_pool = set(id_pool)
+        # Note, same map as in dao.py's _find().
+        query_map = {"data": (self._do_data_query, data),
+                     "file_uri": (self._do_get_given_document_uri, file_uri),
+                     "mimetype": (self.get_with_mime_type, mimetype),
+                     "types": (self.get_all_of_type, types)}
+
+        def get_id_set_from_query_type(query_type):
+            """Get ids for a single query."""
+            query_func, arg = query_map[query_type]
+            if arg is not None:
+                if query_type == "data":
+                    return query_func(arg, id_pool=id_pool)
+                return query_func(arg,  # pylint: disable=unexpected-keyword-arg
+                                  id_pool=id_pool,
+                                  ids_only=True)
+            return None
+
+        individual_pools = [get_id_set_from_query_type(x) for x in query_order]
+        for individual_pool in individual_pools:
+            if individual_pool is None:  # the query wasn't invoked
+                continue
+            if id_pool is None:  # first invoked query, no id_pool arg
+                id_pool = set(individual_pool)
+            else:
+                id_pool = id_pool.intersection(individual_pool)
+        # Let the DAO handle the logic of returning in the proper format.
+        return super(RecordDAO, self)._find(id_pool=id_pool, ids_only=ids_only)
 
     def get_available_types(self):
         """
@@ -820,17 +876,22 @@ class RecordDAO(dao.RecordDAO):
                                  'tags': tags}
         return scalars
 
-    def get_with_mime_type(self, mimetype, ids_only=False):
+    def get_with_mime_type(self, mimetype, ids_only=False, id_pool=None):
         """
         Return all records or IDs with documents of a given mimetype.
 
         :param mimetype: The mimetype to use as a search term
         :param ids_only: Whether to only return the ids
+        :param id_pool: Used when combining queries: a pool of ids to restrict
+                        the query to. Only records with ids in this pool can be
+                        returned.
 
         :returns: Record object or IDs fitting the criteria.
         """
         query_set = (self.session.query(schema.Document.id)
                      .filter(schema.Document.mimetype == mimetype))
+        if id_pool is not None:
+            query_set = query_set.filter(schema.Document.id.in_(id_pool))
         ids = (x[0] for x in query_set)
         return ids if ids_only else self.get(ids)
 

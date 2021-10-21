@@ -265,7 +265,7 @@ perform unlocked parallel inserts with that backend!
 Inserting objects is otherwise straightforward::
 
   ...
-  from sina.model import Record, Run
+  from sina.model import Record, Run, CurveSet
   from sina.datastore import create_datastore
 
   datastore = create_datastore(db_path='path_to_sqlite_file')
@@ -277,10 +277,15 @@ Inserting objects is otherwise straightforward::
                      data={"start_val": {"value": start_val}},
                      files=[{"uri": "bar/baz.qux", "tags": ["output"]}])
 
+  # Records function like dictionaries and can have raw JSON added into them
   my_record.data["return_time"] = {"value": my_func(start_val),
                                    "units": "ms"}
 
+  # However, you may find it more convenient/readable to use Record utility methods
   my_other_record = Record("another_id", "some_type")
+  my_curve_set = my_other_record.add_curve_set("my_curve_set")
+  my_curve_set.add_independent("time", [0, 1, 2, 3], units="h")
+  my_curve_set.add_dependent("distance", [0, 44, 84, 126], units="km")
 
   # Like get(), insert() takes one or more ids.
   recs.insert([my_record, my_other_record])

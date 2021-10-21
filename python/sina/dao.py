@@ -14,7 +14,7 @@ import six
 
 import sina.model
 import sina.sjson as json
-from sina.utils import DataRange
+from sina.utils import DataRange, Negation
 
 LOGGER = logging.getLogger(__name__)
 
@@ -203,6 +203,20 @@ class RecordDAO(object):
         return self.data_query(**kwargs)
 
     @staticmethod
+    def _ensure_is_list(arg):
+        """
+        Ensure args are expressed as lists.
+
+        For user QoL, some queries can take either a single criterion
+        (ex: "run") or several as a list (ex: ["run", "test", "msub"]).
+        This method is used to standardize into the list expected by some
+        backend-side query functions.
+        """
+        if isinstance(arg, six.string_types):
+            return [arg]
+        return list(arg)  # safety cast for gens
+
+    @staticmethod
     def _criteria_are_for_scalars(criteria):
         """
         Determine whether criteria for a single datum describes scalars or strings.
@@ -228,7 +242,8 @@ class RecordDAO(object):
         """
         Given a(n iterable of) type(s) of Record, return all Records of that type(s).
 
-        :param types: A(n iterable of) types of Records to return
+        :param types: A(n iterable of) types of Records to filter on. Can be negated with
+                      not_() to return Records not of those types.
         :param ids_only: whether to return only the ids of matching Records
         :param id_pool: Used when combining queries: a pool of ids to restrict
                         the query to. Only records with ids in this pool can be
@@ -236,10 +251,10 @@ class RecordDAO(object):
 
         :returns: A generator of matching Records.
         """
-        if isinstance(types, six.string_types):
-            types = [types]
+        if isinstance(types, Negation):
+            types.arg = self._ensure_is_list(types.arg)
         else:
-            types = list(types)  # safety cast for gens
+            types = self._ensure_is_list(types)
         # safety cast for id_pool as well
         if id_pool is not None:
             id_pool = list(id_pool)  # safety cast for gens
@@ -248,7 +263,7 @@ class RecordDAO(object):
 
     @abstractmethod
     def _do_get_all_of_type(self, types, ids_only=False, id_pool=None):
-        """Handle the logic of the type query."""
+        """Handle backend-specific logic for get_all_of_type."""
         raise NotImplementedError
 
     def get_all(self, ids_only):
@@ -424,12 +439,15 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def get_with_mime_type(self, mimetype, ids_only=False):
+    def get_with_mime_type(self, mimetype, ids_only=False, id_pool=None):
         """
         Return all records or IDs with documents of a given mimetype.
 
         :param mimetype: The mimetype to use as a search term
         :param ids_only: Whether to only return the ids
+        :param id_pool: Used when combining queries: a pool of ids to restrict
+                        the query to. Only records with ids in this pool can be
+                        returned.
 
         :returns: Record object or IDs fitting the criteria.
         """
@@ -438,15 +456,28 @@ class RecordDAO(object):
     # High arg count is inherent to the functionality.
     # pylint: disable=too-many-arguments
     def _find(self, types=None, data=None, file_uri=None,
-              id_pool=None, ids_only=False, query_order=("data", "file_uri", "types")):
+              mimetype=None, id_pool=None, ids_only=False,
+              query_order=("data", "file_uri", "mimetype", "types")):
         """Implement cross-backend logic for the DataStore method of the same name."""
         LOGGER.debug('Performing a general find() query with order %s', query_order)
         query_map = {"data": (self._do_data_query, data),
                      "file_uri": (self._do_get_given_document_uri, file_uri),
-                     "types": (self._do_get_all_of_type, types)}
+                     "mimetype": (self.get_with_mime_type, mimetype),
+                     "types": (self.get_all_of_type, types)}
+
+        if all((x is None for x in [types, data, file_uri, mimetype])):
+            # Not passing any filter is valid usage; we return all.
+            if id_pool is None:
+                return self.get_all(ids_only=ids_only)
+            # Passing in only id_pool is valid usage; we return all that exist.
+            existing_ids = [x[1] for x in zip(self.exist(id_pool), id_pool) if x[0]]
+            if ids_only:
+                return (x for x in existing_ids)
+            return self.get(existing_ids)
+
         for query_type in query_order:
             query_func, arg = query_map[query_type]
-            if arg:
+            if arg is not None:
                 if query_type == "data":
                     # Data has no ids_only
                     id_pool = list(query_func(arg, id_pool=id_pool))

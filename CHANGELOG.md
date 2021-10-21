@@ -5,6 +5,20 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.11
+============
+- Added load_records() and load_sole_record() functions.
+- Added QoL for CurveSets and Curves
+- Improved functionality of find():
+    - Functionality with no filters specified
+    - mimetype filter
+- Added initial support for query negation logic
+    - Added NOT functionality for type queries
+- Fixed a memory leak in AdiakWriter
+- Made DAO protected in data stores
+- Fixed issue with update() where Relationships weren't preserved
+- Fixed issue with DataRange handling of zero in SQL
+
 1.10
 ====
 - Added a new section to Records, library_data

@@ -54,6 +54,19 @@ class UniversalQueryOperation(Enum):
     EXISTS = "EXISTS"  # Only one for now.
 
 
+# Negation is indev. More public methods may be added.
+class Negation(object):  # pylint: disable=too-few-public-methods
+    """Object passed to signify that a query should be negated."""
+
+    def __init__(self, arg):
+        """
+        Pass arg through to be received by query.
+
+        You probably don't want to use this. See not_() instead.
+        """
+        self.arg = arg
+
+
 def _import_tuple_args(unpack_tuple):
     """Unpack args to allow using import_json with ThreadPools in <Python3."""
     import_json(unpack_tuple[0], unpack_tuple[1])
@@ -120,6 +133,34 @@ def load_document(path_or_file):
         with io.open(path_or_file, 'r', encoding='utf-8') as fp:
             contents = fp.read()
     return _load_document(contents)
+
+
+def load_records(path_or_file):
+    """
+    Read a Sina document at the specified location and return the list of
+    records in it.
+
+    :param path_or_file: the path of a file, or a io.TextIOBase object from
+     which to read the document
+    :return: the list of records in the document
+    """
+    return load_document(path_or_file)[0]
+
+
+def load_sole_record(path_or_file):
+    """
+    Read a Sina document at the specified location and return the single
+    record contained in it. If it does not contain exactly one record, a
+    ValueError is raised.
+
+    :param path_or_file: the path of a file, or a io.TextIOBase object from
+     which to read the document
+    :return: the record in the document
+    """
+    records = load_records(path_or_file)
+    if len(records) != 1:
+        raise ValueError('Expected a single record, but found {}'.format(len(records)))
+    return records[0]
 
 
 def import_json(factory, json_paths):
@@ -679,6 +720,14 @@ def get_example_path(relpath,
 def exists():
     """QoL method mimicking has_all/etc. that returns the relevant UniversalQueryOperation."""
     return UniversalQueryOperation.EXISTS
+
+
+# While calling it "not" would be nicer, not() is reserved and throws a syntax error.
+def not_(arg):
+    """QoL method used to passthrough to a Negation."""
+    if isinstance(arg, Negation):
+        return arg.arg
+    return Negation(arg)
 
 
 def has_all(*values):

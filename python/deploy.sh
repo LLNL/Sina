@@ -136,7 +136,7 @@ deployExamples() {
   done
   # We'll also need to create a special folder for the advanced (untested) notebooks
   # It has no associated db, so it won't be created above
-  mkdir $EXAMPLES_DEST_ROOT/advanced_tutorials
+  mkdir -p $EXAMPLES_DEST_ROOT/advanced_tutorials
   deactivate
 
   # Copy the example notebooks
