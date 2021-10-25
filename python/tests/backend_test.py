@@ -41,13 +41,14 @@ def create_daos(class_):
     class_.relationship_dao = class_.factory.create_relationship_dao()
 
 
-def populate_database_with_data(record_dao):
+def populate_database_with_data(record_dao):  # pylint: disable=too-many-statements
     """
     Add test data to a database in a backend-independent way.
 
     :param record_dao: The RecordDAO used to insert records into a database.
     :return: a dict of all the inserted records, where the IDs are the keys
     """
+    # Pylint disable note: we need to insert enough data to cover our test cases.
     spam_record = Run(id="spam", application="breakfast_maker")
     spam_record["user"] = "Bob"
     spam_record["version"] = "1.4.0"
@@ -97,6 +98,10 @@ def populate_database_with_data(record_dao):
     spam_record_3.files = {"beeq.png": {"mimetype": 'image/png'},
                            "many.eggs.narf": {}}
 
+    spam_record_3_ish = Record(id="spam3ish", type="foo")
+    spam_record_3_ish.data["spam_scal"] = {"value": 10.5}
+    spam_record_3_ish.data["spam_scal_2"] = {"value": 10.6}
+
     spam_record_4 = Record(id="spam4", type="bar")
     spam_record_4.data["val_data_list_1"] = {"value": [-11, -9]}
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
@@ -135,7 +140,7 @@ def populate_database_with_data(record_dao):
         }
     }
 
-    records = [spam_record_3, spam_record_4, spam_record_6, egg_record,
+    records = [spam_record_3, spam_record_3_ish, spam_record_4, spam_record_6, egg_record,
                spam_record, spam_record_2, spam_record_5,
                record_with_shared_scalar_data_and_curve]
     record_dao.insert(records)
@@ -415,6 +420,8 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         record_dao._do_delete_all_records()
         six.assertCountEqual(self, list(record_dao.get_all(ids_only=True)), [])
 
+    # _find() is protected to disincentivize using it from the DAOS.
+    # pylint: disable=protected-access
     def test_recorddao_update_one(self):
         """Test that RecordDAO is updating correctly."""
         record_dao = self.factory.create_record_dao()
@@ -424,6 +431,7 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
                      files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
                      user_defined={})
         record_dao.insert(rec)
+        self.assertEqual(len(list(record_dao._find(data={"eggs": 12}))), 1)
         returned_record = record_dao.get("spam")
         self.assertEqual(returned_record.data, rec.data)
         rec["data"]["eggs"]["value"] = 144
@@ -439,6 +447,26 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertNotEqual(returned_record.data["eggs"]["value"],
                             updated_record.data["eggs"]["value"])
         self._assert_records_equal(updated_record, rec)
+        self.assertEqual(len(list(record_dao._find(data={"eggs": 12}))), 0)
+        self.assertEqual(len(list(record_dao._find(data={"eggs": 144}))), 1)
+
+    # pylint: disable=protected-access
+    def test_recorddao_update_deletion(self):
+        """Tests that a deleted key is properly propagated."""
+        initial_data = {"egg_count": {"value": 12}, "bacon_texture": {"value": "crispy"}}
+        rec = Record(id="spam", type="eggs", data=initial_data)
+        record_dao = self.factory.create_record_dao()
+        record_dao.insert(rec)
+        initial_rec = record_dao.get("spam")
+        self.assertEqual(initial_rec.data, initial_data)
+        self.assertEqual(len(list(record_dao._find(data={"egg_count": 12}))), 1)
+        del rec.data["egg_count"]
+        record_dao.update(rec)
+        self.assertEqual(len(list(record_dao._find(data={"egg_count": 12}))), 0)
+        self.assertEqual(len(list(record_dao._find(data={"bacon_texture": "crispy"}))), 1)
+        del rec.data["bacon_texture"]
+        record_dao.update(rec)
+        self.assertEqual(len(list(record_dao._find(data={"bacon_texture": "crispy"}))), 0)
 
     def test_recorddao_update_with_invalid_data(self):
         """
@@ -478,12 +506,16 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         record_dao.insert([rec, rec2, rec3])
         rec.type = "tofeggs"
         rec2.data["source"]["tags"] = ["applewood smoked"]
-        rec3.files["image/of/toast.png"] = {}
+        rec3.files["toast.png"] = {}
         record_dao.update(rec for rec in [rec, rec2, rec3])  # test against generator
         upd_rec, upd_rec2, upd_rec3 = list(record_dao.get(["spam", "spam2", "spam3"]))
         self._assert_records_equal(upd_rec, rec)
         self._assert_records_equal(upd_rec2, rec2)
         self._assert_records_equal(upd_rec3, rec3)
+        self.assertEqual(len(list(record_dao.get_all_of_type("eggs"))), 0)
+        self.assertEqual(len(list(record_dao.get_all_of_type("tofeggs"))), 1)
+        self.assertEqual(len(list(record_dao.get_all_of_type("bacon"))), 1)
+        self.assertEqual(len(list(record_dao.get_given_document_uri("toast.png"))), 1)
 
     def test_recorddao_update_with_relationships(self):
         """Test that RecordDAO doesn't delete relationships when updating records."""
@@ -872,10 +904,10 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_get_with_max_multi(self):
         """Test we can return the X largest in correct order."""
-        max_spam_scals = list(self.record_dao.get_with_max("spam_scal",
+        max_spam_scals = list(self.record_dao.get_with_max("spam_scal_2",
                                                            count=2,
                                                            id_only=True))
-        self.assertEqual(max_spam_scals, ["spam2", "spam3"])
+        self.assertEqual(max_spam_scals, ["spam", "spam3ish"])
 
     # ###################### get_with_min ##########################
     def test_get_with_min(self):
@@ -911,6 +943,13 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         names = set(self.record_dao.data_names(record_type='foo', data_types='scalar'))
         self.assertEqual(names, set(["spam_scal", "spam_scal_2"]))
 
+    def test_data_names_filter_constants(self):
+        """Make sure that we get names of non-constant scalar data when filtering."""
+        names = set(self.record_dao.data_names(record_type='foo',
+                                               data_types='scalar',
+                                               filter_constants=True))
+        six.assertCountEqual(self, names, ["spam_scal_2"])
+
     def test_data_names_with_list(self):
         """Make sure that we get names of scalar data when given a list."""
         names = set(self.record_dao.data_names(record_type='foo', data_types=['scalar']))
@@ -928,18 +967,24 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         six.assertCountEqual(self, types_found,
                              ["run", "spamrec", "bar", "foo", "eggrec", "overlap"])
 
+    # ####################### test_get_curve_set_names ######################
+    def test_get_curve_set_names(self):
+        """Make sure that we return a correct list of the curve set names in a datebase."""
+        curve_set_names_found = self.record_dao.get_curve_set_names()
+        six.assertCountEqual(self, curve_set_names_found, ["cs1", "spam_curve", "egg_curve"])
+
     # ########################### basic data_query ##########################
     def test_recorddao_scalar_datum_query(self):
         """Test that the RecordDAO data query is retrieving based on one scalar correctly."""
         just_right_range = DataRange(min=0, max=300, max_inclusive=True, min_inclusive=False)
         just_right = self.record_dao.data_query(spam_scal=just_right_range)
-        self.assertEqual(len(list(just_right)), 3)
+        self.assertEqual(len(list(just_right)), 4)
 
     def test_recorddao_scalar_datum_query_zero(self):
         """Test that the RecordDAO data query is retrieving based on zero correctly."""
         gt_zero = list(self.record_dao.data_query(spam_scal=DataRange(min=0,
                                                                       min_inclusive=False)))
-        six.assertCountEqual(self, gt_zero, ["spam", "spam2", "spam3"])
+        six.assertCountEqual(self, gt_zero, ["spam", "spam2", "spam3", "spam3ish"])
         lte_zero = list(self.record_dao.data_query(spam_scal_2=DataRange(max=0,
                                                                          max_inclusive=True)))
         six.assertCountEqual(self, lte_zero, ["eggs"])
@@ -948,7 +993,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         """Test that the RecordDAO data query is respecting the inclusivity settings."""
         restricted_range = DataRange(min=10, max=10.99999, min_inclusive=True, max_inclusive=False)
         restricted_recs = self.record_dao.data_query(spam_scal=restricted_range)
-        six.assertCountEqual(self, list(restricted_recs), ["spam", "spam3"])
+        six.assertCountEqual(self, list(restricted_recs), ["spam", "spam3", "spam3ish"])
 
     def test_recorddao_data_query_returns_generator(self):
         """Test that the data-query method returns a generator."""
@@ -1226,7 +1271,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_recorddao_multiple_types_match(self):
         """Test the RecordDAO type query correctly returns Records for multiple types."""
         ids_only = self.record_dao.get_all_of_type(["run", "foo", "spamrec"], ids_only=True)
-        six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam3", "spam5", "spam6"])
+        six.assertCountEqual(self, list(ids_only), ["spam", "spam2", "spam3", "spam3ish",
+                                                    "spam5", "spam6"])
 
     def test_recorddao_types_match_id_pool(self):
         """Test the RecordDAO type query correctly only returns Records from a pool."""
@@ -1250,11 +1296,11 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_recorddao_not_type(self):
         """Test the RecordDAO type query works when negated."""
         get_all_but_one = list(self.record_dao.get_all_of_type(types=not_("run")))
-        self.assertEqual(len(get_all_but_one), 5)
+        self.assertEqual(len(get_all_but_one), 6)
         self.assertIsInstance(get_all_but_one[0], Record)
         all_but_one_id = [x.id for x in get_all_but_one]
         six.assertCountEqual(self, all_but_one_id,
-                             ["spam3", "spam4", "spam6", "eggs",
+                             ["spam3", "spam3ish", "spam4", "spam6", "eggs",
                               "shared_curve_set_and_matching_scalar_data"])
 
     def test_recorddao_not_type_list(self):
@@ -1262,9 +1308,9 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         get_several = list(self.record_dao.get_all_of_type(types=not_(["bar", "spamrec",
                                                                        "eggrec", "run"]),
                                                            ids_only=True))
-        self.assertEqual(len(get_several), 2)
+        self.assertEqual(len(get_several), 3)
         six.assertCountEqual(self, get_several,
-                             ["spam3", "shared_curve_set_and_matching_scalar_data"])
+                             ["spam3", "spam3ish", "shared_curve_set_and_matching_scalar_data"])
 
     # ######################### get_with_curve_set #########################
     def test_recorddao_get_with_curve_set(self):

@@ -277,18 +277,31 @@ class ReadOnlyDataStore(object):
             """
             return self._record_dao.get_available_types()
 
-        def data_names(self, record_type, data_types=None):
+        def get_curve_set_names(self):
+            """
+            Return the names of all curve sets available in the backend.
+
+            :returns: An iterable of curve set names.
+            """
+            return self._record_dao.get_curve_set_names()
+
+        def data_names(self, record_type, data_types=None, filter_constants=False):
             """
             Return a list of all the data labels for data of a given type.
+
             Defaults to getting all data names for a given record type.
 
             :param record_type: Type of records to get data names for.
             :param data_types: A single data type or a list of data types
                                to get the data names for.
+            :param filter_constants: If True, will filter out any string or scalar data
+                                     whose value is identical between all records in the
+                                     database (such as the density of some material). No
+                                     effect on list data.
 
             :returns: A generator of data names.
             """
-            return self._record_dao.data_names(record_type, data_types)
+            return self._record_dao.data_names(record_type, data_types, filter_constants)
 
         # ------------------ Operations tied to Record data -------------------
         def find_with_data(self, **kwargs):

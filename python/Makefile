@@ -1,7 +1,7 @@
 # The following environment variables can be used to change the behavior of
 # building the virtual environment:
 #
-#   PYTHON           = Specify non-default python (e.g., python3)
+#   PYTHON           = Specify non-default python
 #   SINA_PIP_OPTIONS = Additional options to pip (e.g., '--no-index')
 #   VENV             = Name of the Sina virtual environment (default 'venv')
 #   VENV_OPTIONS     = Additional options when the venv is created (e.g.,
@@ -31,19 +31,8 @@ else
 endif
 export SINA_PIP_OPTIONS
 
-# Determine whether being run for Python 2 or Python 3 since it affects virtual
-# virtual environment commands.
-PYTHON?=python
+PYTHON?=python3
 export PYTHON
-PYVERSION=$(shell $(PYTHON) -c 'import sys; print(sys.version_info[0])')
-ifeq ($(PYVERSION),2)
-  PYTHON_VENV_OPTION:=virtualenv
-  # Setuptools dropped Py2 support in 45
-  SETUPTOOLS_INSTALL="setuptools<45.0.0"
-else
-  PYTHON_VENV_OPTION:=venv
-  SETUPTOOLS_INSTALL=--upgrade setuptools
-endif
 
 # TODO: Pylint issues must be addressed before including it in the normal CI
 # process.
@@ -62,15 +51,6 @@ NO_LINKS_FILE=no-links.txt
 LC_LINKS_FILE=lc-links.txt
 LC_URL_FILE=lc-url-links.txt
 LINKS_FILE=requirements/links.txt
-
-# Work-around for LC Python 3.6 installation-related issues for testing purposes
-LC_PYTHON3=/usr/apps/python-3.6.0/bin
-HAVE_LC_PY3=$(shell if test -d $(LC_PYTHON3); then echo 1; else echo 0; fi)
-ifeq ($(HAVE_LC_PY3),1)
-  TEST_PATH:=$(LC_PYTHON3):$(PATH)
-else
-  TEST_PATH:=$(PATH)
-endif
 
 SHELL=/bin/bash
 
@@ -104,14 +84,14 @@ TEST_VENV=tests/test_venv
 install: $(LINKS_FILE)
 	@if test ! -d $(VENV); then \
 	  echo "Making virtual environment in $(VENV)"; \
-	  $(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) $(VENV); \
+	  $(PYTHON) -m venv $(VENV_OPTIONS) $(VENV); \
 	  set -e; \
 	else \
 	  echo "You already have the virtual environment $(VENV)"; \
 	fi; \
 	if test -d $(VENV); then \
 	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip; \
-	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL); \
+	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade setuptools; \
 	    $(VENV)/bin/pip install $(SINA_PIP_OPTIONS) -r requirements/development.txt; \
 	    echo $(PR_ACT); \
 	else \
@@ -164,7 +144,6 @@ docs: install
 
 # Add flake8 dependencies to an existing test virtual environment, where
 # one is created through a recursive call to make if it does not exist.
-flake8: export PATH=$(TEST_PATH)
 flake8: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
 	  echo "Making the test virtual environment in $(TEST_VENV)"; \
@@ -215,7 +194,6 @@ $(LINKS_FILE):
 #
 # PEP8 is an optional check until we discuss which flake8 plugins we want to
 # add (see SIBO-675).
-pep8: export PATH=$(TEST_PATH)
 pep8: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
 	  echo "Making test virtual environment in $(TEST_VENV)"; \
@@ -229,14 +207,13 @@ pylint: export PATH=$(PYLINT_PATH)
 pylint:
 	@echo "Creating $(PYLINT_VENV)"; \
 	rm -rf $(PYLINT_VENV); \
-	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) $(PYLINT_VENV); \
+	$(PYTHON) -m venv $(VENV_OPTIONS) $(PYLINT_VENV); \
 	set -e; \
 	$(PYLINT_VENV)/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip tox; \
 	$(PYLINT_VENV)/bin/tox -e pylint
 
 # Set up a clean test virtual environment before running tests by making
 # recursive calls to make to ensure the work is done in the specified order.
-tests: export PATH=$(TEST_PATH)
 tests: $(LINKS_FILE)
 	@make --no-print-directory clean-tests-venv; \
 	make --no-print-directory install VENV=$(TEST_VENV); \
@@ -244,7 +221,6 @@ tests: $(LINKS_FILE)
 
 # Run cassandra tests, which depend on a suitably configured test virtual
 # environment.
-test-cassandra: export PATH=$(TEST_PATH)
 test-cassandra:
 	@if test ! -d $(TEST_VENV); then \
 	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add Cassandra if it is to be included."; \
@@ -255,7 +231,6 @@ test-cassandra:
 
 # Run mysql tests, which depend on a suitably configured test virtual
 # environment.
-test-mysql: export PATH=$(TEST_PATH)
 test-mysql:
 	@if test ! -d $(TEST_VENV); then \
 	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add mysql if it is to be included."; \
@@ -269,7 +244,6 @@ test-mysql:
 #
 # Note: Use of underscore in the target name ensures deploy.sh can readily
 # process options.
-test-cli_tools: export PATH=$(TEST_PATH)
 test-cli_tools: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
 	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add cli_tools if they are to be included."; \
@@ -280,7 +254,6 @@ test-cli_tools: $(LINKS_FILE)
 
 # Run the core Sina tests, which depend on the basic virtual environment so
 # it can be created if necessary using a recursive call to make.
-test-core: export PATH=$(TEST_PATH)
 test-core: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
           echo "Making the test virtual environment in $(TEST_VENV)"; \
@@ -292,7 +265,6 @@ test-core: $(LINKS_FILE)
 
 # Run jupyter tests, which depend on a suitably configured test virtual
 # environment.
-test-jupyter: export PATH=$(TEST_PATH)
 test-jupyter: $(LINKS_FILE)
 	@if test ! -d $(TEST_VENV); then \
 	  echo "The test virtual environment $(TEST_VENV) is required.  Be sure to add jupyter if it is to be included."; \
@@ -305,9 +277,9 @@ test-jupyter: $(LINKS_FILE)
 wheel:
 	@echo "Creating the sina wheel"; \
 	rm -rf ./wheel dist; \
-	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) ./wheel; \
+	$(PYTHON) -m venv $(VENV_OPTIONS) ./wheel; \
 	wheel/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip wheel; \
-	wheel/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL); \
+	wheel/bin/pip install $(SINA_PIP_OPTIONS) --upgrade setuptools; \
 	wheel/bin/python setup.py bdist_wheel --universal; \
 	wheel/bin/python setup.py sdist --formats=gztar; \
 	rm -rf ./wheel
@@ -317,9 +289,9 @@ wheel:
 # https://packaging.python.org/tutorials/packaging-projects/#uploading-the-distribution-archives
 publish:
 	@echo "Publishing Sina to Pypi"
-	$(PYTHON) -m $(PYTHON_VENV_OPTION) $(VENV_OPTIONS) distvenv
+	$(PYTHON) -m venv $(VENV_OPTIONS) distvenv
 	distvenv/bin/pip install $(SINA_PIP_OPTIONS) --upgrade pip
-	distvenv/bin/pip install $(SINA_PIP_OPTIONS) $(SETUPTOOLS_INSTALL) twine
+	distvenv/bin/pip install $(SINA_PIP_OPTIONS) --upgrade setuptools twine
 	distvenv/bin/twine upload dist/*
 
 # Set up a clean branch, recursively calling make to clean up notebooks and

@@ -150,19 +150,24 @@ class ReadOnlyDatastoreTests(AbstractDataStoreTest):
         self.assert_record_method_is_passthrough("get_types",
                                                  "get_available_types")
 
+    def test_get_curve_set_names(self):
+        """Test the RecordOperation get_curve_set_names()."""
+        self.assert_record_method_is_passthrough("get_curve_set_names",
+                                                 "get_curve_set_names")
+
     def test_exist(self):
         """Test the RecordOperation exist()."""
         self.assert_record_method_is_passthrough("exist", "exist", 1)
 
     def test_get_raw(self):
-        """Test the RecordOperation get_raw()"""
+        """Test the RecordOperation get_raw()."""
         self.assert_record_method_is_passthrough("get_raw", "get_raw", 1)
 
     def test_data_names(self):
         """Test the RecordOperation data_names()."""
-        self.assert_record_method_is_passthrough("data_names", "data_names", 2)
+        self.assert_record_method_is_passthrough("data_names", "data_names", 3)
         self.assert_record_method_is_passthrough("data_names", "data_names", 1,
-                                                 opt_args=(None,))
+                                                 opt_args=(None, False))
 
     def test_find_with_data(self):
         """Test the RecordOperation find_with_data()."""

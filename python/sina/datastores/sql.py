@@ -241,10 +241,18 @@ class RecordDAO(dao.RecordDAO):
 
         :param records: A list of Records to update.
         """
-        # self.session.merge does not yet support bulk merges
-        # https://github.com/sqlalchemy/sqlalchemy/issues/5441
+        # Note that session.merge() does not delete removed attributes, hence the
+        # manual delete-reinsert. We also need to be sure we preserve relationships,
+        # since they would otherwise cascade delete.
+        temp_rel_dao = RelationshipDAO(self.session)
         for record in records:
-            self.session.merge(self.create_sql_record(record))
+            old_subject_relationships = temp_rel_dao.get(subject_id=record.id)
+            old_object_relationships = temp_rel_dao.get(object_id=record.id)
+            self._delete_no_commit(record.id)
+            self._insert_no_commit(record)
+            self.session.flush()  # Ensure the record exists before re-adding relationships
+            temp_rel_dao.insert(old_object_relationships)
+            temp_rel_dao.insert(old_subject_relationships)
 
     def _do_data_query(self, criteria, id_pool=None):
         """
@@ -644,14 +652,28 @@ class RecordDAO(dao.RecordDAO):
         results = self.session.query(schema.Record.type).distinct().all()
         return [entry[0] for entry in results]
 
-    def data_names(self, record_type, data_types=None):
+    def get_curve_set_names(self):
+        """
+        Return the names of all curve sets available in the backend.
+
+        :returns: An iterable of curve set names.
+        """
+        return list(x[0] for x in self.session.query(schema.CurveSetMeta.name)
+                    .distinct().all())
+
+    def data_names(self, record_type, data_types=None, filter_constants=False):
         """
         Return a list of all the data labels for data of a given type.
+
         Defaults to getting all data names for a given record type.
 
         :param record_type: Type of records to get data names for.
         :param data_types: A single data type or a list of data types
                            to get the data names for.
+        :param filter_constants: If True, will filter out any string or scalar data
+                                 whose value is identical between all records in the
+                                 database (such as the density of some material). No
+                                 effect on list data.
 
         :returns: A generator of data names.
         """
@@ -670,9 +692,14 @@ class RecordDAO(dao.RecordDAO):
         query_tables = [type_name_to_tables[type] for type in data_types]
 
         for query_table in query_tables:
-            results = (self.session.query(query_table.name).join(schema.Record)
-                       .filter(schema.Record.type == record_type)
-                       .distinct())
+            if filter_constants and query_table in (schema.ScalarData, schema.StringData):
+                results = (self.session.query(query_table.name).join(schema.Record)
+                           .filter(schema.Record.type == record_type).group_by(query_table.name)
+                           .having(sqlalchemy.func.count(query_table.value.distinct()).__gt__(1)))
+            else:
+                results = (self.session.query(query_table.name).join(schema.Record)
+                           .filter(schema.Record.type == record_type)
+                           .distinct())
             for result in results:
                 yield result[0]
 
@@ -921,6 +948,11 @@ class RelationshipDAO(dao.RelationshipDAO):
         :param object_id: The id of the object.
         :param predicate: A string describing the relationship between subject and object.
         """
+        self._insert_no_commit(relationships, subject_id, object_id, predicate)
+
+    def _insert_no_commit(self, relationships=None, subject_id=None, object_id=None,
+                          predicate=None):
+        """Insert without committing; for shared functionality."""
         if (isinstance(relationships, model.Relationship)
                 or any(x is not None for x in (subject_id, object_id, predicate))):
             subj, obj, pred = self._validate_insert(relationship=relationships,

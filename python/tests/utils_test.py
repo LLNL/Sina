@@ -838,6 +838,26 @@ class LoadDocumentTest(unittest.TestCase):
 
         self.assertRecordsAreCorrect(records)
 
+    def test_load_record_with_local_id(self):
+        """Verify that load_document() removes the 'local_id' from records"""
+        contents = six.text_type("""
+        {
+            "records": [
+                {
+                  "type": "some_type",
+                  "local_id": "obj1"
+                }
+            ]
+        }
+        """)
+
+        records, _ = sina.utils.load_document(
+            io.StringIO(contents))
+        record = records[0]
+
+        self.assertNotIn('local_id', record.raw)
+        self.assertIn('id', record.raw)
+
     def assertContentsAreCorrect(self, records, relationships):
         """
         Assert that the records and relationships are as expected
