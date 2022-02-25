@@ -25,9 +25,14 @@ It works by collecting information from code runs, logs, and other outputs into
 a common file format which can then be passed off to one of Sina's supported
 backends, all of which are queried using the same user-friendly Python API. To the
 end user, this means that important data can be accessed through Python scripts,
-GUIs (Jupyter notebooks) etc. with all the speed of a datastore and none of the
-complexity (the user never has to interact with the datastore schema), nor any of
+GUIs (Jupyter notebooks) etc. with all the speed of a database and none of the
+complexity (the user never has to interact with database architecture), nor any of
 the traditional headaches of parsing logs or remembering which file contains what.
+
+Sina is integrated into a number of LLNL physics codes to capture simulation data;
+look for the _sina.json! If your code isn't configured to output Sina, but you'd
+like it to be, we may be able to work with the code team to integrate it--you can reach
+us at siboka@llnl.gov, or check the WEAVE project.
 
 The instructions below will guide you through setting up a virtual environment for
 Sina (or installing it in one that already exists), running example notebooks, and
@@ -55,8 +60,7 @@ in the same directory.
 Sina will now be available for use via Python virtual environment, and can be
 tested with `sina -h` (which should display a help message). When you're done,
 use `deactivate` to exit the virtual environment. Note that this will be the release
-(master) Sina version--if you want to use Sina Develop, you'll need to perform a local
-install.
+(master) Sina version--if you want to use Sina Develop, keep reading!
 
 If you run into issues with the LC virtual environment, please email us at siboka@llnl.gov.
 
@@ -64,8 +68,17 @@ If you run into issues with the LC virtual environment, please email us at sibok
 Standard Non-LC Setup
 =====================
 
-Standard installation, provided by the Makefile, is initiated by entering
-the following at the command line::
+Sina is available on PyPi::
+
+    $ pip install llnl-sina
+
+However, this will only give you access to the release version! Non-release
+versions are not available externally. Internal users looking to use our development
+version, or wanting to contribute to Sina, clone us from CZ Gitlab. External
+contributors should clone us from the LLNL Github.
+
+After cloning, cd to the python folder. Standard installation, provided by the Makefile,
+is initiated by entering the following at the command line::
 
     $ make
 
@@ -76,7 +89,7 @@ You can build the documentation, which will appear in `build/docs`, using::
 
     $ make docs
 
-Test are run by entering::
+Tests are run by entering::
 
     $ make tests
 
@@ -133,7 +146,9 @@ The first file contains the options needed to restrict packages to those
 available on the wheelhouse hosted on the Open Computing Facility (OCF) at
 Lawrence Livermore National Laboratory.  The second file contains no flags.
 The links.txt file is included in other requirements files to ensure the
-options are consistent for the build and testing processes.
+options are consistent for the build and testing processes. The makefile will create a
+softlink to the appropriate file; if you're doing this manually, you'll need to
+link requirements/links.txt to the appropriate file yourself.
 
 Once you've set up your requirements/links.txt, you can use our dev requirements
 file (<sina_root>/python/requirements/development.txt) to install
@@ -156,7 +171,9 @@ Enter the following command to enter the virtual environment::
 
 where `SINA_PYTHON` is the python subdirectory of the Sina source code.
 You will need to do this every time you want to start up a session in the named
-virtual environment.
+virtual environment. You can test Sina's available with::
+
+    (venv) $ sina --version
 
 Enter the following command to deactivate the virtual environment::
 
@@ -174,10 +191,12 @@ sina root folder alongside the python and cpp folders), and are organized by
 dataset, with data_overview.rst containing descriptions of each set.
 To use the notebooks, you'll first need to run getting_started.ipynb
 (also in the examples directory) from the LC Jupyter server at
-lc.llnl.gov/jupyter. After that, you'll be ready to run the rest of the
+lc.llnl.gov/jupyter. This will create a Jupyter kernel from your current virtual
+environment, making anything installed in it available to the notebook.
+After that, you'll be ready to run the rest of the
 notebooks. If you're not working on LC, you can also set Jupyter up locally:
-run `make Jupyter` and then `jupyter notebook`. This will open a webpage similar
-to what you'd see accessing LC's Jupyter server.
+run `make Jupyter` from the python folder, then `jupyter notebook`. This will
+open a webpage similar to what you'd see accessing LC's Jupyter server.
 
 Most notebooks rely on sample datasets. Pre-built sets are deployed
 with Sina to the LC, but you can build them locally as well to experiment with

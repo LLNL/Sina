@@ -2,31 +2,37 @@
 -r links.txt
 
 # Development dependencies
-# more-itertools is required by other dependencies. We specify its
-# version first because newer versions drop python 2 support,
-# but use of the py2&3--compatible version is not enforced otherwise
-more-itertools<=5.0.0
-# As with more-itertools, we need a version that keeps python 2 support.
-# importlib, markupsafe, and pyrsistent are not direct dependencies of sina.
-importlib_metadata==1.7.0
-pyrsistent<0.17.3
-markupsafe<=1.1
-
-# Need to restrict version to build with python 2. Should be able to
-# get rid of this when we are python3-only.
-virtualenv<20; python_version < "3.0"
-
 tox<3.14
 flake8
 mock
 jsonschema
 
+# Sub-dependencies whose versions need to be fixed
+# Usually, this is due to the removal of something another dependency needs
+# (ex: soft_unicode in markupsafe, required by downgraded jinja2, required by...)
+importlib-metadata==1.6.1 
+ipython<8.0.0
+jinja2<3.0.0
+MarkupSafe<2.1.0
+# Someone removed nbformat as a dependency, so we get it ourself for the Jupyter tests
+nbformat
+
 # Install nose independently of tox to ensure xunit functionality is available
 nose
-sphinx==1.4.4
+sphinx
 sphinx_rtd_theme
+nbsphinx
+
+# Similarly, install ipykernel and matplotlib seperately of tox to ensure they're available
+# for visualization tests and the like, including numpy's (temporary) version restriction
+# and running jupyter notebooks for docs
+numpy<1.21.6
+ipykernel
+matplotlib
+ipywidgets
 
 # Install the project in editable (development) mode, which also adds 
 # setup.py's install_requires packages.
 # We also need the jupyter requirements to work with sina's visualization.py module.
 -e .
+-e .[jupyter]

@@ -30,12 +30,13 @@ my_hist.display()
 from __future__ import print_function
 from collections import defaultdict
 import random
+import uuid
+import math
 import six
 # Disable pylint check due to its issue with virtual environments
 # pylint: disable=import-error
 import IPython.display
 import ipywidgets as widgets
-import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # Required for 3D plotting.
 assert Axes3D  # Satisfies flake8 and pylint
@@ -50,6 +51,20 @@ DEFAULT_GRAPH_SETTINGS = {"dimension_names": ["x", "y", "z", "4th d", "5th d"]}
 # We use this instead of something like None so it's standard across interactive selections
 # and functions, vs. having to swap between two forms.
 NO_CURVE_SET = "SINA_VIS_NO_CURVE_SET"
+# Unique attribute used in matplob axes to identify them as colorbars
+# Used because colorbars must be their own axis, and we need to be able to identify
+# them so we don't keep adding new axes (essentially, it's safety for custom figs)
+SINA_COLORBAR_ATTRIB = "SINA_COLORBAR_AXIS"
+# Its sister value, used to assign a unique ID to link a "support" axis and its target plot.
+# Only used for colorbars right now.
+SINA_AXIS_IDENTIFIER = "SINA_AXIS_IDENTIFIER"
+# Finally, we *also* need a link from the axis containing the colorbar to the colorbar itself,
+# since the colorbar is not trivially located (attrib changes between versions).
+SINA_SUPPORT_OBJ = "SINA_SUPPORT_OBJ"
+
+# visualization.py is actively evolving; it may be good to return and split it
+# after it's stabilized -Becky
+# pylint: disable=too-many-lines
 
 
 class Visualizer(object):
@@ -73,9 +88,9 @@ class Visualizer(object):
         self.id_pool = id_pool
         self.matplotlib_options = matplotlib_options
 
-    def create_histogram(self, x, fig=None, ax=None, interactive=False,
-                         selectable_data=None, id_pool=None, title="Distribution of {x_name}",
-                         num_bins=20, y_label="Count", matplotlib_options=None,):
+    def create_histogram(self, x, y=None, fig=None, ax=None, interactive=False,
+                         selectable_data=None, id_pool=None, title=None,
+                         num_bins=20, y_label=None, matplotlib_options=None,):
         """
         Create a histogram (also handles string data via bar charts).
 
@@ -83,6 +98,8 @@ class Visualizer(object):
         other create_* functions.
 
         :param x: The name of the scalar to plot on the x axis.
+        :param y: The name of the scalar to plot on the y axis (or None). Changes it to a
+                  psuedo-heatmap with a colorbar.
         :param fig: The matplotlib figure to add the visualization to.
         :param ax: The matplotlib axis to add the visualization to.
         :param interactive: Whether the visualization should be interactive. Provides
@@ -95,31 +112,55 @@ class Visualizer(object):
                       use the name of the x datum in the title (ex: "distribution of {x_name}").
                       Set to None to disable the title.
         :param num_bins: The number of bins to use in the histogram.
-        :param y_label: The label to use for the y axis.
+        :param y_label: The label to use for the y axis. Overrides y if both are specified.
         :param matplotlib_options: A dictionary of kwargs to pass through to matplotlib
                                    containing configurations (like graph color) to
                                    use for this graph. Overrides any Visualizer-level ones.
         """
+        if title is None:
+            if y is None:
+                title = "Distribution of {x_name}"
+            else:
+                title = "Distribution of {y_name} and {x_name}"
         return self._setup_vis(fig, ax, self._gen_histogram,
-                               [x], interactive, selectable_data, id_pool, title,
+                               [x, y], interactive, selectable_data, id_pool, title,
                                matplotlib_options, fallback_data="scalar_and_string",
                                args=(num_bins, y_label))
 
-    def create_scatter_plot(self, x, y, fig=None, ax=None, interactive=False,
-                            selectable_data=None, id_pool=None,
-                            title="{y_name} vs. {x_name}",
+    def create_scatter_plot(self, x, y, z=None, fig=None, ax=None, interactive=False,
+                            selectable_data=None, id_pool=None, color_val=None,
+                            title=None,
                             matplotlib_options=None):
         """
         Create a scatter plot.
 
         Uses the same params as create_histogram() with the following alterations:
 
-        :param y: The name of the scalar to plot on the y axis.
-        :param title: Same usage as histogram, but also accepts {y_name}
+        :param y: The name of the scalar to plot on the y axis. Optional in histogram,
+                  required here.
+        :param z: The name of the scalar to plot on the z axis, if any. Specifying
+                  changes the plot to 3d.
+        :param color_val: The name of the scalar to use for a colorbar, if any.
+                          Change the color by passing a cmap to matplotlib_options as usual.
+        :param title: Same usage as histogram, but also accepts {z_name} and {color_val}.
         """
-        return self._setup_vis(fig, ax, self._gen_scatter_plot,
-                               [x, y], interactive, selectable_data, id_pool,
-                               title, matplotlib_options, fallback_data="scalar")
+        if title is None:
+            if z is None:
+                title = "{y_name} vs. {x_name}"
+            else:
+                title = "{y_name} vs. {x_name} vs. {z_name}"
+            if color_val is not None:
+                title += "\n(color: {color_val})"
+        if z is None:
+            return self._setup_vis(fig, ax, self._gen_scatter_plot,
+                                   [x, y], interactive, selectable_data, id_pool,
+                                   title, matplotlib_options, fallback_data="scalar",
+                                   args=[color_val])
+        else:
+            return self._setup_vis(fig, ax, self._gen_scatter_plot,
+                                   [x, y, z], interactive, selectable_data, id_pool,
+                                   title, matplotlib_options, fallback_data="scalar",
+                                   args=[color_val])
 
     def create_surface_plot(self, x, y, z, fig=None, ax=None, interactive=False,
                             selectable_data=None, id_pool=None,
@@ -130,7 +171,7 @@ class Visualizer(object):
 
         Uses the same params as create_histogram() with the following alterations:
 
-        :param y: The name of the scalar to plot on the y axis.
+        :param y: The name of the scalar to plot on the y axis. Not optional here.
         :param z: The name of the scalar to plot on the z axis.
         :param title: Same usage as histogram, but also accepts {y_name} and {z_name}.
         """
@@ -146,7 +187,7 @@ class Visualizer(object):
 
         Uses the same params as create_histogram() with the following alterations:
 
-        :param y: The name of the scalar to plot on the y axis.
+        :param y: The name of the scalar to plot on the y axis. Not optional here.
         :param curve_set: The name of the curve set that x and y belong to. Curve sets
                           are a special Sina feature used to group associated dependent
                           and independent value series. For example, you might use multiple
@@ -171,6 +212,68 @@ class Visualizer(object):
                                title, matplotlib_options,
                                fallback_data="scalar_list", args=(curve_set, sample_rec),
                                dedicated_interactive_class=Visualizer._InteractiveCurveSetVis)
+
+    def create_violin_box_plot(self, x, fig=None, ax=None, interactive=False,
+                               selectable_data=None, id_pool=None,
+                               title="Distribution of {x_name}", y_label="{x_name}",
+                               matplotlib_options=None, vb_type='both'):
+        """
+        Create a violin and box plot.
+
+        :param x: The name of the scalar to plot on the x axis.
+        :param fig: The matplotlib figure to add the visualization to.
+        :param ax: The matplotlib axis to add the visualization to.
+        :param interactive: Whether the visualization should be interactive. Provides
+                            selection dropdown for configuring the axis/axes.
+        :param selectable_data: If `interactive` is True, the data to fill the dropdown
+                                with. If None, then provides names of data with an
+                                appropriate  type.
+        :param id_pool: A pool of IDs to optionally restrict visualizations to
+        :param title: The title to assign to the figure (if any). Use {x_name} to
+                      use the name of the x datum in the title (ex: "distribution of {x_name}").
+                      Set to None to disable the title.
+        :param y_label: The label to use for the y axis.
+        :param matplotlib_options: A dictionary of kwargs to pass through to matplotlib
+                                   containing configurations (like graph color) to
+                                   use for this graph. Overrides any Visualizer-level ones.
+        :param vb_type: Plot a `violin` or `box` plot, defaults to `both`.
+        """
+
+        return self._setup_vis(fig, ax, self._gen_violin_box_plot,
+                               [x], interactive, selectable_data, id_pool, title,
+                               matplotlib_options, fallback_data="scalar", args=(vb_type, y_label)
+                               )
+
+    def create_pdf_cdf_plot(self, x, fig=None, ax=None, interactive=False,
+                            selectable_data=None, id_pool=None, title="Distribution of {x_name}",
+                            matplotlib_options=None, pc_type='both', num_bins=None):
+
+        """
+        Create a PDF and CDF plot.
+
+        :param x: The name of the scalar to plot on the x axis.
+        :param fig: The matplotlib figure to add the visualization to.
+        :param ax: The matplotlib axis to add the visualization to.
+        :param interactive: Whether the visualization should be interactive. Provides
+                            selection dropdown for configuring the axis/axes.
+        :param selectable_data: If `interactive` is True, the data to fill the dropdown
+                                with. If None, then provides names of data with an
+                                appropriate  type.
+        :param id_pool: A pool of IDs to optionally restrict visualizations to
+        :param title: The title to assign to the figure (if any). Use {x_name} to
+                      use the name of the x datum in the title (ex: "distribution of {x_name}").
+                      Set to None to disable the title.
+        :param matplotlib_options: A dictionary of kwargs to pass through to matplotlib
+                                   containing configurations (like graph color) to
+                                   use for this graph. Overrides any Visualizer-level ones.
+        :param pc_type: Plot a `pdf` or `cdf` plot, defaults to `both`.
+        :param num_bins: The number of bins for histogram, defaults to square root of data points.
+        """
+
+        return self._setup_vis(fig, ax, self._gen_pdf_cdf_plot,
+                               [x], interactive, selectable_data, id_pool, title,
+                               matplotlib_options, fallback_data="scalar", args=(pc_type, num_bins)
+                               )
 
     def _combine_matplotlib_options(self, options=None):
         """
@@ -313,8 +416,9 @@ class Visualizer(object):
 
     # The point of this message is to gather together shared configuration work across a
     # large number of visualization types. It might make sense to split in the future, but
-    # for now, keeping it all in one function is hopefully clearer.
-    # pylint: disable=too-many-locals
+    # for now, keeping it all in one function is hopefully clearer. For now, there's
+    # naturally a large number of variables and logic branches.
+    # pylint: disable=too-many-locals,too-many-branches
     def _setup_vis(self, fig, ax, gen_func, default_values, interactive, selectable_data,
                    id_pool, title, matplotlib_options, fallback_data, args=None,
                    dedicated_interactive_class=None):
@@ -344,6 +448,8 @@ class Visualizer(object):
                                             vis class.
         """
         combined_matplotlib_options = self._combine_matplotlib_options(matplotlib_options)
+        if id_pool is None:
+            id_pool = self.id_pool
         if fig is None and ax is None:
             if len(default_values) < 3:
                 fig, ax = plt.subplots(1, 1, figsize=(6, 4))
@@ -363,9 +469,9 @@ class Visualizer(object):
         # This is for easy reuse of "report formats", so that a configured notebook can
         # be loaded with any dataset and instantly "work" (though the visualizations themselves
         # might be meaningless until configured)
-        for idx, value in enumerate(default_values):
-            if value is None:
-                default_values[idx] = selectable_data[idx]
+        # for idx, value in enumerate(default_values):
+        #    if value is None:
+        #        default_values[idx] = selectable_data[idx]
         if isinstance(default_values, six.string_types):
             default_values = [default_values]
         if interactive:
@@ -396,50 +502,160 @@ class Visualizer(object):
         :param matplotlib_options: A dictionary of kwargs to pass through to matplotlib
                                    containing configurations (like graph color) to
                                    use for this graph. Overrides any Visualizer-level ones.
-        :param num_bins: The number of bins to use in the histogram.
+        :param num_bins: The number of bins to use in the histogram. Only used for scalar data.
         :param y_label: The label to use for the y axis.
         """
-        x_name = value_names[0]
-        values = self.get_values(id_pool, x_name)[x_name]
+        values = self.get_values(id_pool, value_names)
+        x_name, y_name = value_names
+        x_bins = num_bins
         ax.cla()
-        if value_names[0] in self.data_names["scalar"]:
-            ax.hist(values,
-                    num_bins,
+        if x_name not in self.data_names["scalar"]:
+            x_tick_labels, values[x_name] = make_hist_enum(values[x_name])
+            x_bins = len(x_tick_labels)
+            ax.set_xticklabels(x_tick_labels)
+            inc = (x_bins-1)/x_bins
+            ax.set_xticks([x*inc+inc/2 for x in range(0, x_bins)])
+
+        # Workaround for numpy issue with large numbers in bins:
+        # https://github.com/matplotlib/matplotlib/issues/609/
+        ax.set_xrange = ((0.5*min(values[x_name]), max(values[x_name])*1.5)
+                         if max(values[x_name]) > 1e15 else None)
+        ax.set_xlabel(x_name)
+
+        if y_name is None:
+            ax.hist(values[x_name],
+                    x_bins,
                     **matplotlib_options)
-            # Workaround for numpy issue with large numbers in bins:
-            # https://github.com/matplotlib/matplotlib/issues/609/
-            ax.set_xrange = (0.5*min(values), max(values)*1.5) if max(values) > 1e15 else None
-        else:  # Generate a bar graph pretending to be a histogram
-            labels, counts = np.unique(values, return_counts=True)
-            ticks = range(len(counts))
-            ax.set_xticks(ticks)
-            ax.set_xticklabels(labels)
-            ax.bar(ticks, counts, align='center', **matplotlib_options)
+            ax.set_ylabel("Count")
+
+        # 2d histogram needs a little (lot) extra TLC
+        else:
+            y_bins = num_bins
+            if y_name not in self.data_names["scalar"]:
+                y_tick_labels, values[y_name] = make_hist_enum(values[y_name], reverse=True)
+                y_bins = len(y_tick_labels)
+                ax.set_yticklabels(y_tick_labels)
+                ax.set_ylabel(y_name)
+                inc = (y_bins-1)/y_bins
+                ax.set_yticks([x*inc+inc/2 for x in range(0, y_bins)])
+            ax.set_yrange = ((0.5*min(values[y_name]), max(values[y_name])*1.5)
+                             if max(values[y_name]) > 1e15 else None)
+            plot = ax.hist2d(values[x_name],
+                             values[y_name],
+                             [x_bins, y_bins],
+                             **matplotlib_options)
+            ax.set_ylabel(y_name)
+            # For info on this, see _gen_scatter_plot()
+            cbar = None
+            if not hasattr(ax, SINA_AXIS_IDENTIFIER):
+                setattr(ax, SINA_AXIS_IDENTIFIER, str(uuid.uuid4()))
+            for axis in fig.get_axes():
+                if (hasattr(axis, SINA_COLORBAR_ATTRIB)
+                        and (getattr(axis, SINA_COLORBAR_ATTRIB) ==
+                             getattr(ax, SINA_AXIS_IDENTIFIER))):
+                    # Apparently matplotlib is working on better access here.
+                    # For now, we have a workaround.
+                    cbar = getattr(axis, SINA_SUPPORT_OBJ)
+                    # print(plot)
+                    cbar.update_normal(plot[-1])
+                    break
+            if cbar is None:
+                # Why [3]? Ask matplotlib
+                cbar = fig.colorbar(plot[3], shrink=0.75)
+                cbar_ax = fig.get_axes()[-1]
+                setattr(cbar_ax, SINA_COLORBAR_ATTRIB, getattr(ax, SINA_AXIS_IDENTIFIER))
+                setattr(cbar_ax, SINA_SUPPORT_OBJ, cbar)
+        # We do allow this to override.
         if y_label is not None:
             ax.set_ylabel(y_label)
-        ax.set_xlabel(x_name)
         if title is not None:
-            ax.set_title(title.format(x_name=x_name))
+            ax.set_title(title.format(x_name=x_name, y_name=y_name))
 
     # The _gen functions share a signature. Not all make use of fig.
-    # pylint: disable=unused-argument
+    # Also, the scatter plot is highly configurable (inc. 2-4 dimensions),
+    # which requires a good bit of unique branching.
+    # pylint: disable=unused-argument, too-many-branches
     def _gen_scatter_plot(self, fig, ax, value_names, id_pool, title,
-                          matplotlib_options):
+                          matplotlib_options, color_val):
         """
         Generate a scatterplot.
 
         Uses the same params (technically a subset of them) as create_histogram().
         """
-        x_name, y_name = value_names
-        ax.cla()
-        data = self.get_values(id_pool, [x_name, y_name])
-        ax.scatter(data[x_name],
-                   data[y_name],
-                   **matplotlib_options)
-        ax.set_xlabel(x_name)
-        ax.set_ylabel(y_name)
-        if title is not None:
-            ax.set_title(title.format(x_name=x_name, y_name=y_name))
+        color_nums = None
+        if color_val is not None:
+            if not matplotlib_options.get("cmap"):
+                matplotlib_options["cmap"] = "viridis"
+            color_nums = self.get_values(id_pool, [color_val])[color_val]
+        # This ugly hack gets around three conflicting needs: one, we need to be able to handle a
+        # user giving us an arbitrary fig/ax. Two, matplotlib needs to make colorbars their own
+        # axis. Three, we need to redraw this many times (if in interactive mode), thus we need
+        # to somehow locate the right axis (if it exists) to update the colorbar with. We can't
+        # just delete the most recent since we could be working on a preexisting fig/ax, so...
+        if not hasattr(ax, SINA_AXIS_IDENTIFIER):
+            setattr(ax, SINA_AXIS_IDENTIFIER, str(uuid.uuid4()))
+
+        if len(value_names) == 2:  # Plot is 2D
+            x_name, y_name = value_names
+            z_name = None
+            ax.cla()
+            data = self.get_values(id_pool, [x_name, y_name])
+            plot = ax.scatter(data[x_name],
+                              data[y_name],
+                              c=color_nums,
+                              **matplotlib_options)
+            ax.set_xlabel(x_name)
+            ax.set_ylabel(y_name)
+            if title is not None:
+                ax.set_title(title.format(x_name=x_name, y_name=y_name, color_val=color_val))
+
+        else:  # Plot is 3D
+            x_name, y_name, z_name = value_names
+            ax.cla()
+            data = self.get_values(id_pool, [x_name, y_name, z_name])
+            try:
+                plot = ax.scatter(data[x_name],
+                                  data[y_name],
+                                  data[z_name],
+                                  c=color_nums,
+                                  **matplotlib_options)
+                ax.set_xlabel(x_name)
+                ax.set_ylabel(y_name)
+                ax.set_zlabel(z_name)
+                if title is not None:
+                    ax.set_title(title.format(x_name=x_name, y_name=y_name,
+                                              z_name=z_name, color_val=color_val))
+
+            except ValueError as e:
+                print('[ERROR]: Could not plot the 3-dimensional scatter plot. '
+                      'This is likely due to attempting to plot a single variable'
+                      ' on multiple axes.')
+                print('ValueError -- ' + str(e) + '\n')
+        # We may need to update or delete a colorbar.
+        # For now, colorbar isn't interactive, so I'm not worrying about the delete.
+        cbar_ax = None
+        for axis in fig.get_axes():
+            if (hasattr(axis, SINA_COLORBAR_ATTRIB)
+                    and (getattr(axis, SINA_COLORBAR_ATTRIB) ==
+                         getattr(ax, SINA_AXIS_IDENTIFIER))):
+                cbar_ax = axis
+                break
+
+        if color_val is not None:
+            if cbar_ax is None:
+                # we can't cbar = fig.colorbar(plot) because we need to set the
+                # attrib on the axis itself.
+                pad = 0 if z_name is None else 0.2
+                if z_name is not None:  # Full-sized colorbar looks wonky with 3d scatter
+                    cbar = fig.colorbar(plot, shrink=0.75, pad=pad)
+                else:
+                    cbar = fig.colorbar(plot, pad=pad)
+                cbar.set_label(color_val)
+                cbar_ax = fig.get_axes()[-1]
+                setattr(cbar_ax, SINA_COLORBAR_ATTRIB, getattr(ax, SINA_AXIS_IDENTIFIER))
+                setattr(cbar_ax, SINA_SUPPORT_OBJ, cbar)
+            else:
+                getattr(cbar_ax, SINA_SUPPORT_OBJ).update_ticks()
 
     def _gen_surface_plot(self, fig, ax, value_names, id_pool, title, matplotlib_options):
         """
@@ -463,7 +679,7 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
             ax.set_title(title.format(x_name=x_name, y_name=y_name, z_name=z_name))
         # Add a color bar which maps values to colors.
         if matplotlib_options.get("cmap"):
-            fig.colorbar(surface_plot, shrink=0.5, aspect=5)
+            fig.colorbar(surface_plot, shrink=0.75)
 
     def _gen_line_plot(self, fig, ax, value_names, id_pool, title, matplotlib_options, curve_set,
                        sample_rec=None):
@@ -497,6 +713,87 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
         ax.legend(target_ids)
         if title is not None:
             ax.set_title(title.format(x_name=x_of_interest, y_name=y_of_interest))
+
+    def _gen_violin_box_plot(self, fig, ax, x, id_pool, title,
+                             matplotlib_options, vb_type, y_label):
+        """
+        Generate a Violin and Box plot.
+
+        Uses the same params (technically a subset of them) as create_histogram().
+        """
+
+        x_name = x[0]
+        values = self.get_values(id_pool, x_name)[x_name]
+
+        ax.cla()
+
+        if vb_type in ('both', 'violin'):
+            ax.violinplot(values, positions=[1], showextrema=False, **matplotlib_options)
+        if vb_type in ('both', 'box'):
+            ax.boxplot(values, positions=[1], **matplotlib_options)
+
+        ax.set_xticks([])
+        if y_label is not None:
+            ax.set_ylabel(x_name)
+        if title is not None:
+            ax.set_title(title.format(x_name=x_name))
+
+    def _gen_pdf_cdf_plot(self, fig, ax, x, id_pool, title,
+                          matplotlib_options, pc_type, num_bins):
+        """
+        Generate a PDF and CDF plot.
+
+        Uses the same params (technically a subset of them) as create_histogram().
+        """
+
+        x_name = x[0]
+        values = self.get_values(id_pool, x_name)[x_name]
+
+        if not hasattr(ax, SINA_AXIS_IDENTIFIER):
+            setattr(ax, SINA_AXIS_IDENTIFIER, str(uuid.uuid4()))
+
+        ax.cla()
+
+        # Need this since ax1 = ax.twinx() automatically creates an axis on ax as well
+        # This causes a positive feedback loop which keeps creating more axes.
+        for axis in fig.get_axes():
+            if hasattr(axis, SINA_AXIS_IDENTIFIER):
+                if len(axis.figure.axes) > 1:
+                    axis.figure.axes[1].remove()
+
+        if num_bins is None:
+            num_bins = int(math.ceil(math.sqrt(len(values))))
+
+        if pc_type == 'both':
+
+            ax1 = ax.twinx()
+
+            ax.hist(values, bins=num_bins, histtype='step', density=True,
+                    label='PDF', **matplotlib_options)
+            ax1.hist(values, bins=num_bins, histtype='step', density=True,
+                     cumulative=True, label='CDF', color='#ff7f0e', **matplotlib_options)
+
+            ax.set_ylabel("PDF")
+            ax1.set_ylabel("CDF")
+
+            lines, labels = ax.get_legend_handles_labels()
+            lines2, labels2 = ax1.get_legend_handles_labels()
+            ax.legend(lines + lines2, labels + labels2, loc='upper left')
+
+        elif pc_type == 'pdf':
+
+            ax.hist(values, bins=num_bins, histtype='step', density=True, **matplotlib_options)
+            ax.set_ylabel("PDF")
+
+        elif pc_type == 'cdf':
+
+            ax.hist(values, bins=num_bins, histtype='step', density=True, cumulative=True,
+                    **matplotlib_options)
+            ax.set_ylabel("CDF")
+
+        ax.set_xlabel(x_name)
+        if title is not None:
+            ax.set_title(title.format(x_name=x_name))
 
     class _NonInteractiveVis(object):  # pylint: disable=too-many-instance-attributes
         """Helper class for standardizing fig/ax access between visualizations."""
@@ -559,17 +856,16 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
                 title, matplotlib_options, args, _delay_display=True)
             self.widgets = []
             self.selectable_data = selectable_data
-            for dim in range(len(default_values)):
-                self.widgets.append(self.init_dropdown(
-                    self.default_values[dim],
-                    # Hardcoded for now. May revisit if use case arises.
-                    DEFAULT_GRAPH_SETTINGS["dimension_names"][dim]))
-                select_func = self.gen_select(dim)
-                self.widgets[dim].observe(select_func)
+            for dim, default_value in enumerate(default_values):
+                if default_value is not None:
+                    self.widgets.append(self.init_dropdown(
+                        self.default_values[dim],
+                        # Hardcoded for now. May revisit if use case arises.
+                        DEFAULT_GRAPH_SETTINGS["dimension_names"][dim]))
+                    select_func = self.gen_select(dim)
+                    self.widgets[dim].observe(select_func)
             # Children may have further setup and so want to call display themselves.
             if not _delay_display:
-                self.gen_func(self.fig, self.ax, self.default_values, self.id_pool,
-                              self.title, self.matplotlib_options, *self.args)
                 self.display()
 
         def init_dropdown(self, initial_val, name):
@@ -711,3 +1007,24 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
             self.gen_func(self.fig, self.ax, self.default_values, self.id_pool,
                           self.title, self.matplotlib_options, self.curve_set)
             self.fig.canvas.draw()
+
+
+def make_hist_enum(target_list, reverse=False):
+    """
+    Turn a list of values into a list of fake enum values plus key.
+
+    To streamline the various combinations of 1d, 2d, string, scalar,
+    string + scalar etc. histograms, this helper function parses a list like
+    ["ann", "bob", "anne"] into ["ann", "bob"] and [0, 1, 0].
+
+    :returns: a list of unique values, a list of indexes of each value in
+              target_list WRT the unique ones (see above)
+    """
+    # Modern Python dicts remember insertion order, so that's handy!
+    # This is functionally an ordered set.
+    target_set = list(set(target_list))
+    lookup = {x: y for y, x in enumerate(sorted(target_set, reverse=reverse))}
+    enumerated_list = []
+    for entry in target_list:
+        enumerated_list.append(lookup[entry])
+    return list(lookup.keys()), enumerated_list

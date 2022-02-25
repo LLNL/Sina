@@ -137,6 +137,15 @@ public:
      */
     conduit::Node toNode() const override;
 
+   /**
+    * Add another record to this one as library data.
+    *
+    * Useful for libraries that can run in standalone mode; the host
+    * simply calls this method on the record the library produces.
+    * Merges file lists.
+    */
+    void addRecordAsLibraryData(Record const &childRecord, std::string const &name);
+
 private:
     internal::IDField id;
     std::string type;

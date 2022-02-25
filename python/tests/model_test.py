@@ -1,7 +1,8 @@
 """Test the SQL portion of the DAO structure."""
 
-import unittest
 import json
+import tempfile
+import unittest
 
 from sina.model import Record, Run, Relationship, CurveSet
 import sina.model as model
@@ -410,6 +411,19 @@ class TestModel(unittest.TestCase):
         self.assertTrue(test_record.is_valid())
         self.assertEqual(sorted(set(json.loads(target_json))),
                          sorted(set(json.loads(test_record.to_json()))))
+
+    def test_to_file(self):
+        """Ensure we can dump our record as a Sina document file."""
+        with tempfile.NamedTemporaryFile(suffix='.json') as temp_file:
+            self.record_one.to_file(temp_file.name)
+            with open(temp_file.name, "r") as output:
+                doc = json.load(output)
+                self.assertEqual(len(doc["records"]), 1)
+                self.assertEqual(len(doc["relationships"]), 0)
+                loaded_rec = model.generate_record_from_json(doc["records"][0])
+                self.assertTrue(loaded_rec.is_valid())
+                self.assertEqual(sorted(set(self.record_one.raw)),
+                                 sorted(set(loaded_rec.raw)))
 
     def test_generate_json_run(self):
         """Ensure Run JSON is generating properly."""

@@ -1,0 +1,1 @@
+{"records": [{"id": "sample_rec", "type": "sample", "data": {"runtime": {"value": 10.5, "units": "s"}, "user": {"value": "Anna Bob"}, "volume": {"value": [5, 6, 7, 12]}, "mass": {"value": [0.5, 0.5, 0.5, 0.5]}}}], "relationships": []}

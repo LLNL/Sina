@@ -17,6 +17,10 @@ char const GLOBAL_ID_FIELD[] = "id";
 char const TYPE_FIELD[] = "type";
 char const FILES_FIELD[] = "files";
 
+// Used to preserve information when appending "standalone" library data
+char const LIBRARY_DATA_ID_DATUM[] = "SINA_librarydata_id";
+char const LIBRARY_DATA_TYPE_DATUM[] = "SINA_librarydata_type";
+
 }
 
 namespace sina {
@@ -63,6 +67,17 @@ void Record::remove(File const &file) {
 void Record::add(File file) {
     files.erase(file);
     files.insert(std::move(file));
+}
+
+void Record::addRecordAsLibraryData(Record const &childRecord, std::string const &name) {
+    if(!childRecord.files.empty()){
+      for (auto &file : childRecord.files) {
+          add(file);
+      }
+    }
+    auto newLibData = addLibraryData(name, childRecord.toNode());
+    newLibData->add(LIBRARY_DATA_ID_DATUM, Datum{childRecord.getId().getId()});
+    newLibData->add(LIBRARY_DATA_TYPE_DATUM, Datum{childRecord.type});
 }
 
 void RecordLoader::addTypeLoader(std::string const &type, TypeLoader loader) {

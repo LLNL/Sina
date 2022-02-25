@@ -45,6 +45,16 @@ std::shared_ptr<DataHolder> DataHolder::addLibraryData(std::string const &name) 
   return libraryData.at(name);
 }
 
+std::shared_ptr<DataHolder> DataHolder::addLibraryData(std::string const &name, conduit::Node existingLibraryData) {
+  auto existing = libraryData.find(name);
+  if (existing == libraryData.end()) {
+      libraryData.emplace(name, std::make_shared<DataHolder>(existingLibraryData));
+    } else {
+        existing->second = std::make_shared<DataHolder>(existingLibraryData);
+    }
+  return libraryData.at(name);
+}
+
 void DataHolder::setUserDefinedContent(conduit::Node userDefined_) {
     userDefined = std::move(userDefined_);
 }
