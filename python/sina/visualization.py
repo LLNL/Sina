@@ -161,7 +161,7 @@ class Visualizer(object):
         # to inform our interactive vis (if any) what the contents of any given curve
         # set is. This assumes that records are homogenous within the id_pool.
         if id_pool is None:
-            sample_rec = self.recs.get(self.recs.get_all(ids_only=True))
+            sample_rec = self.recs.get(next(self.recs.get_all(ids_only=True)))
         else:
             sample_rec = self.recs.get(id_pool[0])
         if curve_set is None:
@@ -465,11 +465,19 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
         if matplotlib_options.get("cmap"):
             fig.colorbar(surface_plot, shrink=0.5, aspect=5)
 
-    def _gen_line_plot(self, fig, ax, value_names, id_pool, title, matplotlib_options, curve_set):
+    def _gen_line_plot(self, fig, ax, value_names, id_pool, title, matplotlib_options, curve_set,
+                       sample_rec=None):
         """
         Generate a lineplot.
 
-        Uses the same params as create_histogram(), plus curve_set to set the curve set.
+        Uses the same params as create_histogram(), plus curve_set to set the curve set and
+        sample_rec to allow the passing of curve set names.
+
+        Note that the sample_rec isn't (currently) used here directly, but line plots are
+        a bit special in that they require so much extra logic to handle using curve sets.
+        By allowing it to be passed through here, we let _setup_vis to stay ignorant of
+        the specifics of the _gen functions, while also not needing to violate the
+        decoupling of the _Vis classes from the database.
         """
         x_of_interest, y_of_interest = value_names
         ax.cla()
@@ -617,7 +625,7 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
             # We do this here because the super() call needs to come first.
             # This sets our axes dropdowns to match our curve set, then draws
             self.display()
-            self.reset_selectable_curves()
+            self.reset_selectable_curves(default_values)
 
         def get_curves_in_current_set(self):
             """Return all curves (both dependent and independent) for a curve set name."""
@@ -627,19 +635,31 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
                             .union(self.sample_rec.curve_sets[self.curve_set]["dependent"].keys()))
             return self.selectable_data
 
-        def reset_selectable_curves(self):
-            """Reset the selection dropdowns to fit the current curve set."""
+        def reset_selectable_curves(self, axis_overrides=None):
+            """
+            Reset the selection dropdowns to fit the current curve set.
+
+            :param axis_overrides: When the curve set changes, we set our axes to
+                                   the first name we find in the curve set, to avoid
+                                   generating a stack of errors while the graph is being
+                                   reconfigured. If we know a set of names is "safe" as
+                                   defaults though (guaranteed to exist with the new curve set,
+                                   ex: when this is first called), pass them here to have
+                                   them set.
+            """
             for idx in range(1, len(self.widgets)):  # Don't reset the curve set widget
                 # Dynamically resetting the options for a widget is pretty nasty, and
                 # involves observe/unobserve chicanery that isn't well documented.
                 # Instead, since they're simple, we recreate them.
                 dim = idx-1  # We have the curve set dropdown first for user ease
+                new_val = (self.available_curves[0] if axis_overrides is None
+                           else axis_overrides[dim])
                 self.widgets[idx].close()
                 self.widgets[idx] = self.init_curve_axis_dropdown(
-                    self.available_curves[0],
+                    new_val,
                     DEFAULT_GRAPH_SETTINGS["dimension_names"][dim])
                 self.widgets[idx].observe(self.gen_axis_select(dim))
-                self.default_values[dim] = self.available_curves[0]
+                self.default_values[dim] = new_val
                 IPython.display.display(self.widgets[idx])
             self.gen_func(self.fig, self.ax, self.default_values, self.id_pool,
                           self.title, self.matplotlib_options, self.curve_set)
