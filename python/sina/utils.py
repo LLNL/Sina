@@ -98,7 +98,7 @@ def _load_document(document_as_string):
         if 'id' not in entry:
             id = str(uuid.uuid4())
             try:
-                local[entry['local_id']] = id
+                local[entry.pop('local_id')] = id
                 # Save the UUID to be used for record generation
                 entry['id'] = id
             except KeyError:
@@ -140,6 +140,17 @@ def load_records(path_or_file):
     Read a Sina document at the specified location and return the list of
     records in it.
 
+    To load records from multiple files, you can use
+    `glob.glob() <https://docs.python.org/3/library/glob.html#glob.glob/>`_
+    or `os.walk <https://docs.python.org/3/library/os.html#os.walk>`_.
+    For example, to recursively load all records in any json files in the
+    directory "my_runs", you can do the following::
+
+        records = []
+        for file in glob.glob('my_runs/**/*.json', recursive=True):
+            records += load_records(file)
+
+
     :param path_or_file: the path of a file, or a io.TextIOBase object from
      which to read the document
     :return: the list of records in the document
@@ -176,7 +187,7 @@ def import_json(factory, json_paths):
 
     if not factory.supports_parallel_ingestion or len(json_paths) < 2:
         for json_path in json_paths:
-            records, relationships = convert_json_to_records_and_relationships(json_path)
+            records, relationships = load_document(json_path)
             factory.create_record_dao().insert(records)
             factory.create_relationship_dao().insert(relationships)
     else:

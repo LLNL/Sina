@@ -44,7 +44,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(len(expected_relationships), len(dumped_relationships))
 
         def rel_sort(relationships):
-            relationships.sort(lambda x, i: cmp(i.subject_id, i.object_id))
+            relationships.sort(key=lambda x: (x.subject_id, x.object_id))
         rel_sort(expected_relationships)
         rel_sort(dumped_relationships)
         for exp_rel, dump_rel in zip(expected_relationships, dumped_relationships):

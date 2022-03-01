@@ -7,9 +7,14 @@
 # but use of the py2&3--compatible version is not enforced otherwise
 more-itertools<=5.0.0
 # As with more-itertools, we need a version that keeps python 2 support.
-# importlib and pyrsistent are not direct dependencies of sina.
+# importlib, markupsafe, and pyrsistent are not direct dependencies of sina.
 importlib_metadata==1.7.0
 pyrsistent<0.17.3
+markupsafe<=1.1
+
+# Need to restrict version to build with python 2. Should be able to
+# get rid of this when we are python3-only.
+virtualenv<20; python_version < "3.0"
 
 tox<3.14
 flake8
@@ -23,4 +28,5 @@ sphinx_rtd_theme
 
 # Install the project in editable (development) mode, which also adds 
 # setup.py's install_requires packages.
+# We also need the jupyter requirements to work with sina's visualization.py module.
 -e .

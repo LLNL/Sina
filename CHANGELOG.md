@@ -5,8 +5,34 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
-1.11
+1.12
 ============
+- Added a visualization module, sina.visualization, that creates matplotlib visualizations directly from Sina DataStores
+    - Includes interactive mode for live configuration of data
+    - Initial module includes scatter plots, line plots, histograms, and surface plots
+    - For full features and functionality, see documentation
+- Added ways to simplify access to the values of data and curves via
+  attribute-style and subscript-style access to Records.
+
+    - `sina.model.Record.data_values` allows direct access to data items.
+      For example, you can write `my_field = my_record.data_values.my_field` to
+      access the value of `my_field`.
+    - `sina.model.Record.curve_set_values` allow direct access to curve sets.
+      For example, `my_record.curve_set_values.my_curve_set.temperature = [1, 2, 3]`
+      sets the values for `temperature` in curve set `my_curve_set`.
+- Added new query: DataStore.records.get_curve_set_names()
+- Added filter_constants to DataStore.records.data_names(): filters out data whose values don't change between Records
+- Improved usage of DataStore.records.find() with a large id_pool 
+- Made update() properly available as DataStore.records.update()
+- Reduced max string column size to 15k to fit updated LC row length requirements
+- Updated documentation, including fix to schema docs and example of loading Records from multiple files
+- Fixed a bug wherein update() calls would not delete removed attributes
+- Fixed a bug where 0 was treated as false in DataRanges
+- Explicitly remove local_id field from ingested Records 
+- Various internal test/build improvements, such as correct deallocation of node post-test 
+
+1.11
+====
 - Added load_records() and load_sole_record() functions.
 - Added QoL for CurveSets and Curves
 - Improved functionality of find():

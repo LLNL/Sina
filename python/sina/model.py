@@ -8,11 +8,16 @@ import copy
 import six
 
 import sina.sjson as json
+import sina.proxies
 
 logging.basicConfig()
 LOGGER = logging.getLogger(__name__)
 RESERVED_TYPES = ["run"]  # Types reserved by Record's children
 
+
+# Disable this check temporarily. Need to move some classes to another
+# location, but that is well out of scope for the current task.
+# pylint: disable=too-many-lines
 
 # Disable redefined-builtin, invalid-name due to ubiquitous use of id and type
 # pylint: disable=invalid-name,redefined-builtin
@@ -93,6 +98,14 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         self['data'] = data
 
     @property
+    def data_values(self):
+        """
+        Get a :py:class:`sina.proxies.ValueProxy` object that gives direct
+        access to the "value" objects of the "data" dictionary on this record.
+        """
+        return sina.proxies.ValueProxy(self['data'])
+
+    @property
     def curve_sets(self):
         """Get or set the Record's curve dictionary."""
         return self['curve_sets']
@@ -124,6 +137,14 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
             raise AttributeError('Record "{}" has no curve set "{}"'.format(self.id, name))
 
     @property
+    def curve_set_values(self):
+        """
+        Get a :py:class:`sina.proxies.CurveSetProxy` object that gives direct
+        access to the "value" objects of curves sets in this record.
+        """
+        return sina.proxies.CurveSetProxy(self.raw['curve_sets'])
+
+    @property
     def library_data(self):
         """Get or set the Record's data dictionary."""
         return self['library_data']
@@ -131,6 +152,15 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
     @library_data.setter
     def library_data(self, library_data):
         self['library_data'] = library_data
+
+    @property
+    def library_data_values(self):
+        """
+        Get a :py:class:`sina.proxies.LibraryValuesProxy` object that gives
+        access to the "value" objects of data and curves sets in the
+        library sections of this record.
+        """
+        return sina.proxies.LibraryValuesProxy(self.library_data)
 
     @property
     def files(self):

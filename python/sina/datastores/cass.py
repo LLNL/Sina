@@ -882,20 +882,37 @@ class RecordDAO(dao.RecordDAO):
         # CQL's "distinct" is limited to partition columns (ID) and "static" columns only.
         return list(set(schema.Record.objects.values_list('type', flat=True)))
 
-    def data_names(self, record_type, data_types=None):
+    def get_curve_set_names(self):
+        """
+        Return the names of all curve sets available in the backend.
+
+        :returns: An iterable of curve set names.
+        """
+        return (schema.RecordFromCurveSetMeta.objects.distinct(['name'])
+                .values_list('name', flat=True))
+
+    def data_names(self, record_type, data_types=None, filter_constants=False):
         """
         Return a list of all the data labels for data of a given type.
+
         Defaults to getting all data names for a given record type.
 
         :param record_type: Type of records to get data names for.
         :param data_types: A single data type or a list of data types
                            to get the data names for.
+        :param filter_constants: Whether to filter out data whose values are the
+                                 same for all records. NOT CURRENTLY SUPPORTED IN
+                                 CASSANDRA.
 
         :returns: A generator of data names.
         """
         type_name_to_tables = {'scalar': schema.ScalarDataFromRecord,
                                'string': schema.StringDataFromRecord}
         possible_types = list(type_name_to_tables.keys())
+        if filter_constants:
+            msg = """filter_constants is not currently supported, due to cqlengine not yet
+implementing GROUP_BY. Please email the siboka team if you need this functionality."""
+            raise ValueError(msg)
         if data_types is None:
             data_types = possible_types
         if not isinstance(data_types, list):

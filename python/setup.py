@@ -3,7 +3,7 @@
 
 from setuptools import setup, find_packages
 
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 
 setup(name='llnl-sina',
       version=VERSION,

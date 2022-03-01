@@ -14,6 +14,7 @@ Sina documentation index
    schema_best_practices
    cli_basics
    api_basics
+   visualization
    cpp
    examples
    faq

@@ -297,10 +297,7 @@ def setup_logging(args):
         ROOTLOGGER.addHandler(stream_handler)
 
     LOGGER.info("-------------------------STARTING-------------------------")
-    LOGGER.info("INFO Logging Level -- Enabled")
-    LOGGER.warning("WARNING Logging Level -- Enabled")
-    LOGGER.critical("CRITICAL Logging Level -- Enabled")
-    LOGGER.debug("DEBUG Logging Level -- Enabled")
+    LOGGER.info("Logging level: %s", loglevel)
 
 
 def ingest(args):

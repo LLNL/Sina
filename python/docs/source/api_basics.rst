@@ -32,9 +32,9 @@ You start by creating a DataStore, which will connect to your backend of
 choice and expose many functions for interacting with the Records and
 Relationships stored within. For a simple demonstration::
 
-  from sina.datastore import create_datastore
+  import sina
 
-  ds = create_datastore(db_path="somefile.sqlite")
+  ds = sina.connect(database="somefile.sqlite")
   all_sruns = ds.records.find(types=["srun", "msub"])
 
 This would set :code:`all_sruns` to a list of all the records contained in
@@ -83,7 +83,7 @@ data, simply specify the owning library/libraries with path notation::
 
   # This would find records with a library named "outer_lib" that has a library
   # named "inner_lib", that itself has a data item "final volume" equal to 310
-  records = ds.records.find(data={"outer_lib/inner_lib/final_volume"=310})
+  records = ds.records.find(data={"outer_lib/inner_lib/final_volume":310})
 
 IMPORTANT NOTE: when providing multiple criteria, only entries fulfilling all criteria
 will be returned (boolean AND). If OR-like functionality is desired, see the next
@@ -315,3 +315,36 @@ also possible to delete ALL a datastore's contents (Records, Relationships, etc.
 with :code:`ds.delete_all_contents`. This is irrecoverable and will prompt
 confirmation from the user (which can be bypassed with :code:`skip_prompt=True`;
 use with caution).
+
+Working With Records
+~~~~~~~~~~~~~~~~~~~~
+Once you have acquired a record, you will likely want to access values and
+other data within it. To access the full set of data in a record,
+you can use the :py:attr:`sina.model.Record.data`,
+:py:attr:`sina.model.Record.curve_sets`,
+and :py:attr:`sina.model.Record.library_data` attributes. This will give
+you access to the Python dictionaries containing the values, tags, and units
+of any items in the record. The examples below illustrate the basic
+access pattern::
+
+  ...
+  my_record = Record(...)
+  energy_data = record.data['energy']
+  energy = energy_data['value']
+  energy_units = energy_data['units']
+  energy_tag = energy_data['tags']
+
+While the above allows us to access all the information attached to attributes,
+it can be rather verbose for when you just want the values. For those cases,
+you can use :py:attr:`sina.model.Record.data_values`,
+:py:attr:`sina.model.Record.curve_set_values`,
+and :py:attr:`sina.model.Record.library_data_values`::
+
+  ...
+  my_record = Record(...)
+  energy = record.data_values.energy  # e.g. 12.34
+  time = record.curve_set_values.cs1.time  # e.g. [0.1, 0.2, 0.3, ...]
+
+For more details on this, see the documentation linked above. There is also
+a notebook called "Working with Records" that has more examples. Instructions
+for getting the notebooks can be found in the :ref:`readme` section.

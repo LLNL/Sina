@@ -285,6 +285,15 @@ class RecordDAO(object):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_curve_set_names(self):
+        """
+        Return the names of all curve sets available in the backend.
+
+        :returns: An iterable of curve set names.
+        """
+        raise NotImplementedError
+
     def exist(self, test_ids):
         """
         Given an (iterable of) id(s), return boolean (list) of whether those
@@ -327,14 +336,19 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
-    def data_names(self, record_type, data_types):
+    def data_names(self, record_type, data_types, filter_constants):
         """
         Return a list of all the data labels for data of a given type.
+
         Defaults to getting all data names for a given record type.
 
         :param record_type: Type of records to get data names for.
         :param data_types: A single data type or a list of data types
                            to get the data names for.
+        :param filter_constants: If True, will filter out any string or scalar data
+                                 whose value is identical between all records in the
+                                 database (such as the density of some material). No
+                                 effect on list data.
 
         :returns: A generator of data names.
         """

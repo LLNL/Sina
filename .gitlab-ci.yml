@@ -1,26 +1,33 @@
 variables:
-  ALLOC_NAME: "sina_gitlab_runner_build_test_alloc"
+  ALLOC_NAME: "sina_gitlab_runner_build_test_alloc_${CI_PIPELINE_ID}"
 
 stages:
   - allocate
   - test
   - test-integration
   - deploy
+  - deallocate
 
-.get-alloc:
-  # Gets an allocation on a target machine.
-  # This is used to avoid doing heavy work on the login node.
-  # Be sure to run this before other jobs to get $JOBID set!
+allocate_nodes:
   tags:
     - shell
+    - quartz
+  stage: allocate
   script:
     - echo "===== begin alloc for remaining stages ====="
-    - echo "Cancelling previous allocation, if it exists"
-    - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
-    - if [ -z "${JOBID}" ] ; then scancel $JOBID; fi
-    - salloc -N 1 -c 36 -p pdebug -t 60 --no-shell --job-name=$ALLOC_NAME
+    -  salloc -N 1 --exclusive -p pdebug -t 60 --no-shell --job-name=$ALLOC_NAME
     - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
     - echo "===== alloc'd JOBID $JOBID ====="
+
+deallocate_nodes:
+  tags:
+    - shell
+    - quartz
+  stage: deallocate
+  when: always
+  script:
+    - export JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
+    - ([[ -n "${JOBID}" ]] && scancel ${JOBID} || echo "Job ${JOBID} not running")
 
 .test-python:
   # Runs the base set of Sina Python tests. This doesn't include
@@ -34,9 +41,11 @@ stages:
     # Potential race condition. If Jupyter tests fail on concurrent tests, see about changing this.
     - rm -rf ~/.local/share/jupyter/kernels/sina-test
     - cd python
+    - module load python/3.8
     - echo "Running Sina Python tests"
     - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
-    - srun $( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID}" ) -t 60 -n1 make tests
+    - SRUN_OPTS=$( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID} --exclusive" || echo "-ppdebug")
+    - srun $SRUN_OPTS -t 60 -n1 make tests
   artifacts:
     paths:
       - python/tests/test_venv
@@ -51,6 +60,7 @@ stages:
   script:
     - echo "===== begin test_python_mysql ===== "
     - cd python
+    - module load python/3.8
     - make test-mysql
 
 .test-cpp:
@@ -72,7 +82,17 @@ stages:
     - cd cpp
     - rm -fr "build-$CPP_TEST_TARGET_COMPILER"
     - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
-    - srun $( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID}" ) -t 60 -n1 run-builds.py $CPP_TEST_TARGET_COMPILER
+    - SRUN_OPTS=$( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID} --exclusive" || echo "-ppdebug")
+    - srun $SRUN_OPTS -t 60 -n1 run-builds.py $CPP_TEST_TARGET_COMPILER
+
+    # When coming back from the build job, sometimes there is a lag in
+    # the file system and the new build directory is not yet visible on
+    # the login node. This causes failures on the next step. Trying to
+    # make the directory should be an atomic operation, causing the
+    # "mkdir -p" call below to wait. We add the "-p" so the call will not
+    # fail due to the existence of the directory.
+    - mkdir -p "build-$CPP_TEST_TARGET_COMPILER"
+
     - cd "build-$CPP_TEST_TARGET_COMPILER"
     - echo "Running tests for C++"
     - bin/unittests --gtest_output=xml:test_results.xml
@@ -133,6 +153,7 @@ stages:
     - echo "===== begin doc deployment ====="
     - echo "Making Python docs"
     - cd python
+    - module load python/3.8
     - make docs
     - rm -rf $DOC_DIR/sina && cd ./docs/build && mv ./html $DOC_DIR/sina
     - cd ../cpp/build-clang
@@ -148,24 +169,28 @@ stages:
 test-cpp-clang-CZ:
   tags:
     - quartz
+    - shell
   stage: test
   extends: [ .test-cpp-clang ]
 
 test-cpp-icc-CZ:
   tags:
     - quartz
+    - shell
   stage: test
   extends: [ .test-cpp-icc ]
 
 test-python-CZ:
   tags:
     - quartz
+    - shell
   stage: test
   extends: [ .test-python ]
 
 test-python-mysql-CZ:
   tags:
     - quartz
+    - shell
   stage: test
   variables:
     SINA_MYSQL_TEST_CONNECTION: "mysql+mysqlconnector://cz-wf-dev.apps.czapps.llnl.gov:31706/?read_default_file=$HOME/.my.cnf.test_sina"
@@ -173,6 +198,7 @@ test-python-mysql-CZ:
 
 test-integration-CZ:
   tags:
+    - shell
     - quartz
   stage: test-integration
   extends: [ .test-cpp-clang, .test-integration]
@@ -184,7 +210,7 @@ deploy-RZ:
   only:
     variables:
       - $DO_DEPLOY
-  extends: [.get-alloc, .deploy-all]
+  extends: [.deploy-all]
 
 deploy-docs-CZ:
   tags:
@@ -193,4 +219,4 @@ deploy-docs-CZ:
   only:
     variables:
       - $DO_DEPLOY
-  extends: [.get-alloc, .deploy-docs]
+  extends: [.deploy-docs]

@@ -91,11 +91,11 @@ A more fleshed-out example, with field descriptions:
           "outer_lib": {
               // libraries can have curve_sets and data sections just like the greater Record.
               // They cannot have files or user_defined; those still belong to the greater Record.
-              "data": {"total_energy": 2.2},
+              "data": {"total_energy": {"value": 2.2}},
               // libraries can be nested to whatever depth is required
               "library_data": {
                   "inner_lib": {
-                      "data": {"total_energy": 0.2}
+                      "data": {"total_energy": {"value": 0.2}}
                   }
               }
           }

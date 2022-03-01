@@ -14,7 +14,9 @@ from sqlalchemy.schema import Index  # pylint: disable=import-error
 
 Base = declarative_base()
 
-MAX_STRING_SIZE = 16000  # The version of MySQL used on LC enforces this size
+# The version of MySQL used on LC enforces 16k max, but 16k on our tables would go
+# over the max row size.
+MAX_STRING_SIZE = 15000
 LARGE_STRING_SIZE = 1500  # Size for longer strings like URIs
 
 
