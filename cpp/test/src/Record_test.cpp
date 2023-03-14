@@ -26,6 +26,8 @@ char const EXPECTED_DATA_KEY[] = "data";
 char const EXPECTED_LIBRARY_DATA_KEY[] = "library_data";
 char const EXPECTED_FILES_KEY[] = "files";
 char const EXPECTED_USER_DEFINED_KEY[] = "user_defined";
+char const LIBRARY_DATA_ID_DATUM[] = "SINA_librarydata_id";
+char const LIBRARY_DATA_TYPE_DATUM[] = "SINA_librarydata_type";
 
 TEST(Record, create_typeMissing) {
     conduit::Node originalNode;
@@ -99,6 +101,41 @@ TEST(Record, add_file_existing_key) {
     record.add(replacement);
     EXPECT_EQ(1u, record.getFiles().size());
     EXPECT_EQ("image", record.getFiles().find(File{path})->getMimeType());
+}
+
+TEST(Record, add_child_record_as_library_data) {
+  Record parentRecord{ID{"parent id", IDType::Local}, "test_record_parent"};
+  Record childRecord{ID{"child id", IDType::Local}, "test_record_child"};
+  parentRecord.addRecordAsLibraryData(childRecord, "child");
+  auto &parentLibData = parentRecord.getLibraryData();
+  ASSERT_THAT(parentLibData, Contains(Key("child")));
+  auto &childLibContents = parentLibData.at("child")->getData();
+  ASSERT_THAT(childLibContents, Contains(Key(LIBRARY_DATA_ID_DATUM)));
+  EXPECT_EQ("child id", childLibContents.at(LIBRARY_DATA_ID_DATUM).getValue());
+  ASSERT_THAT(childLibContents, Contains(Key(LIBRARY_DATA_TYPE_DATUM)));
+  EXPECT_EQ("test_record_child", childLibContents.at(LIBRARY_DATA_TYPE_DATUM).getValue());
+}
+
+TEST(Record, add_child_record_as_library_data_with_data) {
+  Record parentRecord{ID{"parent id", IDType::Local}, "test_record_parent"};
+  Record childRecord{ID{"child id", IDType::Local}, "test_record_child"};
+  childRecord.add("key1", Datum{"val1"});
+  parentRecord.addRecordAsLibraryData(childRecord, "child");
+  auto &childLibContents = parentRecord.getLibraryData().at("child")->getData();
+  ASSERT_THAT(childLibContents, Contains(Key("key1")));
+  EXPECT_EQ("val1", childLibContents.at("key1").getValue());
+}
+
+TEST(Record, add_child_record_as_library_data_with_files) {
+  Record parentRecord{ID{"parent id", IDType::Local}, "test_record_parent"};
+  Record childRecord{ID{"child id", IDType::Local}, "test_record_child"};
+  std::string path = "the/path.txt";
+  File childFile{path};
+  childFile.setMimeType("txt");
+  childRecord.add(childFile);
+  parentRecord.addRecordAsLibraryData(childRecord, "child");
+  EXPECT_EQ(1u, parentRecord.getFiles().size());
+  EXPECT_EQ("txt", parentRecord.getFiles().find(File{path})->getMimeType());
 }
 
 TEST(Record, create_localId_fromNode) {

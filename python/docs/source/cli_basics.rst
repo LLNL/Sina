@@ -1,6 +1,14 @@
 CLI Basics
 ==========
 
+.. warning::
+    Sina's command line interface (CLI) is undergoing a major overhaul. For
+    now, it's recommended to use it mostly as a convenient, code-free way of
+    ingesting data. Its querying and export capabilities are out of date, and due to
+    the scale of the refactor, intermediate changes aren't added to the docs.
+    For now, please consider this page likely out of date--if you run into
+    any difficulties using the CLI, reach out to us!
+
 The Sina command line interface (CLI) acts as a simplified and less feature-rich
 companion to the API; its primary use is ingesting data, but it supports three
 subcommands: query, ingest, and export. To access these subcommands, make sure you're

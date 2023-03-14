@@ -1,7 +1,14 @@
 .. _sina_schema:
 
-Sina Schema
-============
+Sina JSON Schema
+================
+
+.. note:: Most users won't interact with Sina's JSON schema directly. This is provided as a
+    reference for anyone designing a workflow where direct interaction with the
+    JSON is required. Most post-processing can be done through Sina's Python API, which
+    is more user-friendly; visit `the post-processing tutorial <examples/post_processing.html>`__
+    for more info.
+
 
 Overview
 --------
@@ -10,7 +17,9 @@ The Sina schema is a generalized JSON format for representing experimental data.
 It consists of two types of JSON objects: Records, which represent the components in
 an experiment (such as runs, msubs, and jobs) and Relationships, which represent
 the relationships between Records. This page outlines the basics of the schema.
-Further helpful info can be found at :ref:`schema_best_practices`.
+
+These concepts are, of course, deeply linked to Sina's `API Concepts <api_basics.html>`__.
+Familiarity with those should help here!
 
 Each Sina document consists of a single JSON object with arrays for Records and
 Relationships:
@@ -40,19 +49,20 @@ A minimal example of a Record:
 
 Note that :code:`id` can be replaced by :code:`local_id`. Use :code:`local_id`
 if you're not sure that all your Records will be named uniquely (:code:`local_id` must
-still be unique within a JSON document).
+still be unique within a JSON document). This is especially useful when outputting
+a Sina Record from a code, since it avoids needing to come up with a UUID/etc. within
+the integration.
 
 A more fleshed-out example, with field descriptions:
 
-.. warning::
-    Comments are not part of the JSON standard, meaning this example is not
+.. warning:: Comments are not part of the JSON standard, meaning this example is not
     valid JSON. See the end of this page for a JSON "skeleton" or one of the
     example datasets (described in the :ref:`readme`) for valid Sina JSON.
 
 .. code-block:: javascript
 
     {
-      // Category of the Record. Some types (ex: run) have additional support within Sina
+      // Category of the Record.
       "type": "some_type",
       // Local ID of the Record. Must be unique within JSON document. Will be
       // replaced by global id (or simply 'id') in db.
@@ -155,40 +165,6 @@ When ingested by Sina, the :code:`local_id` "run1" and :code:`local_object` "run
 to the same globally unique ID in order to preserve the relationship.
 
 
-Special Record Types
---------------------
-
-Certain types of Records are expected to recur in data ingested by Sina.
-These types support additional fields in datastores created by Sina, and
-may also support additional queries. What follows is a list of Sina's
-special Record types and the fields they support. Note that **all
-fields supported by generic Sina Records are supported by the special types**,
-such as :code:`local_id`, :code:`data`, etc.
-
-Run
-~~~
-
-A Run is a Record that represents a single "run" of code within an application.
-As such, Runs **require** an application identification, and optionally take
-a user and version:
-
-.. code-block:: javascript
-
-    {
-      "type": "run", // Type is case-sensitive
-      "id": "myRunName",
-      "application": "hydro",  // The application that produced the run
-      "user": "John Doe",  // The user who ran the application
-      "version": "1.5-dev2",  // The application's version
-      "files": {
-          "run_image_1.png": {"mimetype": "png"}
-      },
-      "data": {
-          "final_energy": {"value": 4005.52, "units": "kJ"}
-      }
-    }
-
-
 Complete, Empty Document
 ------------------------
 
@@ -203,9 +179,9 @@ actual name of the datum (such as "density" or "max_volume").
         {
           "type": "",
           "id": "",
-          "files": [
-              {"uri": "", "mimetype": "", "tags": []}
-          ],
+          "files": {
+              "uri": {"mimetype": "", "tags": []}
+          },
           "data": {
               "datum_name": {"value": "", "units": "", "tags": []}
           },
@@ -220,6 +196,16 @@ actual name of the datum (such as "density" or "max_volume").
           "data": {
               "datum_name": {"value": [], "units": "", "tags": []}
           },
+          "curve_sets": {
+              "curve_set_name": {
+                  "independent": {
+                      "independent_name": {"value": [], "units": "", "tags": []}
+                  },
+                  "dependent": {
+                      "dependent_name": {"value": [], "units": "", "tags": []}
+                  }
+              }
+          }
           "library_data": {
               "outer_lib": {
                   "data": {"datum_name": {"value": [], "units": "", "tags": []}}

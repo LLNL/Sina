@@ -1,350 +1,216 @@
 .. _api-basics:
 
-API Basics
-==========
+API Concepts
+============
 
 .. note::
-    This page documents the major concepts of Sina's API; for a hands-on
-    tutorial, see the Jupyter notebooks detailed in the :ref:`readme`.
+    This page documents Sina API concepts, essentially the "what" and "why", and
+    is intended for those needing to think about Sina as a workflow component.
+    You may want to check out `the examples <examples/index.html>`__
+    for practical coverage, code examples, and a greater focus on the "how".
 
-Major API Concepts
-~~~~~~~~~~~~~~~~~~
-The Sina API is organized around Records and Relationships.
-A Record typically represents something like a run, msub, or experiment, while a
+An Overview of Working with the Sina API
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Sina API is organized around Records and Relationships. These are stored in
+a DataStore to be queried en masse.
+
+A Record typically represents something like a run, msub, or experiment (more
+generally, a set of inputs and corresponding outputs and metadata), while a
 Relationship represents a link between Records, such as which msub submitted which
-job. Records and Relationships are both valid JSON objects, and are documented
-further in the :ref:`sina_schema`. Sina's API allows users to store, query, and retrieve
-these objects from several backends, including SQL and Cassandra, using
-backend-agnostic Python.
+job. Records and Relationships are Python objects, and are often stored as/read from
+JSON (as a compromise between human readability and ease of automation).
+
+Sina's API allows users to store, query, and retrieve Records and Relationships
+from several backends, including SQLite, MySQL, and Cassandra, using
+backend-agnostic Python to both access and modify them. The only time the user
+should need to worry about the backend is during the initial setup; when using the
+simplest backend, no setup is required beyond choosing a filename (if even that).
+Because these backends differ greatly, but Sina "hides" these differences, we use
+the more general term "DataStore".
+
+For an example of these three things in action, let's say you launch an ensemble of runs:
+simulations of a baseball impacting a certain model of bat, with the
+initial velocity being varied between them. Each run is represented as a Record containing the inputs,
+outputs, and any files produced--one Record is one collection of all the information
+surrounding one impact between ball and bat. The ensemble itself could also have a Record
+(containing shared metadata, msub parameters, etc), and we can use Relationships
+to link an ensemble to each of its runs. If you realize you ran the ensemble in a legacy units
+mode, Sina's API lets you easily find those runs, iterate through them, and update the units.
+Once your runs are all complete, you
+could ask the DataStore which simulation had the greatest :code:`total_baseball_distance`,
+it hands you back the Record, you can easily pull the :code:`.silo` containing the mesh
+of the bat, as we  stored its path as part of the workflow. This can all be
+accomplished in around a dozen lines of Python, total.
+
+Because Sina integrates with simulation codes, the hope is that all of the above can
+be achieved with minimal effort on the user side; the code outputs a JSON
+Record per run, which (along with any Relationships) can be handed to Sina DataStore
+as part of the workflow, and all the user needs to think about is how they personally
+want to interact with the data.
+
+Of course, creating such a fluid experience requires bridging the way users
+think about data and the way Sina "thinks" about data. The rest of this document
+covers the latter, in hopes of making the process as easy as possible!
 
 
-Special Record Types
-####################
-While a Record can represent anything, there are special types of Records,
-such as Runs, that support additional queries. Any Record with a :code:`type`
-equal to the name of a special type will be sorted somewhat differently
-to allow for these queries. To see what types are available, please see the
-`Model documentation <generated_docs/sina.model.html>`__
+What a Record Is
+~~~~~~~~~~~~~~~~
 
-Basic Access
-############
-You start by creating a DataStore, which will connect to your backend of
-choice and expose many functions for interacting with the Records and
-Relationships stored within. For a simple demonstration::
+A Record is Sina's basic unit of info, often a collection of inputs and outputs
+(ex: one run of a simulation, one analyte on a well plate). Records are useful
+on their own, as they represent that info in a simple, Python-friendly
+object that can be analyzed and post-processed without the hassle of
+heterogenous file structures and the like.
+
+.. image:: images/record_concrete.png
+  :width: 600
+  :align: center
+  :alt: Diagram version of the contents of the following paragraph, starting with "If you use"
+
+If you use a simulation code that outputs a :code:`_sina.json` file, think of it
+as the filesystem equivalent of a Record (specifically, a Record object
+representing your simulation run). You can turn the json into
+a Record, and dump the Record back out as the json. Of course, reading the json
+into a Record doesn't intrinsically link them--that is, editing the Record object won't
+edit the file any more than opening a .pkl file and editing the object(s) within
+would edit the .pkl. But once you dump that Record back to json, they're once
+again in sync.
+
+
+What a Record Is Used For
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+First off, you can use the aforementioned Record/json parity to post-process
+simulation runs. See `the post-processing tutorial <examples/post_processing.html>`__
+for an example!
+
+Records are even more useful in aggregate. When collected together, you can use Sina to
+efficiently locate Records (and thus runs of a simulation, components in a workflow, etc.) that
+fulfill criteria. You can then get back that entire Record for deeper analysis--again,
+no need to hassle with paths, combine data across files, etc.
+
+A major part of this is the Record's :code:`data` field, which holds the
+inputs, outputs, start times, etc. the Record's associated with. :code:`data`'s
+contents can be *queried* (the criteria matching above). For example,
+let's say we're interested in all Records with a
+:code:`final_volume` of 310 and with a :code:`quadrant` of "NW"::
+
+  records = ds.records.find_with_data(final_volume=310, quadrant="NW")
+
+Of course, Records can have more than just data associated with them! Files,
+families of curves, libraries (with their own data, curve sets, files, etc), as well
+as the Record's :code:`type` (a short description of what the Record represents, often
+something like :code:`msub` or :code:`phase_0_run`), all can be queried alone
+or in concert to retrieve Records that fulfill all specified criteria over your
+entire set of runs. These forms of information are also available to Sina's visualizations
+and other utilities, meaning that a Record that properly characterizes your
+simulation can, as you continue to fire off runs, seamlessly evolve into the
+capability to analyze the entire set of runs at a go.
+
+
+What a Relationships Is
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Because Relationships are much simpler than Records, most of their concepts can
+(and are) covered in a single dedicated tutorial, found `here <examples/relationships.html>`__
+
+In short, Relationships are used to form links between Records, and consist of
+exactly three parts: subject_id, predicate, and object_id. These work more or less as
+a sentence: in "Anne knows Bob", "Anne" is the subject_id, "knows" is the predicate,
+and "Bob" is the object_id. Another example is "msub_1 submits run_22".
+
+
+What a Relationship Is Used For
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can use Relationships to glue together your workflow, associate iterations of
+a Record, really anything where you'd want to retrieve info about some Record from another.
+
+.. image:: images/relationship_concrete.png
+  :width: 600
+  :align: center
+  :alt: Diagram version of the contents of the following paragraph, starting with "Relationships are key"
+
+Relationships are key to modeling more robust workflows. For example, your workflow might
+involve runs done against a few different decks. You might want to store some info about
+a deck, and check that info if the deck produces an interesting run. Since that
+deck is re-used (one deck, many runs), you may not want to store thousands of copies of that
+same information. Having a relationship between the Record representing each run and the
+Record representing the deck used (think "run_22" "uses" "deck_A") makes that easy!
+
+Of course, Relationships are completely optional, and generally not necessary
+for the most basic Sina cases (ex: you just want to store runs of a simulation
+and produce some graphs about them).
+
+
+What a DataStore Is
+~~~~~~~~~~~~~~~~~~~
+As mentioned in our discussion of Records and indicated by the existence of
+Relationships, a lot of Sina's power comes from working with many Records at once.
+
+DataStores are the key to this work. "DataStore" is Sina's generic term for a collection
+of Records organized into a form Sina can work with efficiently. Basically, when you
+tell Sina you want to work with a collection of Records, Sina copies
+those Records into the datastore, then sorts pieces of the Records within for quick access.
+This storing and sorting process is what makes the API so efficient, as well as
+allowing Sina to act as an archive, fetching back the entirety of whatever Record each piece of
+information came from.
+
+The DataStore itself can be anything from a file on disk (in the sqlite case) to
+a massive Cassandra keyspace, but at its heart, it's just Sina's way of organizing the
+data you give it. As such, you don't need to worry about its exact form or schema.
+Instead, you interact with the DataStore via a simple API that's identical regardless
+of which backend (SQLite, MySQL, Cassandra...) is being used behind the scenes.
+
+
+What a DataStore Is Used For
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+By connecting to DataStores with Sina's API, we can access and operate on
+an entire selection of Records at the same time, and do so quickly, efficiently, and
+agnostic of where the data's from (whether it's biology, climate, etc).
+
+.. image:: images/datastore_concrete.png
+  :width: 600
+  :align: center
+  :alt: Diagram version of the contents of the following paragraph, starting with "First, we use"
+
+First, we use a DataStore to define which Records we want to be available for these types
+of operations. We'll dip briefly into the Sina command line here, as it's a quick way to get a
+simulation run into a DataStore (:code:`somefile.sqlite` doesn't need to already exist)::
+
+  sina ingest -d somefile.sqlite xxxx_sina.json
+
+Now all the data found in that JSON can be accessed straight from the Python API,
+no file opening or JSON parsing required! Of course, ingestion can be done through
+the API as well, which can be used within a workflow to make data available right
+as simulations finish (in which case no JSON is required at all).
+
+Let's pretend we've populated that DataStore with simulation data, msubs, sruns,
+and anything else we want. Now we simply connect to it::
 
   import sina
 
-  ds = sina.connect(database="somefile.sqlite")
+  ds = sina.connect("somefile.sqlite")
   all_sruns = ds.records.find(types=["srun", "msub"])
 
-This would set :code:`all_sruns` to a list of all the records contained in
-:code:`somefile.sqlite` with :code:`"type": "srun"` or :code:`"type": "msub"`.
-You can easily pass data between supported backends::
+This would set :code:`all_sruns` to a generator of all the Record objects contained
+in :code:`somefile.sqlite` with :code:`"type": "srun"` or :code:`"type": "msub"`.
+
+All backends use the same JSON object model, same API (on the user side), etc,
+meaning it's easy to pass data between them if you ever want to scale up
+from a file on disk::
 
   ...
 
-  cass_ds=create_datastore(keyspace="sruns_only")
-  cass_ds.records.insert(all_sruns)
+  mysql_ds=create_datastore("mysql+mysqlconnector://<connection_info>")
+  mysql_ds.records.insert(all_sruns)
 
-This would result in a keyspace (essentially a Cassandra database)
-:code:`sruns_only` that contains all the :code:`"type": "srun"` records found
-in :code:`somefile.sqlite` (assuming that :code:`sruns_only` was previously
+This would result in a MySQL database that contains all the :code:`"type": "srun"`
+records found in :code:`somefile.sqlite` (assuming that :code:`sruns_only` was previously
 empty). Of course, this can also be used for passing between backends of
 the same type, such as creating a new sqlite file containing a subset of a
 larger one, ex: all the records with :code:`"type": "run"` with a scalar "volume" greater
 than 400.
 
-The remainder of this page will detail the basics of using DataStores to
-interact with Records and Relationships. It only covers a subset; for
-documentation of all the methods available, please see the
-`DataStore documentation <generated_docs/sina.datastore.html>`__.
-
-
-Filtering Records Based on Their Data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Basic Filtration
-################
-Records have a :code:`data` field that holds the experimental data they're
-associated with. This can be inputs, outputs, start times, etc. This data
-is queryable, and can be used to find Records fitting criteria. For example, let's
-say we're interested in all Records with a :code:`final_volume` of 310 and with
-a :code:`quadrant` of "NW"::
-
-  records = ds.records.find(data={"final_volume": 310, "quadrant": "NW"}, ids_only=True)
-
-  # Does the same as the above, but you may sometimes find the kwargs more convenient.
-  # Note that this form can't return record objects (no ids_only=False option)
-  records = ds.records.find_with_data(final_volume=310, quadrant="NW")
-
-This will find all the records record_dao knows about (so those in
-:code:`somefile.sqlite`) that fit our specifications. To access nested library
-data, simply specify the owning library/libraries with path notation::
-
-  # This would find records with a library named "outer_lib" that has a library
-  # named "inner_lib", that itself has a data item "final volume" equal to 310
-  records = ds.records.find(data={"outer_lib/inner_lib/final_volume":310})
-
-IMPORTANT NOTE: when providing multiple criteria, only entries fulfilling all criteria
-will be returned (boolean AND). If OR-like functionality is desired, see the next
-section, :ref:`Ids_Only`.
-
-Filtering on a Range
-####################
-Perhaps we don't want a :code:`final_volume` of 310 exactly, but rather one
-between 200 and 311. DataRanges allow us to specify this. They follow the Python
-convention of min-inclusive, max-exclusive, but this can be altered::
-
-  from sina.utils import DataRange
-
-  # data_query is aliased to get_given_data, they're interchangeable
-  records = ds.records.find(data={"final_volume": DataRange(200, 311),
-                                  "final_acceleration": DataRange(min=12,
-                                                                  max=20,
-                                                                  min_inclusive=False,
-                                                                  max_inclusive=True),
-                                  "schema": DataRange(max="bb_12"),
-                                  "quadrant": "NW"},
-                            ids_only=True)
-
-Now we've found the ids of all Records that have a :code:`final_volume` >= 200
-and < 310, a :code:`final_acceleration` > 12 and <= 20, a :code:`schema`
-that comes before "bb_12" alphabetically, and a :code:`quadrant` = "NW". For an
-interactive demo, see examples/fukushima/fukushima_subsecting_data.ipynb.
-
-Filtering on Lists
-##################
-Because there are several possible ways a list might match some criteria,
-the syntax for performing the query is slightly different. Let's say we want all
-Records fulfilling a criterion for :code:`velocity`, a timeseries. In this case,
-we want a velocity that's never gone above 50::
-
-  from sina.utils import all_in
-
-  records = ds.records.find_with_data(velocity=all_in(DataRange(max=50)))
-
-A slightly different set of queries applies to string list data. Let's say
-we want all Records where "strength_1" or "strength_2" were included in
-:code:`active_packages`::
-
-  from sina.utils import has_any
-
-  records = ds.records.find_with_data(active_packages=has_any("strength_1", "strength_2"))
-
-This is the general syntax for list queries in Sina. Supported queries are:
-
-+------------------------------------------------------------------------------------------------+
-| Scalar List Queries                                                                            |
-+============+===================================================================================+
-| all_in     | Takes a DataRange. All values in this datum must be within the DataRange.         |
-+------------+-----------------------------------------------------------------------------------+
-| any_in     | Takes a DataRange. At least one value in this datum must be within the DataRange. |
-+------------+-----------------------------------------------------------------------------------+
-
-+--------------------------------------------------------------------------------------------+
-| String List Queries                                                                        |
-+============+===============================================================================+
-| has_all    | Takes one or more strings. All strings must be present in this datum.         |
-+------------+-------------------------------------------------------------------------------+
-| has_any    | Takes one or more strings. At least one string must be present in this datum. |
-+------------+-------------------------------------------------------------------------------+
-
-
-See examples/basic_usage.ipynb for list queries in use.
-
-.. _Ids_Only:
-
-Combining Filters
-~~~~~~~~~~~~~~~~~
-
-Sina includes a "unified" query, :code:`find()`, which allows you to to combine
-multiple filters into a single call. It will return every record that fulfills
-all your criteria::
-
-  ...
-  # This would get all Records with a type of "msub" or "sbatch" that have a
-  # num_procs greater than 4. In this instance, find() combines find_with_type()
-  # and find_with_data()
-  ds.records.find(types=["msub", "sbatch"],
-                  data={"num_procs": DataRange(min=4)})
-
-See the :code:`find()` documentation for all supported arguments. For more
-complex combinations, filtering methods (like :code:`find()`) take an optional
-argument, :code:`ids_only`. If passed as :code:`True`, they'll return only the
-ids of Records that fulfill their criteria, rather than the entire Record. This
-is faster than assembling the entire Record object(s), and is useful for set-based
-filtering::
-
-  ...
-
-  type_filter = ds.records.find(types=["msub"], ids_only=True)
-  file_filter = ds.records.find(file_uri="mock_msub_out.txt", ids_only=True)
-
-  # This will print ids of all records which are msubs or are associated with
-  # a file "mock_msub_out.txt", **but not both** (exclusive OR).
-  # If you wanted AND, find() would cover that functionality.
-  xor_recs = set(type_filter).symmetric_difference(file_filter)
-  print(xor_recs)
-
-
-Getting Specific Data for Many Records
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You may want, for example, to get the :code:`final_speed` and :code:`shape` of
-each Record matching the above criteria. Rather than building Record objects for
-all matches and then selecting only the data you want, you can use
-get_data_for_records() to find specific data entries across a list of Records::
-
- ...
-
- desired_data = ["final_speed", "shape"]
-
- data = ds.records.get_data(id_list = xor_recs, data_list = desired_data)
-
- for id in data:
-     msg = "For record {}: final speed {}, shape {}"
-     print(msg.format(id,
-                      data[id]["final_speed"]["value"],
-                      data[id]["shape"]["value"]))
-
-NOTE: Some machines enforce a limit on the number of variables per SQL
-statement, generally around 999. If you run into issues selecting data for
-large numbers of Records, consider using the Cassandra backend, or simply split
-your get_data_for_records call to use smaller chunks of Records.
-
-
-Working with Records, Runs, Etc. as Objects
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Given the id of a Record, you can get the entire Record as a Python object using::
-
-   # get() takes one or more ids
-   record = ds.records.get("my_record_id")
-   records_list = ds.records.get(["my_first_record", "my_second_record"])
-
-Full descriptions are available in
-`model documentation <generated_docs/sina.model.html>`__, but
-as a quick overview, Records have, at minimum, an :code:`id` and :code:`type`.
-These and additional optional fields (such as the Record's data and files) can be
-accessed as object attributes::
-
- ...
- run_spam = ds.records.get(id="spam")
-
- print(run.type)
- print(run.data["egg_count"]["value"])
- print(run.data["egg_count"]["units"])
- run.data["egg_count"]["value"] = 12
- del run.data["bad_eggs"]
- for file in run.files:
-     print(file.get("mimetype"))
-
-You can also assign additional fields not officially supported by the Sina
-schema and not "seen" by the DAOs. While this isn't normally recommended (in
-case we implement something with the same name), you may find it useful,
-particularly if you have a very specific name in mind::
-
- run["nonqueried_data_for_bob"]["spam_flavor"] = "concerning"
-
-That said, consider whether the :code:`user_defined` field might be a better fit,
-as it's guaranteed to be safe, as well as omitted from the DAO queries::
-
- run.user_defined["spam_flavor"] = "concerning"
-
-
-Inserting Records and Relationships Programmatically
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can use Sina's API to insert objects into its databases directly, allowing
-databases to grow as a script progresses, rather than writing to file and
-ingesting all at once later on.
-
-**SQLite does not support concurrent modification**, so you should never
-perform unlocked parallel inserts with that backend!
-
-Inserting objects is otherwise straightforward::
-
-  ...
-  from sina.model import Record, Run, CurveSet
-  from sina.datastore import create_datastore
-
-  datastore = create_datastore(db_path='path_to_sqlite_file')
-  recs = datastore.records
-
-  start_val = 12
-  my_record = Record(id="some_id",
-                     type="some_type",
-                     data={"start_val": {"value": start_val}},
-                     files=[{"uri": "bar/baz.qux", "tags": ["output"]}])
-
-  # Records function like dictionaries and can have raw JSON added into them
-  my_record.data["return_time"] = {"value": my_func(start_val),
-                                   "units": "ms"}
-
-  # However, you may find it more convenient/readable to use Record utility methods
-  my_other_record = Record("another_id", "some_type")
-  my_curve_set = my_other_record.add_curve_set("my_curve_set")
-  my_curve_set.add_independent("time", [0, 1, 2, 3], units="h")
-  my_curve_set.add_dependent("distance", [0, 44, 84, 126], units="km")
-
-  # Like get(), insert() takes one or more ids.
-  recs.insert([my_record, my_other_record])
-
-
-Deleting Records
-~~~~~~~~~~~~~~~~
-
-To delete a Record entirely from one of Sina's backends::
-
-  ...
-  my_record_to_delete = Record("fodder", "fodder_type")
-  recs.insert(my_record_to_delete)
-
-  # This would print 1
-  print(len(list(recs.find(types=["fodder_type"]))))
-
-  # Like get() and insert(), delete() takes one or more ids.
-  recs.delete("fodder")
-
-  # This would print 0
-  print(len(list(recs.find(types=["fodder_type"]))))
-
-Be careful, as the deletion will include every Relationship the Record is
-mentioned in, all the scalar data associated with that Record, etc. It's
-also possible to delete ALL a datastore's contents (Records, Relationships, etc.)
-with :code:`ds.delete_all_contents`. This is irrecoverable and will prompt
-confirmation from the user (which can be bypassed with :code:`skip_prompt=True`;
-use with caution).
-
-Working With Records
-~~~~~~~~~~~~~~~~~~~~
-Once you have acquired a record, you will likely want to access values and
-other data within it. To access the full set of data in a record,
-you can use the :py:attr:`sina.model.Record.data`,
-:py:attr:`sina.model.Record.curve_sets`,
-and :py:attr:`sina.model.Record.library_data` attributes. This will give
-you access to the Python dictionaries containing the values, tags, and units
-of any items in the record. The examples below illustrate the basic
-access pattern::
-
-  ...
-  my_record = Record(...)
-  energy_data = record.data['energy']
-  energy = energy_data['value']
-  energy_units = energy_data['units']
-  energy_tag = energy_data['tags']
-
-While the above allows us to access all the information attached to attributes,
-it can be rather verbose for when you just want the values. For those cases,
-you can use :py:attr:`sina.model.Record.data_values`,
-:py:attr:`sina.model.Record.curve_set_values`,
-and :py:attr:`sina.model.Record.library_data_values`::
-
-  ...
-  my_record = Record(...)
-  energy = record.data_values.energy  # e.g. 12.34
-  time = record.curve_set_values.cs1.time  # e.g. [0.1, 0.2, 0.3, ...]
-
-For more details on this, see the documentation linked above. There is also
-a notebook called "Working with Records" that has more examples. Instructions
-for getting the notebooks can be found in the :ref:`readme` section.
+This is only a small fraction of what's possible with DataStores. Be sure to check
+out `the examples <examples/index.html>`__!

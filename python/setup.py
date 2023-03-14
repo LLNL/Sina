@@ -3,7 +3,7 @@
 
 from setuptools import setup, find_packages
 
-VERSION = "1.12.0"
+VERSION = "1.13.0"
 
 setup(name='llnl-sina',
       version=VERSION,
@@ -21,23 +21,20 @@ setup(name='llnl-sina',
         'cassandra': [
             'cassandra-driver',
         ],
-        'jupyter:python_version<"3"': [
-            'wcwidth<0.1.8',
-            'ipython>=5,<6',  # ipython 6 drops support for Python 2
-            'ipykernel<5',
-            'matplotlib<3.0'
-        ],
-        'jupyter:python_version>="3"': [
-            'nbconvert<=5.4.0',
-            'ipython',
-            'ipykernel>=5',
-            'matplotlib',
-        ],
         'jupyter': [
-            'pyzmq<18',   # pyzmq 18.0 has bug on Python 3, use anything below
+            # More recent nbconverts cause jinja "missing python.tpl" errors.
+            'nbconvert<=5.4.0',
+            # and nbconvert in general isn't compatible with recent mistunes.
+            'mistune<2',
+            # Older nbconvert requires older Tornado.
+            'tornado<5.1',
+            'ipython<8',  # Required for Python 3.7 (LC machine version)
+            'ipykernel>=5',
             'ipywidgets',
-            'tabulate',
-            'tornado<5.1'  # Tornado 5.1 gets stuck in a loop
+            # Newer numpys (1.22, 1.23) seem to have an issue with up-to-date setuptools
+            'numpy<1.22',
+            'matplotlib',
+            'tabulate'
         ],
         'cli_tools': [
             'deepdiff',
@@ -54,6 +51,7 @@ setup(name='llnl-sina',
         'orjson;python_version>="3.6" and platform_machine!="ppc64le"',
         'ujson;python_version>="3.6" and platform_machine=="ppc64le"',
         'ujson<4;python_version<"3.6" and platform_machine!="ppc64le"',
+        'freetype-py;platform_system=="Darwin"',
       ],
       license='MIT',
       classifiers=[
@@ -63,10 +61,7 @@ setup(name='llnl-sina',
           # Pick your license as you wish (should match "license" above)
           'License :: OSI Approved :: MIT License',
 
-          # Specify the Python versions you support here. In particular, ensure
-          # that you indicate whether you support Python 2, Python 3 or both.
-          'Programming Language :: Python :: 2',
-          'Programming Language :: Python :: 2.7',
+          # Specify the Python versions you support here.
           'Programming Language :: Python :: 3',
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7'

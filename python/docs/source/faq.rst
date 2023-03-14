@@ -1,12 +1,109 @@
+Tips, FAQ, and Best Practices
+=============================
+.. faq:
+
+This page covers misc. recommendations and optional guidelines for working with
+the Sina schema. Nothing here is mandatory, but following these
+recommendations where possible may lead to easier querying, simplified
+ingestion, clearer pedigree, etc.
+
+Tips and Best Practices
++++++++++++++++++++++++
+
+Knowing when to use Sina
+------------------------
+
+Sina primarily exists to make physics simulation runs (which may include thousands of named data) easy to access and incorporate
+into workflows, including workflows that are under development, without requiring familiarity with databases. Of course, it will
+also work with other data sources, ex: wet lab experiments (as Sina's source-agnostic).
+
+Sina may be useful if you're working on a code that already outputs Sina JSON (even without using the database side of things,
+it should help with post-processing), or if you're working with many measurements at once, especially collaboratively and/or at
+scales where individual inspection of runs becomes cumbersome. Sina's also handy if you want database-like performance without the
+architectural lift. You may also want to use Sina if you want access to the interactive visualizations.
+
+
+DataStores can be heterogenous
+------------------------------
+
+Sina can handle many types of Record within one datastore. The most important
+consideration on deciding what to store together is how it'll be queried.
+If, for example, you generate both msub info and data from application executions,
+and you expect to need details from the msubs when handling the application data,
+it makes sense to store them in the same datastore.
+
+To contrast that, if you're doing two experiments that happen to use the same
+code, but never want to see results from the first experiment mixed in with
+the second, it may be more appropriate to use two datastores to avoid
+"polluting" your results. You can always combine them later!
+
+
+Common Sina file names: _sina.json
+----------------------------------
+
+The recommended naming convention is :code:`<somefilename>_sina.fileformat`, ex:
+:code:`breakfast_simulations_sina.json`, or simply :code:`sina.json`. This makes
+it easier to find sina files later without breaking syntax highlighting by
+changing the file extension.
+
+A full copy of each record is kept by Sina in order to preserve any
+non-queryable data. If you're generating a file per record, you can
+generally ingest and then delete the file, useful for saving on inodes.
+
+
+Pythonic Record.data names are easier to query
+----------------------------------------------
+
+Wherever possible, data names should be valid Python variable names. This
+allows them to be used as keyword arguments for queries:
+
+.. code-block:: python
+
+    recs.data_query(my_legal_data_name=foo, density=bar, name3=baz)
+
+Avoid names like :code:`my/var/here` or :code:`2d_res` if you want to use this
+more convenient form.
+
+
+Use SI units when possible
+--------------------------
+
+If you're adding units to your data, we recommend SI with / for division and ^
+for exponentiation. Unit enhancements/features added to Sina will focus
+on this syntax.
+
+
+Lists of scalars are treated as continuous
+------------------------------------------
+
+Scalar lists are stored for efficient querying of continuous values. If you're
+using a scalar list as more of an enum, where you'll want to know things like
+"is 3 in this list", versus something like "is at least one value in this list
+greater than 3", then consider casting the enum values to strings.
+
+
+Put long, unqueried strings in Record.user_defined
+--------------------------------------------------
+
+If you have a string datum that's many thousands of characters long, chances
+are you're not querying on it--a very long string like that can cause
+ingestion to fail if it's in the data section due to limitations in the backend
+itself (ex: MySQL max row length), but can be safely stored in the :code:`user_defined`
+field in a record. In general, though, consider keeping bulk data on the filesystem.
+
+
 Frequently Asked Questions
-==========================
+++++++++++++++++++++++++++
 
 Which backend should I use?
 ---------------------------
 
-You'll generally want to use SQL for smaller, more localized projects.
-Cassandra is useful when handling larger sets (millions of scalars or more).
-SQL:
+You'll generally want to use SQLite for smaller, more localized projects and MySQL as
+you scale up and need concurrent writes (or many tens of thousands/millions of records).
+Cassandra is a niche choice for large and specific use cases--reach out to
+us directly if you think it's the backend for you!
+
+SQLite:
 
  * Can live anywhere on the LC filesystem
  * Can freely have its permissions altered
@@ -15,48 +112,28 @@ SQL:
  * Has somewhat poorer query performance, becoming noticeable in the "millions of scalars" range
  * Faster serial inserts, no parallel inserts (or concurrent access in general)
 
+MySQL:
+
+ * Can be stood up quickly and easily on LC using LaunchIT
+ * Is more powerful than SQLite and generally scales better
+ * Allows for parallel access across hundreds of nodes (including safe parallel writes)
+ * Functions very similarly to SQLite; you'll simply connect with a URL-like string instead of a filepath
+ * Can have its permissions controlled by access to a config file
+ * Does carry a networking cost (for very small workflows, SQLite may be faster)
+ * Can be connected to across the CZ/RZ/etc. networks (ex: accessing a MySQL DB on Quartz from Catalyst), but does require connection to LC.
+
 Cassandra:
 
- * Can be accessed only through Cassandra hosts (Sonar, RZSonar, etc)
- * Permissions are handled by Sonar admins
+ * Like MySQL, allows parallel access
+ * In specific large-data cases, performs better than MySQL due to horizontal scaling--can handle tens of millions of scalars with sub-second query times
+ * Can be accessed only on Cassandra hosts (Sonar, RZSonar, etc)
+ * Permissions are handled by Sonar admins; Cassandra isn't typically exposed as an end-user capability
  * Requires some additional setup to create multiple keyspaces
- * Handles millions of entries while maintaining sub-second query times
- * Slower serial inserts due to network latency, but can be parallelized
- * Concurrent access is supported natively
+ * Slower inserts
+ * Is a radically different way of storing data; queries that may be performant on MySQL suffer much higher relative slowdown on Cassandra, without the tradeoffs being obvious to the user
 
 
-What does a workflow using Sina look like?
-------------------------------------------
+What if I run into difficulties?
+--------------------------------
 
-This depends mainly on whether you run then insert or run *and* insert.
-
-Run first, write JSON, insert when done
-#######################################
-You will need to modify your code to write Sina schema-compliant JSON. Use the Sina
-CLI to ingest this JSON; it will handle setting up the backend (though you'll
-need a pre-existing keyspace for Cassandra). That's it! Once ingestion completes,
-you can begin querying your data.
-
-Embed Sina in your workflow
-###########################
-See the API examples for specifics. Generally, you'll use Sina as one of the final
-steps, when writing a completed run to file. You'll first need to create a
-"factory" object (which will also set up the backend), then a DAO for whatever
-object it is you're creating (ex: one RecordDAO and one RelationshipDAO).
-Then, simply attach data to an object and use the relevant DAO's insert() method.
-Each call to insert() will grow the data pool. A Cassandra database will be
-available for querying while ingesting data; a SQL one should be handled with
-care, as SQLite does not support concurrent access. You may wish to "checkpoint"
-the SQLite database with a simple copy to make something safely queryable.
-
-
-What's the performance like?
-----------------------------
-
-It depends on your data! In general, the more there is, the greater the potential
-for "noticeable" slowdown. However, in testing against multi-million-scalar sets on Cassandra,
-no Sina native query took longer than around half a second to complete, and the
-majority of that time was spent "in transit" (one exception: mid-string matching
-on Cassandra isn't supported natively, so partial URI searches are handled more
-slowly in Python). For SQL, performance is more variable and largely depends on
-the data.
+Email us! Our most up-to-date contact info is listed in our toplevel README. Your questions help us improve this documentation!

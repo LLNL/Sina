@@ -1,9 +1,6 @@
 # Read in system-specific link constraints.
 -r links.txt
 
-# We're supporting Py2, so we explicitly grab an earlier version of Numpy
-numpy < 1.18 
-
 # Remaining dependencies for running example Jupyter notebooks
 # .. Tox appears to have trouble with environment markers in requirements
 #    files so grab them from setup.py.

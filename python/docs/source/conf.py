@@ -33,7 +33,8 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.doctest',
               'sphinx.ext.coverage',
               'sphinx.ext.ifconfig',
-              'sphinx.ext.githubpages']
+              'sphinx.ext.githubpages',
+              'nbsphinx']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -76,8 +77,7 @@ exclude_patterns = ['generated_docs/sina_api.*', 'generated_docs/sina_model.*',
                     'generated_docs/sina_cli.*', 'generated_docs/setup*']
 
 # Soft dependencies, to avoid autodoc erroring out trying to import unavailable modules.
-autodoc_mock_imports = ['cassandra.cqlengine.query',
-                        'cassandra.cqlengine.management',
+autodoc_mock_imports = ['cassandra',
                         'deepdiff',
                         'texttable']
 

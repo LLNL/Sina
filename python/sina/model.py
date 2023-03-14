@@ -23,8 +23,8 @@ RESERVED_TYPES = ["run"]  # Types reserved by Record's children
 # pylint: disable=invalid-name,redefined-builtin
 
 # We don't mind the high instance attribute count since this is essentially
-# a reflection of our schema.
-class Record(object):  # pylint: disable=too-many-instance-attributes
+# a reflection of our schema. Similarly, we need a fair few methods for all those attribs.
+class Record(object):  # pylint: disable=too-many-instance-attributes, too-many-public-methods
     """
     A record is any arbitrary object we've chosen to store.
 
@@ -341,6 +341,26 @@ class Record(object):  # pylint: disable=too-many-instance-attributes
         :returns: A JSON string representing this Record
         """
         return json.dumps(self.raw)
+
+    def to_file(self, path):
+        """
+        Dump the JSON form of this Record to a file as a Sina Document.
+
+        This creates Sina Document object, aka the JSON container
+        that holds Records and Relationships, containing only this Record.
+
+        It's often the case that a json (especially those output as part of simulations)
+        contains exactly one Record and zero Relationships. This function is a
+        convenience method to aid in post-processing that common file type.
+
+        :param path: The path to the file to be created. Note that the contents,
+                     if any, will be replaced. This is intended, as this function
+                     acts as the filesystem equivalent of the datastore-side update().
+        """
+        with open(path, "wb") as outpath:
+            content = {"records": [self.raw], "relationships": []}
+            # Note the use of dumps()--that's because orjson doesn't have dump()
+            outpath.write(json.dumps(content, outpath))
 
     def _library_data_is_valid(self, library_data, prefix=""):
         """
@@ -789,11 +809,11 @@ class Run(Record):
 
     def __repr__(self):
         """Return a string representation of a model Run."""
-        return('Model Run <id={}, application={}, user={}, version={}>'
-               .format(self.id,
-                       self.application,
-                       self.user,
-                       self.version))
+        return 'Model Run <id={}, application={}, user={}, version={}>'.format(
+            self.id,
+            self.application,
+            self.user,
+            self.version)
 
 
 def _is_valid_list(list_of_data):

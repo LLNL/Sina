@@ -5,6 +5,21 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.13
+===========
+- Overhauled documentation
+    - Many topics are now covered in the form of Jupyter notebooks, which are run and distributed as part of the documentation
+    - Outdated guides removed, new ones added, etc.
+    - Reworked tutorial flow to be more user-friendly
+    - Added intro to ToC to help orient users
+- Removed restrictions that enforce Python 2 build compatibility
+    - Sina itself is still compatible with Python 2, but the special build rules that bound it to older software versions to maintain 2 compatibility have been lifted.
+- Added C++ Record function to merge another Record in as library_data (useful for host codes)
+- Added new dimensions for histogram (2D "Heatmap") and scatter plot (optional z and colorbar)
+- Added new visualizations, such as violin and CDF plots
+- Fixed a bug wherein a visualizer would not properly pass down its id_pool
+- QoL for operating on individual records (namely Record.to_file for single Record post-processing).
+
 1.12
 ============
 - Added a visualization module, sina.visualization, that creates matplotlib visualizations directly from Sina DataStores

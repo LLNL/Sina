@@ -96,6 +96,8 @@ public:
      */
     std::shared_ptr<DataHolder> addLibraryData(std::string const &name);
 
+    std::shared_ptr<DataHolder> addLibraryData(std::string const &name, conduit::Node existingLibraryData);
+
     /**
      * Get all library data associated with this DataHolder.
      *
