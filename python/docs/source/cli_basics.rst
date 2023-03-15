@@ -19,6 +19,17 @@ largely backend-agnostic. While you may need to specify additional flags
 (ex: providing a Cassandra keyspace if you do not have a default set), the
 functionality between supported backends is otherwise identical.
 
+Inspect
+~~~~~~~
+
+Sina json is usually output as a single line. If you'd like to inspect it at
+the command line, python's inbuild json tool is invaluable::
+
+    python -m json.tool some_sina.json prettyprinted_sina.json
+
+This will separate everything onto its own line for easy manual inspection.
+
+
 Ingest
 ~~~~~~
 

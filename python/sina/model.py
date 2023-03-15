@@ -360,7 +360,10 @@ class Record(object):  # pylint: disable=too-many-instance-attributes, too-many-
         with open(path, "wb") as outpath:
             content = {"records": [self.raw], "relationships": []}
             # Note the use of dumps()--that's because orjson doesn't have dump()
-            outpath.write(json.dumps(content, outpath))
+            try:
+                outpath.write(json.dumps(content, outpath))
+            except TypeError:
+                outpath.write(json.dumps(content, outpath).encode())
 
     def _library_data_is_valid(self, library_data, prefix=""):
         """
@@ -445,7 +448,7 @@ class Record(object):  # pylint: disable=too-many-instance-attributes, too-many-
                 if (data[entry].get("tags") and
                         (isinstance(data[entry].get("tags"), six.string_types)
                          or not isinstance(data[entry].get("tags"),
-                                           collections.Sequence))):
+                                           collections.abc.Sequence))):
                     (warnings.append("At least one {}data value entry belonging "
                                      "to Record {} has a malformed tag "
                                      "list. Value: {}".format(prefix, self.id, entry)))
@@ -483,7 +486,7 @@ class Record(object):  # pylint: disable=too-many-instance-attributes, too-many-
             # a list, tuple, etc (but not a string)
             if (file_info.get("tags") and
                     (isinstance(file_info.get("tags"), six.string_types) or
-                     not isinstance(file_info.get("tags"), collections.Sequence))):
+                     not isinstance(file_info.get("tags"), collections.abc.Sequence))):
                 (warnings.append("At least one file entry belonging to "
                                  "Record {} has a malformed tag list. File: {}"
                                  .format(self.id, file_info)))

@@ -17,7 +17,7 @@ mxterm 1 36 60
 cd cpp
 mkdir build-clang
 cd build-clang
-cmake -C ../CMake/host-configs/sina-linux-rhel7-ivybridge-clang@11.0.1.cmake -DCMAKE_TOOLCHAIN_FILE=../CMake/Platform/toss_3_x86_64_clang.cmake ..
+cmake -C ../CMake/host-configs/sina-linux-rhel7-ivybridge-clang@14.0.6.cmake -DCMAKE_TOOLCHAIN_FILE=../CMake/Platform/toss_4_x86_64_clang.cmake .. -DCMAKE_INSTALL_PREFIX=install
 make -j all test
 ```
 

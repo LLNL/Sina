@@ -1,4 +1,5 @@
 cmake_minimum_required (VERSION 3.7)
+include(CMakePackageConfigHelpers)
 
 find_package(Conduit REQUIRED)
 
@@ -14,6 +15,7 @@ blt_register_library(NAME libdl
     TREAT_INCLUDES_AS_SYSTEM ON
     LINK_FLAGS -ldl
 )
+
 
 set(OPTIONAL_SINA_DEPENDENCIES "")
 
@@ -64,5 +66,22 @@ blt_add_library(NAME sina
 )
 
 install(TARGETS sina
+    EXPORT sinaTarget
     ARCHIVE DESTINATION "lib"
     LIBRARY DESTINATION "lib")
+
+#install(EXPORT sinaTarget
+#        FILE "SinaConfig.cmake"
+#        NAMESPACE sina::
+#        DESTINATION "lib/cmake/sina"
+#)
+
+set(sina_INSTALL_INCLUDE_DIR include/)
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/../CMake/config.cmake.in"
+  "SinaConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/sina"
+  PATH_VARS sina_INSTALL_INCLUDE_DIR)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/SinaConfig.cmake"
+        DESTINATION lib/cmake/sina)

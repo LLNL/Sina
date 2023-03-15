@@ -7,6 +7,7 @@ datastore.py for up-to-date user-level descriptions of what everything should
 do.
 """
 from abc import ABCMeta, abstractmethod
+import copy
 import logging
 import numbers
 
@@ -32,10 +33,12 @@ class RecordDAO(object):
         Given an (iterable of) id(s), return matching Record(s).
 
         :param ids: The id(s) of the Record(s) to return.
-        :param chunk_size: Size of chunks to pull records in.
-        :param _record_builder: The function used to create a Record object
-                                (or one of its children) from the raw. Does not
-                                need to be touched by the user.
+
+        _record_builder is for internal use only, the function used to create a Record object
+        (or one of its children) from the raw. Should not be touched by the user.
+
+        Likewise, chunk_size is a machine-specific parameter set to 999 for safety to limit
+        the size of an IN query below the compiled max in SQL. Should usually not be touched.
 
         :returns: If provided an iterable, a generator of Record objects, else a
                   single Record object.
@@ -125,9 +128,9 @@ class RecordDAO(object):
         if isinstance(records, sina.model.Record):
             LOGGER.debug('Updating record with id=%s', records.id)
             ids = [records.id]
-            records = [records]
+            records = [sina.model.flatten_library_content(records)]
         else:
-            records = list(records)  # In case it's a generator
+            records = [sina.model.flatten_library_content(record) for record in records]
             ids = [record.id for record in records]
             LOGGER.debug('Updating records with ids=%s', ids)
         if not all(self.exist(ids)):
@@ -139,15 +142,53 @@ class RecordDAO(object):
         """Handle the logic of the update itself."""
         raise NotImplementedError
 
-    def insert(self, records):
+    def insert(self, records, ingest_funcs=None,
+               ingest_funcs_preserve_raw=None):
         """
         Given one or more Records, insert them into the DAO's backend.
 
         :param records: A Record or iter of Records to insert
+        :param ingest_funcs: A function or list of functions to
+                             run against each record before insertion.
+                             We queue them up to run here. They will be run in list order.
+        :param ingest_funcs_preserve_raw: Whether the postprocessing is allowed
+                                          to touch the underlying json on ingest.
+                                          If we can interact with the raw, we don't
+                                          need to pass an unaltered set of records.
+                                          MUST BE SPECIFIED if using ingest_funcs
         """
         if isinstance(records, (sina.model.Record, sina.model.Run)):
             records = [records]
-        self._do_insert(sina.model.flatten_library_content(record) for record in records)
+        if callable(ingest_funcs):
+            ingest_funcs = [ingest_funcs]
+        if ingest_funcs is None:
+            self._do_insert(sina.model.flatten_library_content(record) for record in records)
+            return
+        else:
+            if ingest_funcs_preserve_raw is None:
+                raise ValueError(
+                    "`ingest_funcs_preserve_raw` must be specified when using ingest_funcs")
+        self._do_insert(self._do_process(record, ingest_funcs,
+                                         ingest_funcs_preserve_raw)
+                        for record in records)
+
+    @staticmethod
+    def _do_process(record, postprocessing_funcs, preserve_raw):
+        """Simply applies a set of functions to some record and returns the results."""
+        if preserve_raw:
+            preserved_raw = copy.deepcopy(record.raw)
+        for func in postprocessing_funcs:
+            record = func(record)
+        record = sina.model.flatten_library_content(record)
+        if preserve_raw:
+            if not record.library_data:
+                # flatten_library_content usually skips anything without library data
+                # for efficiency, but we need its created _FlatRecord here to decouple
+                # the raw from the data.
+                # pylint: disable=protected-access
+                record = sina.model._FlatRecord(**record.raw)
+            record.raw = preserved_raw
+        return record
 
     @abstractmethod
     def _do_insert(self, records):
@@ -155,11 +196,13 @@ class RecordDAO(object):
         raise NotImplementedError
 
     @abstractmethod
+    # Sphinx has an issue with trailing-underscore params, we need to escape it for the doc
+    # pylint: disable=anomalous-backslash-in-string
     def get_raw(self, id_):
         """
         Get the raw content of the record identified by the given ID.
 
-        :param id_: the ID of the record
+        :param id\_: the ID of the record
         :return: the raw JSON for the specified record
         :raises: ValueError if the record does not exist
         """
@@ -299,7 +342,7 @@ class RecordDAO(object):
         Given an (iterable of) id(s), return boolean (list) of whether those
         record(s) exist or not.
 
-        :param ids: The id(s) of the Record(s) to test.
+        :param test_ids: The id(s) of the Record(s) to test.
 
         :returns: If provided an iterable, a generator of bools pertaining to
                   the ids' existence, else a single boolean value.

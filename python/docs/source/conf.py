@@ -34,7 +34,11 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.coverage',
               'sphinx.ext.ifconfig',
               'sphinx.ext.githubpages',
-              'nbsphinx']
+              'myst_nb',
+              'sphinx_immaterial']
+
+
+myst_heading_anchors = 1
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -68,7 +72,7 @@ release = __VERSION__
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -93,16 +97,23 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'sphinx_immaterial'
 
+html_theme_options = {
+        "palette": { "scheme": "slate", "primary": "black", "accent": "blue" },
+        "font": False
+}
+
+################  THE FOLLOWING ARE NOT USED WITH FURO ##########################
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-html_theme_options = {
-    'collapse_navigation': True,
-    'sticky_navigation': False,
-}
+#html_theme_options = {
+#    'collapse_navigation': True,
+#    'sticky_navigation': False,
+#}
+
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
@@ -113,12 +124,14 @@ html_theme_options = {
 #
 # This is required for the alabaster theme
 # refs: http://alabaster.readthedocs.io/en/latest/installation.html#sidebars
-html_sidebars = {
-    '**': [
-        'relations.html',  # needs 'show_related': True theme option to display
-        'searchbox.html',
-    ]
-}
+#html_sidebars = {
+#    '**': [
+#        'relations.html',  # needs 'show_related': True theme option to display
+#        'searchbox.html',
+#    ]
+#}
+
+############### END LEGACY SECTION ###########################################
 
 
 # -- Options for HTMLHelp output ------------------------------------------

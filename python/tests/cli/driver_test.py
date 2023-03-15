@@ -9,7 +9,7 @@ from six.moves import cStringIO as StringIO
 
 # Disable pylint checks due to its issue with virtual environments
 from mock import patch, MagicMock  # pylint: disable=import-error
-from nose.plugins.attrib import attr  # pylint: disable=import-error
+import pytest  # pylint: disable=import-error
 from sqlalchemy.orm.exc import NoResultFound  # pylint: disable=import-error
 
 from sina.cli import driver
@@ -61,7 +61,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(mock_args['factory'].db_path, self.created_db)
         self.assertEqual(mock_args['json_paths'], [self.args.source])
 
-    @attr('cassandra')
+    @pytest.mark.cassandra
     @patch('sina.cli.driver.import_json', return_value=True)
     @patch('sina.datastores.cass.schema.form_connection', return_value=True)
     def test_ingest_json_cass(self, mock_connect, mock_import):
@@ -173,7 +173,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(mock_uri_args['accepted_ids_list'][0],
                          mock_get_given_data.return_value[0])
 
-    @attr('cassandra')
+    @pytest.mark.cassandra
     @patch('sina.cli.driver.cass.RecordDAO.get_given_document_uri',
            return_value=[MagicMock(raw='hello')])
     @patch('sina.cli.driver.cass.RecordDAO.get_given_data',
@@ -206,7 +206,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(mock_uri_args['accepted_ids_list'][0],
                          mock_data.return_value[0])
 
-    @attr('cassandra')
+    @pytest.mark.cassandra
     @patch('sina.cli.driver.cass.RecordDAO.get_given_document_uri')
     @patch('sina.cli.driver.sql.RecordDAO.get_given_document_uri')
     def test_query_error_messages(self, mock_sql_query, mock_cass_query):
@@ -234,7 +234,7 @@ class TestCLI(unittest.TestCase):
 
     @patch('sina.cli.driver.sql.RecordDAO.get')
     @patch('sina.cli.driver.sina.cli.diff.print_diff_records')
-    @attr('cli_tools')
+    @pytest.mark.cli_tools
     def test_compare_records_good(self, mock_model_print, mock_get):
         """Verify compare subcommand prints the correct output."""
         self.args.database = "fake.sqlite"
@@ -248,7 +248,7 @@ class TestCLI(unittest.TestCase):
 
     @patch('sina.cli.driver.sql.RecordDAO.get')
     @patch('sina.cli.driver.sina.cli.diff.print_diff_records')
-    @attr('cli_tools')
+    @pytest.mark.cli_tools
     def test_compare_records_bad(self, mock_model_print, mock_get):
         """Verify compare subcommand prints useful error if given a bad id."""
         self.args.database = "fake.sqlite"

@@ -1,38 +1,22 @@
 # Read in system-specific link constraints.
 -r links.txt
 
-# Development dependencies
-tox<3.14
+# Install the project in editable (development) mode, which also adds
+# setup.py's install_requires packages.
+# We also need the jupyter requirements to work with sina's visualization.py module.
+-e .[jupyter]
+
+# Additional dependencies for tests and docs, not for usage.
+tox<4  # Tox 4 broke pip options in dependencies. Addressed but not yet available: https://github.com/tox-dev/tox/issues/2814
 flake8
 mock
 jsonschema
-
-# Sub-dependencies whose versions need to be fixed
-# Usually, this is due to the removal of something another dependency needs
-# (ex: soft_unicode in markupsafe, required by downgraded jinja2, required by...)
-importlib-metadata==1.6.1 
-ipython<8.0.0
-jinja2<3.0.0
-MarkupSafe<2.1.0
-# Someone removed nbformat as a dependency, so we get it ourself for the Jupyter tests
-nbformat
-
-# Install nose independently of tox to ensure xunit functionality is available
-nose
+sphinx-immaterial
+pytest
 sphinx
 sphinx_rtd_theme
-nbsphinx
+myst-nb
+nbformat
+ipython_genutils
 
-# Similarly, install ipykernel and matplotlib seperately of tox to ensure they're available
-# for visualization tests and the like, including numpy's (temporary) version restriction
-# and running jupyter notebooks for docs
-numpy<1.21.6
-ipykernel
-matplotlib
-ipywidgets
-
-# Install the project in editable (development) mode, which also adds 
-# setup.py's install_requires packages.
-# We also need the jupyter requirements to work with sina's visualization.py module.
--e .
--e .[jupyter]
+nbconvert>=7

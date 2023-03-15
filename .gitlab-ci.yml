@@ -41,7 +41,7 @@ deallocate_nodes:
     # Potential race condition. If Jupyter tests fail on concurrent tests, see about changing this.
     - rm -rf ~/.local/share/jupyter/kernels/sina-test
     - cd python
-    - module load python/3.8
+    - module load python/3.9
     - echo "Running Sina Python tests"
     - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
     - SRUN_OPTS=$( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID} --exclusive" || echo "-ppdebug")
@@ -60,7 +60,7 @@ deallocate_nodes:
   script:
     - echo "===== begin test_python_mysql ===== "
     - cd python
-    - module load python/3.8
+    - module load python/3.9
     - make test-mysql
 
 .test-cpp:
@@ -112,7 +112,7 @@ deallocate_nodes:
     - cd cpp
     - ln -s build-clang build
     - cd ..
-    - nosetests integration_test.py  --with-xunit
+    - pytest integration_test.py  --junitxml=pytest-integration_test.xml
 
 .deploy-all:
   # Builds a wheel, venv, tarball, examples, and docs.
@@ -153,7 +153,7 @@ deallocate_nodes:
     - echo "===== begin doc deployment ====="
     - echo "Making Python docs"
     - cd python
-    - module load python/3.8
+    - module load python/3.9
     - make docs
     - rm -rf $DOC_DIR/sina && cd ./docs/build && mv ./html $DOC_DIR/sina
     - cd ../cpp/build-clang

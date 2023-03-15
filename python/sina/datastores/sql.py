@@ -568,20 +568,22 @@ class RecordDAO(dao.RecordDAO):
         :param universal_criteria: List of tuples: (datum_name, UniversalCriteria)
         :return: generator of ids of Records fulfilling all criteria.
         """
-        result_counts = defaultdict(lambda: 0)
+        result_counts = defaultdict(set)
         desired_names = [x[0] for x in universal_criteria]
         LOGGER.info('Finding Records where data in %s exist', desired_names)
         expected_result_count = len(universal_criteria)
         for query_table in DATA_TABLES:
+            # OLD:
             # We know that a single Record can never have more than one datum with
             # a given name, so all we need to get is count.
-            query = (self.session.query(query_table.id, sqlalchemy.func.count(query_table.name))
-                     .filter(query_table.name.in_(desired_names))
-                     .group_by(query_table.id))
-            for result in query:
-                result_counts[result[0]] += result[1]  # Add the number of found names
+            # NOW (fixed bug):
+            # They can if curve set and data "collide"! We need to allow those.
+            query = (self.session.query(query_table.id, query_table.name)
+                     .filter(query_table.name.in_(desired_names)))
+            for id, found in query:
+                result_counts[id].add(found)
         for entry, val in six.iteritems(result_counts):
-            if val == expected_result_count:
+            if len(val) == expected_result_count:
                 yield entry
 
     # High arg count is inherent to the functionality.
