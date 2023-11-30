@@ -142,6 +142,29 @@ class RecordDAO(object):
         """Handle the logic of the update itself."""
         raise NotImplementedError
 
+    def update_appendonly(self, records):
+        """
+        Given one or more Records, update them in the backend.
+
+        :param records: A Record or iterable of Records to update.
+        """
+        if isinstance(records, sina.model.Record):
+            LOGGER.debug('Updating record with id=%s', records.id)
+            ids = [records.id]
+            records = [sina.model.flatten_library_content(records)]
+        else:
+            records = [sina.model.flatten_library_content(record) for record in records]
+            ids = [record.id for record in records]
+            LOGGER.debug('Updating records with ids=%s', ids)
+        if not all(self.exist(ids)):
+            raise ValueError("Can't update a record that hasn't been inserted!")
+        self._do_update_appendonly(records)
+
+    @abstractmethod
+    def _do_update_appendonly(self, records):
+        """Handle the logic of the update itself."""
+        raise NotImplementedError
+
     def insert(self, records, ingest_funcs=None,
                ingest_funcs_preserve_raw=None):
         """
@@ -237,7 +260,7 @@ class RecordDAO(object):
         return self._do_data_query(criteria=kwargs)
 
     @abstractmethod
-    def _do_data_query(self, criteria, id_pool=None):
+    def _do_data_query(self, criteria, id_pool=None, alias_dict=None):
         """Handle the backend dependent logic of data_query."""
         raise NotImplementedError
 
@@ -514,7 +537,7 @@ class RecordDAO(object):
     # pylint: disable=too-many-arguments
     def _find(self, types=None, data=None, file_uri=None,
               mimetype=None, id_pool=None, ids_only=False,
-              query_order=("data", "file_uri", "mimetype", "types")):
+              query_order=("data", "file_uri", "mimetype", "types"), alias_dict=None):
         """Implement cross-backend logic for the DataStore method of the same name."""
         LOGGER.debug('Performing a general find() query with order %s', query_order)
         query_map = {"data": (self._do_data_query, data),
@@ -537,7 +560,7 @@ class RecordDAO(object):
             if arg is not None:
                 if query_type == "data":
                     # Data has no ids_only
-                    id_pool = list(query_func(arg, id_pool=id_pool))
+                    id_pool = list(query_func(arg, id_pool=id_pool, alias_dict=alias_dict))
                 else:
                     # This usage of query_func seems to confuse pylint; it complains as
                     # long as I'm using ids_only=True, maybe it's "seeing" the call above.

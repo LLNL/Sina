@@ -1,3 +1,5 @@
+include: [component: $CI_SERVER_FQDN/lc-components/id_tokens/id_tokens-component@main]
+
 variables:
   ALLOC_NAME: "sina_gitlab_runner_build_test_alloc_${CI_PIPELINE_ID}"
 
@@ -11,18 +13,18 @@ stages:
 allocate_nodes:
   tags:
     - shell
-    - quartz
+    - dane
   stage: allocate
   script:
     - echo "===== begin alloc for remaining stages ====="
-    -  salloc -N 1 --exclusive -p pdebug -t 60 --no-shell --job-name=$ALLOC_NAME
+    -  salloc -N 1 --exclusive -t 60 --no-shell --job-name=$ALLOC_NAME
     - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
     - echo "===== alloc'd JOBID $JOBID ====="
 
 deallocate_nodes:
   tags:
     - shell
-    - quartz
+    - dane
   stage: deallocate
   when: always
   script:
@@ -44,7 +46,7 @@ deallocate_nodes:
     - module load python/3.9
     - echo "Running Sina Python tests"
     - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
-    - SRUN_OPTS=$( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID} --exclusive" || echo "-ppdebug")
+    - SRUN_OPTS=$( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID} --exclusive")
     - srun $SRUN_OPTS -t 60 -n1 make tests
   artifacts:
     paths:
@@ -82,7 +84,7 @@ deallocate_nodes:
     - cd cpp
     - rm -fr "build-$CPP_TEST_TARGET_COMPILER"
     - JOBID=$(squeue -h --name=${ALLOC_NAME} --format=%A)
-    - SRUN_OPTS=$( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID} --exclusive" || echo "-ppdebug")
+    - SRUN_OPTS=$( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID} --exclusive")
     - srun $SRUN_OPTS -t 60 -n1 run-builds.py $CPP_TEST_TARGET_COMPILER
 
     # When coming back from the build job, sometimes there is a lag in
@@ -168,28 +170,28 @@ deallocate_nodes:
 
 test-cpp-clang-CZ:
   tags:
-    - quartz
+    - dane
     - shell
   stage: test
   extends: [ .test-cpp-clang ]
 
 test-cpp-icc-CZ:
   tags:
-    - quartz
+    - dane
     - shell
   stage: test
   extends: [ .test-cpp-icc ]
 
 test-python-CZ:
   tags:
-    - quartz
+    - dane
     - shell
   stage: test
   extends: [ .test-python ]
 
 test-python-mysql-CZ:
   tags:
-    - quartz
+    - dane
     - shell
   stage: test
   variables:
@@ -199,7 +201,7 @@ test-python-mysql-CZ:
 test-integration-CZ:
   tags:
     - shell
-    - quartz
+    - dane
   stage: test-integration
   extends: [ .test-cpp-clang, .test-integration]
 
@@ -214,7 +216,7 @@ deploy-RZ:
 
 deploy-docs-CZ:
   tags:
-    - quartz
+    - dane
   stage: deploy
   only:
     variables:

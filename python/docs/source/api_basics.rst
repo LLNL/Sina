@@ -16,12 +16,12 @@ a DataStore to be queried en masse.
 
 A Record typically represents something like a run, msub, or experiment (more
 generally, a set of inputs and corresponding outputs and metadata), while a
-Relationship represents a link between Records, such as which msub submitted which
+Relationship represents a link between Records, such as which worker submitted which
 job. Records and Relationships are Python objects, and are often stored as/read from
 JSON (as a compromise between human readability and ease of automation).
 
 Sina's API allows users to store, query, and retrieve Records and Relationships
-from several backends, including SQLite, MySQL, and Cassandra, using
+from several backends, primarily SQLite and MariaDB, using
 backend-agnostic Python to both access and modify them. The only time the user
 should need to worry about the backend is during the initial setup; when using the
 simplest backend, no setup is required beyond choosing a filename (if even that).
@@ -33,7 +33,7 @@ simulations of a baseball impacting a certain model of bat, with the
 initial velocity being varied between them. Each run is represented as a Record containing the inputs,
 outputs, and any files produced--one Record is one collection of all the information
 surrounding one impact between ball and bat. The ensemble itself could also have a Record
-(containing shared metadata, msub parameters, etc), and we can use Relationships
+(containing shared metadata, scheduler parameters, etc), and we can use Relationships
 to link an ensemble to each of its runs. If you realize you ran the ensemble in a legacy units
 mode, Sina's API lets you easily find those runs, iterate through them, and update the units.
 Once your runs are all complete, you
@@ -71,8 +71,8 @@ If you use a simulation code that outputs a :code:`_sina.json` file, think of it
 as the filesystem equivalent of a Record (specifically, a Record object
 representing your simulation run). You can turn the json into
 a Record, and dump the Record back out as the json. Of course, reading the json
-into a Record doesn't intrinsically link them--that is, editing the Record object won't
-edit the file any more than opening a .pkl file and editing the object(s) within
+into a Record doesn't intrinsically link them--that is, editing the Record object within
+your Python code won't edit the file any more than opening a .pkl file and editing the object(s) within
 would edit the .pkl. But once you dump that Record back to json, they're once
 again in sync.
 
@@ -156,11 +156,11 @@ This storing and sorting process is what makes the API so efficient, as well as
 allowing Sina to act as an archive, fetching back the entirety of whatever Record each piece of
 information came from.
 
-The DataStore itself can be anything from a file on disk (in the sqlite case) to
-a massive Cassandra keyspace, but at its heart, it's just Sina's way of organizing the
+The DataStore itself can be anything from a file on disk to a massive remote
+database, but conceptually it's just Sina's way of organizing the
 data you give it. As such, you don't need to worry about its exact form or schema.
 Instead, you interact with the DataStore via a simple API that's identical regardless
-of which backend (SQLite, MySQL, Cassandra...) is being used behind the scenes.
+of which backend is in use.
 
 
 What a DataStore Is Used For

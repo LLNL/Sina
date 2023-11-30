@@ -28,8 +28,8 @@ DataStores can be heterogenous
 
 Sina can handle many types of Record within one datastore. The most important
 consideration on deciding what to store together is how it'll be queried.
-If, for example, you generate both msub info and data from application executions,
-and you expect to need details from the msubs when handling the application data,
+If, for example, you generate both ensemble info and data from application executions,
+and you expect to need details from the ensemble when handling the application data,
 it makes sense to store them in the same datastore.
 
 To contrast that, if you're doing two experiments that happen to use the same
@@ -82,7 +82,7 @@ using a scalar list as more of an enum, where you'll want to know things like
 greater than 3", then consider casting the enum values to strings.
 
 
-Put long, unqueried strings in Record.user_defined
+Put long, unqueried strings (and similar data) in Record.user_defined
 --------------------------------------------------
 
 If you have a string datum that's many thousands of characters long, chances
@@ -90,6 +90,8 @@ are you're not querying on it--a very long string like that can cause
 ingestion to fail if it's in the data section due to limitations in the backend
 itself (ex: MySQL max row length), but can be safely stored in the :code:`user_defined`
 field in a record. In general, though, consider keeping bulk data on the filesystem.
+User_defined allows you to store any data that can be expressed in JSON, and is handy
+for ensuring it's returned alongside the record data, but it cannot be queried directly.
 
 
 Frequently Asked Questions
@@ -98,10 +100,8 @@ Frequently Asked Questions
 Which backend should I use?
 ---------------------------
 
-You'll generally want to use SQLite for smaller, more localized projects and MySQL as
+You'll generally want to use SQLite for smaller, more localized projects and MariaDB as
 you scale up and need concurrent writes (or many tens of thousands/millions of records).
-Cassandra is a niche choice for large and specific use cases--reach out to
-us directly if you think it's the backend for you!
 
 SQLite:
 
@@ -110,27 +110,17 @@ SQLite:
  * Is trivial to stand up (the ingest commands will create a database for you)
  * Is ultimately just a file, with all the advantages that brings (give/take, copying, etc)
  * Has somewhat poorer query performance, becoming noticeable in the "millions of scalars" range
- * Faster serial inserts, no parallel inserts (or concurrent access in general)
+ * Faster serial inserts, no parallel inserts (or concurrent modification in general)
 
-MySQL:
+MariaDB:
 
- * Can be stood up quickly and easily on LC using LaunchIT
+ * Can be stood up quickly and easily on LC using [LaunchIT](https://hpc.llnl.gov/services/cloud/launchit)
  * Is more powerful than SQLite and generally scales better
  * Allows for parallel access across hundreds of nodes (including safe parallel writes)
- * Functions very similarly to SQLite; you'll simply connect with a URL-like string instead of a filepath
+ * Functions very similarly to SQLite; you'll simply connect with a URL-like string instead of a filepath (provided by LaunchIT)
  * Can have its permissions controlled by access to a config file
- * Does carry a networking cost (for very small workflows, SQLite may be faster)
- * Can be connected to across the CZ/RZ/etc. networks (ex: accessing a MySQL DB on Quartz from Catalyst), but does require connection to LC.
-
-Cassandra:
-
- * Like MySQL, allows parallel access
- * In specific large-data cases, performs better than MySQL due to horizontal scaling--can handle tens of millions of scalars with sub-second query times
- * Can be accessed only on Cassandra hosts (Sonar, RZSonar, etc)
- * Permissions are handled by Sonar admins; Cassandra isn't typically exposed as an end-user capability
- * Requires some additional setup to create multiple keyspaces
- * Slower inserts
- * Is a radically different way of storing data; queries that may be performant on MySQL suffer much higher relative slowdown on Cassandra, without the tradeoffs being obvious to the user
+ * Does carry a networking cost (for small workflows, SQLite may be faster)
+ * Can be connected to across the CZ/RZ/etc. networks (ex: accessing a MariaDB instance on RZTopaz from RZHound), but does require connection to LC.
 
 
 What if I run into difficulties?

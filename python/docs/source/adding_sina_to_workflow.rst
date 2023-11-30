@@ -17,12 +17,12 @@ Answering a few questions up front may be helpful in deciding how to begin:
 - For the files containing that data, what's the organization like? Is it unstructured ASCII? Logs? JSON?
 - Which of those files contain things used to categorize results? That is, if you have a thousand simulation runs, which data would let you choose the runs you're interested in? That's the sort of data you'll want in Sina (physics output scalars are a common example)
 - Of that, what should constitute one Record? Consider what data belongs together as a single grouping of inputs and outputs. A simulation run, a well in a plate, and a set of measurements at one coordinate point are all natural candidates for a single Record.
-- Do you want to have multiple types of Record? For example, you might want to track :code:`msub` s and :code:`run` s. Or say you're doing oceanography data, taking measurements at a series of points--you might want :code:`point_measure` s and :code:`trip` s.
+- Do you want to have multiple types of Record? For example, you might want to track :code:`ensemble_instance` s and :code:`run` s. Or say you're doing oceanography data, taking measurements at a series of points--you might want :code:`point_measure` s and :code:`trip` s.
 - What additional [meta]data, if any, would you like to add in? Timestamps are a common example.
 - Which Relationships, if any, would you like to track? It can be helpful to think under which circumstances you'd need to find one Record given another (for example, you might have both :code:`deck` s and :code:`run` s that use a deck, and you may want to find the latter's info from the former, or vice versa)
 
 
-The simplest case for Sina (which is not uncommon) is that you're already using a code that outputs
+The simplest case for Sina (as well as perhaps the most common) is that you're already using a code that outputs
 Sina JSON. In that case, all you need to do is run the ingest command and start using the visualizer! If not,
 you'll have to decide how to line up how you (and/or your users) think about the data with how Sina accesses it.
 The aforementioned `API Concepts <api_basics.html>`__ doc covers the ideas, but we can explore some of the

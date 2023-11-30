@@ -7,6 +7,7 @@ Few operations are performed--this file makes heavy use of mocking.
 # pylint: disable=too-many-public-methods, too-many-arguments
 
 import unittest
+import os
 
 # Disable pylint checks due to its issue with virtual environments
 from mock import Mock, patch  # pylint: disable=import-error
@@ -16,6 +17,7 @@ import sina
 import sina.datastore
 
 from sina.datastore import connect, create_datastore, DataStore, ReadOnlyDataStore
+from sina.model import Record, CurveSet
 
 
 class AbstractDataStoreTest(unittest.TestCase):
@@ -235,12 +237,12 @@ class ReadOnlyDatastoreTests(AbstractDataStoreTest):
     def test_record_find(self):
         """Test the RecordOperation find()."""
         self.assert_record_method_is_passthrough("find",
-                                                 "_find", 7)
+                                                 "_find", 8)
         self.assert_record_method_is_passthrough("find",
                                                  "_find", 0,
                                                  opt_args=(None, None, None, None, None,
                                                            False, ("data", "file_uri",
-                                                                   "mimetype", "types")))
+                                                                   "mimetype", "types"), None))
 
     # #############  RelationshipOperations  ############# #
     def test_find(self):
@@ -471,3 +473,156 @@ class CreateDatastore(unittest.TestCase):
     def test_connect_defined_at_sina(self):
         """Verify sina.connect() is defined and the same as sina.datastore.connect()"""
         self.assertEqual(sina.connect, sina.datastore.connect)
+
+
+class AppendOnlyDatastore(unittest.TestCase):
+    """Test append store"""
+
+    # pylint: disable=too-many-statements
+    def test_append_only_datastore(self):
+        """Verify sina.connect(connection_type='append') only appends"""
+        store_name = 'test.sqlite'
+        try:
+            os.remove(store_name)
+        except FileNotFoundError:
+            pass
+        store = connect(store_name, connection_type='append')
+        record = Record(id="spam", type="foo")
+        record.data["spam_scal"] = {"value": 10.5}
+        record.data["spam_scal_2"] = {"value": 10.5}
+        record.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
+        record.data["val_data_2"] = {"value": "double yolks"}
+        record.data["test_data_2"] = {"value": 1000}
+        record.data["test_data_2_a"] = {"value": 2}
+        record.curve_sets = {
+            "spam_curve0": {
+                "dependent": {"firmness0": {"value": [1, 1, 1, 1.2]}},
+                "independent": {"time0": {"value": [0, 1, 2, 3],
+                                          "tags": ["misc"],
+                                          "units": "seconds"}}}}
+        store.records.insert(record)
+
+        # ---------- Data ----------
+        data_dict = {'spam_scal': {'value': 10.5},
+                     'spam_scal_2': {'value': 10.5},
+                     'val_data': {'value': 'chewy', 'tags': ['edible', 'simple']},
+                     'val_data_2': {'value': 'double yolks'},
+                     'test_data_2': {'value': 1000},
+                     'test_data_2_a': {'value': 2}}
+
+        # Set data
+        record.set_data("test_data_2", value=5, tags=['first_tag', 'second_tag'])
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        data_dict["test_data_2"]["tags"] = ['first_tag', 'second_tag']
+        self.assertEqual(record.data, data_dict)
+
+        # Dictionary data
+        record.data["test_data_2_a"]["value"] = 5
+        record.data["test_data_2_a"]["tags"] = ['third_tag', 'fourth_tag']
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        data_dict["test_data_2_a"]["tags"] = ['third_tag', 'fourth_tag']
+        self.assertEqual(record.data, data_dict)
+
+        # New data
+        record.data["new_data"] = {"value": 'my value'}
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        data_dict["new_data"] = {"value": 'my value'}
+        self.assertEqual(record.data, data_dict)
+
+        # New set data
+        record.set_data("new_data", value=5, tags=['first_tag', 'second_tag'])
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        data_dict["new_data"]["tags"] = ['first_tag', 'second_tag']
+        self.assertEqual(record.data, data_dict)
+
+        # New dictionary data
+        record.data["new_data"]["value"] = 7
+        record.data["new_data"]["units"] = 'm/s'
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        data_dict["new_data"]["units"] = 'm/s'
+        self.assertEqual(record.data, data_dict)
+
+        # Deleted data
+        record.data = {'spam_scal': {'value': 'test'}}
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        self.assertEqual(record.data, data_dict)
+
+        # ---------- Curve Sets ----------
+        curve_set_dict = {'spam_curve0': {'dependent': {'firmness0': {'value': [1, 1, 1, 1.2]}},
+                                          'independent': {'time0': {'value': [0, 1, 2, 3],
+                                                                    'tags': ['misc'],
+                                                                    'units': 'seconds'}}}}
+
+        # Set curve_set
+        new_curve_set = CurveSet("spam_curve0", {"independent": {"time0": {"value": [19, 29,
+                                                                                     39]}}})
+        record.set_curve_set(new_curve_set)
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        self.assertEqual(record.curve_sets, curve_set_dict)
+
+        # Dictionary curve_set
+        record.curve_sets["spam_curve0"]["independent"] = {"time0": {"value": [19, 29, 39]}}
+        record.curve_sets["spam_curve0"]["dependent"] = {"firmness0": {"value": [19, 19,
+                                                                                 19, 999]},
+                                                         "other_curve": {"value": [19, 19,
+                                                                                   19, 999]
+                                                                         }}
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        curve_set_dict["spam_curve0"]["dependent"]["other_curve"] = {"value": [19, 19, 19, 999]}
+        self.assertEqual(record.curve_sets, curve_set_dict)
+
+        # New curve_set
+        record.curve_sets['my_curve'] = {"dependent": {"firmness2": {"value": [1.7, 1.7, 1.7, 1.7]
+                                                                     }},
+                                         "independent": {"time2": {"value": [0.7, 1.7, 2.7, 3.7],
+                                                                   "tags": ["hpc"],
+                                                                   "units": "minutes"}}}
+        store.records.update(record)
+
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        curve_set_dict['my_curve'] = {"dependent": {"firmness2": {"value": [1.7, 1.7, 1.7, 1.7]
+                                                                  }},
+                                      "independent": {"time2": {"value": [0.7, 1.7, 2.7, 3.7],
+                                                                "tags": ["hpc"],
+                                                                "units": "minutes"}}}
+        self.assertEqual(record.curve_sets, curve_set_dict)
+
+        record.curve_sets["my_curve"]["independent"] = {"time2": {"value": [19, 29, 39]}}
+        store.records.update(record)
+        record = list(store.records.find(id_pool=["spam"]))[0]
+        self.assertEqual(record.curve_sets, curve_set_dict)
+
+        # Deleted data
+        new_curve = {"egg_curve": {"independent": {"firmness4": {"value": [1.7, 1.7, 1.7, 1.7]
+                                                                 }},
+                                   "dependent": {"time4": {"value": [0.7, 1.7, 2.7, 3.7],
+                                                           "tags": ["misc"],
+                                                           "units": "minutes"}}}}
+
+        record.curve_sets = new_curve
+        store.records.update(record)
+        record = list(store.records.find(id_pool=["spam"]))[0]
+
+        curve_set_dict['egg_curve'] = {"independent": {"firmness4": {"value": [1.7, 1.7, 1.7, 1.7]
+                                                                     }},
+                                       "dependent": {"time4": {"value": [0.7, 1.7, 2.7, 3.7],
+                                                               "tags": ["misc"],
+                                                               "units": "minutes"}}}
+
+        self.assertEqual(record.curve_sets, curve_set_dict)

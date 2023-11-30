@@ -3,12 +3,12 @@
 
 from setuptools import setup, find_packages
 
-VERSION = "1.14.0"
+VERSION = "1.15.0"
 
 setup(name='llnl-sina',
       version=VERSION,
       author='Siboka Team',
-      author_email='siboka@llnl.gov',
+      author_email='weave-support@llnl.gov',
       packages=find_packages(),
       description='Simulation INsight and Analysis',
       long_description=open('README.md').read(),
@@ -39,7 +39,8 @@ setup(name='llnl-sina',
       },
       install_requires=[
           'six',
-          'sqlalchemy<2',  # API changes, to be investigated/updated for
+          'sqlalchemy',  # API changes, to be investigated/updated for
+          'sqlalchemy<2;python_version<"3"',
           'enum34;python_version<"3.4"',
           'orjson;python_version>="3.6" and platform_machine!="ppc64le"',
           'ujson;python_version>="3.6" and platform_machine=="ppc64le"',

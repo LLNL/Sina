@@ -5,6 +5,16 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.15
+===========
+- New intro and guidance in documentation
+- Added ORM extension functionality and guide notebook
+- Added ingester/converter for CSV to Sina Record
+- Added append mode for datastores
+- Added ability to find data by alias
+- Updated testing environment
+- Fixed and updated doc building with Sphinx
+
 1.14
 ===========
 - Updated for TOSS4
