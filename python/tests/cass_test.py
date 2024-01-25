@@ -5,7 +5,7 @@ import logging
 import unittest
 
 # Disable pylint checks due to its issue with virtual environments
-from nose.plugins.attrib import attr  # pylint: disable=import-error
+import pytest  # pylint: disable=import-error
 from mock import patch  # pylint: disable=import-error
 
 try:
@@ -40,7 +40,7 @@ if TERSIFY_CASSANDRA_LOGGER:
     logging.getLogger("cassandra").setLevel(logging.ERROR)
 
 
-@attr('cassandra')
+@pytest.mark.cassandra
 # Mixin class, has no use for an __init__.
 # pylint: disable=no-init
 class CassandraMixin(object):
@@ -81,7 +81,7 @@ class CassandraMixin(object):
         management.drop_keyspace(TEMP_KEYSPACE_NAME)
 
 
-@attr('cassandra')
+@pytest.mark.cassandra
 class TestSetup(CassandraMixin, unittest.TestCase):
     """
     Provides methods needed for setup-type tests on the Cassandra backend.
@@ -104,7 +104,7 @@ class TestSetup(CassandraMixin, unittest.TestCase):
             self.assertIsInstance(factory, self.backend.DAOFactory)
 
 
-@attr('cassandra')
+@pytest.mark.cassandra
 class TestModify(CassandraMixin, tests.backend_test.TestModify):
     """
     Provides methods needed for modify-type tests on the Cassandra backend.
@@ -125,7 +125,7 @@ class TestModify(CassandraMixin, tests.backend_test.TestModify):
         super(TestModify, self).tearDown()
 
 
-@attr('cassandra')
+@pytest.mark.cassandra
 class TestQuery(CassandraMixin, tests.backend_test.TestQuery):
     """
     Unit tests that specifically deal with queries.
@@ -148,7 +148,7 @@ class TestQuery(CassandraMixin, tests.backend_test.TestQuery):
         cls.teardown_cass_keyspace()
 
 
-@attr('cassandra')
+@pytest.mark.cassandra
 class TestImportExport(CassandraMixin, tests.backend_test.TestImportExport):
     """
     Provides methods needed for import/export-type tests on the Cassandra backend.

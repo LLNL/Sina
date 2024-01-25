@@ -10,7 +10,7 @@ import unittest
 
 # Disable pylint checks due to its issue with virtual environments
 from mock import Mock, patch  # pylint: disable=import-error
-from nose.plugins.attrib import attr  # pylint: disable=import-error
+import pytest  # pylint: disable=import-error
 
 import sina
 import sina.datastore
@@ -314,6 +314,7 @@ class DataStoreTest(AbstractDataStoreTest):
     def test_insert_record(self):
         """Test the RecordOperation insert()."""
         self.assert_record_method_is_passthrough("insert", "insert", 1,
+                                                 opt_args=(None, None),
                                                  has_result=False)
 
     def test_delete_record(self):
@@ -433,7 +434,7 @@ class CreateDatastore(unittest.TestCase):
         self.assertEqual(mock_datastore_init.call_count, 3)
         self.assertEqual(mock_read_only_store_init.call_count, 1)
 
-    @attr('cassandra')
+    @pytest.mark.cassandra
     @patch('sina.datastore.DataStore.__init__')
     @patch('sina.datastores.cass.DAOFactory.__init__')
     def test_connect_cass_datastore(self, mock_factory_init,

@@ -19,7 +19,7 @@ python/docs/source/generated_docs/
 python/venv/
 python/distvenv
 
-python/nosetests*.xml*
+python/pytest*.xml*
 python/requirements/links.txt
 
 # Build directories

@@ -212,10 +212,10 @@ To clean all output from the notebooks::
 Testing
 =======
 
-This package uses nosetests to run unit tests.  Enter the following while in
+This package uses pytest to run unit tests.  Enter the following while in
 your virtual environment::
 
-    (venv) $ nosetests
+    (venv) $ pytest
 
 Additional tests, which include checks for PEP8 compliance and proper
 documentation, can be run my entering the following::

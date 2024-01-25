@@ -10,7 +10,7 @@ import io
 from six.moves import cStringIO as StringIO
 
 # Disable pylint checks due to its issue with virtual environments
-from nose.plugins.attrib import attr  # pylint: disable=import-error
+import pytest  # pylint: disable=import-error
 import jsonschema  # pylint: disable=import-error
 
 from sina.cli import driver
@@ -105,7 +105,7 @@ class TestSQLIntegration(unittest.TestCase):
                 sys.stdout = sys.__stdout__
 
 
-@attr('cassandra')
+@pytest.mark.cassandra
 class TestCassIntegration(unittest.TestCase):
     """Cass tests for how the suite fits together that mimic a user's steps."""
 

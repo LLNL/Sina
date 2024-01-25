@@ -8,8 +8,9 @@ import logging
 from six.moves import cStringIO
 
 # Disable pylint check due to its issue with virtual environments
-from nose.plugins.attrib import attr  # pylint: disable=import-error
+import pytest  # pylint: disable=import-error
 
+import sina
 from sina.model import Record
 try:
     import sina.cli.diff
@@ -24,7 +25,7 @@ LOGGER = logging.getLogger(__name__)
 TARGET = None
 
 
-@attr('cli_tools')
+@pytest.mark.cli_tools
 class TestRecordDiff(unittest.TestCase):
     """Unit tests that involve diffing Records using the CLI."""
 

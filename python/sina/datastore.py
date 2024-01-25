@@ -1,6 +1,7 @@
 """Defines the DataStore, Sina's toplevel data interaction object."""
 from __future__ import print_function
 import warnings
+
 import six
 
 import sina.datastores.sql as sina_sql
@@ -176,6 +177,8 @@ class ReadOnlyDataStore(object):
             """
             return self._record_dao.get(ids_to_get, chunk_size=chunk_size)
 
+        # Sphinx has an issue with trailing-underscore params, we need to escape it for the doc
+        # pylint: disable=anomalous-backslash-in-string
         def get_raw(self, id_):
             """
             Get the raw content of the record identified by the given ID.
@@ -184,7 +187,7 @@ class ReadOnlyDataStore(object):
             and cannot be used to create a via the get() call. This is not
             intended to be used for other purposes.
 
-            :param id_: the ID of the record
+            :param id\_: the ID of the record
             :return: the raw JSON for the specified record
             :raises: ValueError if the record does not exist
             """
@@ -195,7 +198,7 @@ class ReadOnlyDataStore(object):
             Given an (iterable of) id(s), return boolean list of whether those
             records exist or not.
 
-            :param ids: The id(s) of the Record(s) to test.
+            :param ids_to_check: The id(s) of the Record(s) to test.
 
             :returns: If provided an iterable, a generator of bools pertaining to
                       the ids existence, else a single boolean value.
@@ -529,13 +532,26 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
         """
 
         # -------------------- Basic operations ---------------------
-        def insert(self, records_to_insert):
+        def insert(self, records_to_insert, ingest_funcs=None,
+                   ingest_funcs_preserve_raw=None):
             """
             Given one or more Records, insert them into the DAO's backend.
 
             :param records_to_insert: A Record or iter of Records to insert
+            :param ingest_funcs: A function or list of functions to
+                                 run against each record before insertion.
+                                 See the postprocessing module for a few
+                                 you can use! They will be run in list order.
+            :param ingest_funcs_preserve_raw: Whether the postprocessing is allowed
+                                              to touch the underlying json on ingest.
+                                              This may break parity with files on the
+                                              filesystem, but is needed if you want
+                                              to use filter_keep/etc. to make smaller
+                                              records. MUST BE SPECIFIED if you want
+                                              to use the ingest_funcs.
             """
-            self._record_dao.insert(records_to_insert)
+            self._record_dao.insert(records_to_insert, ingest_funcs,
+                                    ingest_funcs_preserve_raw)
 
         def update(self, records_to_update):
             """

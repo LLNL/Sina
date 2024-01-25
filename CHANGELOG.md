@@ -5,6 +5,24 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.14
+===========
+- Updated for TOSS4
+- Added Fortran support alongside C++ API
+- Added new python post-processing module
+    - Includes functions for common post-processing tasks like data filtration
+    - Run per record or at ingest
+    - Takes custom functions
+- Made further improvements to documentation
+    - Enhanced existing tutorials
+    - Changed docs to use dark mode
+    - Clearer images
+- Cleaned up dependencies
+- Fixed a bug involving using exists() on records that have identical data and curve set names
+- Fixed a bug involving name flattening on some library data for queries
+- Replace error connecting visualizer to empty database with a descriptive warning
+- Internal build and testing improvements
+
 1.13
 ===========
 - Overhauled documentation

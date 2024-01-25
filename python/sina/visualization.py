@@ -344,8 +344,12 @@ class Visualizer(object):
         """
         data_names = defaultdict(set)
         known_types = list(self.recs.get_types())
+        data_types = ["scalar", "string", "scalar_list", "string_list"]
+        if not known_types:
+            print("WARNING: You've connected to a datastore that appears to be empty!")
+            return {x: list() for x in data_types}
         for known_type in known_types:
-            for data_type in ["scalar", "string", "scalar_list", "string_list"]:
+            for data_type in data_types:
                 current_data_names = list(self.recs.data_names(known_type,
                                                                data_type,
                                                                filter_constants))

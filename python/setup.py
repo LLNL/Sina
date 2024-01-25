@@ -3,7 +3,7 @@
 
 from setuptools import setup, find_packages
 
-VERSION = "1.13.0"
+VERSION = "1.14.0"
 
 setup(name='llnl-sina',
       version=VERSION,
@@ -13,45 +13,38 @@ setup(name='llnl-sina',
       description='Simulation INsight and Analysis',
       long_description=open('README.md').read(),
       entry_points={
-        'console_scripts': [
-            'sina = sina.cli.driver:main'
-        ]
+          'console_scripts': [
+              'sina = sina.cli.driver:main'
+          ]
       },
       extras_require={
-        'cassandra': [
-            'cassandra-driver',
-        ],
-        'jupyter': [
-            # More recent nbconverts cause jinja "missing python.tpl" errors.
-            'nbconvert<=5.4.0',
-            # and nbconvert in general isn't compatible with recent mistunes.
-            'mistune<2',
-            # Older nbconvert requires older Tornado.
-            'tornado<5.1',
-            'ipython<8',  # Required for Python 3.7 (LC machine version)
-            'ipykernel>=5',
-            'ipywidgets',
-            # Newer numpys (1.22, 1.23) seem to have an issue with up-to-date setuptools
-            'numpy<1.22',
-            'matplotlib',
-            'tabulate'
-        ],
-        'cli_tools': [
-            'deepdiff',
-            'texttable'
-        ],
-        'mysql': [
-            'mysql-connector-python',
-        ]
+          'cassandra': [
+              'cassandra-driver',
+          ],
+          'jupyter': [
+              'jupyter-client',
+              'ipython<8.13',  # 8.13 seems to require Python 3.9 but not limit itself to >= it.
+              'ipykernel',
+              'ipywidgets',
+              'matplotlib',
+              'tabulate'
+          ],
+          'cli_tools': [
+              'deepdiff',
+              'texttable'
+          ],
+          'mysql': [
+              'mysql-connector-python',
+          ]
       },
       install_requires=[
-        'six',
-        'sqlalchemy',
-        'enum34;python_version<"3.4"',
-        'orjson;python_version>="3.6" and platform_machine!="ppc64le"',
-        'ujson;python_version>="3.6" and platform_machine=="ppc64le"',
-        'ujson<4;python_version<"3.6" and platform_machine!="ppc64le"',
-        'freetype-py;platform_system=="Darwin"',
+          'six',
+          'sqlalchemy<2',  # API changes, to be investigated/updated for
+          'enum34;python_version<"3.4"',
+          'orjson;python_version>="3.6" and platform_machine!="ppc64le"',
+          'ujson;python_version>="3.6" and platform_machine=="ppc64le"',
+          'ujson<4;python_version<"3.6" and platform_machine!="ppc64le"',
+          'freetype-py;platform_system=="Darwin"',
       ],
       license='MIT',
       classifiers=[

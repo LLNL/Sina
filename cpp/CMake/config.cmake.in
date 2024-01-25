@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+set_and_check(sina_INCLUDE_DIR "@PACKAGE_sina_INSTALL_INCLUDE_DIR@")
+
+set(sina_INCLUDE_DIRS ${sina_INCLUDE_DIR})
+set(sina_LIBRARIES sina::sina)
+
+check_required_components(sina)

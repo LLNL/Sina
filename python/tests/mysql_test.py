@@ -6,7 +6,7 @@ import uuid
 import unittest
 
 # Disable pylint checks due to its issue with virtual environments
-from nose.plugins.attrib import attr  # pylint: disable=import-error
+import pytest  # pylint: disable=import-error
 import sqlalchemy  # pylint: disable=import-error
 
 import sina.datastores.sql as backend
@@ -66,7 +66,7 @@ class DBManager(object):
 
 # Disable pylint no-init check just on the Mixin class, since it has no use
 # for an __init__ and there is no expectation of adding more public methods.
-@attr('mysql')
+@pytest.mark.mysql
 class StaticSQLMixin(unittest.TestCase):  # pylint: disable=no-init,too-few-public-methods
     """
     Contains setUpClass() and tearDownClass() methods for creating and populating a test
@@ -99,7 +99,7 @@ class StaticSQLMixin(unittest.TestCase):  # pylint: disable=no-init,too-few-publ
         return cls.db_manager.create_dao_factory()
 
 
-@attr('mysql')
+@pytest.mark.mysql
 class InstanceSQLMixin(unittest.TestCase):  # pylint: disable=no-init,too-few-public-methods
     """
     Contains setUp() and tearDown() methods for creating and populating a test
@@ -128,7 +128,7 @@ class InstanceSQLMixin(unittest.TestCase):  # pylint: disable=no-init,too-few-pu
         return self.db_manager.create_dao_factory()
 
 
-@attr('mysql')
+@pytest.mark.mysql
 class TestModify(InstanceSQLMixin, tests.backend_test.TestModify):
     """
     Provides methods needed for modify-type tests on the SQL backend.
@@ -139,7 +139,7 @@ class TestModify(InstanceSQLMixin, tests.backend_test.TestModify):
     __test__ = True
 
 
-@attr('mysql')
+@pytest.mark.mysql
 class TestQuery(StaticSQLMixin, tests.backend_test.TestQuery):
     """
     Provides methods needed for query-type tests on the SQL backend.
@@ -150,7 +150,7 @@ class TestQuery(StaticSQLMixin, tests.backend_test.TestQuery):
     __test__ = True
 
 
-@attr('mysql')
+@pytest.mark.mysql
 class TestImportExport(InstanceSQLMixin, tests.backend_test.TestImportExport):
     """
     Provides methods needed for import/export-type tests on the SQL backend.

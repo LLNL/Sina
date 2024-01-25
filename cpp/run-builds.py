@@ -65,13 +65,13 @@ def main() -> None:
     all_platforms = [
         Platform(
             'intel',
-            Path('sina-linux-rhel7-ivybridge-intel@19.0.4.cmake'),
-            Path('toss_3_x86_64_intel.cmake')
+            Path('sina-linux-rhel7-ivybridge-intel@classic-2021-6-0.cmake'),
+            Path('toss_4_x86_64_intel.cmake')
         ),
         Platform(
             'clang',
-            Path('sina-linux-rhel7-ivybridge-clang@11.0.1.cmake'),
-            Path('toss_3_x86_64_clang.cmake')
+            Path('sina-linux-rhel7-ivybridge-clang@14.0.6.cmake'),
+            Path('toss_4_x86_64_clang.cmake')
         ),
         Platform(
             'gcc',

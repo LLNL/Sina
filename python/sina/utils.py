@@ -179,7 +179,7 @@ def import_json(factory, json_paths):
     Import one or more JSON document(s) into a supported backend.
 
     :param factory: The factory used to perform the import.
-    :param json_path: The filepath or list of paths to the json to import.
+    :param json_paths: The filepath or list of paths to the json to import.
     """
     LOGGER.debug('Importing %s', json_paths)
     if isinstance(json_paths, six.string_types):
@@ -347,8 +347,8 @@ def intersect_ordered(iterables):
     ids. Important to avoid too much being stored in memory; here, we only store
     the generator stack plus (len(iterables)+C) values.
 
-    :param gen_list: A list of iterators. Must be ordered ascending with respect
-                     to python's comparators (ex: numerically for scalars)
+    :param iterables: A list of iterators. Must be ordered ascending with respect
+                      to python's comparators (ex: numerically for scalars)
 
     :returns: A generator that crawls through the iterators and returns
               values that all of them share.

@@ -20,6 +20,7 @@ from sina.utils import (DataRange, import_json, export, _export_csv, has_all,
                         has_any, all_in, any_in, exists, not_)
 from sina.model import Run, Record, Relationship, flatten_library_content
 import sina.sjson as json
+import sina.postprocessing as spp
 
 LOGGER = logging.getLogger(__name__)
 TARGET = None
@@ -30,11 +31,13 @@ TARGET = None
 # pylint: disable=invalid-name,too-many-lines,too-many-statements
 
 
+# Sphinx has an issue with trailing-underscore params, we need to escape it for the doc
+# pylint: disable=anomalous-backslash-in-string
 def create_daos(class_):
     """
     Create DAOs for the specified class.
 
-    :param class_: Backend class
+    :param class\_: Backend class
     """
     class_.factory = class_.create_dao_factory()
     class_.record_dao = class_.factory.create_record_dao()
@@ -323,6 +326,63 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         retrieved = record_dao.get('spam')
         self.assertIsNotNone(retrieved)
 
+    def test_recorddao_insert_with_postprocessing(self):
+        """Test that RecordDAO can handle postprocessing."""
+        record_dao = self.factory.create_record_dao()
+        data = {"eggs": {"value": 12},
+                "bread": {"value": "toasty"},
+                "oranges": {"value": [4, 3, 2.1, 0]}}
+        rec_1 = Record(id="spam", type="breakfast", data=data)
+        rec_2 = Record(id="spam2", type="breakfast", data=data)
+        allow_rec = Record(id="o", type="o",
+                           data={"eggs": {"value": 2}, "oranges": {"value": 4}})
+        deny_rec = Record(id="o", type="o",
+                          data={"oranges": {"value": 4}})
+        record_dao.insert((x for x in (rec_1, rec_2)), [spp.filter_keep(allow_rec),
+                                                        spp.filter_remove(deny_rec)],
+                          ingest_funcs_preserve_raw=True)
+        # Our queries shouldn't turn anything up
+        self.assertEqual(len(list(record_dao.data_query(bread=exists()))), 0)
+        self.assertEqual(len(list(record_dao.data_query(oranges=exists()))), 0)
+        # But when we get back the records themselves...
+        returned_records = list(record_dao.get(record_dao.data_query(eggs=exists())))
+        self.assertEqual(len(returned_records), 2)
+        # Their data should be unaltered
+        self.assertEqual(returned_records[1].data["eggs"]["value"],
+                         rec_2["data"]["eggs"]["value"])
+        self.assertTrue("bread" in returned_records[0].data)
+        self.assertTrue("bread" in returned_records[1].data)
+
+    def test_recorddao_insert_with_postprocessing_destructive_raw(self):
+        """Test that RecordDAO can handle postprocessing."""
+        record_dao = self.factory.create_record_dao()
+        data = {"eggs": {"value": 12},
+                "bread": {"value": "toasty"},
+                "oranges": {"value": [4, 3, 2.1, 0]}}
+        rec_1 = Record(id="spam", type="breakfast", data=data)
+        rec_2 = Record(id="spam2", type="breakfast", data=data)
+        allow_rec = Record(id="o", type="o",
+                           data={"eggs": {"value": 2}, "oranges": {"value": 4}})
+        deny_rec = Record(id="o", type="o",
+                          data={"oranges": {"value": 4}})
+        # This time, we allow the raws to be altered
+        record_dao.insert((x for x in (rec_1, rec_2)), [spp.filter_keep(allow_rec),
+                                                        spp.filter_remove(deny_rec)],
+                          ingest_funcs_preserve_raw=False)
+        # Thus, when we get them back...
+        returned_records = list(record_dao.get((x for x in ("spam", "spam2"))))
+        self.assertEqual(returned_records[0].data["eggs"]["value"],
+                         rec_1["data"]["eggs"]["value"])
+        self.assertEqual(returned_records[1].data["eggs"]["value"],
+                         rec_2["data"]["eggs"]["value"])
+        # ...we expect to find only the things we didn't filter out.
+        self.assertFalse("bread" in returned_records[0].data)
+        self.assertFalse("bread" in returned_records[1].data)
+        self.assertFalse("oranges" in returned_records[0].data)
+        self.assertFalse("oranges" in returned_records[1].data)
+        self.assertTrue("eggs" in returned_records[0].data)
+        self.assertTrue("eggs" in returned_records[1].data)
+
     def test_recorddao_delete_one(self):
         """Test that RecordDAO is deleting correctly."""
         record_dao = self.factory.create_record_dao()
@@ -429,11 +489,14 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
                      data={"eggs": {"value": 12, "units": None, "tags": ["runny"]},
                            "recipes": {"value": 5}},
                      files={"eggs.brek": {"mimetype": "egg", "tags": ["fried"]}},
-                     user_defined={})
+                     user_defined={},
+                     library_data={"test": {"data": {"time": {"value": 11}}}})
         record_dao.insert(rec)
         self.assertEqual(len(list(record_dao._find(data={"eggs": 12}))), 1)
         returned_record = record_dao.get("spam")
-        self.assertEqual(returned_record.data, rec.data)
+        # These will not be equal because of the presence of library data.
+        # We test values below individually instead.
+        # self.assertEqual(returned_record.data, rec.data)
         rec["data"]["eggs"]["value"] = 144
         rec["type"] = "gross_eggs"
         record_dao.update(rec)
@@ -443,6 +506,8 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(returned_record.user_defined, updated_record.user_defined)
         self.assertEqual(returned_record.data["recipes"]["value"],
                          updated_record.data["recipes"]["value"])
+        self.assertEqual(returned_record.library_data["test"]["data"]["time"]["value"],
+                         updated_record.library_data["test"]["data"]["time"]["value"])
         self.assertNotEqual(returned_record.type, updated_record.type)
         self.assertNotEqual(returned_record.data["eggs"]["value"],
                             updated_record.data["eggs"]["value"])
@@ -778,9 +843,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
         Class method to avoid it being re-run per test. Attributes must be set
         to appropriate (backend-specific) values by child.
-
-        :param record_dao: A RecordDAO to perform queries.
         """
+        # A RecordDAO to perform queries.
         cls.record_dao = None
         create_daos(cls)
         cls.inserted_records = populate_database_with_data(cls.record_dao)
@@ -1173,6 +1237,14 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                                                  flex_data_2=exists()))  # 5
         self.assertEqual(len(just_5), 1)
         self.assertIn("spam5", just_5)
+
+    def test_recorddao_exists_overlap(self):
+        """Test that exists() works correctly with "duplicate" names."""
+        # There's an edge case we need to support where a datum and curve set
+        # have the same name. We need to make sure we don't double-count them.
+        no_results = list(self.record_dao.data_query(eggs_scal=exists(),
+                                                     shared_scalar=exists()))
+        self.assertEqual(len(no_results), 0)
 
     def test_recorddao_data_query_mixed_list_criteria(self):
         """
