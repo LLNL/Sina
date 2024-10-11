@@ -521,7 +521,7 @@ def _export_csv(data, scalar_names, output_file):
                 writer.writerow([run] + [dataset[scalar]['value'] for scalar in scalar_names])
 
 
-def parse_data_string(data_string):
+def parse_data_string(filters: str):
     """
     Parse a string into a {name: DataRange} dict for use with data_query().
 
@@ -530,54 +530,237 @@ def parse_data_string(data_string):
     paired up with their respective names and returned as:
     [("speed", range_1), ("max_height", range_2)]
 
-    IMPORTANT CAVEATS: values passed in can't have quotes, equals signs, etc.
-    Same conventions as python variable naming: som3cat is fine, cat=sp'm isn't.
-    Should look something like "speed=[fast,faster] height=real_tall". In case
-    your string looks like a number (ex: version=1.2.8 got updated to 1.3),
-    **this will NOT work correctly** and it's time to revisit the function.
+    Data specifiers can be separated by space and/or commas;
+    other tokens can be separated by spaces.
+    Ex: "speed = (3,4], max_height=( 3, 4 ]"
 
-    :param data_string: A string of space-separated range descriptions
+    Each specifier consists of:
+    - A name starting with a letter or '_' and consisting of letters,
+      digits and '_'. Follows the same rule as python identifiers.
+    - An operator '=', '>', '<', '>=' or '<='
+    - A value.
+      - Inequalities ('>', '<', '>=' or '<=') must be followed by a number
+      - Equalities can be followed by one of:
+        - number e.g "3.14", "-42" or ".12e-20"
+        - range of two numbers e.g "[2, 4]" or "(-2, 2]"
+        - string. A string may be quoted with " or '. If not quoted
+          then it starts with a '_' or a letter and will end at the
+          first space or comma.
+          e.g. "'hello world'" or "hello"
+
+    Numbers must start with a digit (0-9), '-' or '.' and consist of
+    digits, '.', 'e' or 'E'. The python `float` function is used to perform
+    the conversion.
+
+    In EBNF notation:
+
+        filters = [ filter, { (space | ","), {space | ","}, filter } ]
+
+        filter = identifier, {space}, "=", {space}, (number | range | string)
+               | identifier, {space}, (">", "<", ">=", "<="), {space}, number ;
+
+        identifier = (letter | "_"), { letter | digit | "_" } ;
+
+        space = " " | "\t" ;
+
+        number = [ "-" ], {digit}, [ ".", {digit} ], [ ("e" | "E"), [ "-" ] digit, {digit} ] ;
+
+        range = ("[" | "("), number, ",", number, ("]", ")")
+
+        string = "\"", {characters except "\""}, "\""
+               | "'", {characters except "'"}, "'"
+               | (letter | "_"), {characters except space or ","}
+
+        digit = "0".."9" ;
+
+        letter = "a".."z" | "A".."Z" ;
+
+    :param filters   A string of space- or comma-separated range descriptions
 
     :raises ValueError: if given a badly-formatted range, ex: '<foo>=,2]'
 
-    :returns: a dict of {name: DataRange}.
-
+    :returns: a dict of {name: DataRange}
     """
-    # This code was lifted from parse_scalars() and only updated enough to avoid
-    # breaking things; further refinement should be tackled in another PR.
-    # Notable issues are outlined above as "IMPORTANT CAVEATS".
+    LOGGER.info(f"Parsing string '{filters}' into DataRange objects")
 
-    LOGGER.debug('Parsing string <%s> into DataRange objects.', data_string)
-    raw_data = filter(None, data_string.split(" "))
+    s = iter(filters)
+    try:
+        c = next(s)  # First character
+    except StopIteration:
+        return {}  # No filters
+
+    # Collect data ranges
     clean_data = {}
 
-    for entry in raw_data:
-        components = entry.split("=")
-        name = components[0]
+    def parse_number(c, s, name):
+        # Allow for integers, floats, negative numbers
+        if not (c.isdigit() or (c == ".") or (c == "-")):
+            raise ValueError(f"Expecting a number for '{name}' but got '{c}'")
+        numstr = ""
+        try:
+            # Scientific notation allowed
+            # Note: This accepts many things that are not valid numbers,
+            #       relying on float() to perform proper parsing
+            while c.isdigit() or (c == ".") or (c == "e") or (c == "E") or (c == "-"):
+                numstr += c
+                c = next(s)
+        except StopIteration:
+            c = " "
+        return c, float(numstr)
 
-        # Make sure scalar's of the form <foo>=<bar>
-        if len(components) < 2 or components[1] == "":
-            raise ValueError('Bad syntax for scalar \'{}\'.'.format(name))
-        val_range = components[1].split(",")
-        # Dummy DataRange as we can't have an empty range, will be set below.
-        data_range = DataRange(float("-inf"), float("inf"))
-
-        if len(val_range) == 1:
-            val = val_range[0]
+    try:
+        while True:
+            # Skip space, detect end of filter specification
             try:
-                val = float(val)
-            except ValueError:
-                pass  # It's a non-numeric string, we just keep going
-            data_range.set_equal(val)
-            clean_data[name] = data_range
-        elif is_grouped_as_range(components[1]) and len(val_range) == 2:
-            data_range.parse_min(val_range[0])
-            data_range.parse_max(val_range[1])
-            clean_data[name] = data_range
-        else:
-            raise ValueError('Bad specifier in range for {}'.format(name))
+                while c.isspace() or c == ",":
+                    c = next(s)
+            except StopIteration:
+                # End of the list of filters
+                return clean_data
 
-    return clean_data
+            # Expect an name of a field
+            # - Starts with a-zA-Z or '_'
+            # - Consists of letters, numbers and '_'
+            name = ""
+            if not (c.isalpha() or (c == "_")):
+                raise ValueError(f"Field name can't start with '{c}'")
+            while c.isalnum() or (c == "_"):
+                name += c
+                c = next(s)
+
+            LOGGER.debug(f"Parsing filter on '{name}'")
+
+            # May have space between field and operator
+            while c.isspace():
+                c = next(s)
+
+            # Get the operator
+            if c == "=":
+                # Followed by one of:
+                # - A number e.g. '42' or '3.14' or '.528'
+                # - A range e.g '(3,4]', '[1,2]'
+                c = next(s)
+                # May have a space after the '='
+                while c.isspace():
+                    c = next(s)
+
+                if c.isdigit() or c == "." or c == "-":
+                    # Start of a number
+                    c, value = parse_number(c, s, name)
+                    clean_data[name] = DataRange(
+                        min=value, max=value, min_inclusive=True, max_inclusive=True
+                    )
+                    if not (c.isspace() or (c == ",")):
+                        raise ValueError(
+                            f"Unexpected character '{c}' after number for {name}"
+                        )
+
+                elif (c == "[") or (c == "("):
+                    # A range
+                    min_inclusive = c == "["  # '(' is exclusive
+
+                    c = next(s)
+                    while c.isspace():
+                        c = next(s)
+
+                    c, minval = parse_number(c, s, name)
+
+                    while c.isspace() or (c == ","):
+                        c = next(s)
+
+                    c, maxval = parse_number(c, s, name)
+
+                    while c.isspace():
+                        c = next(s)
+
+                    if c == "]":
+                        max_inclusive = True
+                    elif c == ")":
+                        max_inclusive = False
+                    else:
+                        raise ValueError(f"Expected ']' or ')' in range for '{name}'")
+
+                    try:
+                        c = next(s)
+                    except StopIteration:
+                        c = " "
+
+                    clean_data[name] = DataRange(
+                        min=minval,
+                        max=maxval,
+                        min_inclusive=min_inclusive,
+                        max_inclusive=max_inclusive,
+                    )
+                elif c == "'" or c == '"':
+                    # A quoted string that may contain spaces and commas
+                    delim = c
+                    c = next(s)
+                    value = ""
+                    while c != delim:
+                        value += c
+                        c = next(s)
+                    try:
+                        # Advance past delimiter
+                        c = next(s)
+                    except StopIteration:
+                        c = " "
+                    clean_data[name] = DataRange(
+                        min=value, max=value, min_inclusive=True, max_inclusive=True
+                    )
+                elif c.isalpha() or (c == "_"):
+                    # A non-quoted string. Keep going until reaching a space, comma, or end of string
+                    try:
+                        value = ""
+                        while not (c.isspace() or c == ","):
+                            value += c
+                            c = next(s)
+                    except StopIteration:
+                        c = " "
+                    clean_data[name] = DataRange(
+                        min=value, max=value, min_inclusive=True, max_inclusive=True
+                    )
+                else:
+                    raise ValueError(f"Unexpected character '{c}' in value of {name}")
+
+            elif c == ">":
+                c = next(s)
+                inclusive = False
+                if c == "=":
+                    # '>=' operator
+                    inclusive = True
+                    c = next(s)
+
+                # May have a space
+                while c.isspace():
+                    c = next(s)
+
+                # Expect a number
+                c, value = parse_number(c, s, name)
+                clean_data[name] = DataRange(
+                    min=value, max=float("inf"), min_inclusive=inclusive
+                )
+            elif c == "<":
+                c = next(s)
+                inclusive = False
+                if c == "=":
+                    # '<=' operator
+                    inclusive = True
+                    c = next(s)
+
+                # May have a space
+                while c.isspace():
+                    c = next(s)
+
+                # Expect a number
+                c, value = parse_number(c, s, name)
+                clean_data[name] = DataRange(
+                    min=float("-inf"), max=value, max_inclusive=inclusive
+                )
+            else:
+                raise ValueError(f"Expected '=', '>' or '<' after '{name}'")
+
+    except StopIteration:
+        raise ValueError("Unexpected end of filter specifier")
 
 
 def is_grouped_as_range(range_string):

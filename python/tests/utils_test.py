@@ -771,6 +771,73 @@ class TestSinaUtils(unittest.TestCase):  # pylint: disable=too-many-public-metho
         self.assertEqual(both_sides_equal, few_dict["quadrant"])
         self.assertFalse(sina.utils.parse_data_string(none))
 
+    def test_parse_data_string_identifiers(self):
+        """Test that valid identifiers are accepted and invalid raise exceptions."""
+        result = DataRange(42, 42, max_inclusive=True)
+        self.assertEqual(result, sina.utils.parse_data_string("speed=42")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string("max_height=42")["max_height"])
+        self.assertEqual(result, sina.utils.parse_data_string("val_3=42")["val_3"])
+        self.assertEqual(result, sina.utils.parse_data_string("_value=42")["_value"])
+
+    def test_parse_data_string_numbers(self):
+        """Test that valid and invalid numbers are parsed correctly."""
+        self.assertAlmostEqual(3.14, sina.utils.parse_data_string("val=3.14")["val"].min)
+        self.assertAlmostEqual(-42, sina.utils.parse_data_string("val=-42")["val"].min)
+        self.assertAlmostEqual(0.12e-20, sina.utils.parse_data_string("val=0.12e-20")["val"].min)
+        self.assertAlmostEqual(5.3e4, sina.utils.parse_data_string("val=5.3E4")["val"].min)
+
+        with self.assertRaises(ValueError) as context:
+            sina.utils.parse_data_string("val=--42")
+        with self.assertRaises(ValueError) as context:
+            sina.utils.parse_data_string("val=3.1.4")
+        with self.assertRaises(ValueError) as context:
+            sina.utils.parse_data_string("val=5.3ee4")
+        with self.assertRaises(ValueError) as context:
+            sina.utils.parse_data_string("val=5.3E--4")
+
+    def test_parse_data_string_space(self):
+        """Test that white space is handled correctly."""
+        result = DataRange(42, 42, max_inclusive=True)
+        self.assertEqual(result, sina.utils.parse_data_string("speed = 42")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string("  speed=42")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string("speed=42  ")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string("max_height=2 speed=42")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string("max_height=2,speed=42")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string("max_height=2,,speed=42")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string("max_height=2  speed=42,")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string(",max_height=2  speed=42")["speed"])
+        self.assertEqual(result, sina.utils.parse_data_string("max_height = 2  speed = 42")["speed"])
+
+    def test_parse_data_string_malformed(self):
+        """Test that malformed filters are rejected"""
+        with self.assertRaises(ValueError) as context:
+            sina.utils.parse_data_string("max_height=2eed=42")
+        with self.assertRaises(ValueError) as context:
+            sina.utils.parse_data_string("max_height=2speed=42")
+        with self.assertRaises(ValueError) as context:
+            sina.utils.parse_data_string("max_height==42")
+        with self.assertRaises(ValueError) as context:
+            sina.utils.parse_data_string("speed > = 3")
+
+    def test_parse_data_string_inequalities(self):
+        """Test that inequalities are parsed correctly"""
+        self.assertEqual(DataRange(3, float("inf"), min_inclusive=False),
+                         sina.utils.parse_data_string("speed > 3")["speed"])
+        self.assertEqual(DataRange(3, float("inf"), min_inclusive=True),
+                         sina.utils.parse_data_string("speed >= 3")["speed"])
+        self.assertEqual(DataRange(float("-inf"), 42, max_inclusive=False),
+                         sina.utils.parse_data_string("speed < 42")["speed"])
+        self.assertEqual(DataRange(float("-inf"), 42, max_inclusive=True),
+                         sina.utils.parse_data_string("speed <= 42")["speed"])
+
+    def test_parse_data_string_quoting(self):
+        """Test quoting of strings"""
+        self.assertEqual(DataRange("Hello World", "Hello World", max_inclusive=True),
+                         sina.utils.parse_data_string("msg = 'Hello World'")["msg"])
+        self.assertEqual(DataRange("3.1.4", "3.1.4", max_inclusive=True),
+                         sina.utils.parse_data_string("msg = '3.1.4'")["msg"])
+        self.assertEqual(DataRange(" 3.1.4 ", " 3.1.4 ", max_inclusive=True),
+                         sina.utils.parse_data_string('msg = " 3.1.4 "')["msg"])
 
 class LoadDocumentTest(unittest.TestCase):
     """Tests for load_document()"""
