@@ -3,6 +3,7 @@
 import json
 import tempfile
 import unittest
+import os
 
 from sina.model import Record, Run, Relationship, CurveSet
 import sina.model as model
@@ -446,6 +447,50 @@ class TestModel(unittest.TestCase):
         self.assertTrue(test_run.is_valid())
         self.assertEqual(sorted(set(json.loads(target_json))),
                          sorted(set(json.loads(test_run.to_json()))))
+
+    def test_gen_record_from_csv(self):
+        """Ensure we can generate a Record from valid csv input."""
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        file_path = os.path.join(dir_path, "test_files/test_csv_Data.csv")
+        record = model.generate_record_from_csv(file_path)
+        self.assertEqual(f"{file_path}_0", record.id)
+        self.assertEqual("csv_rec", record.type)
+        self.assertEqual("4/5/2011 2:11:29 AM", record.data["Time"]["value"])
+        self.assertEqual(37.762307, record.data["Temperature"]["value"])
+        self.assertEqual(140.959459, record.data["Pressure"]["value"])
+        self.assertEqual(243.557, record.data["Distance"]["value"])
+        self.assertEqual(163.28, record.data["Velocity"]["value"])
+        self.assertEqual(3, record.data["Acceleration"]["value"])
+        self.assertEqual(997353, record.data["Volts"]["value"])
+        self.assertEqual("test", record.data["Amps"]["value"])
+        self.assertEqual("my string", record.data["Watts"]["value"])
+
+    def test_gen_record_from_multiple_csvs(self):
+        """Ensure we can generate Records from multiple csv inputs."""
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        file_path_1 = os.path.join(dir_path, "test_files/test_csv_Data.csv")
+        file_path_2 = os.path.join(dir_path, "test_files/test_AMS C12 Sea Data.csv")
+        records = model.generate_record_from_csv([file_path_1, file_path_2])
+        self.assertEqual(len(records), 11)
+        rows_1 = ["Time", "Temperature", "Pressure",
+                  "Distance", "Velocity", "Acceleration",
+                  "Volts", "Amps", "Watts"]
+        rows_2 = ["Time", "Latitude", "Longitude",
+                  "ALT_HAE", "AGL", "NumDet",
+                  "LiveuSec", "GC", "GCNORM"]
+        data_1 = list(records[0].data.keys())
+        self.assertEqual(rows_1, data_1)
+        for rec in records[1:]:
+            data_2 = list(rec.data.keys())
+            self.assertEqual(rows_2, data_2)
+
+    def test_gen_record_from_csv_bad(self):
+        """Ensure we can generate a Record from valid csv input."""
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        file_path = os.path.join(dir_path, "test_files/test_csv_Data_bad.csv")
+        with self.assertRaises(ValueError) as context:
+            model.generate_record_from_csv(file_path)
+        self.assertIn("has malformed data at row", str(context.exception))
 
     def test_gen_record_from_json_good(self):
         """Ensure we can generate a Record from valid json input."""

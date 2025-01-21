@@ -59,6 +59,8 @@ def populate_database_with_data(record_dao):  # pylint: disable=too-many-stateme
     spam_record.data["spam_scal_2"] = {"value": 200}
     spam_record.data["val_data"] = {"value": "runny", "tags": ["edible"]}
     spam_record.data["val_data_2"] = {"value": "double yolks"}
+    spam_record.data["test_data_0"] = {"value": 1000}
+    spam_record.data["test_data_0_a"] = {"value": 0}
     spam_record.files = {"beep.wav": {},
                          "beep.pong": {}}
     spam_record.library_data["main_lib"] = {"data": {"lib_scalar": {"value": 12},
@@ -83,6 +85,8 @@ def populate_database_with_data(record_dao):  # pylint: disable=too-many-stateme
 
     spam_record_2 = Run(id="spam2", application="scal_generator")
     spam_record_2.data["spam_scal"] = {"value": 10.99999}
+    spam_record_2.data["test_data_1"] = {"value": 1000}
+    spam_record_2.data["test_data_1_a"] = {"value": 1}
     spam_record_2.files = {"beep/png": {}}
     spam_record_2.curve_sets["spam_curve"] = {
         "independent": {"time": {"value": [1, 2, 3]}},
@@ -98,16 +102,22 @@ def populate_database_with_data(record_dao):  # pylint: disable=too-many-stateme
     spam_record_3.data["spam_scal_2"] = {"value": 10.5}
     spam_record_3.data["val_data"] = {"value": "chewy", "tags": ["edible", "simple"]}
     spam_record_3.data["val_data_2"] = {"value": "double yolks"}
+    spam_record_3.data["test_data_2"] = {"value": 1000}
+    spam_record_3.data["test_data_2_a"] = {"value": 2}
     spam_record_3.files = {"beeq.png": {"mimetype": 'image/png'},
                            "many.eggs.narf": {}}
 
     spam_record_3_ish = Record(id="spam3ish", type="foo")
     spam_record_3_ish.data["spam_scal"] = {"value": 10.5}
     spam_record_3_ish.data["spam_scal_2"] = {"value": 10.6}
+    spam_record_3_ish.data["test_data_2"] = {"value": 1000}
+    spam_record_3_ish.data["test_data_2_b"] = {"value": 22}
 
     spam_record_4 = Record(id="spam4", type="bar")
     spam_record_4.data["val_data_list_1"] = {"value": [-11, -9]}
     spam_record_4.data["val_data_2"] = {"value": "double yolks"}
+    spam_record_4.data["test_data_3"] = {"value": 1000}
+    spam_record_4.data["test_data_3_a"] = {"value": 3}
     spam_record_4.files = {"beep.png": {"mimetype": 'image/png'},
                            "eggs.count": {}}
 
@@ -118,6 +128,8 @@ def populate_database_with_data(record_dao):  # pylint: disable=too-many-stateme
     spam_record_5.data["flex_data_2"] = {"value": 6}
     spam_record_5.data["val_data_list_1"] = {"value": [0, 8]}
     spam_record_5.data["val_data_list_2"] = {"value": ['eggs', 'pancake']}
+    spam_record_5.data["test_data_3"] = {"value": 1000}
+    spam_record_5.data["test_data_3_b"] = {"value": 33}
     spam_record_5.files = {"beep.wav": {"tags": ["output", "eggs"],
                                         "mimetype": 'audio/wav'},
                            "eggs.count": {}}
@@ -127,15 +139,27 @@ def populate_database_with_data(record_dao):  # pylint: disable=too-many-stateme
     spam_record_6.data["val_data_3"] = {"value": "syrup"}
     spam_record_6.data["val_data_list_1"] = {"value": [8, 20]}
     spam_record_6.data["val_data_list_2"] = {"value": ['eggs', 'pancake', 'yellow']}
+    spam_record_6.data["test_data_4"] = {"value": 1000}
+    spam_record_6.data["test_data_4_a"] = {"value": 4}
 
     egg_record = Record(id="eggs", type="eggrec")
     egg_record.data["eggs_scal"] = {"value": 0}
     egg_record.data["spam_scal"] = {"value": -1}
     egg_record.data["spam_scal_2"] = {"value": 0}
+    egg_record.data["test_data_4"] = {"value": 1000}
+    egg_record.data["test_data_4_b"] = {"value": 44}
+    egg_record.data["num_val_data_list_1"] = {"value": [0, 20]}
+    egg_record.data["str_val_data_list_2"] = {"value": ['eggs', 'pancake', 'green']}
 
     record_with_shared_scalar_data_and_curve = Record(
         id='shared_curve_set_and_matching_scalar_data', type='overlap')
     record_with_shared_scalar_data_and_curve.add_data('shared_scalar', 1000)
+    record_with_shared_scalar_data_and_curve.add_data('test_data_5', 1000)
+    record_with_shared_scalar_data_and_curve.add_data('test_data_5_a', 5)
+    record_with_shared_scalar_data_and_curve.data["num_val_data_list_2"] = {"value": [-10, 20]}
+    record_with_shared_scalar_data_and_curve.data["str_val_data_list_3"] = {"value": ['eggs',
+                                                                                      'pancake',
+                                                                                      'green']}
     record_with_shared_scalar_data_and_curve.curve_sets = {
         'cs1': {
             'independent': {'time': {'value': [1, 2, 3]}},
@@ -1005,7 +1029,8 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_data_names_with_string(self):
         """Make sure that we get names of scalar data when given a string."""
         names = set(self.record_dao.data_names(record_type='foo', data_types='scalar'))
-        self.assertEqual(names, set(["spam_scal", "spam_scal_2"]))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2", "test_data_2",
+                                     "test_data_2_a", "test_data_2_b"]))
 
     def test_data_names_filter_constants(self):
         """Make sure that we get names of non-constant scalar data when filtering."""
@@ -1017,12 +1042,14 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_data_names_with_list(self):
         """Make sure that we get names of scalar data when given a list."""
         names = set(self.record_dao.data_names(record_type='foo', data_types=['scalar']))
-        self.assertEqual(names, set(["spam_scal", "spam_scal_2"]))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2", "test_data_2",
+                                     "test_data_2_a", "test_data_2_b"]))
 
     def test_data_names_with_default(self):
         """Make sure that we get names of all data by default."""
         names = set(self.record_dao.data_names(record_type='foo'))
-        self.assertEqual(names, set(["spam_scal", "spam_scal_2", "val_data", "val_data_2"]))
+        self.assertEqual(names, set(["spam_scal", "spam_scal_2", "val_data", "val_data_2",
+                                     "test_data_2", "test_data_2_a", "test_data_2_b"]))
 
     # ####################### test_get_available_types ######################
     def test_get_available_types(self):
@@ -1594,7 +1621,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
                            ids_only=True)
 
         dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2", "rec_3",
-                                                              "rec_4", "rec_5"])
+                                                              "rec_4", "rec_5"], alias_dict=None)
         dao._do_get_given_document_uri.assert_called_with("bar",
                                                           id_pool=["rec_1", "rec_2",
                                                                    "rec_3", "rec_4"],
@@ -1633,7 +1660,7 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         dao.get_all_of_type.assert_called_with("baz",
                                                id_pool=["rec_1", "rec_2", "rec_3"],
                                                ids_only=True)
-        dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2"])
+        dao._do_data_query.assert_called_with("foo", id_pool=["rec_1", "rec_2"], alias_dict=None)
         self.assertEqual(list(result), ["rec_1"])  # Should match the final id_pool returned.
 
     def test_recorddao_find_multi(self):
@@ -1670,6 +1697,282 @@ class TestQuery(unittest.TestCase):  # pylint: disable=too-many-public-methods
         find_get_all = list(self.record_dao._find(types=not_("run"), ids_only=True))
         expected_get_all = list(self.record_dao.get_all_of_type(not_("run"), ids_only=True))
         six.assertCountEqual(self, find_get_all, expected_get_all)
+
+    def test_recorddao_find_with_alias_dict(self):
+        """Test it's possible to use _find() with alias dictionary."""
+
+        # ############################## One Data Attribute #################################
+
+        # Search key with string value
+        alias_dict = {"eggs_scal": "val_data"}
+        results = list(self.record_dao._find(data={"eggs_scal": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['eggs', 'spam', 'spam3']))
+
+        # Search value with string value
+        alias_dict = {"eggs_scal": "val_data"}
+        results = list(self.record_dao._find(data={"val_data": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['eggs', 'spam', 'spam3']))
+
+        # Search key with single item list value
+        alias_dict = {"eggs_scal": ["val_data"]}
+        results = list(self.record_dao._find(data={"eggs_scal": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['eggs', 'spam', 'spam3']))
+
+        # Search value with single item list value
+        alias_dict = {"eggs_scal": ["val_data"]}
+        results = list(self.record_dao._find(data={"val_data": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['eggs', 'spam', 'spam3']))
+
+        # Search key with list value
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"]}
+        results = list(self.record_dao._find(data={"eggs_scal": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['eggs', 'spam', 'spam3', 'spam5', 'spam6']))
+
+        # Search value with list value
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"]}
+        results = list(self.record_dao._find(data={"val_data_3": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['eggs', 'spam', 'spam3', 'spam5', 'spam6']))
+
+        # ############################### Two Data Attributes #################################
+
+        # Search key with string value
+        alias_dict = {"eggs_scal": "val_data",
+                      "shared_scalar": "test_data_1"}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        alias_dict = {"eggs_scal": "val_data",
+                      "shared_scalar": "test_data_1"}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        # Search key with single item list value first key
+        alias_dict = {"eggs_scal": ["val_data"],
+                      "shared_scalar": "test_data_1"}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        alias_dict = {"eggs_scal": ["val_data"],
+                      "shared_scalar": "test_data_1"}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        # Search key with list value first key
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": "test_data_1"}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": "test_data_1"}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        # Search key with single list value second key
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_1"]}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_1"]}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        # Search key with list value second key
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_1", "test_data_5"]}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_1", "test_data_5"]}
+        results = list(self.record_dao._find(data={"eggs_scal": exists(),
+                                                   "shared_scalar": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        # Search for value instead of key
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_1", "test_data_5"]}
+        results = list(self.record_dao._find(data={"val_data": exists(),
+                                                   "test_data_1": exists()},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_1", "test_data_5"]}
+        results = list(self.record_dao._find(data={"val_data": exists(),
+                                                   "test_data_1": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        # alias_dict doesn't contain query data test_data_2_a
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_0", "test_data_23_a"]}
+        results = list(self.record_dao._find(data={"val_data": exists(),
+                                                   "test_data_2_a": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        # Actually finding data
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_0", "test_data_2"]}
+        results = list(self.record_dao._find(data={"val_data": exists(),
+                                                   "test_data_0": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['spam', 'spam3']))
+
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_0", "test_data_2_a"]}
+        results = list(self.record_dao._find(data={"val_data": exists(),
+                                                   "test_data_2_a": 1000},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['spam']))
+
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_0_a", "test_data_2_a"]}
+        results = list(self.record_dao._find(data={"val_data_3": exists(),
+                                                   "test_data_2_a": DataRange(0, 2,
+                                                                              max_inclusive=True)},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['spam', 'spam3']))
+
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "shared_scalar": ["test_data_0_a", "test_data_2_a", "test_data_3_b"]}
+        results = list(self.record_dao._find(data={"val_data_3": exists(),
+                                                   "shared_scalar": DataRange(0, 33,
+                                                                              max_inclusive=True)},
+                                             alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['spam', 'spam3', 'spam5']))
+
+        # ############################### Three Data Attributes #################################
+        # String value
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "spam_scal": "spam_scal_3",
+                      "shared_scalar": ["test_data_0_a", "test_data_2_a", "test_data_3_b"],
+                      }
+        results = list(self.record_dao._find(
+            data={"spam_scal": 46,
+                  "test_data_3_b": DataRange(0, 33, max_inclusive=True),
+                  "val_data": exists()},
+            alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['spam5']))
+
+        # Single item list value
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "spam_scal": ["spam_scal_3"],
+                      "shared_scalar": ["test_data_0_a", "test_data_2_a", "test_data_3_b"],
+                      }
+        results = list(self.record_dao._find(
+            data={"spam_scal": 46,
+                  "test_data_3_b": DataRange(0, 33, max_inclusive=True),
+                  "val_data": exists()},
+            alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['spam5']))
+
+        # List value
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "spam_scal": ["spam_scal_3", "spam_scal_2"],
+                      "shared_scalar": ["test_data_0_a", "test_data_2_a", "test_data_3_b"],
+                      }
+        results = list(self.record_dao._find(
+            data={"spam_scal": DataRange(10.5, 46, max_inclusive=True),
+                  "test_data_3_b": DataRange(0, 33, max_inclusive=True),
+                  "val_data": exists()},
+            alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set(['spam5', 'spam3']))
+
+        # alias_dict doesn't contain query data test_data_3_ba
+        alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                      "spam_scal": ["spam_scal_3", "spam_scal_2"],
+                      "shared_scalar": ["test_data_0_a", "test_data_2_a", "test_data_3_b"],
+                      }
+        results = list(self.record_dao._find(
+            data={"spam_scal_3": 46,
+                  "test_data_3_ba": DataRange(0, 33, max_inclusive=True),
+                  "val_data": exists()},
+            alias_dict=alias_dict, ids_only=True))
+        self.assertEqual(set(results), set([]))
+
+        # alias_dict contains val_data in multiple locations
+        with self.assertRaises(KeyError):
+            alias_dict = {"eggs_scal": ["val_data", "val_data_3"],
+                          "spam_scal": ["val_data", "spam_scal_2"],
+                          "shared_scalar": ["test_data_0_a", "test_data_2_a", "test_data_3_b"],
+                          }
+            self.record_dao._find(
+                data={"spam_scal_3": 46,
+                      "test_data_3_ba": DataRange(0, 33, max_inclusive=True),
+                      "val_data": exists()},
+                alias_dict=alias_dict, ids_only=True)
+
+        # ############################### List Query #################################
+
+        alias_dict = {"val_data_list_1": "num_val_data_list_1",
+                      "str_val_data_list_2": ["val_data_list_2", "str_val_data_list_3"],
+                      "flex_data_1": ["num_val_data_list_2"],
+                      }
+
+        # all_in for numeric
+        results = list(self.record_dao.data_query(
+            # 4, 5 & 6 & eggs
+            val_data_list_1=all_in(DataRange(-11, 30)),
+            alias_dict=alias_dict))
+
+        self.assertEqual(set(results), set(['spam4', 'spam5', 'spam6', 'eggs']))
+
+        # all_in for numeric and has_all for string
+        results = list(self.record_dao.data_query(
+            # 5 & 6 & eggs
+            val_data_list_1=all_in(DataRange(-11, 30, min_inclusive=False)),
+            # eggs & shared_curve_set_and_matching_scalar_data
+            str_val_data_list_3=has_all('green', 'eggs'),
+            alias_dict=alias_dict))
+
+        self.assertEqual(set(results), set(['eggs']))
+
+        # any_in for numeric
+        results = list(self.record_dao.data_query(
+            # 5 & shared_curve_set_and_matching_scalar_data
+            flex_data_1=any_in(DataRange(-11, 100, max_inclusive=True)),
+            alias_dict=alias_dict))
+
+        self.assertEqual(set(results), set(['spam5', 'shared_curve_set_and_matching_scalar_data']))
+
+        # any_in for numeric and has_any for string
+        results = list(self.record_dao.data_query(
+            # 4, 5 & 6 & eggs
+            val_data_list_1=any_in(DataRange(-11, 100, max_inclusive=True)),
+            # 5 & 6 & eggs & shared_curve_set_and_matching_scalar_data
+            str_val_data_list_3=has_any('eggs'),
+            alias_dict=alias_dict))
+
+        self.assertEqual(set(results), set(['spam5', 'spam6', 'eggs']))
 
 
 class TestImportExport(unittest.TestCase):

@@ -15,8 +15,7 @@ subcommands: query, ingest, and export. To access these subcommands, make sure y
 currently in a virtual environment that has Sina and its dependencies
 installed. You can access general help information using :code:`sina -h` or
 subcommand-specific help with :code:`sina <subcommand_name> -h`. These commands are
-largely backend-agnostic. While you may need to specify additional flags
-(ex: providing a Cassandra keyspace if you do not have a default set), the
+largely backend-agnostic. While you may need to specify additional flags, the
 functionality between supported backends is otherwise identical.
 
 Inspect
@@ -34,15 +33,15 @@ Ingest
 ~~~~~~
 
 The ingest subcommand is used for taking data from one source and inserting
-it into one of Sina's supported backends. Currently, this means taking from a
-JSON file and inserting it into either a sqlite file or a Cassandra instance.
+it into one of Sina's supported backends.
+
 To be ingested correctly, a JSON file needs to conform to the Sina schema.
 For Sina schema examples and further information, see the
 `Confluence page <https://lc.llnl.gov/confluence/display/SIBO/Sina+JSON+Schema/>`_.
 
 A basic import would look like this::
 
-  sina ingest --database somefile.sqlite to_import.json
+  sina ingest --database somefile.sqlite myfile_sina.json
 
 This will import the contents of :code:`to_import.json` into a sqlite file called
 :code:`somefile.sqlite`. If :code:`somefile.sqlite` does not already exist, it will be
@@ -52,12 +51,13 @@ database has the file extension "sqlite" and the source has the extension
 to a sqlite database. To specify a database and/or source type, include the
 :code:`--database-type` and/or :code:`--source-type` flags::
 
-  sina ingest --database somefile.sqlite --database-type sqlite to_import.json --source-type json
+  sina ingest --database somefile.sqlite --database-type sqlite myfile_sina.json --source-type json
 
-Cassandra databases currently cannot be inferred. They also have a third flag
-associated with them, :code:`--keyspace`::
+If ingesting many files at once, the usual command line tricks will work (with a more formal solution
+coming with the CLI refresh)::
 
-  sina ingest --database 127.0.0.1 --database-type cass --keyspace some_space to_import.json
+  sina ingest -d somefile.sqlite `find ../run-myrun*/*/myfile_sina.json | tr '\n' ',' | sed 's/,$//' | sed -z '$ s/\n$//'`
+
 
 Query
 ~~~~~
@@ -89,8 +89,7 @@ database technologies. An example raw query::
 
   sina query -r "Select value from scalar where name=xpos" --database somefile.sqlite
 
-This returns the values of all scalars named "xpos". This query would work against SQL and
-Cassandra backends.
+This returns the values of all scalars named "xpos".
 
 Export
 ~~~~~~

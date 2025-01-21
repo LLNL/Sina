@@ -32,7 +32,7 @@ the traditional headaches of parsing logs or remembering which file contains wha
 Sina is integrated into a number of LLNL physics codes to capture simulation data;
 look for the _sina.json! If your code isn't configured to output Sina, but you'd
 like it to be, we may be able to work with the code team to integrate it--you can reach
-us at siboka@llnl.gov, or check the WEAVE project.
+us at weave-support@llnl.gov, or check out the WEAVE project on Gitlab and Teams.
 
 The instructions below will guide you through setting up a virtual environment for
 Sina (or installing it in one that already exists), running example notebooks, and
@@ -62,7 +62,7 @@ tested with `sina -h` (which should display a help message). When you're done,
 use `deactivate` to exit the virtual environment. Note that this will be the release
 (master) Sina version--if you want to use Sina Develop, keep reading!
 
-If you run into issues with the LC virtual environment, please email us at siboka@llnl.gov.
+If you run into issues with the LC virtual environment, please email us at weave-support@llnl.gov.
 
 
 Standard Non-LC Setup

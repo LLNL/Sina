@@ -1,4 +1,8 @@
 """Module for handling miscellany."""
+# Disable pylint checks due to ubiquitous use of id, type, max, and min
+# Also disable too-many-lines
+# pylint: disable=invalid-name,redefined-builtin,too-many-lines,no-self-use,import-error
+
 from __future__ import print_function
 import abc
 import copy
@@ -15,19 +19,21 @@ from enum import Enum
 from multiprocessing.pool import ThreadPool
 from collections import OrderedDict, defaultdict
 import warnings
-
+from functools import partial
 import six
 
-import sina.model as model
+from sqlalchemy import and_, Column, text, Float, String
+from sqlalchemy.ext.hybrid import hybrid_property, hybrid_method
+from sina import model
 import sina.sjson as json
+
+from sina.model import Record
+from sina.datastores.sql_schema import Record as SQLRecord, ScalarData
+from .datastores.sql_schema import Base
 
 LOGGER = logging.getLogger(__name__)
 MAX_THREADS = 8
 
-
-# Disable pylint checks due to ubiquitous use of id, type, max, and min
-# Also disable too-many-lines
-# pylint: disable=invalid-name,redefined-builtin,too-many-lines
 
 class ListQueryOperation(Enum):
     """
@@ -101,8 +107,8 @@ def _load_document(document_as_string):
                 local[entry.pop('local_id')] = id
                 # Save the UUID to be used for record generation
                 entry['id'] = id
-            except KeyError:
-                raise ValueError("Record requires one of: local_id, id: {}".format(entry))
+            except KeyError as exc:
+                raise ValueError("Record requires one of: local_id, id: {}".format(entry)) from exc
         if entry["type"] == 'run':
             records.append(model.generate_run_from_json(json_input=entry))
         else:
@@ -218,19 +224,19 @@ def _process_relationship_entry(entry, local_ids):
     try:
         subj = local_ids[entry['local_subject']] if 'subject' not in entry else entry['subject']
         obj = local_ids[entry['local_object']] if 'object' not in entry else entry['object']
-    except KeyError:
+    except KeyError as exc:
         if not any(subj in ("local_subject", "subject") for subj in entry):
             msg = "Relationship requires one of: subject, local_subject: {}".format(entry)
             LOGGER.error(msg)
-            raise ValueError(msg)
+            raise ValueError(msg) from exc
         if not any(obj in ("local_object", "object") for obj in entry):
             msg = "Relationship requires one of: object, local_object: {}".format(entry)
             LOGGER.error(msg)
-            raise ValueError(msg)
+            raise ValueError(msg) from exc
         msg = ("Local_subject and/or local_object must be the "
                "local_id of a Record within file: {}".format(entry))
         LOGGER.error(msg)
-        raise ValueError(msg)
+        raise ValueError(msg) from exc
     return (subj, obj)
 
 
@@ -253,8 +259,7 @@ def intersect_lists(lists_to_intersect):
             for entry in lists_to_intersect[1:]:
                 shared_ids = shared_ids.intersection(entry)
         return shared_ids
-    else:
-        return set()
+    return set()
 
 
 def merge_ranges(list_of_ranges):
@@ -322,20 +327,20 @@ def invert_ranges(list_of_ranges):
     # If the "leftmost" DataRange is left-closed, we need the inverse to be left-open
     if merged_ranges[0].min_is_finite():
         inverted_ranges = [DataRange(max=merged_ranges[0].min,
-                                     max_inclusive=(not merged_ranges[0].min_inclusive))]
+                                     max_inclusive=not merged_ranges[0].min_inclusive)]
     else:
         inverted_ranges = []
     # We continue to find the "gap" between adjacent DataRanges
     for prior_range, current_range in zip(merged_ranges[:-1], merged_ranges[1:]):
         new_range = DataRange(min=prior_range.max,
-                              min_inclusive=(not prior_range.max_inclusive),
+                              min_inclusive=not prior_range.max_inclusive,
                               max=current_range.min,
-                              max_inclusive=(not current_range.min_inclusive))
+                              max_inclusive=not current_range.min_inclusive)
         inverted_ranges.append(new_range)
     # As with the leftmost, the rightmost is special. We decide open or closed.
     if merged_ranges[-1].max_is_finite():
         inverted_ranges.append(DataRange(min=merged_ranges[-1].max,
-                                         min_inclusive=(not merged_ranges[-1].max_inclusive)))
+                                         min_inclusive=not merged_ranges[-1].max_inclusive))
     return inverted_ranges
 
 
@@ -512,7 +517,7 @@ def _export_csv(data, scalar_names, output_file):
     """
     LOGGER.debug('About to write data to csv file: %s', output_file)
     header = ['id'] + scalar_names
-    with open(output_file, 'w') as csvfile:
+    with open(output_file, 'w', encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(header)
         for run, dataset in data.items():
@@ -673,9 +678,9 @@ def create_file(path):
             else:
                 msg = 'Unexpected OSError: {}'.format(err)
                 LOGGER.error(msg)
-                raise OSError(msg)
+                raise OSError(msg) from err
         # Make file
-        with open(path, 'a+') as output_file:
+        with open(path, 'a+', encoding="utf-8") as output_file:
             output_file.close()
 
 
@@ -1197,10 +1202,10 @@ class DataRange(object):
                 raise ValueError
             # Note that both being None is a special case, since then we don't
             # know if what we're ultimately looking for is a number or string.
-        except ValueError:
+        except ValueError as exc:
             msg = "Bad type for portion of range: {}".format(self)
             LOGGER.error(msg)
-            raise TypeError(msg)  # TypeError, as ValueError is a bit broad
+            raise TypeError(msg) from exc  # TypeError, as ValueError is a bit broad
 
         if self.min_is_finite():
             min_gt_max = self.max_is_finite() and self.min > self.max
@@ -1210,3 +1215,141 @@ class DataRange(object):
                 msg = "Bad range for data, min must be <= max: {}".format(self)
                 LOGGER.error(msg)
                 raise ValueError(msg)
+
+
+def make_sina_sqlalchemy_class(store, virtual_columns=None):
+    """
+    Creates a SQLBase class compatible with Sina's SQLRecords
+
+    :param store: sina store
+    :type store: sina.datastore.DataStore
+    :param virtual_columns: names of virtual columns to map back to a Sina Record data metadata
+    :type virtual_columns: None, Sina Record or list of str
+    :return: A Class that can be used with sqlalchemy ORM
+    :rtype: SinaSQLAlchemylass
+    """
+    if virtual_columns is None:
+        virtual_columns = next(store.records.find())["data"].keys()
+    elif isinstance(virtual_columns, Record):
+        virtual_columns = list(virtual_columns["data"].keys())
+    elif isinstance(virtual_columns, str):
+        virtual_columns = list(store.records.get(virtual_columns)["data"].keys())
+    elif (not isinstance(virtual_columns, (list, tuple)) or
+          not all(isinstance(item, str) for item in virtual_columns)):
+        raise ValueError("`virtual_columns` must be None, a Sina record or a list of columns")
+
+    class SinaSQLAlchemy(SQLRecord):
+        """Class to allow access of generic Sina records via standard ORM calls
+creates some convenience functions as well"""
+        __sina_records = store.records
+
+        def sim_name(self, x=""):
+            """Gets the simulation name"""
+            return self.raw + x + self.id
+
+        def get_column_from_sina_record(self, column_name):
+            """Gets value for a virtual column name"""
+            rec = self.__sina_records.get(self.id)
+            return rec["data"][column_name]["value"]
+
+        @hybrid_method
+        def like_column_name(self, column_name, value):
+            """Gets rec whose column_name is like value"""
+            pattern = '%"' + column_name + '":{"value":' + repr(value).replace("'", "\"") + '}%'
+            return Column('raw').like(pattern)
+
+        @hybrid_method
+        def greater_column_name(self, column_name, value):
+            """Get records whose column_name is greater than value"""
+            return and_(ScalarData.name == column_name, ScalarData.value > value)
+
+        @hybrid_method
+        def greater_equal_column_name(self, column_name, value):
+            """Get records whose column_name is greater or equal than value"""
+            return and_(ScalarData.name == column_name, ScalarData.value >= value)
+
+        @hybrid_method
+        def less_column_name(self, column_name, value):
+            """Get records whose column_name is less than value"""
+            return and_(ScalarData.name == column_name, ScalarData.value < value)
+
+        @hybrid_method
+        def less_equal_column_name(self, column_name, value):
+            """Get records whose column_name is less or equal than value"""
+            return and_(ScalarData.name == column_name, ScalarData.value <= value)
+
+        # def __init__(self, id, type, raw=None):
+        #     super().__init__(id, type, raw)
+
+    for col_name in virtual_columns:
+        prt = partial(SinaSQLAlchemy.get_column_from_sina_record, column_name=col_name)
+        h = hybrid_property(prt)
+        h.__name__ = col_name
+        setattr(SinaSQLAlchemy, col_name, h)
+
+    return SinaSQLAlchemy
+
+
+def records_to_sqltable(store, record=None, columns=None,
+                        tablename=None, target_session=None):
+    """
+    Creates a SQLBase class from a Sina record and populate it
+
+    :param store: Sina store to use to lookup records from
+    :type store: sina.datastore.DataStore
+    :param record: record to use, if not passed will use first record in found in store
+    :type record: None, Sina Record
+    :param columns: names of columns to map back to a Sina Record data metadata
+    :type columns: None, Sina Record or list of str
+    :param tablename: name to use for tabe in db
+    :type tablename: str
+    :param target_session: session for target database where the new table will be created
+    :type target_session: Session
+    :return: A Class that can be used with sqlalchemy ORM
+    :rtype: SinaSQLAlchemyFromSina class
+    """
+    # We protect _record_dao to disincentize users using the DAO directly.
+    # pylint: disable=protected-access
+    session = store._record_dao.session
+    target_session = session if target_session is None else target_session
+    if record is None:
+        record = next(store.records.find())
+    elif isinstance(record, str):
+        record = next(store.records.get(record))
+    if (not isinstance(columns, (list, tuple)) or
+            not all(isinstance(item, str) for item in columns)):
+        raise ValueError("`columns` must be None or a list of columns")
+    columns = columns = record["data"].keys() if columns is None else columns
+
+    tablename = f"SQLAlchemyFromSina_{record['id']}" if tablename is None else tablename
+
+    sql = text(f"DROP TABLE IF EXISTS {tablename};")
+    target_session.execute(sql)
+    init_columns = {'id': Column(String, primary_key=True),
+                    '__tablename__': tablename}
+    results = session.query(ScalarData).filter(ScalarData.id == record["id"])
+    for col in columns:
+        if col == 'id':
+            continue
+        res2 = list(results.filter(ScalarData.name == col))
+        init_columns[col] = Column(String) if len(res2) == 0 else Column(Float)
+
+    cls = type('SQLAlchemyFromSina', (Base,), init_columns)
+
+    Base.metadata.create_all(target_session.get_bind(), tables=[Base.metadata.tables[tablename],])
+    recs = []
+    for rec in store.records.find():
+        init_cols = {}
+        for col in init_columns:
+            if col == '__tablename__':
+                continue
+            if col == "id":
+                init_cols[col] = rec["id"]
+            elif col in rec["data"]:
+                init_cols[col] = rec["data"][col]["value"]
+            else:
+                break
+        recs.append(cls(**init_cols))
+    target_session.add_all(recs)
+    target_session.commit()
+    return cls

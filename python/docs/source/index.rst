@@ -6,11 +6,21 @@
 Welcome to Sina's documentation!
 ++++++++++++++++++++++++++++++++
 
-Sina exists to ease some of the hassles of heterogenous simulation data--we're here to put more data into user's hands, more quickly, at larger scales, and with minimal time investment from code teams or users, all without interrupting existing user workflows. Naturally, that means you can use a lot of Sina or just a little (or none). Here's our major features and where to go to learn more, ordered as "increasing amounts of Sina" from the end-user perspective.
+Sina exists to put more data into user's hands, more quickly, at larger scales, and with minimal time investment from code teams or users,
+all without interrupting existing user workflows.
+
+In brief, it comes in two parts: a C++ library that's called from within codes to output data to a common format, and a Python API + toolset
+providing a wide range of functionality for working with these files.
+
+Naturally, you can use a lot of Sina or just a little. Here's our major features and where to go to learn more,
+ordered as "increasing amounts of Sina" from the end-user perspective.
+
 
 Sina integrates with codes to output data
 -----------------------------------------
-Sina collects data directly within codes, outputting them to a common file output format designed alongside code teams and users. This enhances collaboration and automation without putting any existing workflows at risk, and also allows us to capture data that might otherwise be difficult for users to access. Typically called <something>_sina.json, Sina's file is optionally output at the end of a run, and contains metadata, physics quantities, deck info, etc. If you want to see if your code of choice has Sina integration, see `here <https://lc.llnl.gov/confluence/display/WEAV/Sina+Integration>`__. If you'd like to learn about adding Sina to a code, check out our `C++ documentation <cpp.html>`__, and reach out to us at siboka@llnl.gov.
+Sina collects data directly within codes, outputting them to a common file output format designed alongside code teams and users. Typically called <something>_sina.json, Sina's file is optionally output at the end of (or during) a run, and contains metadata, physics quantities, deck info, etc.
+
+If you want to see if your code of choice has Sina integration (potentially including customization on the type(s) of data output), see `here <https://lc.llnl.gov/confluence/display/WEAV/Sina+Integration>`__. If you'd like to learn about adding Sina to a code, check out our `C++ documentation <cpp.html>`__, and reach out to us at weave-support@llnl.gov.
 
 Data are organized for easy access and automation
 -------------------------------------------------
@@ -30,7 +40,7 @@ Sina provides its own visualization module, essentially queries mixed into a plo
 
 And more!
 ---------
-Sina can't solve every problem, but we do hope to help with common data management troubles, slot easily into workflows, and generally support fast, easy, and sane access of the data users care about. If you're intending to incorporate Sina into a workflow yourself (or otherwise want a more "holistic" understanding of what's going on), I'd recommend going down the left bar in order (though check out `API Concepts <api_basics.html>`__ first if you prefer to have the "what" and "why" before the "how"). And please don't hesitate to reach out to us!
+Sina can't solve every problem, but we do hope to help with common data management troubles, slot easily into workflows, and generally support fast, easy, and sane access of the data users care about. We also act as the basis for other tools that expand on Sina's functionality, namely `Kosh <https://kosh.readthedocs.io/en/latest/>`__ (which adds loaders for non-common-file-format data). If you're intending to incorporate Sina into a workflow yourself (or otherwise want a more "holistic" understanding of what's going on), I'd recommend going down the left bar in order (though check out `API Concepts <api_basics.html>`__ first if you prefer to have the "what" and "why" before the "how"). And please don't hesitate to reach out to us!
 
 
 Installation/Accessing Sina

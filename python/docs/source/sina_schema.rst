@@ -64,9 +64,8 @@ A more fleshed-out example, with field descriptions:
     {
       // Category of the Record.
       "type": "some_type",
-      // Local ID of the Record. Must be unique within JSON document. Will be
-      // replaced by global id (or simply 'id') in db.
-      "local_id": "obj1",
+      // A unique internal ID; something like <machine>_<timestamp> or a UUID are common
+      "id": "obj1",
       // A dictionary of files associated with the Record
       "files": {
           // Each file can optionally specify a mimetype and tags.

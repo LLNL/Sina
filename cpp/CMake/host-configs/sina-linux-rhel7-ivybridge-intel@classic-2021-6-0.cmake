@@ -23,7 +23,7 @@ else()
 
   set(CMAKE_CXX_COMPILER "/usr/tce/packages/intel-classic/intel-classic-2021.6.0-magic/bin/icpc" CACHE PATH "")
 
-  set(CMAKE_Fortran_COMPILER "/usr/tce/packages/intel-classic/intel-classic-2021.6.0-magic/bin/fort" CACHE PATH "")
+  set(CMAKE_Fortran_COMPILER "/usr/tce/packages/intel-classic/intel-classic-2021.6.0-magic/bin/ifort" CACHE PATH "")
 
 endif()
 

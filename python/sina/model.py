@@ -4,6 +4,7 @@ import logging
 import collections
 import numbers
 import copy
+import csv
 
 import six
 
@@ -1027,3 +1028,51 @@ def convert_record_to_run(record):
                '{}.'.format(record.id))
         LOGGER.warn(msg)
         raise ValueError(msg)
+
+
+# pylint: disable=too-many-locals
+def generate_record_from_csv(source_path, delimiter=",", quotechar='"', type="csv_rec"):
+    """Generate Record(s) from CSV file(s). Accepts only strings and scalars as data.
+
+    :param source_path: A path or list of paths to csv file(s).
+    :param delimiter: The delimiter of the csv file(s).
+    :param quotechar: The quote character of the csv file(s).
+    :param type: The Record type.
+    :returns: A Record object or list of Record objects built from csv file(s).
+    """
+    records = list()
+
+    if isinstance(source_path, str):
+        source_path = [source_path]
+
+    # Looping through files
+    for source in source_path:
+        with open(source) as source_csv:
+            # CSV reader
+            datareader = csv.reader(source_csv, delimiter=delimiter, quotechar=quotechar)
+            names = next(datareader)
+            data = list(datareader)
+
+            # Looping through rows
+            for row_i, row in enumerate(data):
+
+                if len(row) != len(names):
+                    raise ValueError(f"File {source} has malformed data at row {row_i}:"
+                                     f"\n\t{names}\n\t{row}")
+
+                record = Record(id=f"{source}_{row_i}", type=type)
+
+                # Looping through columns
+                for column_i, column in enumerate(row):
+                    try:
+                        val = float(column)
+                    except ValueError:  # just a normal string
+                        val = column
+                    record.add_data(names[column_i], val)
+
+                records.append(record)
+
+    if len(records) == 1:
+        return records[0]
+    else:
+        return records

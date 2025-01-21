@@ -18,6 +18,7 @@ import sina.model as model
 import sina.datastores.sql_schema as schema
 from sina.utils import sort_and_standardize_criteria
 from sina import utils
+from sina.postprocessing import underlay
 
 # Disable redefined-builtin, invalid-name due to ubiquitous use of id
 # pylint: disable=invalid-name,redefined-builtin
@@ -254,17 +255,64 @@ class RecordDAO(dao.RecordDAO):
             temp_rel_dao.insert(old_object_relationships)
             temp_rel_dao.insert(old_subject_relationships)
 
-    def _do_data_query(self, criteria, id_pool=None):
+    @_commit_or_rollback
+    def _do_update_appendonly(self, records):
+        """
+        Given a list of Records, update them in the backend in a single transaction.
+
+        :param records: A list of Records to update.
+        """
+        new_records = []
+        for record in records:
+            # Replaces values from old record into new record
+            # that way only appends are new
+            old_record = list(super(RecordDAO, self)._find(id_pool=[record.id]))[0]
+            underlay_func = underlay(record)
+            new_records.append(underlay_func(old_record))
+
+        self._do_update(new_records)
+
+    # pylint: disable=too-many-locals, too-many-branches
+    def _do_data_query(self, criteria, id_pool=None, alias_dict=None):
         """
         Handle the backend-specific logic for the dao data_query.
 
         :param criteria: Dict of {data_name: criteria_to_fulfill}
         :param id_pool: List of ids to restrict results to.
+        :param alias_dict: An alias dictionary to find differently named data across records
         :returns: A generator of Record ids that fulfill all criteria.
 
         :raises ValueError: if not supplied at least one criterion or given
                             a criterion it does not support
         """
+        # For data_query() method since everything gets passed in as criteria
+        if alias_dict is None and 'alias_dict' in criteria:
+            alias_dict = criteria.get('alias_dict')
+            criteria.pop('alias_dict')
+
+        # Finding relevant keys and values
+        if alias_dict:
+            # Flattening the alias dict
+            alias_flattened = [[]] * len(alias_dict)
+            for i, (key, val) in enumerate(alias_dict.items()):
+                alias_flattened[i] = [key]
+                if isinstance(val, list):
+                    alias_flattened[i].extend(val)
+                elif isinstance(val, str):
+                    alias_flattened[i].extend([val])
+
+            # Creating dictionary based on original arg values
+            alias = {}
+            for a in criteria:
+                for alias_list in alias_flattened:
+                    if a in alias_list:
+                        if alias.get(a) is None:
+                            alias[a] = alias_list
+                        else:
+                            raise KeyError(f'Alias {a} already in multiple locations!')
+
+            alias_dict = alias
+
         (scalar_criteria,
          string_criteria,
          scalar_list_criteria,
@@ -274,18 +322,22 @@ class RecordDAO(dao.RecordDAO):
 
         # First handle scalar and string criteria
         if scalar_criteria:
-            sub_queries.append(self._generate_data_table_query(scalar_criteria, schema.ScalarData))
+            sub_queries.append(self._generate_data_table_query(scalar_criteria, schema.ScalarData,
+                                                               alias_dict=alias_dict))
         if string_criteria:
-            sub_queries.append(self._generate_data_table_query(string_criteria, schema.StringData))
+            sub_queries.append(self._generate_data_table_query(string_criteria, schema.StringData,
+                                                               alias_dict=alias_dict))
 
         # Move on to any list criteria
         sub_queries += [self._string_list_query(datum_name=datum_name,
                                                 string_list=list_criteria.value,
-                                                operation=list_criteria.operation)
+                                                operation=list_criteria.operation,
+                                                alias_dict=alias_dict)
                         for datum_name, list_criteria in string_list_criteria]
         sub_queries += [self._scalar_list_query(datum_name=datum_name,
                                                 data_range=list_criteria.value,
-                                                operation=list_criteria.operation)
+                                                operation=list_criteria.operation,
+                                                alias_dict=alias_dict)
                         for datum_name, list_criteria in scalar_list_criteria]
 
         joined_query = self.session.query(schema.Record.id)
@@ -298,7 +350,7 @@ class RecordDAO(dao.RecordDAO):
         # Universal criteria currently go cross-table and have to be handled
         # with Python logic
         if universal_criteria:
-            universal_pool = self._universal_query(universal_criteria)
+            universal_pool = self._universal_query(universal_criteria, alias_dict=alias_dict)
             if not sub_queries and id_pool is None:
                 return universal_pool
             universal_pool = set(universal_pool)
@@ -306,7 +358,7 @@ class RecordDAO(dao.RecordDAO):
 
         return (x[0] for x in joined_query.all())
 
-    def _scalar_list_query(self, datum_name, data_range, operation):
+    def _scalar_list_query(self, datum_name, data_range, operation, alias_dict=None):
         """
         Return all Records where [datum_name] fulfills [operation] for [data_range].
 
@@ -315,6 +367,7 @@ class RecordDAO(dao.RecordDAO):
         :param datum_name: The name of the datum
         :param data_range: A datarange to be used with <operation>
         :pram operation: What kind of ListQueryOperation to do.
+        :param alias_dict: An alias dictionary to find differently named data across records
         :returns: A query object returning ids of matching Records.
 
         :raises ValueError: if given an invalid operation for a datarange
@@ -322,7 +375,20 @@ class RecordDAO(dao.RecordDAO):
         LOGGER.info('Finding Records where datum %s has %s in %s', datum_name,
                     operation.value.split('_')[0], data_range)
         table = schema.ListScalarData
-        query = self.session.query(table.id).filter(table.name == datum_name)
+
+        if alias_dict:
+            temp = alias_dict.get(datum_name, [datum_name])
+            datum_name = temp
+        else:
+            datum_name = [datum_name]
+
+        if len(datum_name) == 1:
+            range_criteria = [table.name == datum_name[0]]
+        else:
+            range_criteria = [table.name.in_(datum_name)]
+
+        query = self.session.query(table.id).filter(*range_criteria)
+
         filters = []
         if operation == utils.ListQueryOperation.ALL_IN:
             # What must be [>,>=] the criterion's min
@@ -346,7 +412,7 @@ class RecordDAO(dao.RecordDAO):
 
         return query.filter(*filters)
 
-    def _string_list_query(self, datum_name, string_list, operation):
+    def _string_list_query(self, datum_name, string_list, operation, alias_dict=None):
         """
         Return all Records where [datum_name] fulfills [operation] for [string_list].
 
@@ -355,6 +421,7 @@ class RecordDAO(dao.RecordDAO):
         :param datum_name: The name of the datum
         :param string_list: A list of strings datum_name must contain.
         :param operation: What kind of ListQueryOperation to do.
+        :param alias_dict: An alias dictionary to find differently named data across records
         :returns: A query object returning matching Records or the Records
                   themselves (see ids_only).
 
@@ -365,11 +432,13 @@ class RecordDAO(dao.RecordDAO):
         criteria_tuples = [(datum_name, x) for x in string_list]
         if operation == utils.ListQueryOperation.HAS_ALL:
             query = self._generate_data_table_query(table=schema.ListStringDataEntry,
-                                                    criteria_pairs=criteria_tuples)
+                                                    criteria_pairs=criteria_tuples,
+                                                    alias_dict=alias_dict)
         elif operation == utils.ListQueryOperation.HAS_ANY:
             query = self._generate_data_table_query(table=schema.ListStringDataEntry,
                                                     criteria_pairs=criteria_tuples,
-                                                    fulfill_all=False)
+                                                    fulfill_all=False,
+                                                    alias_dict=alias_dict)
         else:
             # This can only happen if there's an operation that accepts a list
             # of strings but is not supported by string_list_query.
@@ -378,17 +447,29 @@ class RecordDAO(dao.RecordDAO):
         return query
 
     @staticmethod
-    def _generate_criterion_filters(criterion_pair, table):
+    def _generate_criterion_filters(criterion_pair, table, alias_dict=None):
         """
         Generate the AND expression fulfilling a single criterion pair.
 
         :param criterion_pair: A tuple of (datum_name, criterion). Criterion must be a DataRange
                                or single value, ex: 6, "low_frequency"
         :param table: The table the datum is expected to exist in
+        :param alias_dict: An alias dictionary to find differently named data across records
         :return: A SQLAlchemy AND expression fulfilling the criterion pair
         """
         datum_name, criterion = criterion_pair
-        range_criteria = [table.name == datum_name]
+
+        if alias_dict:
+            temp = alias_dict.get(datum_name, [datum_name])
+            datum_name = temp
+        else:
+            datum_name = [datum_name]
+
+        if len(datum_name) == 1:
+            range_criteria = [table.name == datum_name[0]]
+        else:
+            range_criteria = [table.name.in_(datum_name)]
+
         if isinstance(criterion, utils.DataRange):
             if not criterion.is_single_value():
                 if criterion.min is not None:
@@ -403,7 +484,7 @@ class RecordDAO(dao.RecordDAO):
             range_criteria.append(table.value.__eq__(criterion))
         return sqlalchemy.and_(*range_criteria)
 
-    def _generate_data_table_query(self, criteria_pairs, table, fulfill_all=True):
+    def _generate_data_table_query(self, criteria_pairs, table, fulfill_all=True, alias_dict=None):
         """
         Generate a query that determines whether a Record fulfills a set of criteria.
 
@@ -416,11 +497,12 @@ class RecordDAO(dao.RecordDAO):
         :param fulfill_all: Whether we should ensure every criteria_pair is fulfilled. If
                             false, only one or more pairs need to be fulfilled
                             (ex: has_any() list query)
+        :param alias_dict: An alias dictionary to find differently named data across records
 
         :return: A query object representing <criterion> applied to <datum_name> in <table>.
         """
         query = self.session.query(table.id)
-        criteria_queries = [self._generate_criterion_filters(pair, table)
+        criteria_queries = [self._generate_criterion_filters(pair, table, alias_dict=alias_dict)
                             for pair in criteria_pairs]
 
         query = query.filter(sqlalchemy.or_(*criteria_queries))
@@ -433,8 +515,11 @@ class RecordDAO(dao.RecordDAO):
         if len(criteria_pairs) > 1:
             query = query.group_by(table.id)
 
-            if fulfill_all:
+            if fulfill_all and alias_dict is None:
                 query = query.having(sqlalchemy.func.count(table.id) == len(criteria_pairs))
+            elif fulfill_all and alias_dict is not None:
+                # Alias dict will have more criteria_pairs
+                query = query.having(sqlalchemy.func.count(table.id) >= len(criteria_pairs))
 
         return query
 
@@ -558,7 +643,8 @@ class RecordDAO(dao.RecordDAO):
             for test_id in chunk:
                 yield test_id in actual_ids
 
-    def _universal_query(self, universal_criteria):
+    # pylint: disable=too-many-locals
+    def _universal_query(self, universal_criteria, alias_dict=None):
         """
         Pull back all record ids fulfilling universal criteria.
 
@@ -566,10 +652,18 @@ class RecordDAO(dao.RecordDAO):
         possible universal query right now.
 
         :param universal_criteria: List of tuples: (datum_name, UniversalCriteria)
+        :param alias_dict: An alias dictionary to find differently named data across records
         :return: generator of ids of Records fulfilling all criteria.
         """
         result_counts = defaultdict(set)
         desired_names = [x[0] for x in universal_criteria]
+
+        if alias_dict:
+            temp = []
+            for name in desired_names:
+                temp += alias_dict.get(name, name)
+            desired_names = temp
+
         LOGGER.info('Finding Records where data in %s exist', desired_names)
         expected_result_count = len(universal_criteria)
         for query_table in DATA_TABLES:
@@ -583,19 +677,34 @@ class RecordDAO(dao.RecordDAO):
             for id, found in query:
                 result_counts[id].add(found)
         for entry, val in six.iteritems(result_counts):
-            if len(val) == expected_result_count:
+            if len(val) == expected_result_count and alias_dict is None:
                 yield entry
+
+            # alias dict can cause multiple data from same record to show up
+            # which gives a false positive. Statement below checks if data
+            # is from the same alias. E.g. id = 'shared_curve_set_and_matching_scalar_data'
+            # contains both "shared_scalar" and "test_data_5" from
+            # alias_dict = {"shared_scalar": ["test_data_1", "test_data_5"]}
+            elif len(val) == expected_result_count and alias_dict:
+                for _, aval in alias_dict.items():
+                    same_alias = 0
+                    for v in val:
+                        if v in aval:
+                            same_alias += 1
+                    if same_alias == 1:
+                        yield entry
 
     # High arg count is inherent to the functionality.
     # pylint: disable=too-many-arguments
     def _find(self, types=None, data=None, file_uri=None,
               mimetype=None, id_pool=None, ids_only=False,
-              query_order=("data", "file_uri", "mimetype", "types")):
+              query_order=("data", "file_uri", "mimetype", "types"), alias_dict=None):
         """Implement cross-backend logic for the DataStore method of the same name."""
         try:
             return super(RecordDAO, self)._find(types=types, data=data, file_uri=file_uri,
                                                 mimetype=mimetype, id_pool=id_pool,
-                                                ids_only=ids_only, query_order=query_order)
+                                                ids_only=ids_only, query_order=query_order,
+                                                alias_dict=alias_dict)
         # We may have issues when too many ids are returned due to the (compile time)
         # limit on variables, as IN counts every id as a variable. If so, use an
         # alternate form of query.
@@ -608,7 +717,8 @@ class RecordDAO(dao.RecordDAO):
     # pylint: disable=too-many-arguments
     def _find_with_manual_intersection(self, types=None, data=None, file_uri=None,
                                        mimetype=None, id_pool=None, ids_only=False,
-                                       query_order=("data", "file_uri", "mimetype", "types")):
+                                       query_order=("data", "file_uri", "mimetype", "types"),
+                                       alias_dict=None):
         """
         Perform a _find() that uses id_pool intersection.
 
@@ -628,7 +738,7 @@ class RecordDAO(dao.RecordDAO):
             query_func, arg = query_map[query_type]
             if arg is not None:
                 if query_type == "data":
-                    return query_func(arg, id_pool=id_pool)
+                    return query_func(arg, id_pool=id_pool, alias_dict=alias_dict)
                 return query_func(arg,  # pylint: disable=unexpected-keyword-arg
                                   id_pool=id_pool,
                                   ids_only=True)

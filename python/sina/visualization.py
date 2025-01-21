@@ -32,6 +32,7 @@ from collections import defaultdict
 import random
 import uuid
 import math
+import re
 import six
 # Disable pylint check due to its issue with virtual environments
 # pylint: disable=import-error
@@ -181,7 +182,8 @@ class Visualizer(object):
 
     def create_line_plot(self, x, y, fig=None, ax=None, curve_set=None,
                          interactive=False, selectable_data=None, id_pool=None,
-                         title=None, matplotlib_options=None):
+                         title=None, label=None, include_rec_id_in_label=True,
+                         matplotlib_options=None):
         """
         Create a line plot.
 
@@ -195,6 +197,11 @@ class Visualizer(object):
                           specify the curve_set to make sure the right timestep is used.
                           If no curve set is chosen, then data will be searched for outside
                           of curve sets (that is, directly in a Record's .data portion)
+        :param label: Legend label that uses data names in {} in the format of
+                      ex label="{volume} over time at {temp}F {SINA_rec_id}", where
+                      {SINA_rec_id} is included with the param `include_rec_id_in_label`
+        :param include_rec_id_in_label: Include record ID in legend label if using custom
+                                        legend label
         """
         # Sina currently has no way of globally getting all curves associated with a given
         # curve set. In addition, our visualization objects are supposed to be insulated
@@ -210,7 +217,8 @@ class Visualizer(object):
         return self._setup_vis(fig, ax, self._gen_line_plot,
                                [x, y], interactive, selectable_data, id_pool,
                                title, matplotlib_options,
-                               fallback_data="scalar_list", args=(curve_set, sample_rec),
+                               fallback_data="scalar_list", args=(curve_set, sample_rec, label,
+                                                                  include_rec_id_in_label),
                                dedicated_interactive_class=Visualizer._InteractiveCurveSetVis)
 
     def create_violin_box_plot(self, x, fig=None, ax=None, interactive=False,
@@ -686,7 +694,7 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
             fig.colorbar(surface_plot, shrink=0.75)
 
     def _gen_line_plot(self, fig, ax, value_names, id_pool, title, matplotlib_options, curve_set,
-                       sample_rec=None):
+                       sample_rec=None, label=None, include_rec_id_in_label=True):
         """
         Generate a lineplot.
 
@@ -698,11 +706,35 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
         By allowing it to be passed through here, we let _setup_vis to stay ignorant of
         the specifics of the _gen functions, while also not needing to violate the
         decoupling of the _Vis classes from the database.
+
+        :param label: Legend label that uses data names in {} in the format of
+                      ex label="{volume} over time at {temp}F {SINA_rec_id}", where
+                      {SINA_rec_id} is included with the param `include_rec_id_in_label`
+        :param include_rec_id_in_label: Include record ID in legend label if using custom
+                                        legend label
         """
         x_of_interest, y_of_interest = value_names
         ax.cla()
         data = self.get_curve_values(id_pool, [x_of_interest, y_of_interest],
                                      curve_set=curve_set)
+        if label is not None:
+            recs = self.recs.get(id_pool)
+            data_labels = []
+            labels = re.findall('{(.+?)}', label)  # find labels in curly braces
+            for rec in recs:
+                temp_label = label
+                for lab in labels:
+                    try:
+                        l_string = str(rec.data[lab]['value'])
+                    except KeyError:
+                        l_string = 'NOT FOUND'
+                    temp_label = temp_label.replace("{" + lab + "}", l_string)
+
+                if include_rec_id_in_label:
+                    temp_label += f' {rec.id[:10]}'
+                    if len(rec.id) > 10:
+                        temp_label += '...'
+                data_labels.append(temp_label)
         # Doesn't currently support customizing curve colors
         target_ids = data.keys()
         for run_id in target_ids:
@@ -714,7 +746,10 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
             ax.plot(x_data, y_data, **matplotlib_options)
         ax.set_xlabel(x_of_interest)
         ax.set_ylabel(y_of_interest)
-        ax.legend(target_ids)
+        if label is not None:
+            ax.legend(data_labels)
+        else:
+            ax.legend(target_ids)
         if title is not None:
             ax.set_title(title.format(x_name=x_of_interest, y_name=y_of_interest))
 
@@ -915,7 +950,7 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
                 fig, ax, gen_func, default_values, selectable_data,
                 id_pool, title, matplotlib_options, args, _delay_display=True)
             # This dedicated vis class only works with curve sets, so we know our args:
-            self.curve_set, self.sample_rec = args
+            self.curve_set, self.sample_rec, self.label, self.include_rec_id_in_label = args
             self.available_curve_sets = list(self.sample_rec.curve_sets.keys())
             self.available_curve_sets.append(NO_CURVE_SET)
             self.available_curves = self.get_curves_in_current_set()
@@ -962,7 +997,8 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
                 self.default_values[dim] = new_val
                 IPython.display.display(self.widgets[idx])
             self.gen_func(self.fig, self.ax, self.default_values, self.id_pool,
-                          self.title, self.matplotlib_options, self.curve_set)
+                          self.title, self.matplotlib_options, self.curve_set, label=self.label,
+                          include_rec_id_in_label=self.include_rec_id_in_label)
             self.fig.canvas.draw()
 
         def init_curve_set_dropdown(self):
@@ -989,7 +1025,9 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
                     return
                 self.default_values[dim] = change['new']
                 self.gen_func(self.fig, self.ax, self.default_values, self.id_pool,
-                              self.title, self.matplotlib_options, self.curve_set)
+                              self.title, self.matplotlib_options, self.curve_set,
+                              label=self.label,
+                              include_rec_id_in_label=self.include_rec_id_in_label)
                 self.fig.canvas.draw()
             return generic_select
 
@@ -1009,7 +1047,8 @@ insufficient number of unique values to create a trisurface plot?: {}""".format(
             for widget in self.widgets:
                 IPython.display.display(widget)
             self.gen_func(self.fig, self.ax, self.default_values, self.id_pool,
-                          self.title, self.matplotlib_options, self.curve_set)
+                          self.title, self.matplotlib_options, self.curve_set, label=self.label,
+                          include_rec_id_in_label=self.include_rec_id_in_label)
             self.fig.canvas.draw()
 
 

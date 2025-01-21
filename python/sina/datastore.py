@@ -15,16 +15,20 @@ except ImportError:
     HAS_CASSANDRA = False
 
 
+# pylint: disable=anomalous-backslash-in-string
+# pylint: disable=too-many-arguments
 def connect(database=None, keyspace=None, database_type=None,
-            allow_connection_pooling=False, read_only=False):
+            allow_connection_pooling=False, read_only=False,
+            connection_type="write"):
     """
     Connect to a database.
 
-    Given a uri/path (and, if required, the name of a keyspace),
-    figures out which backend is required.
+    Given a uri/path (and, if required, the name of a keyspace), automatically
+    figures out which backend is required. A Sina datastore with the appropriate
+    connection type and settings will be returned.
 
     :param database: The URI of the database to connect to. If empty, an
-     in-memory sqlite3 database will be used.
+                     in-memory sqlite database will be used.
     :param keyspace: The keyspace to connect to (Cassandra only).
     :param database_type: Type of backend to connect to. If not provided, Sina
                           will infer this from <database>. One of "sql" or
@@ -32,7 +36,14 @@ def connect(database=None, keyspace=None, database_type=None,
     :param allow_connection_pooling: Allow "pooling" behavior that recycles connections,
                                      which may prevent them from closing fully on .close().
                                      Only used for the sql backend.
-    :param read_only: whether to create a read-only store
+    :param read_only: whether to create a read-only store (deprecated, favor connection_type)
+                      For backwards compatibility, a True on read_only overrides connection_type
+    :param connection_type: Whether to create a write, append, or read-only store.
+                            Write: the default behavior, all functions available
+                            Read: queries only, no updating, deleting, or inserting
+                            Append: Only queries and inserts, no updates or deletes (useful
+                                    for ex: workflow testing, script debugging, existing
+                                    data integrity and protection...)
     :return: a DataStore object connected to the specified database
     """
     # Determine a backend
@@ -53,9 +64,14 @@ def connect(database=None, keyspace=None, database_type=None,
                               "environment. See the README.")
     else:
         raise ValueError("Given unrecognized database type: {}".format(database_type))
-    if read_only:
+    if connection_type not in ['write', 'append', 'read']:
+        raise ValueError("`connection_type` must be one of ['write', 'append', 'read']")
+    if read_only or connection_type == 'read':
         return ReadOnlyDataStore(connection)
-    return DataStore(connection)
+    elif connection_type == 'append':
+        return AppendOnlyDataStore(connection)
+    else:
+        return DataStore(connection)
 
 
 def create_datastore(database=None, keyspace=None, database_type=None,
@@ -158,6 +174,8 @@ class ReadOnlyDataStore(object):
             """
             Create or assign object(s) we'll need for performing queries.
 
+            This object is usually made automatically by connect().
+
             :param record_dao: the owning DataStore's RecordDAO
             """
             self._record_dao = record_dao
@@ -168,7 +186,10 @@ class ReadOnlyDataStore(object):
             Given one or more Record ids, return matching Record(s).
 
             :param ids_to_get: The id(s) of the Record(s) to return.
-            :param chunk_size: Size of chunks to pull records in.
+            :param chunk_size: Number of Records to pull per (fully internal) subquery.
+                               Chunking limits the number of requested at once
+                               to comply with SQL's own set limits; 999 is a common
+                               value.
 
             :returns: If provided an iterable, a generator of Record objects,
                       else a single Record object.
@@ -196,7 +217,8 @@ class ReadOnlyDataStore(object):
         def exist(self, ids_to_check):
             """
             Given an (iterable of) id(s), return boolean list of whether those
-            records exist or not.
+            records exist or not. A quick call that may be useful in advance of
+            more expensive processing.
 
             :param ids_to_check: The id(s) of the Record(s) to test.
 
@@ -207,7 +229,7 @@ class ReadOnlyDataStore(object):
 
         def get_all(self, ids_only=False):
             """
-            Return all Records.
+            Return all Records in the datastore.
 
             :param ids_only: whether to return only the ids of matching Records
 
@@ -219,7 +241,7 @@ class ReadOnlyDataStore(object):
         # pylint: disable=too-many-arguments
         def find(self, types=None, data=None, file_uri=None, mimetype=None,
                  id_pool=None, ids_only=False,
-                 query_order=("data", "file_uri", "mimetype", "types")):
+                 query_order=("data", "file_uri", "mimetype", "types"), alias_dict=None):
             """
             Return Records that match multiple different types of criteria.
 
@@ -247,12 +269,25 @@ class ReadOnlyDataStore(object):
                                 with the desired type(s), you may wish to put "type" first).
                                 Query names are "types", "file_uri", "mimetype", and "data".
                                 Note that if any query name is absent from the passed tuple,
-                                that query will not be executed.
+                                that query will not be executed, even if parameters are provided.
+            :param alias_dict: An alias dictionary to find differently named data across records
+                               ex: Each {key: value} pair below will be flattened to create query
+                               combinations:
+                                   alias_dict = {"volume": "vol",
+                                                 "density": ["rho"],
+                                                 "T": ["temp", "TEMP"]}
+                               for the find method:
+                                   .find(data={"vol": 46,
+                                               "TEMP": exists()})
+                               would return any records where T, temp or TEMP exists and vol or
+                               volume is equal to 46.
+
+
             """
             # We protect _find to disincentize users using the DAO directly.
             # pylint: disable=protected-access
             return self._record_dao._find(types, data, file_uri, mimetype, id_pool,
-                                          ids_only, query_order)
+                                          ids_only, query_order, alias_dict)
 
         # ------------------ Operations tied to Record type -------------------
         def find_with_type(self, types, ids_only=False, id_pool=None):
@@ -262,9 +297,9 @@ class ReadOnlyDataStore(object):
             :param types: A(n iterable of) types of Records to filter on. Can be negated with
                           not_() to return Records not of those types.
             :param ids_only: whether to return only the ids of matching Records
-            :param id_pool: Used when combining queries: a pool of ids to restrict
-                            the query to. Only records with ids in this pool can be
-                            returned.
+            :param id_pool: A pool of ids to restrict the query to. Only records
+                            with ids in this pool can be returned. Useful for
+                            combining queries.
 
             :returns: A generator of matching Records.
             """
@@ -274,7 +309,7 @@ class ReadOnlyDataStore(object):
 
         def get_types(self):
             """
-            Return all types of Records available in the backend.
+            Return all types of Records available in the datastore.
 
             :returns: A generator of types of Record.
             """
@@ -282,7 +317,7 @@ class ReadOnlyDataStore(object):
 
         def get_curve_set_names(self):
             """
-            Return the names of all curve sets available in the backend.
+            Return the names of all curve sets available in the datastore.
 
             :returns: An iterable of curve set names.
             """
@@ -408,7 +443,7 @@ class ReadOnlyDataStore(object):
             or has_all constructs, ex find_with_file_uris(uri=has_any("%.png", "%.jpg"))
 
             Supports the use of % as a wildcard character. Note that you may or
-            may not get duplicates depending on the backend; call set() to
+            may not get duplicates depending on the underlying backend; call set() to
             collapse the returned generator if required.
 
             :param uri: A uri or criterion describing what to match. Either a string,
@@ -473,10 +508,8 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
     """
     Mediates interactions between users and data.
 
-    Adds operations that modify the data store to ReadOnlyDataStore.
-
-    DataStore and ReadOnlyDataStore grant access to a selection of operations
-    for both Records and Relationships. They're used like this:
+    DataStores grant access to a selection of operations for both Records and
+    Relationships. They're used like this:
 
         ds = connect(path_to_my_database)
         my_runs = ds.records.find_with_type("runs")
@@ -485,6 +518,9 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
     Note the use of connect() in place of manually creating a DataStore
     object. For information on all the operations available, see
     RecordOperations and RelationshipOperations below.
+
+    Expands on the ReadOnlyDataStore with operations that affect the state
+    of the datastore (inserts, updates, and deletes).
     """
 
     @property
@@ -498,9 +534,10 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
         """
         Delete EVERYTHING in a datastore; this cannot be undone.
 
-        :param force: This function is meant to raise a confirmation prompt. If you
-                      want to use it in an automated script (and you're sure of
-                      what you're doing), set this to "SKIP PROMPT".
+        :param force: This function is meant for live usage and raises a confirmation prompt.
+                      If you want to use it in an automated script, set this to "SKIP PROMPT".
+                      Note: if you're creating short-lived datastores, you may want to consider
+                      an in-memory datastore, created with a bare .connect().
         :returns: whether the deletion happened.
         """
         confirm_phrase = "DELETE ALL DATA"
@@ -535,7 +572,7 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
         def insert(self, records_to_insert, ingest_funcs=None,
                    ingest_funcs_preserve_raw=None):
             """
-            Given one or more Records, insert them into the DAO's backend.
+            Given one or more Records, insert them into the datastore.
 
             :param records_to_insert: A Record or iter of Records to insert
             :param ingest_funcs: A function or list of functions to
@@ -555,7 +592,9 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
 
         def update(self, records_to_update):
             """
-            Given one or more Records, update them in the DAO's backend.
+            Given one or more Records, update them in the datastore.
+
+            This will replace the copy of that record in the database entirely.
 
             :param records_to_update: A Record or iter of Records to update
             """
@@ -563,7 +602,7 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
 
         def delete(self, ids_to_delete):
             """
-            Given one or more Record ids, delete all mention from the DAO's backend.
+            Given one or more Record ids, delete all mention from the datastore.
 
             This includes removing all data, raw(s), any relationships
             involving it/them, etc.
@@ -585,7 +624,7 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
 
         def insert(self, relationships_to_insert):
             """
-            Given one or more Relationships, insert them into a backend.
+            Given one or more Relationships, insert them into a datastore.
 
             :param relationships_to_insert: Relationships to insert
             """
@@ -593,7 +632,7 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
 
         def delete(self, subject_id=None, predicate=None, object_id=None):
             """
-            Given one or more criteria, delete all matching Relationships from the DAO's backend.
+            Given one or more criteria, delete all matching Relationships from the datastore.
 
             This does not affect records, data, etc. Only Relationships.
 
@@ -607,3 +646,103 @@ class DataStore(ReadOnlyDataStore):  # pylint: disable=too-few-public-methods
             self._relationship_dao.delete(subject_id=subject_id,
                                           predicate=predicate,
                                           object_id=object_id)
+
+
+class AppendOnlyDataStore(DataStore):  # pylint: disable=too-few-public-methods
+    """
+    Mediates interactions between users and data.
+
+    DataStores grant access to a selection of operations
+    for both Records and Relationships. They're used like this:
+
+        ds = connect(path_to_my_database)
+        my_runs = ds.records.find_with_type("runs")
+        submission_rels = ds.relationships.get(predicate="submitted")
+
+    Note the use of connect() in place of manually creating a DataStore
+    object. For information on all the operations available, see
+    RecordOperations and RelationshipOperations below.
+
+    Modifies the base DataStore to only allow "appending" data. Here, that
+    means that new records can be added, but records can't be deleted, and
+    updates are strictly additive in nature (can't change or remove values).
+
+    May be useful as an additional layer of safety for scripts.
+    """
+
+    @property
+    def read_only(self):
+        """Whether this is a read-only datastore."""
+        return False
+
+    # The DAO version is protected to disincentivize using it from the DAOs.
+    # pylint: disable=protected-access
+    def delete_all_contents(self, force=""):
+        """
+        Delete EVERYTHING in a datastore; this cannot be undone.
+
+        :param force: This function is meant to raise a confirmation prompt. If you
+                      want to use it in an automated script (and you're sure of
+                      what you're doing), set this to "SKIP PROMPT".
+        :returns: whether the deletion happened.
+        """
+        raise NotImplementedError("This is an append only store")
+
+    class RecordOperations(DataStore.RecordOperations):
+        """
+        Defines the queries users can perform on Records.
+
+        This should be considered the "source of truth" in terms of what Record
+        operations are available to users and what each does.
+
+        This doesn't handle implementation, helper methods, etc; it's for
+        defining the user interface.
+        """
+
+        # -------------------- Basic operations ---------------------
+        def update(self, records_to_update):
+            """
+            Given one or more Records, update them in the datastore--but
+            only to add NEW data. In an append-only store, existing data can't
+            be altered or deleted, and will simply be ignored.
+
+            :param records_to_update: A Record or iter of Records to update
+            """
+            self._record_dao.update_appendonly(records_to_update)
+
+        def delete(self, ids_to_delete):
+            """
+            Given one or more Record ids, delete all mention from the datastore.
+
+            This includes removing all data, raw(s), any relationships
+            involving it/them, etc.
+
+            :param ids_to_delete: A Record id or iterable of Record ids to delete.
+            """
+            raise NotImplementedError("This is an append only store")
+
+    class RelationshipOperations(DataStore.RelationshipOperations):
+        """
+        Defines the queries users can perform on Relationships.
+
+        This should be considered the "source of truth" in terms of what
+        Relationship operations are available to users and what each does.
+
+        This doesn't handle implementation, helper methods, etc; it's for
+        defining the user interface.
+        """
+
+        def delete(self, subject_id=None, predicate=None, object_id=None):
+            """
+            Given one or more criteria, delete all matching Relationships from the datastore.
+
+            This does not affect records, data, etc. Only Relationships.
+
+            Note that the arg order here was "naturalized" to be in the order that people
+            would read this in an English sentence ("Carmen helps Danny"), same as
+            find(); this differs from the dao delete()'s order, which matches the
+            older dao.get().
+
+            :raise ValueError: if no criteria are specified.
+            """
+            raise NotImplementedError("This is an append only store")

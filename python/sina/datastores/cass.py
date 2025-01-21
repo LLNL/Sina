@@ -507,6 +507,16 @@ class RecordDAO(dao.RecordDAO):
             self.insert(rollback_recs)
             raise ex
 
+    def _do_update_appendonly(self, records):
+        """
+        Given a list of Records, update them in the backend.
+
+        This is not ACID-safe!
+
+        :param records: A list of Records to update.
+        """
+        raise NotImplementedError
+
     def _do_data_query(self, criteria, id_pool=None):
         """
         Handle the backend-specific logic for the dao data_query.
