@@ -917,7 +917,7 @@ def flatten_library_content(record):
 
     old_raw = copy.deepcopy(record.raw)
 
-    if isinstance(record, Run):
+    if record.type == "run":
         record.raw.pop("type")
         record = _FlatRun(**record.raw)
     else:

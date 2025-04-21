@@ -64,6 +64,11 @@ class TestModel(unittest.TestCase):
                                       "dependent": {"distance": {"value": [0, 10]}}}},
                                   library_data=self.library_data,
                                   user_defined={})
+        self.libdata_run = Run(id="lotsalibsbutrun",
+                               application="something",  # user is None
+                               data={"runtime": {"value": 14}},
+                               library_data=self.library_data,
+                               user_defined={})
         self.relationship_one = Relationship(subject_id="spam",
                                              predicate="supersedes",
                                              object_id="spam2")
@@ -345,6 +350,11 @@ class TestModel(unittest.TestCase):
         self.assertEqual(flat_rec.data["outer_lib/inner_lib/mark_distances"]["value"], [0, 5])
         self.assertEqual(flat_rec.data["outer_lib/inner_lib/mark_distances"]["units"], "km")
         self.assertEqual(flat_rec.data["outer_lib/runtime"]["tags"], ["output"])
+        # Check that it works for runs
+        flat_run = model.flatten_library_content(self.libdata_run)
+        self.assertEqual(flat_run.data["runtime"]["value"], 14)
+        self.assertEqual(flat_run.application, "something")
+        self.assertEqual(flat_run.user, None)
 
     def test_flatten_library_content_curves(self):
         """Ensure that library flattening is happening for curves."""
