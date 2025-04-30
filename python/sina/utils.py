@@ -1,7 +1,9 @@
 """Module for handling miscellany."""
 # Disable pylint checks due to ubiquitous use of id, type, max, and min
 # Also disable too-many-lines
-# pylint: disable=invalid-name,redefined-builtin,too-many-lines,no-self-use,import-error
+# no-name-in-module,no-member: temporary for numpy issue, fixed in newer pylints
+# pylint: disable=invalid-name,redefined-builtin,too-many-lines
+# pylint: disable=no-self-use,import-error,no-name-in-module,no-member
 
 from __future__ import print_function
 import abc

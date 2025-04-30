@@ -5,6 +5,10 @@ This file summarizes the major changes in each version of Sina. For a full list,
 see the commit log at:
 https://lc.llnl.gov/bitbucket/projects/SIBO/repos/sina/commits?until=master
 
+1.15.1
+===========
+- Fixed bug: Recordswith a type of Run returned from datastore would error when flattened if they contained library\_data
+
 1.15
 ===========
 - New intro and guidance in documentation
