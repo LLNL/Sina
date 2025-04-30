@@ -254,6 +254,26 @@ class TestModify(unittest.TestCase):  # pylint: disable=too-many-public-methods
         self.assertEqual(returned_records[1].data["eggs"]["value"],
                          rec_2["data"]["eggs"]["value"])
 
+    def test_recorddao_insert_update(self):
+        """Test that inserting, updating, and getting work in sequence."""
+        # Added to cover a bug involving errors when getting and re-inserting runs
+        record_dao = self.factory.create_record_dao()
+        rec_1 = Record(id="spam", type="eggs", data={"eggs": {"value": 12}},
+                       library_data={"foolib": {"data": {"volume": {"value": 12}}}})
+        rec_2 = Run(id="spam2", data={"volume": {"value": 47}}, application="foo_app",
+                    library_data={"foolib": {"data": {"volume": {"value": 12}}}})
+        record_dao.insert([rec_1, rec_2])
+        returned_records = list(record_dao.get((x for x in ("spam", "spam2"))))
+        returned_records[0].data["eggs"]["value"] = 1
+        returned_records[1].data["volume"]["value"] = "now I'm a string"
+        returned_records[1].library_data["foolib"]["data"]["volume"]["value"] = "me too"
+        record_dao.update(returned_records)
+        returned_again = list(record_dao.get((x for x in ("spam", "spam2"))))
+        self.assertEqual(returned_again[0].data["eggs"]["value"], 1)
+        self.assertEqual(returned_again[1].data["volume"]["value"], "now I'm a string")
+        self.assertEqual(returned_again[1].library_data["foolib"]["data"]["volume"]["value"],
+                         "me too")
+
     def test_recorddao_insert_bad(self):
         """
         Test that the RecordDAO can still be used to query records after an
